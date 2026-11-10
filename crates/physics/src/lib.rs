@@ -4,6 +4,7 @@
 mod body_query;
 mod contacts;
 mod filter;
+mod heightfield;
 mod joint;
 mod mass;
 mod rules;
@@ -17,6 +18,7 @@ mod contacts_tests;
 
 pub use contacts::{ContactEvent, EventKind};
 pub use filter::{DEFAULT_DENSITY, ShapeMeta, function};
+pub use heightfield::Grid;
 pub use joint::{Joint, JointId, JointKind, Motor, MotorJoint, Parallel, Spring, Wheel};
 pub use mass::BodyMass;
 pub use rapier3d;

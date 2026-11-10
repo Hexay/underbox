@@ -10,6 +10,7 @@ mod body_mass;
 mod body_query;
 mod body_slots;
 mod events;
+mod heightfield;
 pub mod joint;
 mod joint_drive_slots;
 mod joint_slots;
@@ -32,6 +33,7 @@ pub fn register(r: &mut abi::Registry) {
     shape_slots::register(r);
     surfaces::register(r);
     triangulate::register(r);
+    heightfield::register(r);
     joint_slots::register(r);
     joint_drive_slots::register(r);
     aggregate_slots::register(r);

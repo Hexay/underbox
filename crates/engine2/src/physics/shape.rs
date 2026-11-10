@@ -17,6 +17,7 @@ pub enum Type {
     Capsule = 1,
     Hull = 2,
     Mesh = 3,
+    HeightField = 4,
 }
 
 /// managed's `PhysicsShapeCreationFlags`.

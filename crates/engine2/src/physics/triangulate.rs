@@ -36,6 +36,8 @@ fn triangles_of(shape: &dyn Parry, pose: &Pose, out: &mut Mesh) {
         c.to_trimesh(n)
     } else if let Some(h) = shape.as_convex_polyhedron() {
         h.to_trimesh()
+    } else if let Some(h) = shape.as_heightfield() {
+        h.to_trimesh()
     } else if let Some(m) = shape.as_trimesh() {
         (m.vertices().to_vec(), m.indices().to_vec())
     } else if let Some(c) = shape.as_compound() {

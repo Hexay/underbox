@@ -1,4 +1,5 @@
 use crate::filter::ShapeMeta;
+use crate::heightfield::Grid;
 use crate::world::World;
 use rapier3d::math::{Pose, Rotation, Vector};
 use rapier3d::prelude::{ActiveCollisionTypes, ActiveHooks, Collider, ColliderBuilder, ColliderHandle, RigidBodyHandle, SharedShape};
@@ -15,8 +16,10 @@ pub enum Shape {
     Cone { half_height: f32, radius: f32 },
     Hull { pose: Pose, points: Vec<Vector> },
     Mesh { vertices: Vec<Vector>, triangles: Vec<[u32; 3]> },
-    /// Several shapes as one, e.g. a whole body swept by a trace. Meshes are left out (parry
-    /// compounds can't nest them).
+    /// Terrain, in Rubikon's heightfield frame (see [`Grid`]).
+    HeightField(Grid),
+    /// Several shapes as one, e.g. a whole body swept by a trace. Meshes and heightfields are
+    /// left out (parry compounds can't nest them).
     Compound(Vec<Shape>),
 }
 
@@ -60,10 +63,14 @@ impl Shape {
             Shape::Mesh { vertices, triangles } => {
                 ColliderBuilder::new(SharedShape::trimesh(vertices.clone(), triangles.clone()).ok()?)
             }
+            Shape::HeightField(grid) => {
+                let (field, pose) = grid.shape();
+                ColliderBuilder::new(SharedShape::new(field)).position(pose)
+            }
             Shape::Compound(parts) => {
                 let parts: Vec<_> = parts
                     .iter()
-                    .filter(|p| !matches!(p, Shape::Mesh { .. } | Shape::Compound(_)))
+                    .filter(|p| !matches!(p, Shape::Mesh { .. } | Shape::HeightField(_) | Shape::Compound(_)))
                     .filter_map(|p| p.collider(surface).map(|b| b.build()))
                     .map(|c| (*c.position(), c.shared_shape().clone()))
                     .collect();
