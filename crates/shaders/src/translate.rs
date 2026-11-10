@@ -60,8 +60,16 @@ pub fn validate(module: &naga::Module) -> Result<ModuleInfo, String> {
     Validator::new(ValidationFlags::all(), capabilities()).validate(module).map_err(|e| chain(&e))
 }
 
-/// Translates a SPIR-V module (already specialized and stripped, see `spirv`).
+/// Translates a SPIR-V module (already specialized and stripped, see `spirv`). naga's SPIR-V
+/// frontend has `unreachable!`s that DXC output can reach, so a panic becomes an error too.
 pub fn spirv_to_wgsl(words: &[u32]) -> Result<Translated, Error> {
+    std::panic::catch_unwind(|| translate(words)).unwrap_or_else(|p| {
+        let msg = p.downcast_ref::<String>().cloned().or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()));
+        Err(Error { phase: Phase::SpvIn, message: format!("naga panicked: {}", msg.unwrap_or_default()) })
+    })
+}
+
+fn translate(words: &[u32]) -> Result<Translated, Error> {
     let fail = |phase, message| Error { phase, message };
     let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
     // HLSL positions are already in wgpu's (D3D-style) clip space; don't flip Y.

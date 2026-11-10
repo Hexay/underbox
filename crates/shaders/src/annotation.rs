@@ -16,6 +16,8 @@ pub struct Annotated {
     pub decl: String,
     /// `(key, args)` per item: `("Attribute", "\"TextureSize\"")`.
     pub items: Vec<(String, String)>,
+    /// For `SpecializedConstant()` globals: the Vulkan constant id the declaration now carries.
+    pub spec_id: Option<u32>,
 }
 
 impl Annotated {
@@ -24,21 +26,36 @@ impl Annotated {
     }
 }
 
-/// Removes annotations from comment-free `text`, keeping line structure.
+/// Removes annotations from comment-free `text`, keeping line structure. A global marked
+/// `SpecializedConstant()` becomes `[[vk::constant_id(n)]] const T name = Default;`, numbered
+/// in order, which `spirv::specialize` later bakes per combo.
 pub fn strip(text: &str, out: &mut Vec<Annotated>) -> String {
     let b = text.as_bytes();
     let mut res = b.to_vec();
     let mut i = 0;
+    let mut next_spec = 0;
     while let Some(n) = text[i..].find('<') {
         let lt = i + n;
         i = lt + 1;
         let Some((gt, items)) = parse_items(text, lt + 1) else { continue };
-        if b.get(skip_trivia(text, gt + 1)) != Some(&b';') {
+        let semi = skip_trivia(text, gt + 1);
+        if b.get(semi) != Some(&b';') {
             continue;
         }
-        let Some((name, decl)) = declared(text, lt) else { continue };
-        out.push(Annotated { name, decl, items });
+        let Some((name, decl, start)) = declared(text, lt) else { continue };
+        let mut a = Annotated { name, decl, items, spec_id: None };
         blank_bytes(&mut res[lt..=gt]);
+        if a.get("SpecializedConstant").is_some() {
+            let value = a.get("Default").filter(|d| !d.is_empty()).unwrap_or("0");
+            let new = format!("[[vk::constant_id({next_spec})]] const {} = {value};", a.decl);
+            if new.len() <= semi + 1 - start && !text[start..semi].contains('\n') {
+                blank_bytes(&mut res[start..=semi]);
+                res[start..start + new.len()].copy_from_slice(new.as_bytes());
+                a.spec_id = Some(next_spec);
+                next_spec += 1;
+            }
+        }
+        out.push(a);
         i = gt + 1;
     }
     String::from_utf8(res).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
@@ -75,8 +92,8 @@ fn parse_items(s: &str, start: usize) -> Option<(usize, Vec<(String, String)>)> 
 }
 
 /// The name declared just before the `<` at `lt`, skipping `: SEMANTIC` / `: register(...)` and
-/// `[N]`, plus the declaration text from the previous statement boundary.
-fn declared(s: &str, lt: usize) -> Option<(String, String)> {
+/// `[N]`, plus the declaration text from the previous statement boundary and where it starts.
+fn declared(s: &str, lt: usize) -> Option<(String, String, usize)> {
     let b = s.as_bytes();
     let start = s[..lt].rfind([';', '{', '}', '\n']).map_or(0, |p| p + 1);
     let head = s[start..lt].trim();
@@ -89,7 +106,7 @@ fn declared(s: &str, lt: usize) -> Option<(String, String)> {
         return None;
     }
     let decl = head.split_whitespace().collect::<Vec<_>>().join(" ");
-    Some((name.into(), decl))
+    Some((name.into(), decl, start))
 }
 
 #[cfg(test)]
@@ -115,5 +132,15 @@ mod tests {
         let kept: Vec<_> = out.lines().map(str::trim).collect();
         assert_eq!(kept[0].split_whitespace().collect::<Vec<_>>(), ["Texture2D<float4>", "t", ";"]);
         assert!(kept[4].contains("i < n") && kept[5].contains("p < q") && kept[6] == "RWTexture2D<float4> u;");
+    }
+
+    #[test]
+    fn specialized_constants_get_ids() {
+        let src = "int A < Attribute( \"A\" ); Default( 2 ); SpecializedConstant(); >;\nint B < Attribute(\"B\"); SpecializedConstant(); >;\n";
+        let mut found = Vec::new();
+        let out = strip(src, &mut found);
+        let lines: Vec<_> = out.lines().map(str::trim).collect();
+        assert_eq!(lines, ["[[vk::constant_id(0)]] const int A = 2;", "[[vk::constant_id(1)]] const int B = 0;"]);
+        assert_eq!(found.iter().map(|a| a.spec_id).collect::<Vec<_>>(), [Some(0), Some(1)]);
     }
 }

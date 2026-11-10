@@ -5,6 +5,7 @@ pub mod annotation;
 pub mod blocks;
 pub mod cache;
 pub mod combo;
+mod compat;
 pub mod compiler;
 pub mod decl;
 pub mod dxc;
@@ -18,7 +19,7 @@ pub mod translate;
 
 pub use cache::Cache;
 pub use combo::{Combo, ComboSet, INVALID_INDEX};
-pub use compiler::{CompiledStage, Compiler};
+pub use compiler::{CompiledStage, Compiler, Variant};
 pub use include::IncludePaths;
 pub use reflect::{Reflection, bind_group_layouts};
 pub use shader::{Program, Stage, VfxShader};
