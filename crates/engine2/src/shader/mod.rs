@@ -3,7 +3,7 @@
 //! translation pipeline agree. Compiling and `.shader_c` loading are not bound yet.
 
 use crate::bind_resource_handle;
-use crate::resource::{self, Resource};
+use crate::resource::{self, ByName, Resource};
 use abi::slots::{c_vfx as vfx, c_vfx_combo_iterator as it};
 use abi::{NativeRef, Registry, StrRet, bind, class};
 use shaders::{ComboSet, INVALID_INDEX, IncludePaths, Stage, VfxShader};
@@ -13,7 +13,36 @@ use std::sync::{Arc, Mutex, RwLock};
 
 pub struct Vfx {
     name: String,
+    /// Set for shaders loaded by resource path (`GetShader`): what `GetFilename` answers.
+    resource: Option<String>,
     shader: RwLock<Option<Arc<VfxShader>>>,
+}
+
+static LOADED: ByName<Vfx> = ByName::new();
+
+/// `shaders/x.shader` for `x`, `x.shader`, `x.shader_c` or `shaders/x.shader_c`.
+fn resource_path(path: &str) -> String {
+    let p = path.replace('\\', "/");
+    let p = p.trim_start_matches('/');
+    let p = p.strip_suffix("_c").unwrap_or(p);
+    let p = p.strip_suffix(".shader").unwrap_or(p);
+    let dir = if p.to_ascii_lowercase().starts_with("shaders/") { "" } else { "shaders/" };
+    format!("{dir}{p}.shader")
+}
+
+/// The shader at a resource path, parsed once; `None` when its source isn't on disk (closed core
+/// shaders such as `complex`) or doesn't parse.
+pub fn find(path: &str) -> Option<Arc<VfxShader>> {
+    by_path(path).shader.read().unwrap().clone()
+}
+
+fn by_path(path: &str) -> Arc<Vfx> {
+    let path = resource_path(path);
+    LOADED.find_or_insert(&path, || {
+        let v = Vfx { name: path.clone(), resource: Some(path.clone()), shader: RwLock::new(None) };
+        load(&v, &path);
+        v
+    })
 }
 
 impl Resource for Vfx {
@@ -87,14 +116,16 @@ mod tests;
 pub fn register(r: &mut Registry) {
     bind_resource_handle!(r, abi::slots::c_vfx, Vfx);
     bind!(r, vfx::CREATE, |name| {
-        resource::new_handle(Arc::new(Vfx { name: string(name), shader: RwLock::new(None) }))
+        resource::new_handle(Arc::new(Vfx { name: string(name), resource: None, shader: RwLock::new(None) }))
     });
+    bind!(r, abi::slots::glue_resources::GET_SHADER, |path, _guid| resource::new_handle(by_path(&string(path))));
     bind!(r, vfx::CREATE_FROM_SHADER_FILE, |h, path, _target, _flags| {
         resource::resolve::<_, Vfx>(h).is_some_and(|v| load(&v, &string(path)))
     });
     bind!(r, vfx::GET_FILENAME, |h| {
-        let path = shader(h).map(|s| s.path.to_string_lossy().into_owned());
-        StrRet::from(path.or_else(|| resource::resolve::<_, Vfx>(h).map(|v| v.name.clone())).unwrap_or_default())
+        let v = resource::resolve::<_, Vfx>(h);
+        let file = || shader(h).map(|s| s.path.to_string_lossy().into_owned());
+        StrRet::from(v.as_ref().and_then(|v| v.resource.clone()).or_else(file).or_else(|| v.map(|v| v.name.clone())).unwrap_or_default())
     });
     bind!(r, vfx::HAS_SHADER_PROGRAM, |h, program| {
         shader(h).is_some_and(|s| stage(program).is_some_and(|st| s.program_for(st).is_some()))

@@ -53,15 +53,19 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, global::APP_IS_DEDICATED_SERVER, || dict::current_config().dedicated_server);
     bind!(r, global::SOURCE_ENGINE_UNIT_TEST_INIT, || true);
-    // TODO: the startup window belongs to the window subsystem; managed only asks with a game window.
-    bind!(r, global::SOURCE_ENGINE_INIT_STARTUP_WINDOW, |_| false);
+    // Managed asks only with a game window, then creates the window itself through globalSdl; we
+    // only need video up (SDL's offscreen driver when headless, which renders offscreen).
+    bind!(r, global::SOURCE_ENGINE_INIT_STARTUP_WINDOW, |_| window::video::ensure());
     bind!(r, global::SOURCE_ENGINE_PRE_INIT, |cmd, _app| {
         *COMMAND_LINE.write().unwrap() = string(cmd);
         true
     });
     bind!(r, global::SOURCE_ENGINE_INIT, |_| true);
-    // False asks managed's EngineLoop to quit. TODO: a client draws here (EngineLoop.OnClientOutput).
-    bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| true);
+    // False asks managed's EngineLoop to quit. A client renders and presents its frame here.
+    bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| {
+        crate::render::game_window::frame();
+        true
+    });
     bind!(r, global::SOURCE_ENGINE_SHUTDOWN, |_, _| SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::Relaxed));
 }
 

@@ -28,15 +28,33 @@ crates/render            wgpu, no abi: usable from tests and tools
   gpu.rs                 Gpu: instance, adapter, device, queue; Gpu::headless()
   texture.rs             Texture/TextureDesc: create, upload, clear, read_back -> Frame
   buffer.rs              Buffer/BufferKind: write, fill, copy_to, read
-  program.rs             Program: WGSL module + bind-group layouts + pipelines per target format
+  program.rs, state.rs   Program (one module or per-stage Stages) + pipelines cached by PipelineKey
+                         (target formats, vertex buffers, raster/depth/blend state)
+  placeholder.rs/.wgsl   the stand-in shader: position, optional color/normal (stride-0 defaults)
+  pass.rs                execute(targets, load, draws): one render pass of MeshDraws
   mesh.rs, forward.rs    placeholder vertex layout; ForwardPass, Camera, DrawItem
+  surface.rs             Surface on a SurfaceTarget or raw SDL handles; present = copy + present
   frame.rs               Frame: hash, compare with tolerance, golden hashes, PPM dump
 crates/engine2/src/render   slots only; state lives in the objects/handle tables
   device.rs              device ownership, GetRenderDeviceAPI, flush/caps slots
   texture.rs, formats.rs CTextureBase: CPU copy + optional GPU texture; ImageFormat -> wgpu
   context.rs             IRenderContext: bound targets, viewport, scissor, attributes; clears
   buffers.rs             RenderBufferHandle_t table; RenderTools buffer upload/fill/copy
-  attributes, material, vfx, image, stats   (pre-M2 stand-ins, unchanged)
+  swap_chain.rs, frames.rs   swap chains (surface or offscreen); UNDERBOX_FRAMES capture
+  readback.rs            ReadTexturePixels sync/async, async buffer reads
+  draw/                  gpu_mesh (MeshGlue upload by version), model (CModel -> draws),
+                         immediate (SetRenderState/Draw*, context Draw*, DrawModel)
+  scene/                 camera (CCameraRenderer), view, layer, setup (+RenderPipelineTools),
+                         execute (layers -> draws), system (g_pSceneSystem frame slots)
+  game_window.rs         GameWindowGlue attach; the client frame SourceEngineFrame runs
+                         (managed OnClientOutput, then GameWindow.Present)
+  shading/               material programs: program (translate Vs/Ps, layouts, uniform blocks,
+                         vfx attributes), cache per (shader, combo) in mod.rs, vertex (shader
+                         inputs <- mesh layout, defaults/instance slots), view (PerViewConstant
+                         Buffer_t), layout (uniform block fill from naga), bind (bind groups by
+                         reflected name), defaults (1x1 textures, samplers). Not yet used by draws.
+  tools.rs               the remaining RenderTools/IRenderContext/g_pRenderDevice slots
+  attributes, material, vfx, image, stats   (pre-M2 stand-ins)
 ```
 
 ## Device ownership
@@ -51,29 +69,39 @@ One `render::Gpu` per process, in a `OnceLock` in `engine2/src/render/device.rs`
   server behaviour instead of failing.
 - Every other slot calls `device::gpu()`, which never creates: without a device textures stay CPU
   copies, buffer creation returns the null handle, clears are no-ops.
-- The device is surfaceless (`Gpu::headless`). Swap chains will add a `wgpu::Surface` per SDL window
-  from the same instance; offscreen rendering does not change.
+- The device is surfaceless (`Gpu::headless`). A swap chain adds a `wgpu::Surface` on its SDL
+  window from the same instance when `window::handle::native` gives handles; otherwise (SDL's
+  offscreen driver, no window) it is two offscreen targets. Views always render into the swap
+  chain's colour/depth textures; `Present` copies colour into the surface image.
 
 ## From scene objects to draw calls
 
 The scene system already keeps worlds and objects (`engine2/src/scene`). Drawing follows the
 native model one to one, so managed's pipeline code runs unchanged:
 
-1. `CCameraRenderer::Render(swapChain)` / `RenderToTexture` creates an `ISceneView` for the camera
-   and calls managed `NativeRenderPipeline.AddLayersToView`, which adds `ISceneLayer`s (depth
-   prepass, opaque, translucent, post, UI) with their targets, viewport and shader mode.
-2. `FinishRenderingViews` executes views in dependency order. For each layer: bind its targets on
-   an `IRenderContext`, call back `Graphics.OnLayer` for managed hooks, then draw the layer's
-   visible objects (world objects filtered by the camera's tags and frustum).
-3. A scene object becomes draw calls through its model: each mesh draw call is (vertex/index
-   buffer range, material, attributes). The material resolves to a `Program` for the layer's
-   shader mode plus the object's combo values; per-object data (transform, tint, lighting) goes
-   into a dynamic uniform slice, as `ForwardPass` does with its per-draw MVP + tint today.
-4. `RenderTools.DrawModel`, `SetRenderState` + `Draw*` and `DrawSceneObject` are the same path entered
-   from managed with explicit state.
+1. `CCameraRenderer::Render(swapChain)` / `RenderToTexture` builds a `Camera` from the generated
+   fields managed set in `Configure` (position, angles, horizontal FOV, near/far, normalised
+   viewport, ortho size per pixel, clip-space bounds, override projection, flips), creates an
+   `ISceneView` and a `CRenderPipelineSetup`, and calls managed `AddLayersToView` (callback 34)
+   when the renderer has a managed camera id. Afterwards it writes `RenderedProjectionToView`,
+   `RenderedViewport` and `RenderedDepthRange`.
+2. No layers added (no managed pipeline, as in tests) → `execute::default_layers`: clear
+   (`clearColor`/`clearFlags` attributes), sky, opaque.
+3. The view runs immediately (`execute::run`), layer by layer on one context: Clear → load ops;
+   Render → the worlds' objects that pass tags, layer match id and required/excluded flags (a model
+   counts as `IsOpaque`); depth prepass, light binner setup and translucent model draws are
+   skipped under the placeholder; managed objects call back `RenderObject` (47); Procedural →
+   managed's `void(ManagedRenderSetup_t)` pointer; Blit → texture copy. Then
+   `OnSceneViewSubmitted` (36).
+4. A model becomes one `Draw` per mesh draw call (LOD 0, enabled mesh groups): MeshGlue buffers
+   upload by version (`draw/gpu_mesh.rs`), the mesh layout maps position/normal/color onto the
+   placeholder, per-draw MVP/model/tint go into a dynamic uniform slice.
+5. `RenderTools.DrawModel`, `SetRenderState` + `Draw*`, `DrawSceneObject`, `DrawSkyBox` are the same
+   path entered from managed with explicit state.
 
-Contexts execute eagerly on the queue (see context.rs). Display lists and multi-threaded
-recording can come later without changing slot behaviour.
+Contexts and views execute eagerly on the queue, so `Begin/FinishRenderingViews` only bracket the
+frame (Finish prunes dead GPU meshes) and async readbacks complete inside the call. Display lists
+and multi-threaded recording can come later without changing slot behaviour.
 
 ## Shaders
 
@@ -81,12 +109,17 @@ Placeholder WGSL (`crates/render/src/placeholder.wgsl`) until the translation pi
 (research/shaders.md: `.shader_c` stores SPIR-V per combo; we compile the core `.shader` sources
 HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is `render::Program`:
 
-- `Program::new(gpu, label, wgsl, bind_group_layouts, entries)` takes any WGSL module with layouts
-  built by the caller. The translator produces one `Program` per (shader, static combo, dynamic
-  combo) with layouts from naga reflection; spec constants are baked in before naga, so each
-  combo is its own module.
-- Pipelines are cached per `Program` and target format. The key grows to include vertex layout,
-  blend/depth/raster state and sample count as materials need them.
+- `Program::new(gpu, label, wgsl, bind_group_layouts, entries)` takes one WGSL module;
+  `Program::from_stages(gpu, label, vertex: Stage, fragment: Option<Stage>, layouts)` takes the
+  translator's separate vertex and pixel modules. One `Program` per (shader, static combo, dynamic
+  combo); spec constants are baked in before naga, so each combo is its own module.
+- Bind by name from reflection, never by binding number: the SPIR-V passes renumber (bindless
+  arrays move off set 1 binding 16; a texture sampled both ways gains `<name>_cmp`).
+- Pipelines are cached per `Program` and `PipelineKey` (target formats, vertex buffer layouts,
+  raster/depth/blend state). Sample count joins the key with MSAA.
+- The builtin headers in `crates/shaders/hlsl/builtin/` (instancing, vertex decompression, morph,
+  light probe, lightmap, fog) define buffer layouts the renderer must fill; several are stubs.
+- `isnan(x)` is lowered to `x != x`: never enable fast-math in the backend.
 - Expect naga to reject some DXC output (bindless arrays, `OpSpecConstantOp`, push constants);
   those combos should fall back to the placeholder with a logged warning, never a crash.
 
@@ -104,8 +137,15 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
      `UNDERBOX_BLESS=1 cargo test -p render -- --test-threads=1` records. A failing frame is
      written as PPM under `CARGO_TARGET_TMPDIR`.
 - engine2's `render/context_tests.rs` drives the slots themselves (create texture, bind, clear,
-  read back; GPU buffer upload, copy, read).
-- The corpus will reuse `Frame` for client frame hashes once a client boots.
+  read back; GPU buffer upload, copy, read); `render/readback_tests.rs` the pixel reads.
+- `render/scene/tests.rs` is the headless client frame without managed: a world with the stand-in
+  cube and a sky, a `CCameraRenderer` configured through its fields, rendered to an offscreen swap
+  chain with the default layers, presented, read back. It asserts sky/cube pixels, depth (cube
+  < 1, sky = 1) and determinism, and checks `crates/engine2/tests/golden/frames.tsv`
+  (`UNDERBOX_BLESS=1 sh tools/test.sh engine2 camera_draws` records).
+- A booted client logs or dumps presented frames: `UNDERBOX_FRAMES=log` prints
+  `frame: <swap chain> #<n> <w>x<h> <blake3>`, a directory writes PPMs;
+  `UNDERBOX_FRAMES_EVERY=n` samples.
 
 ## Windows and input (SDL)
 
@@ -171,7 +211,7 @@ SDL, not us, owns the platform layer; both match how native engine2 shipped.
   ones). Wayland is compiled in when its dev packages are present.
 - Not yet: Windows-only extensions (OLE drag and drop, taskbar overlay, DWM chrome) are accepted
   no-ops or report "unsupported"; macOS native handles. `EngineGlobal.SourceEngineInitStartupWindow`
-  (app/platform.rs) still answers false, which a windowed client needs to be true.
+  (app/platform.rs) brings video up (`video::ensure`); managed then creates its windows itself.
 
 Tests without a display (`tools/test.sh window`): layouts of every managed SDL mirror against
 SDL3, event ids and flags; key, scancode and name tables; events pushed through SDL into managed's
@@ -180,9 +220,17 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. Swap chains: `CreateSwapChain`/`Present` on an offscreen texture when there is no window, so a
-   client boots headless and every frame can be hashed.
-2. `ReadTexturePixels` (device and async context) through `Texture::read_back`.
-3. Vertex/index buffers (`MeshGlue`) and `RenderTools.SetRenderState` + `Draw*` on the placeholder
-   program; then `DrawModel` from `CModel` meshes.
-4. `ISceneView`/`ISceneLayer`/`CCameraRenderer` view execution as above, then the corpus drawn.
+1. Client boot (`tools/boot-client.sh`) reaches presented frames on orbmatch; its scene has no
+   camera or renderers, so every frame is black. Add a corpus scene with a camera and dev models
+   (`models/dev/box.vmdl`) and record its frame hashes as a golden test.
+2. Materials: `shading/` builds and binds scene_renderer_mesh on a real device
+   (`shading/tests.rs`). Wire it into draws: `MeshDraw.shaded` (`render::pass::Shaded`) from the
+   draw call's material (shader path, params snapshot), the view's matrices and instance
+   transforms, placeholder on failure. Combos are always 0/0 (TODO). Core material shaders
+   (complex, generic, unlit, ...) ship without source, so most vmats need a stand-in mapping to a
+   shader we can compile. Then `BindTexture` and `SetConstantBufferData` (still no-ops).
+3. `Sandbox.SceneRenderer` (managed's own renderer: `SceneMirror`, `RenderContext.cs`) reads native
+   per-object draws (`GetSceneObjectDraw`, bound) and draws with `DrawModelDrawCall` (answers
+   false): implement once materials bind.
+4. Translucent and depth-prepass layers, shadows (`AddShadowView` returns null), MSAA, cube and
+   stereo renders, GPU timestamps, mip generation, scaled blits.

@@ -4,6 +4,7 @@
 | --- | --- |
 | Unit tests | `tools/test.sh <crate> [test-filter]`: failures and totals only, exits with cargo's status |
 | Boot the server | `tools/boot-server.sh [max-s] [sbox-public]` |
+| Boot the client | `tools/boot-client.sh [max-s] [sbox-public] [-- args]` (headless, logs frame hashes to `target/client/frames.tsv`) |
 | Scripted match | `tools/match.sh` (stops at `MATCH:END`) |
 | Net probe | `tools/net-probe.sh` |
 | Shared-build lock | `tools/boot-lock.sh <cmd...>` (only for scripts that write `sbox-public/game`) |
@@ -22,7 +23,7 @@
 
 ## Game dirs
 
-`sbox-public/game` holds the shared managed build: `game-dir.sh` builds sbox-server there and
+`sbox-public/game` holds the shared managed build: `game-dir.sh` builds the server or client launcher there and
 ReadyToRun-compiles `game/bin/managed` (`tools/r2r-managed.sh`), both under the boot lock. Each
 worktree then boots in its own reflinked copy, `/srv/agents/cache/underbox-game/<worktree>-<hash>`,
 re-copied (about 0.5 s, no extra disk; `logs/` is skipped) when a managed dll or `.underbox-*`
@@ -30,7 +31,8 @@ stamp in the shared dir is newer than the copy. With nothing to do, no lock is t
 deleted any time. Ports come from `tools/worktree-port.sh`, so servers don't collide either.
 
 A script that changes the shared build (a dotnet build into `game/`) runs under `boot-lock.sh`;
-copies pick the change up on their next boot.
+copies pick the change up on their next boot. One boot per worktree at a time: a re-copy swaps
+the directory under a running one.
 
 ## Incremental
 

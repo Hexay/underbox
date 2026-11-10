@@ -14,6 +14,11 @@ pub unsafe fn set_table(table: *const usize) {
     let _ = TABLE.set(copy);
 }
 
+/// Whether managed handed over callback `index` (false in unit tests and before `igen_engine`).
+pub fn is_set(index: usize) -> bool {
+    TABLE.get().is_some_and(|t| t.get(index).is_some_and(|p| *p != 0))
+}
+
 /// Callback `index` as the signature `F`.
 ///
 /// # Safety

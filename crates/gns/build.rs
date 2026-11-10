@@ -32,6 +32,14 @@ fn main() {
             .define("MSVC_CRT_STATIC", "OFF")
             // Default OFF defines PROTOBUF_USE_DLLS, so every protobuf symbol would be a dllimport.
             .define("Protobuf_USE_STATIC_LIBS", "ON");
+        // Generated .pb.cc must come from the protoc matching the linked libprotobuf; a runner's PATH
+        // protoc of another version leaves symbols (e.g. memswap<16>) unresolved.
+        let protoc = ["x64-windows-static-md", "x64-windows"]
+            .map(|t| vcpkg.join(format!("installed/{t}/tools/protobuf/protoc.exe")))
+            .into_iter()
+            .find(|p| p.exists())
+            .expect("vcpkg protoc.exe (vcpkg install protobuf)");
+        cfg.define("Protobuf_PROTOC_EXECUTABLE", &protoc);
         let libs = vcpkg.join("installed/x64-windows-static-md/lib");
         println!("cargo:rustc-link-search=native={}", libs.display());
         // Modern protobuf depends on Abseil and utf8_range, split across many static libs.
