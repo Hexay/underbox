@@ -9,6 +9,7 @@ pub mod containers;
 pub mod fs;
 pub mod handles;
 pub mod math;
+pub mod mesh;
 pub mod model;
 mod igen;
 mod interfaces;

@@ -85,7 +85,12 @@ pub fn set_motion_locks(rb: &mut RigidBody, locks: [bool; 6]) {
 }
 
 pub fn create(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &PhysicsBodySettings) -> HandleId<class::IPhysicsBody> {
-    let Some(world) = world::get(world_ref) else { return HandleId::new(-1) };
+    spawn(world_ref, kind, pose, settings).and_then(get).map_or(HandleId::new(-1), |b| b.handle.id())
+}
+
+/// As [`create`], answering the body itself.
+pub fn spawn(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &PhysicsBodySettings) -> Option<Ref> {
+    let world = world::get(world_ref)?;
     let id = {
         let mut sim = world.sim.lock().unwrap();
         let id = sim.add_body(kind, pose);
@@ -121,7 +126,8 @@ pub fn create(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &Phys
     with_rb(r, |rb| rb.user_data = r.addr() as u128);
     apply_state(r);
     // Registered with the world unlocked: managed's RegisterHandle may call straight back in.
-    body.handle.register(r, Kind::PhysicsBody)
+    body.handle.register::<_, class::IPhysicsBody>(r, Kind::PhysicsBody);
+    Some(r)
 }
 
 /// Remove a body, its shapes, its joints and its managed handles.

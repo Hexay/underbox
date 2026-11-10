@@ -30,6 +30,20 @@ pub fn to_rot(r: Rotation) -> physics::Rotation {
     if q.length_squared() > 0.0 { q.normalize() } else { physics::Rotation::IDENTITY }
 }
 
+pub fn v3(v: Vector3) -> glam::Vec3 {
+    glam::Vec3::new(v.vec.x, v.vec.y, v.vec.z)
+}
+
+pub fn from_v3(v: glam::Vec3) -> Vector3 {
+    vec3(v.x, v.y, v.z)
+}
+
+/// Normalised, identity for a zeroed rotation (as [`to_rot`]).
+pub fn quat(r: Rotation) -> glam::Quat {
+    let q = glam::Quat::from_xyzw(r.quat.x, r.quat.y, r.quat.z, r.quat.w);
+    if q.length_squared() > 0.0 { q.normalize() } else { glam::Quat::IDENTITY }
+}
+
 pub fn from_rot(q: physics::Rotation) -> Rotation {
     Rotation { quat: Quaternion { x: q.x, y: q.y, z: q.z, w: q.w } }
 }

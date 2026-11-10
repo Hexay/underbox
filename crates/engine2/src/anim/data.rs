@@ -49,6 +49,12 @@ pub fn of(model: NativeRef<class::CModel>) -> Arc<ModelData> {
     crate::model::name(model).map_or_else(|| ModelData::new(ModelAnim::default()), |n| by_name(&n))
 }
 
+/// The first loaded model with a clip named `clip`, and its name.
+pub fn find_clip(clip: &str) -> Option<(String, Arc<ModelData>)> {
+    let models = MODELS.lock().unwrap();
+    models.iter().find(|(_, d)| d.anim.clip(clip).is_some()).map(|(n, d)| (n.clone(), d.clone()))
+}
+
 /// Register a runtime model's data (replacing any earlier model of that name).
 pub fn insert(name: &str, anim: ModelAnim) {
     MODELS.lock().unwrap().insert(name.to_ascii_lowercase(), ModelData::new(anim));
