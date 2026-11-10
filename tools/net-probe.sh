@@ -7,21 +7,22 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 HOLD=${1:-5}
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 OUT=$ROOT/target/net-probe
-PORT=27115
+PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" 1)}
 mkdir -p "$OUT"
-cargo build -q --manifest-path "$ROOT/Cargo.toml" -p gns --example probe -j4
+# see docs/dev-loop.md (incremental)
+env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p gns --example probe -j4
 
 : > "$OUT/server.log"
-OUT=$OUT flock -o /srv/agents/cache/underbox-boot.lock sh "$ROOT/tools/boot-server.sh" $((HOLD + 60)) "$SBOX" -- \
+OUT=$OUT sh "$ROOT/tools/boot-server.sh" $((HOLD + 60)) "$SBOX" -- \
     +game "$ROOT/corpus/nethost/.sbproj" +port $PORT > /dev/null 2>&1 &
 BOOT=$!
-# Generous: includes waiting for another worktree's boot to release the lock.
-deadline=$(( $(date +%s) + 300 ))
+# Generous: covers a wait for the shared-build lock (tools/boot-lock.sh) and a dotnet rebuild.
+deadline=$(( $(date +%s) + 720 ))
 until grep -q 'Server started' "$OUT/server.log" 2>/dev/null; do
     [ "$(date +%s)" -lt "$deadline" ] || { echo "server never started"; break; }
     sleep 1
 done
-cargo run -q --manifest-path "$ROOT/Cargo.toml" -p gns --example probe -- "127.0.0.1:$PORT" "$HOLD" > "$OUT/probe.log" 2>&1 || true
+env -u CARGO_INCREMENTAL cargo run -q --manifest-path "$ROOT/Cargo.toml" -p gns --example probe -- "127.0.0.1:$PORT" "$HOLD" > "$OUT/probe.log" 2>&1 || true
 pkill -TERM -f "sbox-server.dll .*[+]port $PORT" 2>/dev/null || true
 wait $BOOT || true
 

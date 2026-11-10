@@ -4,6 +4,7 @@
 # Stops GRACE (default 2) seconds after a log line matches UNTIL, else at max-seconds. UNTIL defaults
 # to 'Server is idle' for a plain boot and to none (run to max-seconds) when server args are given.
 # Log: $OUT/server.log (default target/boot). Each stub slot logs once, on its first call.
+# Runs in this worktree's private game dir (tools/game-dir.sh); no lock needed around it.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 SECS=${1:-60}
@@ -13,7 +14,7 @@ shift $(( $# > 2 ? 2 : $# ))
 [ $# -eq 0 ] && UNTIL=${UNTIL-Server is idle}
 UNTIL=${UNTIL:-}
 GRACE=${GRACE:-2}
-# Close an inherited boot-lock fd (flock keeps the lock) so lingering children can't hold it.
+# Close an inherited boot-lock fd (from a raw `flock <lock> ...` caller) so lingering children can't hold it.
 for fd in /proc/$$/fd/[3-9]; do
     case $(readlink "$fd" 2>/dev/null) in *underbox-boot.lock) eval "exec ${fd##*/}>&-" ;; esac
 done
@@ -22,26 +23,17 @@ mkdir -p "$OUT"
 t0=$(date +%s.%N)
 lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
-sh "$ROOT/tools/prepare-sbox.sh" "$SBOX"
-# Rebuild when missing or when prepare-sbox.sh added EmbeddedRefs after the last build.
-# A stamp, not the dll's mtime: an up-to-date build copies the dll back with its old mtime.
-STAMP="$SBOX/game/.underbox-server-built"
-if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/EmbeddedRefs" -nt "$STAMP" ]; then
-    echo "== building sbox-server (~2 min)"
-    # The icon isn't in the public repo; an empty property skips it without patching their csproj.
-    dotnet build "$SBOX/engine/Launcher/SboxServer/Sbox-Server.csproj" -c Release -m:4 -nodeReuse:false -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
-    touch "$STAMP"
-fi
-sh "$ROOT/tools/r2r-managed.sh" "$SBOX"
+sh "$ROOT/tools/submodules.sh"
+GAME=$(sh "$ROOT/tools/game-dir.sh" "$SBOX")
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
 # see docs/dev-loop.md (incremental)
 env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
-NATIVE="$SBOX/game/bin/linuxsteamrt64"
+NATIVE="$GAME/bin/linuxsteamrt64"
 mkdir -p "$NATIVE"
 # Rename, not overwrite: a server still mapping the old file would crash on an in-place rewrite.
-cp "${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so" "$NATIVE/.libengine2.so.$$"
+cp --reflink=auto "${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so" "$NATIVE/.libengine2.so.$$"
 mv -f "$NATIVE/.libengine2.so.$$" "$NATIVE/libengine2.so"
 # Managed loads these modules by name for their CreateInterface; they're all engine2, and the
 # loader dedupes symlinks by inode so they share its state. TODO(windows): needs forwarder DLLs.
@@ -51,7 +43,7 @@ for m in vfx_vulkan filesystem_stdio; do ln -sf libengine2.so "$NATIVE/lib$m.so"
 sh "$ROOT/tools/nuget-file.sh" SkiaSharp.NativeAssets.Linux 3.116.0 runtimes/linux-x64/native/libSkiaSharp.so \
     "$NATIVE/libSkiaSharp.so"
 
-cd "$SBOX/game"
+cd "$GAME"
 # TERM, not INT: a `&` background sh job inherits SIGINT ignored, and .NET then never hooks it.
 timeout -s TERM -k 10 "$SECS" dotnet sbox-server.dll "$@" > "$OUT/server.log" 2>&1 &
 SERVER=$!
