@@ -3,11 +3,11 @@
 //! and bindless ids, and the GPU features the placeholder renderer doesn't have (compute, ray
 //! tracing, skinning, morphs, lightmaps), which answer "none" so managed skips them.
 
-use crate::render::draw::{immediate, model as model_draw};
+use crate::render::draw::{self, immediate, model as model_draw};
 use crate::render::{context, device, texture};
 use crate::scene::object;
 use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools as tools};
-use abi::structs::{NativeRect, Vector3, Vector4};
+use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
 use abi::{NativeRef, PtrHandle, RawPtr, Registry, bind, class};
 use std::collections::HashMap;
 use std::ffi::c_void;
@@ -34,6 +34,14 @@ fn copy_texture(src: texture::Ref, dst: texture::Ref, r: NativeRect, dx: i32, dy
     let r = rect(r).filter(|r| r[2] > 0 && r[3] > 0).unwrap_or([0, 0, a.desc.width, a.desc.height]);
     // TODO: mip and array slices (always 0 here).
     a.copy_to(gpu, b, r, (dx.max(0) as u32, dy.max(0) as u32));
+}
+
+/// `BlitTexture`: all of `src` into `viewport` of the bound colour target, scaled and converted
+/// (managed's HDR-to-swap-chain copy).
+fn blit_texture(c: context::Ref, src: texture::Ref, viewport: RenderViewport) -> bool {
+    let (Some(s), Some(d)) = (texture::resolve(src), texture::resolve(context::target(c).color)) else { return false };
+    let (Some(a), Some(b)) = (s.gpu.as_ref(), d.gpu.as_ref()) else { return false };
+    draw::blit(a, [0, 0, a.desc.width, a.desc.height], b, draw::viewport_rect(b, &viewport))
 }
 
 /// `GetSceneObjectDraw`: the `index`th draw call over the object's model meshes (LOD 0, enabled
@@ -72,26 +80,6 @@ fn draw_sky_box(c: context::Ref, tint: Vector4) -> bool {
     let Some(d) = crate::render::scene::execute::sky(model_draw::tint(tint)) else { return false };
     immediate::submit(c, &[d]);
     true
-}
-
-/// Allocations managed asked for with `CreateConstantBuffer`, by address, with their layouts.
-static CONSTANT_BUFFERS: LazyLock<Mutex<HashMap<usize, std::alloc::Layout>>> = LazyLock::new(Default::default);
-
-fn create_constant_buffer(size: i32) -> RawPtr<c_void> {
-    let Ok(layout) = std::alloc::Layout::from_size_align(size.max(1) as usize, 16) else { return RawPtr::NULL };
-    // SAFETY: layout has a nonzero size.
-    let p = unsafe { std::alloc::alloc_zeroed(layout) };
-    if !p.is_null() {
-        CONSTANT_BUFFERS.lock().unwrap().insert(p as usize, layout);
-    }
-    RawPtr::from_raw(p.cast())
-}
-
-fn destroy_constant_buffer(p: RawPtr<c_void>) {
-    if let Some(layout) = CONSTANT_BUFFERS.lock().unwrap().remove(&(p.as_ptr() as usize)) {
-        // SAFETY: allocated by create_constant_buffer with this layout.
-        unsafe { std::alloc::dealloc(p.as_ptr().cast(), layout) };
-    }
 }
 
 /// Managed's material-bind block (zeroed by managed): full and similar-material bind counts.
@@ -153,12 +141,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::MAKE_FRAME_BUFFER_COPY, |c, t, x, y, w, h| {
         copy_from_target(c, t, Some([x.max(0) as u32, y.max(0) as u32, w.max(0) as u32, h.max(0) as u32]), false);
     });
-    // TODO: a scaled blit (and the sRGB transfer) needs a draw; same-size copies only for now.
-    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, _srgb| {
-        let t = context::target(c);
-        copy_texture(src, t.color, NativeRect { x: 0, y: 0, w, h }, x, y);
-        true
-    });
+    // TODO: the sRGB transfer flag; the blit draw writes linear values as they are.
+    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, _srgb| blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }));
     bind!(r, tools::COPY_TEXTURE, |_, src, dst, r, dx, dy, _, _, _, _| copy_texture(src, dst, r, dx, dy));
     bind!(r, tools::DRAW_SKY_BOX, |c, _attrs, _mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
@@ -181,22 +165,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::RESET_MATERIAL_BIND, |_| {});
     bind!(r, tools::GET_MATERIAL_BIND_COUNTS, material_bind_counts);
     bind!(r, tools::GET_MATERIAL_SIMILARITY_KEY, |m| m.addr() as u64);
-    bind!(r, tools::CREATE_CONSTANT_BUFFER, create_constant_buffer);
-    bind!(r, tools::DESTROY_CONSTANT_BUFFER, destroy_constant_buffer);
-    // TODO: constant buffers, shaders and textures bind once materials run translated shaders.
-    bind!(r, tools::SET_CONSTANT_BUFFER_DATA, |_, _, _, _, _, _| {});
-    bind!(r, tools::SET_DYNAMIC_CONSTANT_BUFFER_DATA, |_, _, _, _, _| {});
-    bind!(r, ctx::SET_DYNAMIC_CONSTANT_BUFFER_DATA, |_, _, _, _, _| {});
-    bind!(r, ctx::BIND_VERTEX_SHADER, |_, _, _| {});
-    bind!(r, ctx::BIND_PIXEL_SHADER, |_, _| {});
-    bind!(r, ctx::BIND_TEXTURE, |_, _, _| {});
     // Model draw calls through managed's material system; without it these draw nothing.
     bind!(r, tools::BIND_MODEL_DRAW_CALL, |_, _, _, _, _| false);
     bind!(r, tools::BIND_MODEL_DRAW_CALL_VERTEX_IDS, |_, _, _, _, _| false);
     bind!(r, tools::SET_RENDER_STATE_FOR_MODEL_DRAW_CALL, |_, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL_INDIRECT, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL_MULTI_INDIRECT, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
     // No skinning, morphs, compute, ray tracing or auto exposure on the placeholder renderer.
     bind!(r, tools::GET_MODEL_MESH_SKINNING, |_, _, _, _| -1);
     bind!(r, tools::GET_MODEL_MESH_SKINNING_BONES, |_, _, _, _, _| false);

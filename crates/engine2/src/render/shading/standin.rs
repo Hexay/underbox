@@ -22,6 +22,12 @@ const MAPPED: &[(&str, bool)] = &[
     ("tools_solid", false),
     ("unlit", true),
     ("tools_textured_unlit", true),
+    ("tools_sprite", true),
+    ("tools_wireframe", true),
+    ("tools_2d_generic", true),
+    ("ui", true),
+    // TODO: a cube-sampling sky program; the stand-in draws its tint flat (SkyTexture is a cube).
+    ("sky", true),
 ];
 
 fn stem(shader_path: &str) -> &str {

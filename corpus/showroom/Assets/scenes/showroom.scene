@@ -14,8 +14,43 @@
           "FogMode": "Enabled",
           "FogStrength": 1,
           "LightColor": "1,0.97,0.9,1",
-          "Shadows": false,
+          "Shadows": true,
           "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "6a3b2c5d-8b7e-4e36-9ca9-2f3e4d5c6b7a",
+      "Flags": 0,
+      "Name": "Lamp",
+      "Position": "10,-50,45",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.PointLight",
+          "__guid": "7b4c3d6e-9c8f-4f47-8dba-3a4f5e6d7c8b",
+          "LightColor": "1,0.45,0.15,1",
+          "Radius": 160,
+          "Shadows": false
+        }
+      ]
+    },
+    {
+      "__guid": "8c5d4e7f-0d9a-4a58-9ecb-4b5a6f7e8d9c",
+      "Flags": 0,
+      "Name": "Spot",
+      "Position": "40,90,220",
+      "Rotation": "0,0.7071068,0,0.7071068",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.SpotLight",
+          "__guid": "9d6e5f8a-1e0b-4b69-8fdc-5c6b7a8f9e0d",
+          "LightColor": "0.3,0.85,1,1",
+          "Radius": 400,
+          "ConeInner": 15,
+          "ConeOuter": 30,
+          "Shadows": false
         }
       ]
     },

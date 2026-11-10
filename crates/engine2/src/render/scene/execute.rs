@@ -6,18 +6,18 @@ use super::layer::{self, Kind, flags, layer_type};
 use super::view::{self, SceneView};
 use crate::handles::Kind as ObjectKind;
 use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
+use crate::render::lighting::{Lighting, shadow};
 use crate::render::{context, device, texture};
 use crate::scene::object;
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
 use abi::structs::{ISceneLayer, ISceneView, IRenderContext, ManagedRenderSetup_t, SceneSystemPerFrameStats_t};
-use abi::{NativeRef, StringToken};
+use abi::StringToken;
 use glam::{Mat4, Vec3};
 use render::pass::{DrawUniforms, Load};
 use render::{BufferKind, Placeholder, RasterState, Semantic};
 use std::sync::{Arc, OnceLock};
 
-/// `SceneObjectFlags.IsOpaque`: what every model draws as under the placeholder.
-const IS_OPAQUE: i64 = 0x1;
+use crate::scene::object::IS_OPAQUE;
 /// Placeholder sky colour, times the sky object's tint. TODO: the sky material.
 const SKY: [f32; 4] = [0.45, 0.6, 0.85, 1.0];
 
@@ -36,8 +36,13 @@ pub fn default_layers(v: view::Ref, clear_flags: i32, clear_color: abi::structs:
 pub fn run(v: view::Ref) {
     let Some(view) = view::get(v) else { return };
     let ctx = context::create(0);
-    immediate::set_view_proj(ctx, view.view_proj);
-    let layers = view.state.lock().unwrap().layers.clone();
+    let (layers, worlds) = {
+        let s = view.state.lock().unwrap();
+        (s.layers.clone(), s.worlds.clone())
+    };
+    let mut lighting = Lighting::collect(&worlds, view.ambient);
+    shadow::render(&mut lighting, &worlds, view.view_proj);
+    immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {
         run_layer(&view, v, ctx, l);
     }
@@ -76,7 +81,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
         Kind::Clear(_) => {
             let f = layer::clear_flags(l);
             let color = render::wgpu::Color { r: clear_color.x.into(), g: clear_color.y.into(), b: clear_color.z.into(), a: clear_color.w.into() };
-            draw::execute(&t, Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(1.0) }, &[]);
+            draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(1.0) }, &[]);
         }
         Kind::Render(_) => {
             let lt = layer_type(l);
@@ -86,7 +91,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             let filter = Filter { required, excluded, match_id, ignore_match: layer::layer_flags(l) & flags::IGNORE_LAYER_MATCH_ID != 0, translucent: lt == layer::layer_type::TRANSLUCENT };
             let (draws, managed) = collect(view, &filter);
             super::trace::layer(v.addr(), &layer, &t, &draws);
-            draw::execute(&t, Load::default(), &draws);
+            draw::execute(&t, &immediate::lighting(ctx), Load::default(), &draws);
             if custom_objects_callable() {
                 for id in managed {
                     custom::render_object(setup(ctx, v, l, t.color), id);
@@ -99,15 +104,10 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             f(setup(ctx, v, l, t.color));
         }
         Kind::Blit { src, src_viewport: s } => {
-            let (Some(gpu), Some(src), Some(dst)) = (device::gpu(), texture::resolve(src), texture::resolve(t.color)) else { return };
+            let (Some(src), Some(dst)) = (texture::resolve(src), texture::resolve(t.color)) else { return };
             let (Some(a), Some(b)) = (src.gpu.as_ref(), dst.gpu.as_ref()) else { return };
             let rect = if s.m_n_width > 0 { [s.m_n_top_left_x as u32, s.m_n_top_left_y as u32, s.m_n_width as u32, s.m_n_height as u32] } else { [0, 0, a.desc.width, a.desc.height] };
-            let at = (t.viewport.m_n_top_left_x.max(0) as u32, t.viewport.m_n_top_left_y.max(0) as u32);
-            let dst_size = if t.viewport.m_n_width > 0 { (t.viewport.m_n_width as u32, t.viewport.m_n_height as u32) } else { (b.desc.width - at.0.min(b.desc.width), b.desc.height - at.1.min(b.desc.height)) };
-            let same_size = (rect[2], rect[3]) == dst_size;
-            if !(same_size && a.copy_to(gpu, b, rect, at)) && let Some(blitter) = draw::blitter() {
-                blitter.blit(gpu, a, rect, b, [at.0, at.1, dst_size.0, dst_size.1]);
-            }
+            draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport));
         }
         Kind::Procedural(_) | Kind::Label => {}
     }
@@ -130,35 +130,26 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
     let (mut draws, mut managed) = (Vec::new(), Vec::new());
     let sky_layer = f.match_id == StringToken::of("SkyBox").0;
     let worlds = view.state.lock().unwrap().worlds.clone();
-    for w in worlds {
-        let Some(world) = crate::scene::world::get(w) else { continue };
-        let addrs = world.objects.lock().unwrap().clone();
-        for addr in addrs {
-            let Some(obj) = object::get(NativeRef::from_raw(addr as *mut _)) else { continue };
-            let s = obj.state.lock().unwrap();
-            if !s.rendering || !tags_pass(view, &s.tags) {
-                continue;
+    for obj in object::in_worlds(&worlds) {
+        let s = obj.state.lock().unwrap();
+        if !s.rendering || !tags_pass(view, &s.tags) {
+            continue;
+        }
+        if obj.kind == ObjectKind::SceneSkyBoxObject {
+            if sky_layer {
+                draws.extend(sky(model_draw::tint(s.tint)));
             }
-            if obj.kind == ObjectKind::SceneSkyBoxObject {
-                if sky_layer {
-                    draws.extend(sky(model_draw::tint(s.tint)));
-                }
-                continue;
-            }
-            let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };
-            let flags = s.flags | if s.model.is_null() { 0 } else { IS_OPAQUE };
-            if !matched || flags & f.required != f.required || flags & f.excluded != 0 {
-                continue;
-            }
-            match obj.kind {
-                ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
-                _ if f.translucent => {}
-                _ => {
-                    if let Some(model) = crate::model::get(s.model) {
-                        draws.extend(model_draw::draws(&model, model_draw::matrix(&s.transform), view.view_proj, model_draw::tint(s.tint), s.mesh_groups, s.material_override.as_ref()));
-                    }
-                }
-            }
+            continue;
+        }
+        let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };
+        let flags = s.effective_flags();
+        if !matched || flags & f.required != f.required || flags & f.excluded != 0 {
+            continue;
+        }
+        match obj.kind {
+            ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
+            _ if f.translucent => {}
+            _ => draws.extend(model_draw::object(&s, view.view_proj)),
         }
     }
     (draws, managed)

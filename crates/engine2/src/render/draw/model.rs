@@ -46,8 +46,14 @@ pub fn draw_call(mesh: &RenderMesh, call: &DrawCall, uniforms: DrawUniforms, vie
     }
     let state = RasterState { topology: topology(call.prim.into()), ..state };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
-    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj));
+    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj, Default::default()));
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
+}
+
+/// A scene object's model draws, seen through `view_proj`; none without a model.
+pub fn object(s: &crate::scene::object::State, view_proj: Mat4) -> Vec<Draw> {
+    let Some(model) = crate::model::get(s.model) else { return Vec::new() };
+    draws(&model, matrix(&s.transform), view_proj, tint(s.tint), s.mesh_groups, s.material_override.as_ref())
 }
 
 /// Every draw of `model` placed at `world` (model to world), seen through `view_proj`, each with

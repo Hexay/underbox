@@ -10,7 +10,7 @@ use crate::scene::world;
 use abi::slots::i_scene_view as v;
 use abi::structs::RenderViewport;
 use abi::{NativeRef, PtrHandle, RawPtr, Registry, bind, class, handle};
-use glam::Mat4;
+use glam::{Mat4, Vec4};
 use std::sync::{Arc, Mutex};
 
 pub type Ref = NativeRef<class::ISceneView>;
@@ -46,6 +46,8 @@ pub struct SceneView {
     pub render_tags: Vec<u32>,
     pub exclude_tags: Vec<u32>,
     pub post_process: bool,
+    /// The camera's `ambientColor` attribute.
+    pub ambient: Vec4,
     pub state: Mutex<ViewState>,
 }
 
@@ -61,6 +63,7 @@ pub struct Desc {
     pub render_tags: Vec<u32>,
     pub exclude_tags: Vec<u32>,
     pub post_process: bool,
+    pub ambient: Vec4,
     pub unique_id: i32,
     pub managed_camera_id: i32,
 }
@@ -81,6 +84,7 @@ pub fn create(d: Desc) -> Ref {
         render_tags: d.render_tags,
         exclude_tags: d.exclude_tags,
         post_process: d.post_process,
+        ambient: d.ambient,
         state: Mutex::new(state),
     };
     let r: Ref = objects::create(view);

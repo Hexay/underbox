@@ -42,7 +42,8 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
     let built = shader.and_then(|sh| program::build(gpu, compiler, &sh, stem, &shaders::Variant::default()));
     let s = match built {
         Ok(s) => s,
-        Err(e) => return format!("placeholder: {}", e.lines().next().unwrap_or_default()),
+        // wgpu's first line is only "Validation Error"; the cause follows.
+        Err(e) => return format!("placeholder: {}", e.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(" ")),
     };
     if vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).is_none() {
         return "placeholder: mesh layout can't feed its vertex inputs".into();
@@ -50,7 +51,8 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
     let view = View { view_proj: Mat4::IDENTITY, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0] };
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
-    let inputs = bind::Inputs { view: &view, instances: &instances, textures: &textures, values: &[&values] };
+    let lighting = crate::render::lighting::Lighting::fallback();
+    let inputs = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values], attributes: &[], slots: &[] };
     match gpu.checked(|| bind::bind_groups(gpu, &s, &inputs)).and_then(|r| r) {
         Ok(_) => kind.into(),
         Err(e) => format!("placeholder: bind: {}", e.lines().next().unwrap_or_default()),

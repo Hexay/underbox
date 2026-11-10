@@ -35,6 +35,17 @@ pub struct State {
     pub material_override: Option<Arc<crate::mesh::material_ref::MaterialRef>>,
 }
 
+/// `SceneObjectFlags.IsOpaque`.
+pub const IS_OPAQUE: i64 = 0x1;
+
+impl State {
+    /// The flags managed reads: a model object also reports `IsOpaque`, which native derives from
+    /// its draws' materials (`UpdateFlagsBasedOnMaterial`). TODO: translucent materials.
+    pub fn effective_flags(&self) -> i64 {
+        self.flags | if self.model.is_null() { 0 } else { IS_OPAQUE }
+    }
+}
+
 impl Default for State {
     fn default() -> Self {
         Self {
@@ -107,6 +118,12 @@ pub fn create_native<C: NativeClass, D>(world: world::Ref, kind: Kind, state: St
         w.objects.lock().unwrap().push(r.addr());
     }
     (NativeRef::from_raw(r.as_raw().cast()), object.handle.register(r, kind))
+}
+
+/// The live objects of `worlds`, each world's in creation order.
+pub fn in_worlds(worlds: &[world::Ref]) -> Vec<Arc<SceneObject>> {
+    let addrs = worlds.iter().filter_map(|w| world::get(*w)).flat_map(|w| w.objects.lock().unwrap().clone());
+    addrs.filter_map(|a| get(NativeRef::from_raw(a as *mut _))).collect()
 }
 
 /// Remove an object from its world and parent, tell managed, and free it.

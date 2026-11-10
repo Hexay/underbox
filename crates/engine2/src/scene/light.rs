@@ -4,7 +4,7 @@
 use super::object::{self, State};
 use super::world;
 use crate::handles::Kind;
-use crate::math::{from_rot, to_vec, vec3};
+use crate::math::{from_rot, from_vec, to_rot, to_vec, vec3};
 use crate::render::texture;
 use crate::resource;
 use abi::slots::{c_scene_light_object as l, g_p_scene_system as system};
@@ -23,27 +23,29 @@ pub enum Type {
     Ortho = 4,
 }
 
+/// Read by the renderer's light collection (render/lighting).
 #[derive(Clone)]
 pub struct Light {
-    kind: Type,
-    direction: Rotation,
-    color: Vector3,
+    pub(crate) kind: Type,
+    pub(crate) direction: Rotation,
+    pub(crate) color: Vector3,
     bounce_color: Vector3,
-    radius: f32,
-    theta: f32,
-    phi: f32,
+    pub(crate) radius: f32,
+    /// Inner and outer spot cone half-angles, degrees.
+    pub(crate) theta: f32,
+    pub(crate) phi: f32,
     fall_off: f32,
-    shadows: bool,
-    shadow_resolution: i32,
+    pub(crate) shadows: bool,
+    pub(crate) shadow_resolution: i32,
     shadow_width: i32,
     shadow_height: i32,
-    shadow_cascades: i32,
+    pub(crate) shadow_cascades: i32,
     cascade_split_ratio: f32,
     cascade_distance_scale: f32,
     constant_attn: f32,
-    linear_attn: f32,
-    quadratic_attn: f32,
-    fog_strength: f32,
+    pub(crate) linear_attn: f32,
+    pub(crate) quadratic_attn: f32,
+    pub(crate) fog_strength: f32,
     fog_mode: i32,
     flags: u32,
     shape: i64,
@@ -96,6 +98,11 @@ fn create(w: world::Ref, light: Light) -> HandleId<class::CSceneLightObject> {
     object::create_with::<class::CSceneLightObject, _>(w, Kind::SceneLightObject, State::default(), Some(light))
 }
 
+/// The light's forward axis (+X of its rotation), as `GetWorldDirection` reports it.
+fn forward(direction: Rotation) -> Vector3 {
+    from_vec(to_rot(direction) * physics::Vector::X)
+}
+
 /// A directional light shining along `direction` (+X when zero).
 fn directional(direction: Vector3) -> Light {
     let forward = to_vec(direction).normalize_or(physics::Vector::X);
@@ -119,6 +126,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, l::GET_LIGHT_TYPE, |r| with(r, |x| x.kind as i32));
     bind!(r, l::SET_WORLD_POSITION, |r, p| object::with(r.cast(), |st| st.transform.position = p));
     bind!(r, l::SET_WORLD_DIRECTION, |r, q| with(r, |x| x.direction = q));
+    bind!(r, l::GET_WORLD_DIRECTION, |r| with(r, |x| Some(forward(x.direction))).unwrap_or_default());
     field!(r, GET_COLOR, SET_COLOR, color);
     bind!(r, l::SET_BOUNCE_COLOR, |r, c| with(r, |x| x.bounce_color = c));
     field!(r, GET_RADIUS, SET_RADIUS, radius);

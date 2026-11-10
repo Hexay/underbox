@@ -57,15 +57,18 @@ impl Texture {
 static LOADED: ByName<Texture> = ByName::new();
 
 /// The texture at a resource path. Nothing loads compiled textures yet (TODO: assets subsystem),
-/// so every path is native's error texture: a valid handle that reports `IsError`.
+/// so every path but the ones we generate (texture_generated.rs) is native's error texture: a
+/// valid handle that reports `IsError`.
 pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = LOADED.find_or_insert(&name, || {
+        let generated = super::texture_generated::texture(&name);
+        let error = generated.is_none();
+        let (w, h, data) = generated.unwrap_or((1, 1, vec![255, 0, 255, 255]));
         let mut config = TextureCreationConfig_t::default();
-        (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (1, 1, 1, 1);
-        let data = vec![255, 0, 255, 255];
+        (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (w as _, h as _, 1, 1);
         let gpu = gpu_texture(&name, &config, &data);
-        Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(data), gpu, error: true, guid }
+        Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(data), gpu, error, guid }
     });
     resource::new_handle(texture)
 }

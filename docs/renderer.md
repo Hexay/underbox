@@ -101,9 +101,12 @@ native model one to one, so managed's pipeline code runs unchanged:
    Shaders); without one, the mesh layout maps position/normal/color onto the placeholder.
 5. `RenderTools.DrawModel`, `SetRenderState` + `Draw*`, `DrawSceneObject`, `DrawSkyBox` are the same
    path entered from managed with explicit state. `IMaterial2.GetMode` returns one
-   `IMaterialMode` per material (`material_mode.rs`). `SetRenderState` draws stay on the
-   placeholder: shading them before their `CRenderAttributes` reach the binder washed the
-   showroom frame out white (post-process and UI programs read zeroed inputs).
+   `IMaterialMode` per material (`material_mode.rs`). `SetRenderState` draws shade with the
+   mode's material, the state's attributes and the context's (`ContextBindings`), so managed's
+   constant buffers and `BindTexture` slots reach the binder. `DrawModelDrawCall`
+   (`draw/draw_call.rs`) draws one mesh draw call with managed's instance-id buffer as the
+   instance stream and transforms from the `g_TransformBuffer` attribute; its indirect forms are
+   TODO. `BlitTexture` copies or draws through `draw::blit` (scales and converts formats).
 6. Scene objects own a copy of their model handle (`model::copy`): managed's `FromNative` wrappers
    destroy what they're handed, which used to empty the object.
 
@@ -131,14 +134,36 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
 - Expect naga to reject some DXC output (bindless arrays, `OpSpecConstantOp`, push constants);
   those combos fall back to the placeholder with a warning logged once per shader, never a crash
   (`Program::try_pipeline`, bind groups under `gpu.checked`).
-- Core material shaders that ship without source (complex, generic, simple, skin, unlit, ...)
-  draw with a stand-in (`shading/standin.shader`, map in `standin.rs`): `g_tColor` × tint ×
-  vertex tint × a fixed directional light, or unlit. Pixel bindings that collide with a
-  different vertex binding are moved apart after translation (`shading/stages.rs`).
+- Core material shaders that ship without source (complex, generic, simple, skin, unlit,
+  tools_sprite, ui, sky, ...) draw with a stand-in (`shading/standin.shader`, map in
+  `standin.rs`): `g_tColor` × tint × vertex tint × the view's lighting (below), or unlit. Sky
+  draws flat until a cube-sampling stand-in exists. Pixel bindings that collide with a different
+  vertex binding are moved apart after translation (`shading/stages.rs`).
+- Binder precedence per uniform block (`shading/bind.rs`): managed's `SetConstantBufferData` bytes
+  by block name, the view block, the lighting blocks, then member-wise attributes → material →
+  annotation defaults. Textures: attributes → material → lighting (sun shadow map) → the
+  context's `BindTexture` slot with that binding number.
+- Bindless arrays (`g_bindless_*`) bind when the adapter has `TEXTURE_BINDING_ARRAY`: every
+  element is a default texture or sampler, runtime-sized ones get `program::RUNTIME_ARRAY_LEN`.
+  `render::Gpu` also takes `SUBGROUP` (wave ops in the lit shaders) and the adapter's per-stage
+  binding limits (they bind 14+ storage buffers). TODO: managed's global bindless descriptor set.
+- Textures load as native's error texture (no compiled-texture loader yet) except the ones
+  `texture_generated.rs` draws, e.g. the dev test grid behind `testgrid.vmat`.
 - Coverage over sbox-public's vmats: `sh tools/test.sh engine2 material_coverage -- --ignored`
-  writes `target/material-coverage.tsv`. Main gaps: bindless samplers (blendable, glass, water,
-  fur, line), shaders without source and no stand-in (tools_sprite, sky, ui, tools_wireframe),
-  compute-only shaders.
+  writes `target/material-coverage.tsv` (full wgpu error text per row). Main gaps: compute-only
+  shaders, tools shaders without source (selection, visualisers), atmosphere_sky, terrain and
+  gizmo_line/gizmo_sprite translation failures.
+
+### Lighting and shadows
+
+`render/lighting/`: `Lighting::collect` reads the view's worlds (first directional light is the
+sun, the rest are binned) plus the camera's `ambientColor`; worlds without lights fall back to a
+fixed sun so unlit test scenes keep their goldens. It fills `ViewLightingConfigV2`,
+`DirectionalLightCB`, `ClusteredLightingConstants` (one cluster holding every light) and
+`BinnedLightBufferV2` in s&box's layouts, read back from the WGSL (`shading/layout.rs`).
+Falloff is our own packing (`blocks.rs::falloff`). Sun shadows: one 2048² depth map fitted to
+the view frustum and texel-snapped (`lighting/shadow.rs`), sampled by the stand-in with 3×3 PCF
+as `g_tUnderboxSunShadow`. Point and spot shadows are TODO.
 
 ## Headless path and frame-hash tests
 
@@ -241,15 +266,17 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. Lighting: the stand-in's light is fixed; feed the scene's lights (`PackSceneLight` answers
-   -1, `ViewLightingConfigV2`/`DirectionalLightCB` are unfilled) and shadows (`AddShadowView`
-   returns null). Combos are always 0/0 (TODO).
-2. `SetConstantBufferData` / `SetDynamicConstantBufferData`: keep the bytes per block name on the
-   attributes and let `shading/bind.rs` prefer them over its own fill. `BindTexture` per slot.
-   `BindVertexShader`/`BindPixelShader` take a `RenderShaderHandle_t` nothing produces: record only.
-3. `Sandbox.SceneRenderer` (`r_managed_scene`, off by default) draws with `DrawModelDrawCall`
-   (answers false): the given material and mode, instance transforms from the `g_TransformBuffer`
-   attribute or the instance-id buffer, then needs 2's constant buffers.
-4. Coverage gaps (see Shaders): bindless samplers, a stand-in for tools_sprite/sky/ui.
+1. `r_managed_scene` frames show only the clear colour: `DrawModelDrawCall` runs for every mesh
+   (scene models report `IsOpaque`, contexts carrying managed's `PerViewConstantBuffer_t` clear
+   and test depth reverse-Z, `BlitTexture` converts into the swap chain), yet nothing lands.
+   Suspects: managed's view-constant and `g_TransformBuffer` byte layouts against the stand-in's
+   WGSL blocks, and the instance-id stream offset. Build a headless repro (one box, one
+   `DrawModelDrawCall`, read back) before another boot. `+r_managed_scene_compare 20` logs the
+   mirror and writes both frames.
+2. Point and spot shadows (`AddShadowView` returns null; `PackSceneLight` answers -1). Combos are
+   always 0/0 (TODO).
+3. `DrawModelDrawCallIndirect`/`MultiIndirect` (occlusion-culled draws), `ctx::SET_DYNAMIC_
+   CONSTANT_BUFFER_DATA`, `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet).
+4. Real bindless descriptor sets, a cube-sampling sky stand-in, compiled-texture loading.
 5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
-   generation, sRGB-aware scaled blits (`RenderTools.BlitTexture` still copies same-size only).
+   generation, the sRGB flag of `BlitTexture`.
