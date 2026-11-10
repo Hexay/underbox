@@ -15,8 +15,7 @@ pub type Ref = NativeRef<class::CTextureBase>;
 const TSPEC_RENDER_TARGET: u32 = 0x0001;
 
 pub struct Texture {
-    #[allow(dead_code)]
-    name: String,
+    pub name: String,
     config: TextureCreationConfig_t,
     // Boxed: GetTextureDesc hands managed a pointer that must outlive this call.
     desc: Box<CTextureDesc>,

@@ -91,10 +91,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::DISABLE_LOD, |s| with(s, |st| st.lod = None));
     bind!(r, o::GET_CURRENT_LOD_LEVEL, |s| with(s, |st| st.lod.unwrap_or(0)));
     bind!(r, o::GET_CURRENT_LOD_GROUP_MASK, |_| 1);
-    bind!(r, o::GET_MODEL_HANDLE, |s| with(s, |st| st.model));
+    bind!(r, o::GET_MODEL_HANDLE, |s| with(s, |st| crate::model::copy(st.model)));
     bind!(r, o::GET_INT_VALUE, |_, _, default| default);
-    // TODO: material overrides and groups belong with model rendering (M2).
-    bind!(r, o::SET_MATERIAL_OVERRIDE_FOR_MESH_INSTANCES, |_, _| {});
+    bind!(r, o::SET_MATERIAL_OVERRIDE_FOR_MESH_INSTANCES, |s, m| with(s, |st| st.material_override = crate::mesh::material_ref::MaterialRef::keep(m)));
+    // TODO: per-attribute and per-index overrides and material groups.
     bind!(r, o::CLEAR_MATERIAL_OVERRIDE_LIST, |_| {});
     bind!(r, o::SET_MATERIAL_OVERRIDE, |_, _, _, _| {});
     bind!(r, o::SET_MATERIAL_OVERRIDE_BY_INDEX, |_, _, _| {});

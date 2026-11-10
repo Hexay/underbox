@@ -31,6 +31,8 @@ pub struct State {
     pub lod: Option<i32>,
     pub layer_match: u32,
     pub model: NativeRef<class::CModel>,
+    /// Every mesh draws with this instead of its own material (`SetMaterialOverrideForMeshInstances`).
+    pub material_override: Option<Arc<crate::mesh::material_ref::MaterialRef>>,
 }
 
 impl Default for State {
@@ -54,6 +56,7 @@ impl Default for State {
             lod: None,
             layer_match: 0,
             model: NativeRef::NULL,
+            material_override: None,
         }
     }
 }
@@ -71,6 +74,7 @@ pub struct SceneObject {
 impl Drop for SceneObject {
     fn drop(&mut self) {
         objects::destroy(self.attributes);
+        crate::resource::destroy_handle(self.state.get_mut().unwrap().model);
     }
 }
 

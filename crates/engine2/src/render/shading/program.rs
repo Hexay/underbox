@@ -55,7 +55,8 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
 
 pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, v: &Variant) -> Result<Shading, String> {
     let vs = stage(compiler, shader, Stage::Vs, v)?;
-    let ps = stage(compiler, shader, Stage::Ps, v)?;
+    let mut ps = stage(compiler, shader, Stage::Ps, v)?;
+    super::stages::separate(&vs, &mut ps)?;
     let mut bindings: Vec<Binding> = Vec::new();
     for b in vs.reflection.bindings.iter().chain(&ps.reflection.bindings) {
         if !supported(b) {

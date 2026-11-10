@@ -12,6 +12,7 @@ mod frames;
 pub mod game_window;
 pub mod image;
 pub mod material;
+pub mod material_mode;
 mod material_source;
 pub mod readback;
 pub mod scene;
@@ -36,6 +37,7 @@ pub fn register(r: &mut Registry) {
     game_window::register(r);
     image::register(r);
     material::register(r);
+    material_mode::register(r);
     readback::register(r);
     scene::register(r);
     stats::register(r);

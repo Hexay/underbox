@@ -8,6 +8,7 @@ pub mod execute;
 pub mod layer;
 pub mod setup;
 pub mod system;
+mod trace;
 pub mod view;
 
 #[cfg(test)]

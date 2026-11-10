@@ -73,6 +73,12 @@ pub fn create_runtime(name: &str, mut content: Content) -> Ref {
     resource::new_handle(Arc::new(Model { name: name.to_owned(), content, error: false, guid: Guid::default() }))
 }
 
+/// A new strong handle to the model behind `r` (null for a dead or null handle). Whoever
+/// receives a handle owns it: managed wraps every returned one and destroys it when collected.
+pub fn copy(r: Ref) -> Ref {
+    resource::copy_handle::<_, Model>(r)
+}
+
 pub fn get(r: Ref) -> Option<Arc<Model>> {
     resource::resolve::<_, Model>(r)
 }

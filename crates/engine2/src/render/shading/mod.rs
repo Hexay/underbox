@@ -1,14 +1,19 @@
 //! Material shading: a material's vfx translated per stage into a wgpu program (crates/shaders),
 //! compiled lazily per (shader, combo) and cached, plus per-draw resource binding by reflected
 //! name (bind.rs). A program that fails to translate or validate is cached as `None` and draws
-//! fall back to the placeholder, with one warning per shader.
+//! fall back to the placeholder, with one warning per shader. Closed core shaders without source
+//! draw with the stand-in (standin.rs).
 
 pub mod bind;
 mod defaults;
 pub mod layout;
 pub mod program;
+mod stages;
+pub mod standin;
 pub mod vertex;
 pub mod view;
+#[cfg(test)]
+mod coverage;
 #[cfg(test)]
 mod tests;
 
@@ -24,6 +29,27 @@ static COMPILER: LazyLock<Option<shaders::Compiler>> = LazyLock::new(|| {
 type Key = (String, u64, u64);
 static PROGRAMS: LazyLock<Mutex<HashMap<Key, Option<Arc<Shading>>>>> = LazyLock::new(Default::default);
 
+/// Values a draw adds on top of its material's (the stand-in's `StandinUnlit`).
+pub type Extra = Vec<(&'static str, f32)>;
+
+/// The program a material's shader draws with, and its [`Extra`] values; `None` when neither the
+/// shader nor a stand-in builds.
+pub fn for_shader(gpu: &render::Gpu, shader_path: &str) -> Option<(Arc<Shading>, Extra)> {
+    if crate::shader::find(shader_path).is_none()
+        && let Some(unlit) = standin::mapped(shader_path)
+    {
+        return Some((program(gpu, standin::PATH)?, standin::values(unlit).to_vec()));
+    }
+    Some((program(gpu, shader_path)?, Vec::new()))
+}
+
+fn source(shader_path: &str) -> Result<Arc<shaders::VfxShader>, String> {
+    if shader_path == standin::PATH {
+        return standin::shader(&shaders::IncludePaths::new(crate::fs::search_roots())).map(Arc::new);
+    }
+    crate::shader::find(shader_path).ok_or_else(|| "shader not found".into())
+}
+
 /// The program for a shader resource path at a combo, compiled on first use.
 // TODO: static/dynamic combos from material features and render state; always 0, 0 for now.
 pub fn program(gpu: &render::Gpu, shader_path: &str) -> Option<Arc<Shading>> {
@@ -33,7 +59,7 @@ pub fn program(gpu: &render::Gpu, shader_path: &str) -> Option<Arc<Shading>> {
     }
     let built = (|| {
         let compiler = COMPILER.as_ref().ok_or("no shader compiler")?;
-        let shader = crate::shader::find(shader_path).ok_or("shader not found")?;
+        let shader = source(shader_path)?;
         program::build(gpu, compiler, &shader, shader_path, &shaders::Variant::new(key.1, key.2))
     })();
     let built = built.inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader_path}: {e}"))).ok().map(Arc::new);

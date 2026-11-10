@@ -6,7 +6,10 @@
 //! (scene/execute.rs), identity otherwise. TODO: screen-space (UI) draws need their material's
 //! projection once translated shaders bind attributes.
 
-use super::{Draw, gpu_mesh, model as model_draw, topology};
+use super::{Draw, gpu_mesh, model as model_draw, shaded, topology};
+use crate::render::material::Material;
+use crate::render::material_mode;
+use crate::render::shading::bind::Instance;
 use crate::mesh::buffers::{self, IndexBuffer, VertexBuffer};
 use crate::mesh::layout::{self, Layout};
 use crate::render::{buffers as gpu_buffers, context, device, swap_chain};
@@ -34,6 +37,7 @@ enum Indices {
 /// the view transform.
 pub struct DrawState {
     layout: Option<Arc<Layout>>,
+    material: Option<Arc<Material>>,
     vertices: Option<(Vertices, u64)>,
     indices: Option<Indices>,
     pub view_proj: Mat4,
@@ -41,7 +45,15 @@ pub struct DrawState {
 
 impl Default for DrawState {
     fn default() -> Self {
-        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY }
+        DrawState { layout: None, material: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY }
+    }
+}
+
+impl DrawState {
+    /// The `SetRenderState` material's program for `layout`, or None for the placeholder.
+    fn shaded(&self, layout: &Layout) -> Option<shaded::Shaded> {
+        let instance = Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
+        shaded::resolve(self.material.clone()?, layout, instance, self.view_proj)
     }
 }
 
@@ -69,8 +81,11 @@ pub fn submit(c: Ctx, draws: &[Draw]) {
     }
 }
 
-fn set_render_state(c: Ctx, _attrs: NativeRef<class::CRenderAttributes>, _mode: NativeRef<class::IMaterialMode>, l: layout::Ref) -> bool {
-    with(c, |s| s.layout = layout::get(l));
+fn set_render_state(c: Ctx, _attrs: NativeRef<class::CRenderAttributes>, mode: NativeRef<class::IMaterialMode>, l: layout::Ref) -> bool {
+    with(c, |s| {
+        s.layout = layout::get(l);
+        s.material = material_mode::material(mode);
+    });
     device::gpu().is_some()
 }
 
@@ -91,7 +106,8 @@ fn draw_dynamic(c: Ctx, prim: i64, l: layout::Ref, vertices: RawPtr<c_void>, n: 
     });
     let range = 0..if ib.is_some() { n_indices as u32 } else { n as u32 };
     let state = RasterState { topology: topology(prim), ..Default::default() };
-    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state };
+    let shaded = with(c, |s| s.shaded(&layout));
+    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded };
     submit(c, &[draw]);
 }
 
@@ -116,7 +132,8 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
     let uniforms = DrawUniforms { mvp: s.view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
     let state = RasterState { topology: topology(prim), ..Default::default() };
     let vertex = gpu_mesh::vertex_keys(&layout)?;
-    Some(Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state })
+    let shaded = s.shaded(&layout);
+    Some(Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded })
 }
 
 fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {
@@ -146,20 +163,20 @@ fn transforms(p: RawPtr<c_void>, count: i32) -> Vec<Mat4> {
 fn draw_model(c: Ctx, m: crate::model::Ref, xforms: Vec<Mat4>) {
     let Some(model) = crate::model::get(m) else { return };
     let vp = view_proj(c);
-    let draws: Vec<_> = xforms.into_iter().flat_map(|w| model_draw::draws(&model, w, vp, [1.0; 4], u64::MAX)).collect();
+    let draws: Vec<_> = xforms.into_iter().flat_map(|w| model_draw::draws(&model, w, vp, [1.0; 4], u64::MAX, None)).collect();
     submit(c, &draws);
 }
 
 pub(crate) fn draw_scene_object(c: Ctx, o: crate::scene::object::Ref, t: Transform, color: Vector4) {
     let Some(obj) = crate::scene::object::get(o) else { return };
-    let (m, groups, tint) = {
+    let (m, groups, tint, material) = {
         let s = obj.state.lock().unwrap();
-        (s.model, s.mesh_groups, model_draw::tint(s.tint))
+        (s.model, s.mesh_groups, model_draw::tint(s.tint), s.material_override.clone())
     };
     let Some(model) = crate::model::get(m) else { return };
     let color = model_draw::tint(color);
     let tint = std::array::from_fn(|i| tint[i] * color[i]);
-    submit(c, &model_draw::draws(&model, model_draw::matrix(&t), view_proj(c), tint, groups));
+    submit(c, &model_draw::draws(&model, model_draw::matrix(&t), view_proj(c), tint, groups, material.as_ref()));
 }
 
 pub fn register(r: &mut Registry) {

@@ -18,6 +18,10 @@ pub struct View {
 pub const BLOCK: &str = "PerViewConstantBuffer_t";
 
 impl View {
+    pub fn with_view_proj(self, view_proj: Mat4) -> View {
+        View { view_proj, ..self }
+    }
+
     /// The camera's world position: the point the projection sends to infinity (w = 0). An
     /// orthographic camera has none; it gets the near plane's centre.
     pub fn camera_position(&self) -> Vec4 {

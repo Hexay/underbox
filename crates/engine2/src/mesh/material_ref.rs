@@ -13,6 +13,19 @@ impl MaterialRef {
         (!own.is_null()).then(|| Arc::new(Self(own)))
     }
 
+    /// The material at a resource path (`.vmat` source); native's error material without one.
+    pub fn load(path: &str) -> Option<Arc<Self>> {
+        let h = material::load_path(path);
+        let own = Self::keep(h);
+        resource::destroy_handle(h);
+        own
+    }
+
+    /// The material itself, while the handle is alive.
+    pub fn material(&self) -> Option<Arc<Material>> {
+        material::resolve(self.0)
+    }
+
     /// A new handle for managed, which owns (and destroys) it.
     pub fn handle(&self) -> material::Ref {
         resource::copy_handle::<_, Material>(self.0)

@@ -15,7 +15,7 @@ pub enum Kind {
     Other,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Field {
     /// The HLSL name: naga appends `_` to names ending in a digit (`g_vInvProjRow3_`).
     pub name: String,
@@ -23,7 +23,7 @@ pub struct Field {
     pub kind: Kind,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Block {
     pub size: u32,
     pub fields: Vec<Field>,

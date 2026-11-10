@@ -69,6 +69,9 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
         (target(view, l, &s), s.clear_color.vec, s.required, s.excluded, s.match_id)
     };
     context::bind_target(ctx, &t);
+    if !matches!(layer.kind, Kind::Render(_)) {
+        super::trace::layer(v.addr(), &layer, &t, &[]);
+    }
     match layer.kind {
         Kind::Clear(_) => {
             let f = layer::clear_flags(l);
@@ -82,6 +85,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             }
             let filter = Filter { required, excluded, match_id, ignore_match: layer::layer_flags(l) & flags::IGNORE_LAYER_MATCH_ID != 0, translucent: lt == layer::layer_type::TRANSLUCENT };
             let (draws, managed) = collect(view, &filter);
+            super::trace::layer(v.addr(), &layer, &t, &draws);
             draw::execute(&t, Load::default(), &draws);
             if custom_objects_callable() {
                 for id in managed {
@@ -98,8 +102,12 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             let (Some(gpu), Some(src), Some(dst)) = (device::gpu(), texture::resolve(src), texture::resolve(t.color)) else { return };
             let (Some(a), Some(b)) = (src.gpu.as_ref(), dst.gpu.as_ref()) else { return };
             let rect = if s.m_n_width > 0 { [s.m_n_top_left_x as u32, s.m_n_top_left_y as u32, s.m_n_width as u32, s.m_n_height as u32] } else { [0, 0, a.desc.width, a.desc.height] };
-            // TODO: scaled or format-converting blits need a draw.
-            a.copy_to(gpu, b, rect, (t.viewport.m_n_top_left_x.max(0) as u32, t.viewport.m_n_top_left_y.max(0) as u32));
+            let at = (t.viewport.m_n_top_left_x.max(0) as u32, t.viewport.m_n_top_left_y.max(0) as u32);
+            let dst_size = if t.viewport.m_n_width > 0 { (t.viewport.m_n_width as u32, t.viewport.m_n_height as u32) } else { (b.desc.width - at.0.min(b.desc.width), b.desc.height - at.1.min(b.desc.height)) };
+            let same_size = (rect[2], rect[3]) == dst_size;
+            if !(same_size && a.copy_to(gpu, b, rect, at)) && let Some(blitter) = draw::blitter() {
+                blitter.blit(gpu, a, rect, b, [at.0, at.1, dst_size.0, dst_size.1]);
+            }
         }
         Kind::Procedural(_) | Kind::Label => {}
     }
@@ -147,7 +155,7 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
                 _ if f.translucent => {}
                 _ => {
                     if let Some(model) = crate::model::get(s.model) {
-                        draws.extend(model_draw::draws(&model, model_draw::matrix(&s.transform), view.view_proj, model_draw::tint(s.tint), s.mesh_groups));
+                        draws.extend(model_draw::draws(&model, model_draw::matrix(&s.transform), view.view_proj, model_draw::tint(s.tint), s.mesh_groups, s.material_override.as_ref()));
                     }
                 }
             }
@@ -179,5 +187,6 @@ pub(crate) fn sky(tint: [f32; 4]) -> Option<Draw> {
         instances: 1,
         uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::from_translation(Vec3::ZERO), tint },
         state: RasterState { depth_write: false, ..Default::default() },
+        shaded: None,
     })
 }

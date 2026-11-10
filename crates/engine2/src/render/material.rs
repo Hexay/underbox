@@ -24,7 +24,6 @@ struct Params {
 
 pub struct Material {
     name: String,
-    #[allow(dead_code)]
     shader: String,
     attributes: attributes::Ref,
     params: Mutex<Params>,
@@ -39,6 +38,28 @@ impl Resource for Material {
     fn guid(&self) -> Guid {
         self.guid
     }
+}
+
+impl Material {
+    pub fn shader(&self) -> &str {
+        &self.shader
+    }
+
+    /// Texture params by attribute (`g_tColor`) and vector params by name, for a draw's binding.
+    pub fn shading_params(&self) -> (HashMap<String, texture::Ref>, HashMap<String, glam::Vec4>) {
+        let p = self.params.lock().unwrap();
+        let vectors = p.vectors.iter().map(|(k, v)| (k.clone(), glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, v.vec.w))).collect();
+        (p.textures.clone(), vectors)
+    }
+}
+
+/// A strong handle the caller owns to the material at a resource path.
+pub fn load_path(path: &str) -> Ref {
+    load(std::ffi::CString::new(path).ok().as_deref(), Guid::default())
+}
+
+pub fn resolve(m: Ref) -> Option<Arc<Material>> {
+    resource::resolve::<_, Material>(m)
 }
 
 static LOADED: ByName<Material> = ByName::new();
@@ -72,6 +93,7 @@ fn copy(t: Texture) -> Texture {
 
 impl Drop for Material {
     fn drop(&mut self) {
+        super::material_mode::forget(self);
         objects::destroy(self.attributes);
         for t in self.params.get_mut().unwrap().textures.drain().map(|(_, t)| t) {
             resource::destroy_handle(t);

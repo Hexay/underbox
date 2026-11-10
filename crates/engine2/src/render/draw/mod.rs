@@ -1,17 +1,19 @@
 //! Turning meshes into GPU draws: [`gpu_mesh`] uploads `MeshGlue` buffers (re-uploading when
 //! their version moves), [`model`] expands a model into per-draw-call [`Draw`]s, [`immediate`]
-//! holds the RenderTools / IRenderContext draw slots. Everything shades with the placeholder
-//! program for now (docs/renderer.md, "Shaders").
+//! holds the RenderTools / IRenderContext draw slots. Draws with a material shade through
+//! [`shaded`]; the rest, and any that fail to bind, use the placeholder.
 
 pub mod gpu_mesh;
 pub mod immediate;
 pub mod model;
+pub mod shaded;
 
+use crate::render::shading::view::View;
 use crate::render::{device, texture};
 use abi::structs::{NativeRect, RenderViewport};
-use render::pass::{self, DrawUniforms, Load, MeshDraw, Targets};
+use render::pass::{self, DrawUniforms, Load, MeshDraw, Shaded, Targets};
 use render::wgpu::{IndexFormat, PrimitiveTopology};
-use render::{Placeholder, RasterState, VertexBufferKey};
+use render::{PipelineKey, Placeholder, RasterState, VertexBufferKey};
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 
@@ -26,6 +28,8 @@ pub struct Draw {
     pub instances: u32,
     pub uniforms: DrawUniforms,
     pub state: RasterState,
+    /// Drawn with its material's program when that binds; `vertex` and `uniforms` otherwise.
+    pub shaded: Option<shaded::Shaded>,
 }
 
 /// Where draws go: textures (null for none), viewport (zero size = whole target), scissor.
@@ -41,6 +45,12 @@ pub fn placeholder() -> Option<&'static Placeholder> {
     static PLACEHOLDER: OnceLock<Placeholder> = OnceLock::new();
     let gpu = device::gpu()?;
     Some(PLACEHOLDER.get_or_init(|| Placeholder::new(gpu)))
+}
+
+pub fn blitter() -> Option<&'static render::Blitter> {
+    static BLITTER: OnceLock<render::Blitter> = OnceLock::new();
+    let gpu = device::gpu()?;
+    Some(BLITTER.get_or_init(|| render::Blitter::new(gpu)))
 }
 
 /// `RenderPrimitiveType` to a wgpu topology; patches and adjacency draw as triangle lists.
@@ -71,20 +81,36 @@ pub fn execute(target: &Target, load: Load, draws: &[Draw]) {
         targets.viewport = Some([v.m_n_top_left_x as f32, v.m_n_top_left_y as f32, v.m_n_width as f32, v.m_n_height as f32, v.min_z.max(0.0), far]);
     }
     targets.scissor = target.scissor.filter(|s| s.w > 0 && s.h > 0).map(|s| [s.x.max(0) as u32, s.y.max(0) as u32, s.w as u32, s.h as u32]);
+    let state = |d: &Draw| RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state };
+    let view = view_of(&targets);
+    let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
+    let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), &key(d, &s.vertex)))).collect();
+    let (defaults, ids) = shaded::streams(gpu);
     let draws: Vec<_> = draws
         .iter()
-        .map(|d| MeshDraw {
-            vertices: (&d.vertices.buffer, d.vertex_offset),
-            vertex: d.vertex.clone(),
-            indices: d.indices.as_ref().map(|(b, f)| (&b.buffer, *f)),
-            range: d.range.clone(),
-            base_vertex: d.base_vertex,
-            instances: d.instances,
-            uniforms: d.uniforms,
-            state: RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state },
-            shaded: None,
+        .zip(&bound)
+        .map(|(d, groups)| {
+            let material = d.shaded.as_ref().zip(groups.as_ref());
+            MeshDraw {
+                vertices: (&d.vertices.buffer, d.vertex_offset),
+                vertex: material.map_or_else(|| d.vertex.clone(), |(s, _)| s.vertex.clone()),
+                indices: d.indices.as_ref().map(|(b, f)| (&b.buffer, *f)),
+                range: d.range.clone(),
+                base_vertex: d.base_vertex,
+                instances: d.instances,
+                uniforms: d.uniforms,
+                state: state(d),
+                shaded: material.map(|(s, groups)| Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![(&defaults.buffer, 0), (&ids.buffer, 0)] }),
+            }
         })
         .collect();
     let load = Load { color: load.color.filter(|_| targets.color.is_some()), depth: load.depth.filter(|_| targets.depth.is_some()) };
     pass::execute(gpu, placeholder, &targets, load, &draws);
+}
+
+/// The per-view constants' viewport and target size for a pass (its view-projection is per draw).
+fn view_of(targets: &Targets) -> View {
+    let (w, h) = targets.size().unwrap_or((1, 1));
+    let viewport = targets.viewport.map_or([0.0, 0.0, w as f32, h as f32], |[x, y, vw, vh, _, _]| [x, y, vw, vh]);
+    View { view_proj: glam::Mat4::IDENTITY, viewport, target: [w as f32, h as f32] }
 }

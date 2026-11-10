@@ -79,7 +79,11 @@ impl Content {
             .iter()
             .map(|m| {
                 let vertices: Vec<Vertex> = m.vertices.iter().map(Vertex::from).collect();
-                ModelMesh { mesh: RenderMesh::from_vertices(&m.name, &vertices, &m.indices), group_mask: u64::MAX, lod_mask: ALL_LODS }
+                let mesh = RenderMesh::from_vertices(&m.name, &vertices, &m.indices);
+                if !m.material.is_empty() {
+                    mesh.state().material = MaterialRef::load(&m.material);
+                }
+                ModelMesh { mesh, group_mask: u64::MAX, lod_mask: ALL_LODS }
             })
             .collect();
         Self { meshes, ..Self::default() }

@@ -8,6 +8,7 @@ use super::layout::Value;
 use super::program::Shading;
 use super::view::{self, View};
 use crate::render::texture;
+use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
 use render::wgpu::{self, BindingType as B};
 use shaders::reflect::Binding;
@@ -68,7 +69,8 @@ enum Resource {
 
 fn material_view(inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
     let B::Texture { sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false } = b.ty else { return None };
-    let t = texture::resolve(*inputs.textures.get(&b.name)?)?;
+    // An error texture (every compiled texture, for now) would paint the draw magenta.
+    let t = texture::resolve(*inputs.textures.get(&b.name)?).filter(|t| !t.is_error())?;
     let gpu = t.gpu.as_ref()?;
     let ok = match (gpu.desc.format.sample_type(None, None)?, sample_type) {
         (wgpu::TextureSampleType::Float { filterable }, wgpu::TextureSampleType::Float { filterable: want }) => filterable || !want,
