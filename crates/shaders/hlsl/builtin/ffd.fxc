@@ -1,0 +1,23 @@
+// underbox replacement for Valve's ffd.fxc (free-form deformation for gizmo lines).
+// TODO: real lattice deformation; until then positions pass through unchanged.
+#ifndef FFD_FXC
+#define FFD_FXC
+
+struct DeformationParameters_t
+{
+	float flWeight;
+};
+
+DeformationParameters_t ComputeDeformationWeight( float3 vPositionOs )
+{
+	DeformationParameters_t p;
+	p.flWeight = 0.0;
+	return p;
+}
+
+float3 ComputeDeformedPosition( float3 vPositionOs, DeformationParameters_t p )
+{
+	return vPositionOs;
+}
+
+#endif // FFD_FXC

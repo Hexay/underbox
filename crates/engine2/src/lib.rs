@@ -29,6 +29,7 @@ pub mod frustum;
 pub mod bitmap;
 pub mod convar;
 pub mod resource_compiler;
+pub mod shader;
 
 pub use igen::igen_engine;
 pub use interfaces::CreateInterface;

@@ -1,0 +1,19 @@
+[package]
+name = "window"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Windows, events and input: SDL3 built from source and linked statically, behind the globalSdl surface"
+
+[dependencies]
+raw-window-handle = "0.6"
+# Bindings only: build.rs builds and links SDL3 itself (see its header).
+sdl3-sys = { version = "0.7.3", default-features = false, features = ["no-link"] }
+
+[build-dependencies]
+cmake = "0.1"
+sdl3-src = "=3.4.20"
+
+[dev-dependencies]
+abi = { path = "../abi" }
