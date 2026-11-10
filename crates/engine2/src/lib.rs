@@ -25,6 +25,9 @@ pub mod subsystems;
 pub mod kv3;
 pub mod utl_buffer;
 pub mod frustum;
+pub mod bitmap;
+pub mod convar;
+pub mod resource_compiler;
 
 pub use igen::igen_engine;
 pub use interfaces::CreateInterface;
