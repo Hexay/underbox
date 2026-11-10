@@ -15,6 +15,7 @@ assets = { path = "../assets" }
 box2d-sys = { path = "../box2d-sys" }
 glam = "0.33"
 gns = { path = "../gns" }
+kv = { path = "../kv" }
 lz4_flex = "0.14.0"
 objects = { path = "../objects" }
 physics = { path = "../physics" }
