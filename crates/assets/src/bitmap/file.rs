@@ -112,12 +112,11 @@ fn read_pfm(bytes: &[u8]) -> Option<FloatBitmap> {
     let (w, h): (usize, usize) = (fields[1].parse().ok()?, fields[2].parse().ok()?);
     let little = fields[3].parse::<f32>().ok()? < 0.0;
     let floats: Vec<f32> = data
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .take(w * h * channels)
-        .map(|b| {
-            let b = b.try_into().unwrap();
-            if little { f32::from_le_bytes(b) } else { f32::from_be_bytes(b) }
-        })
+        .map(|&b| if little { f32::from_le_bytes(b) } else { f32::from_be_bytes(b) })
         .collect();
     if floats.len() < w * h * channels {
         return None;
