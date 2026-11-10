@@ -11,6 +11,7 @@ mod formats;
 mod frames;
 pub mod game_window;
 pub mod image;
+pub mod lighting;
 pub mod material;
 pub mod material_mode;
 mod material_source;

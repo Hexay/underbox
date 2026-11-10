@@ -23,6 +23,8 @@ pub struct Shading {
     pub bindings: Vec<Binding>,
     pub vertex_inputs: Vec<VertexInput>,
     pub blocks: Blocks,
+    /// Structured-buffer element layouts.
+    pub storage: Blocks,
     /// By HLSL variable name.
     pub attributes: HashMap<String, Attr>,
 }
@@ -77,5 +79,7 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     })?;
     let mut blocks = layout::uniform_blocks(&vs.wgsl);
     blocks.extend(layout::uniform_blocks(&ps.wgsl));
-    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, attributes: attributes(shader) })
+    let mut storage = layout::storage_elements(&vs.wgsl);
+    storage.extend(layout::storage_elements(&ps.wgsl));
+    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader) })
 }

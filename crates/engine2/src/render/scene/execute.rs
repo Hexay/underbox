@@ -6,6 +6,7 @@ use super::layer::{self, Kind, flags, layer_type};
 use super::view::{self, SceneView};
 use crate::handles::Kind as ObjectKind;
 use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
+use crate::render::lighting::Lighting;
 use crate::render::{context, device, texture};
 use crate::scene::object;
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
@@ -36,8 +37,11 @@ pub fn default_layers(v: view::Ref, clear_flags: i32, clear_color: abi::structs:
 pub fn run(v: view::Ref) {
     let Some(view) = view::get(v) else { return };
     let ctx = context::create(0);
-    immediate::set_view_proj(ctx, view.view_proj);
-    let layers = view.state.lock().unwrap().layers.clone();
+    let (layers, worlds) = {
+        let s = view.state.lock().unwrap();
+        (s.layers.clone(), s.worlds.clone())
+    };
+    immediate::set_view(ctx, view.view_proj, Arc::new(Lighting::collect(&worlds, view.ambient)));
     for l in layers {
         run_layer(&view, v, ctx, l);
     }
@@ -76,7 +80,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
         Kind::Clear(_) => {
             let f = layer::clear_flags(l);
             let color = render::wgpu::Color { r: clear_color.x.into(), g: clear_color.y.into(), b: clear_color.z.into(), a: clear_color.w.into() };
-            draw::execute(&t, Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(1.0) }, &[]);
+            draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(1.0) }, &[]);
         }
         Kind::Render(_) => {
             let lt = layer_type(l);
@@ -86,7 +90,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             let filter = Filter { required, excluded, match_id, ignore_match: layer::layer_flags(l) & flags::IGNORE_LAYER_MATCH_ID != 0, translucent: lt == layer::layer_type::TRANSLUCENT };
             let (draws, managed) = collect(view, &filter);
             super::trace::layer(v.addr(), &layer, &t, &draws);
-            draw::execute(&t, Load::default(), &draws);
+            draw::execute(&t, &immediate::lighting(ctx), Load::default(), &draws);
             if custom_objects_callable() {
                 for id in managed {
                     custom::render_object(setup(ctx, v, l, t.color), id);

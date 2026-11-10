@@ -8,6 +8,7 @@ use crate::mesh::layout::Layout;
 use crate::render::material::Material;
 use crate::render::shading::{self, Shading, bind as binding, vertex, view::View};
 use crate::render::device;
+use crate::render::lighting::Lighting;
 use glam::{Mat4, Vec4};
 use render::wgpu;
 use render::{BufferKind, PipelineKey, VertexBufferKey};
@@ -53,10 +54,10 @@ pub fn streams(gpu: &render::Gpu) -> &'static (render::Buffer, render::Buffer) {
 pub const MAX_INSTANCES: u32 = 1024;
 
 /// The draw's bind groups, with its pipeline for `key` built: both under one validation scope.
-pub fn bind(gpu: &render::Gpu, d: &Shaded, view: &View, key: &PipelineKey) -> Option<Vec<wgpu::BindGroup>> {
+pub fn bind(gpu: &render::Gpu, d: &Shaded, view: &View, lighting: &Lighting, key: &PipelineKey) -> Option<Vec<wgpu::BindGroup>> {
     let (textures, vectors) = d.material.shading_params();
     let instances = [d.instance];
-    let inputs = binding::Inputs { view, instances: &instances, textures: &textures, values: &[&d.values, &vectors] };
+    let inputs = binding::Inputs { view, lighting, instances: &instances, textures: &textures, values: &[&d.values, &vectors] };
     let built = gpu.checked(|| binding::bind_groups(gpu, &d.shading, &inputs)).and_then(|groups| groups);
     let built = built.and_then(|groups| d.shading.program.try_pipeline(gpu, key).map(|_| groups));
     built.inspect_err(|e| warn_once(&d.shading.label, e)).ok()

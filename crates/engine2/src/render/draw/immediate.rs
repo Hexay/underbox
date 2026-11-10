@@ -9,6 +9,7 @@
 use super::{Draw, gpu_mesh, model as model_draw, topology};
 use crate::mesh::buffers::{self, IndexBuffer, VertexBuffer};
 use crate::mesh::layout::{self, Layout};
+use crate::render::lighting::Lighting;
 use crate::render::{buffers as gpu_buffers, context, device, swap_chain};
 use abi::slots::{i_render_context as ctx, render_tools as tools};
 use abi::structs::{Transform, Vector4};
@@ -37,11 +38,13 @@ pub struct DrawState {
     vertices: Option<(Vertices, u64)>,
     indices: Option<Indices>,
     pub view_proj: Mat4,
+    /// The view's lights while a layer runs, [`Lighting::fallback`] otherwise.
+    pub lighting: Arc<Lighting>,
 }
 
 impl Default for DrawState {
     fn default() -> Self {
-        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY }
+        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting: Arc::new(Lighting::fallback()) }
     }
 }
 
@@ -55,8 +58,13 @@ pub fn view_proj(c: Ctx) -> Mat4 {
     context::get(c).map_or(Mat4::IDENTITY, |c| c.draw.lock().unwrap().view_proj)
 }
 
-pub fn set_view_proj(c: Ctx, m: Mat4) {
-    with(c, |s| s.view_proj = m);
+/// Draws on `c` go through `view_proj` and are lit by `lighting` from now on.
+pub fn set_view(c: Ctx, view_proj: Mat4, lighting: Arc<Lighting>) {
+    with(c, |s| (s.view_proj, s.lighting) = (view_proj, lighting));
+}
+
+pub fn lighting(c: Ctx) -> Arc<Lighting> {
+    context::get(c).map_or_else(|| Arc::new(Lighting::fallback()), |c| c.draw.lock().unwrap().lighting.clone())
 }
 
 fn uniforms(c: Ctx, world: Mat4, tint: [f32; 4]) -> DrawUniforms {
@@ -65,7 +73,7 @@ fn uniforms(c: Ctx, world: Mat4, tint: [f32; 4]) -> DrawUniforms {
 
 pub fn submit(c: Ctx, draws: &[Draw]) {
     if !draws.is_empty() {
-        super::execute(&context::target(c), Load::default(), draws);
+        super::execute(&context::target(c), &lighting(c), Load::default(), draws);
     }
 }
 

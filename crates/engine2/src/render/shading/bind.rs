@@ -7,6 +7,7 @@ use super::defaults;
 use super::layout::Value;
 use super::program::Shading;
 use super::view::{self, View};
+use crate::render::lighting::{self, Lighting};
 use crate::render::texture;
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
@@ -26,6 +27,7 @@ pub struct Instance {
 /// What one draw brings to its material program.
 pub struct Inputs<'a> {
     pub view: &'a View,
+    pub lighting: &'a Lighting,
     pub instances: &'a [Instance],
     /// Material textures by HLSL name (`g_tColor`).
     pub textures: &'a HashMap<String, texture::Ref>,
@@ -83,11 +85,20 @@ fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Res
     Ok(match b.ty {
         B::Buffer { ty: wgpu::BufferBindingType::Uniform, .. } => {
             let block = s.blocks.get(&(b.group, b.binding)).ok_or_else(|| format!("no layout for block {}", b.name))?;
-            let bytes = if b.name == view::BLOCK { block.fill(|n| inputs.view.constant(n)) } else { block.fill(|n| uniform_value(s, inputs, n)) };
+            let bytes = match b.name.as_str() {
+                view::BLOCK => block.fill(|n| inputs.view.constant(n)),
+                name if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n)),
+                _ => block.fill(|n| uniform_value(s, inputs, n)),
+            };
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::UNIFORM, &bytes))
         }
         B::Buffer { ty: wgpu::BufferBindingType::Storage { .. }, min_binding_size, .. } => {
-            let bytes = if b.name == TRANSFORMS { transforms(inputs.instances) } else { vec![0; min_binding_size.map_or(256, |n| n.get().max(256)) as usize] };
+            let element = s.storage.get(&(b.group, b.binding));
+            let bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
+                Some(bytes) => bytes,
+                None if b.name == TRANSFORMS => transforms(inputs.instances),
+                None => vec![0; min_binding_size.map_or(256, |n| n.get().max(256)) as usize],
+            };
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
         B::Texture { sample_type, view_dimension, .. } => {

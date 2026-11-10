@@ -8,6 +8,7 @@ pub mod immediate;
 pub mod model;
 pub mod shaded;
 
+use crate::render::lighting::Lighting;
 use crate::render::shading::view::View;
 use crate::render::{device, texture};
 use abi::structs::{NativeRect, RenderViewport};
@@ -64,8 +65,9 @@ pub fn topology(prim: i64) -> PrimitiveTopology {
     }
 }
 
-/// Run `draws` (possibly none, to only clear) into `target` as one pass.
-pub fn execute(target: &Target, load: Load, draws: &[Draw]) {
+/// Run `draws` (possibly none, to only clear) into `target` as one pass, shaded draws lit by
+/// `lighting`.
+pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw]) {
     let (Some(gpu), Some(placeholder)) = (device::gpu(), placeholder()) else { return };
     let (color, depth) = (texture::resolve(target.color), texture::resolve(target.depth));
     let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), ..Default::default() };
@@ -84,7 +86,7 @@ pub fn execute(target: &Target, load: Load, draws: &[Draw]) {
     let state = |d: &Draw| RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state };
     let view = view_of(&targets);
     let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
-    let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), &key(d, &s.vertex)))).collect();
+    let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex)))).collect();
     let (defaults, ids) = shaded::streams(gpu);
     let draws: Vec<_> = draws
         .iter()

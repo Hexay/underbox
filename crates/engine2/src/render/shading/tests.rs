@@ -7,6 +7,7 @@ use super::{bind, program, standin, vertex, view::View};
 use crate::mesh::layout::Layout;
 use crate::model::content::Content;
 use crate::render::draw::{self, Target, model, shaded::Shaded};
+use crate::render::lighting::Lighting;
 use crate::render::{device, material, texture};
 use glam::{Mat4, Vec3, Vec4};
 use render::RasterState;
@@ -38,7 +39,8 @@ fn scene_renderer_mesh_builds_and_binds() {
     let view = View { view_proj: Mat4::IDENTITY, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0] };
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
-    let draw = bind::Inputs { view: &view, instances: &instances, textures: &textures, values: &[&values] };
+    let lighting = Lighting::fallback();
+    let draw = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values] };
     let groups = gpu.checked(|| bind::bind_groups(&gpu, &s, &draw)).unwrap().unwrap();
     assert_eq!(groups.len(), s.program.bind_group_layouts.len());
 }
@@ -73,7 +75,7 @@ fn standin_draws_a_tinted_cube() {
 
     let (color, depth) = (texture::create_target("standin", 64, 64, 0), texture::create_target("standin depth", 64, 64, 62));
     let target = Target { color, depth, ..Default::default() };
-    draw::execute(&target, Load { color: Some(render::wgpu::Color::BLACK), depth: Some(1.0) }, &[d]);
+    draw::execute(&target, &Lighting::fallback(), Load { color: Some(render::wgpu::Color::BLACK), depth: Some(1.0) }, &[d]);
     let frame = texture::resolve(color).unwrap().gpu.as_ref().unwrap().read_back(gpu);
     assert_eq!(frame.texel(0, 0), [0, 0, 0, 255], "background");
     let [r, g, b, _] = frame.texel(32, 32)[..4].try_into().unwrap();

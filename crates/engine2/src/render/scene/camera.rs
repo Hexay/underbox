@@ -101,6 +101,7 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
         render_tags,
         exclude_tags,
         post_process: field!(get bool, c::GET_ENABLE_POSTPROCESSING, a),
+        ambient: attributes::vector4(attrs, StringToken::of("ambientColor")).map_or(Vec4::ZERO, |c| Vec4::new(c.vec.x, c.vec.y, c.vec.z, c.vec.w)),
         unique_id: field!(get i32, c::GET_VIEW_UNIQUE_ID, a),
         managed_camera_id: camera_id,
     };
