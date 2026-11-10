@@ -1,0 +1,42 @@
+//! Material shading: a material's vfx translated per stage into a wgpu program (crates/shaders),
+//! compiled lazily per (shader, combo) and cached, plus per-draw resource binding by reflected
+//! name (bind.rs). A program that fails to translate or validate is cached as `None` and draws
+//! fall back to the placeholder, with one warning per shader.
+
+pub mod bind;
+mod defaults;
+pub mod layout;
+pub mod program;
+pub mod vertex;
+pub mod view;
+#[cfg(test)]
+mod tests;
+
+pub use program::Shading;
+
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex};
+
+static COMPILER: LazyLock<Option<shaders::Compiler>> = LazyLock::new(|| {
+    shaders::Compiler::new().inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("shader compiler: {e}"))).ok()
+});
+
+type Key = (String, u64, u64);
+static PROGRAMS: LazyLock<Mutex<HashMap<Key, Option<Arc<Shading>>>>> = LazyLock::new(Default::default);
+
+/// The program for a shader resource path at a combo, compiled on first use.
+// TODO: static/dynamic combos from material features and render state; always 0, 0 for now.
+pub fn program(gpu: &render::Gpu, shader_path: &str) -> Option<Arc<Shading>> {
+    let key = (shader_path.to_owned(), 0, 0);
+    if let Some(cached) = PROGRAMS.lock().unwrap().get(&key) {
+        return cached.clone();
+    }
+    let built = (|| {
+        let compiler = COMPILER.as_ref().ok_or("no shader compiler")?;
+        let shader = crate::shader::find(shader_path).ok_or("shader not found")?;
+        program::build(gpu, compiler, &shader, shader_path, &shaders::Variant::new(key.1, key.2))
+    })();
+    let built = built.inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader_path}: {e}"))).ok().map(Arc::new);
+    PROGRAMS.lock().unwrap().insert(key, built.clone());
+    built
+}

@@ -39,6 +39,20 @@ impl Texture {
     pub fn is_render_target(&self) -> bool {
         self.config.m_n_flags & TSPEC_RENDER_TARGET != 0
     }
+
+    /// `ImageFormat` managed created it with.
+    pub fn image_format(&self) -> i32 {
+        self.config.m_n_image_format
+    }
+
+    /// Mip 0 of the CPU copy, for uncompressed formats the copy covers.
+    pub fn cpu_mip0(&self) -> Option<render::Frame> {
+        let Some(image::Layout::Pixel { bytes }) = image::layout(self.config.m_n_image_format.into()) else { return None };
+        let (w, h) = (self.config.m_n_width.max(1) as u32, self.config.m_n_height.max(1) as u32);
+        let len = (w * h * bytes) as usize;
+        let data = self.data.lock().unwrap();
+        (data.len() >= len).then(|| render::Frame { width: w, height: h, texel_size: bytes, pixels: data[..len].to_vec() })
+    }
 }
 
 static LOADED: ByName<Texture> = ByName::new();
@@ -116,6 +130,17 @@ pub(crate) fn create(name: Option<&CStr>, _anonymous: bool, config: TextureCreat
         guid: Guid::default(),
     };
     resource::new_handle(Arc::new(texture))
+}
+
+/// A render target of `image_format` (an `ImageFormat`; depth formats make depth targets).
+pub fn create_target(name: &str, width: u32, height: u32, image_format: i32) -> Ref {
+    let mut config = TextureCreationConfig_t::default();
+    let clamp = |v: u32| v.clamp(1, i16::MAX as u32) as i16;
+    (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (clamp(width), clamp(height), 1, 1);
+    config.m_n_image_format = image_format;
+    config.m_n_flags = TSPEC_RENDER_TARGET;
+    let name = std::ffi::CString::new(name).unwrap_or_default();
+    create(Some(&name), true, config, &mut [])
 }
 
 fn on<R: Default>(t: Ref, f: impl FnOnce(&Texture) -> R) -> R {

@@ -7,11 +7,8 @@ pub struct Gpu {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub info: wgpu::AdapterInfo,
-    // Kept alive for surface creation once windows exist (docs/renderer.md, "Windows").
-    #[allow(dead_code)]
-    instance: wgpu::Instance,
-    #[allow(dead_code)]
-    adapter: wgpu::Adapter,
+    pub(crate) instance: wgpu::Instance,
+    pub(crate) adapter: wgpu::Adapter,
 }
 
 #[derive(Debug)]
@@ -49,12 +46,25 @@ impl Gpu {
             ..Default::default()
         };
         let (device, queue) = pollster::block_on(adapter.request_device(&desc)).map_err(GpuError::Device)?;
+        // wgpu's default handler panics, which would take a managed client down over one bad draw.
+        device.on_uncaptured_error(std::sync::Arc::new(|e| eprintln!("wgpu error: {e}")));
         Ok(Gpu { info: adapter.get_info(), device, queue, instance, adapter })
     }
 
     /// `backend/adapter name`, e.g. `vulkan/llvmpipe (LLVM 20.1.2, 256 bits)`.
     pub fn describe(&self) -> String {
         format!("{}/{}", self.info.backend, self.info.name)
+    }
+
+    /// Run `f` (resource or pipeline creation) and report the validation error it raised, if any,
+    /// instead of sending it to the uncaptured handler.
+    pub fn checked<R>(&self, f: impl FnOnce() -> R) -> Result<R, String> {
+        let scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let r = f();
+        match pollster::block_on(scope.pop()) {
+            Some(e) => Err(e.to_string()),
+            None => Ok(r),
+        }
     }
 
     /// Block until every submitted command has finished (and map callbacks have run).

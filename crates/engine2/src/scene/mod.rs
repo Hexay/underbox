@@ -6,6 +6,7 @@ pub mod light;
 pub mod object;
 mod object_slots;
 mod probes;
+mod sky;
 pub mod world;
 
 pub fn register(r: &mut abi::Registry) {
@@ -14,4 +15,5 @@ pub fn register(r: &mut abi::Registry) {
     create::register(r);
     light::register(r);
     probes::register(r);
+    sky::register(r);
 }
