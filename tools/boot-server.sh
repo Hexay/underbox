@@ -26,12 +26,13 @@ lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; t0=$(date 
 
 sh "$ROOT/tools/prepare-sbox.sh" "$SBOX"
 # Rebuild when missing or when prepare-sbox.sh added EmbeddedRefs after the last build.
-if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/EmbeddedRefs" -nt "$SBOX/game/sbox-server.dll" ]; then
+# A stamp, not the dll's mtime: an up-to-date build copies the dll back with its old mtime.
+STAMP="$SBOX/game/.underbox-server-built"
+if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/EmbeddedRefs" -nt "$STAMP" ]; then
     echo "== building sbox-server (~2 min)"
     # The icon isn't in the public repo; an empty property skips it without patching their csproj.
     dotnet build "$SBOX/engine/Launcher/SboxServer/Sbox-Server.csproj" -c Release -m:4 -nodeReuse:false -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
-    # An up-to-date build leaves the dll's mtime alone, which would rebuild on every boot.
-    touch "$SBOX/game/sbox-server.dll"
+    touch "$STAMP"
 fi
 T_PREP=$(lap prepare)
 
