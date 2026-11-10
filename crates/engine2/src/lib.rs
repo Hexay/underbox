@@ -30,6 +30,8 @@ pub mod bitmap;
 pub mod convar;
 pub mod resource_compiler;
 pub mod shader;
+mod video;
+mod xr;
 
 pub use igen::igen_engine;
 pub use interfaces::CreateInterface;
