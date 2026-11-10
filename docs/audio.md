@@ -61,8 +61,10 @@ TODO: compiled `.vsnd_c` (DATA block KV3 header + trailing stream).
   per block. TODO: HRTF.
 - Direct: per band gain `distance * air[b] * (occlusion + (1 - occlusion) * transmission[b])` over
   Steam Audio's bands (< 800 Hz, 800 Hz to 8 kHz, > 8 kHz), ramped across the block.
-- Reverb: a 4-line feedback delay network whose line gains give the mid band's T60; low and high
-  T60s set a damping filter.
+- Reverb: a 4-line feedback delay network whose line gains give the mid band's T60; the high
+  band's T60 sets a damping filter. TODO: the low band.
+- Path (`CPathEffect`): passes the input through. Managed never creates one yet.
+- DSP presets: per-unit approximations of Source's processors; delay-time modulation is a TODO.
 
 ## Voice
 

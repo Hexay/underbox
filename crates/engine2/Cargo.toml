@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 abi = { path = "../abi" }
 anim = { path = "../anim" }
 assets = { path = "../assets" }
+audio = { path = "../audio" }
 box2d-sys = { path = "../box2d-sys" }
 glam = "0.33"
 gns = { path = "../gns" }
@@ -24,4 +25,7 @@ render = { path = "../render" }
 serde_json.workspace = true
 
 [features]
+default = ["audio-device"]
 steam = ["platform/steam"]
+# Sound output and microphone capture through cpal (links libasound on Linux).
+audio-device = ["audio/device"]
