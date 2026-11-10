@@ -1,0 +1,7412 @@
+[
+  {
+    "managed": "BBox",
+    "underlying": null,
+    "declared": [
+      "BBox"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "Mins",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Maxs",
+        "offset": 12,
+        "type": "Vector3",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.AlignEdgeUV_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.AlignEdgeUV_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.AnimParamType",
+    "underlying": "byte",
+    "declared": [
+      "NativeEngine.AnimParamType"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.AudioDeviceDesc",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.AudioDeviceDesc"
+    ],
+    "size": 2,
+    "fields": [
+      {
+        "name": "IsAvailable",
+        "offset": 0,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "IsDefault",
+        "offset": 1,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.BufferDesc",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.BufferDesc"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "m_nElementCount",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_nElementSizeInBytes",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_pDebugName",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "m_pBudgetGroupName",
+        "offset": 16,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.ButtonCode",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.ButtonCode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.AnimVariant",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.AnimVariant"
+    ],
+    "size": 17,
+    "fields": [
+      {
+        "name": "_rawValue",
+        "offset": 0,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "_integerValue",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Type",
+        "offset": 16,
+        "type": "enum:byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Animation.GraphRecording.SeekResult",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.Animation.GraphRecording.SeekResult"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.BoneFlags",
+    "underlying": "uint",
+    "declared": [
+      "NativeEngine.BoneFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.CSamplerStateDesc",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.CSamplerStateDesc"
+    ],
+    "size": 20,
+    "fields": [
+      {
+        "name": "m_nFilterMode",
+        "offset": 0,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nMipLodBias",
+        "offset": 1,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nMipLodBiasSign",
+        "offset": 2,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nAddressU",
+        "offset": 3,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nAddressV",
+        "offset": 4,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nAddressW",
+        "offset": 5,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nAnisoExp",
+        "offset": 6,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nComparisonFunc",
+        "offset": 7,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nAllowGlobalMipBiasOverride",
+        "offset": 8,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nMinLod",
+        "offset": 9,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nMaxLod",
+        "offset": 10,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_nBorderColor8Bit",
+        "offset": 12,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_nPad",
+        "offset": 16,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.CTextureDesc",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.CTextureDesc"
+    ],
+    "size": 28,
+    "fields": [
+      {
+        "name": "m_nWidth",
+        "offset": 0,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nHeight",
+        "offset": 2,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nDepth",
+        "offset": 4,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nNumMipLevels",
+        "offset": 6,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nDecodeFlags",
+        "offset": 8,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nImageFormat",
+        "offset": 12,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nFlags",
+        "offset": 16,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "m_nDisplayRectWidth",
+        "offset": 20,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nDisplayRectHeight",
+        "offset": 22,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nMotionVectorsMaxDistanceInPixels",
+        "offset": 24,
+        "type": "short",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Transform",
+    "underlying": null,
+    "declared": [
+      "Transform"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "Position",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Scale",
+        "offset": 12,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Rotation",
+        "offset": 24,
+        "type": "Rotation",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Color32",
+    "underlying": null,
+    "declared": [
+      "Color32"
+    ],
+    "size": 4,
+    "fields": [
+      {
+        "name": "r",
+        "offset": 0,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "g",
+        "offset": 1,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "b",
+        "offset": 2,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "a",
+        "offset": 3,
+        "type": "byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.ColorFormat",
+    "underlying": "uint",
+    "declared": [
+      "NativeEngine.ColorFormat"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "ConVarFlags_t",
+    "underlying": "long",
+    "declared": [
+      "ConVarFlags_t"
+    ],
+    "size": 8,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.SceneCubemap.ProjectionMode",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.SceneCubemap.ProjectionMode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.DeviceSpecificInfo_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.DeviceSpecificInfo_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Steamworks.BeginAuthResult",
+    "underlying": "int",
+    "declared": [
+      "Steamworks.BeginAuthResult"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.SceneLayerType",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.SceneLayerType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.Rendering.LayerFlags",
+    "underlying": "ulong",
+    "declared": [
+      "Sandbox.Rendering.LayerFlags"
+    ],
+    "size": 8,
+    "fields": []
+  },
+  {
+    "managed": "Steamworks.Result",
+    "underlying": "int",
+    "declared": [
+      "Steamworks.Result"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.Rendering.SceneObjectFlags",
+    "underlying": "ulong",
+    "declared": [
+      "Sandbox.Rendering.SceneObjectFlags"
+    ],
+    "size": 8,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.ESceneObjectTypeFlags",
+    "underlying": "uint",
+    "declared": [
+      "NativeEngine.ESceneObjectTypeFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Steamworks.SteamNetworkingAvailability",
+    "underlying": "int",
+    "declared": [
+      "Steamworks.SteamNetworkingAvailability"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Steamworks.NetConfig",
+    "underlying": "int",
+    "declared": [
+      "Steamworks.NetConfig"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Steamworks.TextFilteringContext",
+    "underlying": "int",
+    "declared": [
+      "Steamworks.TextFilteringContext"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "FBMGammaType_t",
+    "underlying": "int",
+    "declared": [
+      "FBMGammaType_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.GenerateUVsMode_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.GenerateUVsMode_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.Animation.GraphValueKind",
+    "underlying": "byte",
+    "declared": [
+      "Sandbox.Animation.GraphValueKind"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "Steamworks.Data.HAuthTicket",
+    "underlying": null,
+    "declared": [
+      "Steamworks.Data.HAuthTicket"
+    ],
+    "size": 4,
+    "fields": [
+      {
+        "name": "Value",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.HMaterial",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.HMaterial"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Rendering.SceneViewRenderTargetHandle",
+    "underlying": null,
+    "declared": [
+      "Sandbox.Rendering.SceneViewRenderTargetHandle"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Network.HSteamListenSocket",
+    "underlying": null,
+    "declared": [
+      "Sandbox.Network.HSteamListenSocket"
+    ],
+    "size": 4,
+    "fields": [
+      {
+        "name": "Id",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Network.HSteamNetConnection",
+    "underlying": null,
+    "declared": [
+      "Sandbox.Network.HSteamNetConnection"
+    ],
+    "size": 4,
+    "fields": [
+      {
+        "name": "Id",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Network.HSteamNetPollGroup",
+    "underlying": null,
+    "declared": [
+      "Sandbox.Network.HSteamNetPollGroup"
+    ],
+    "size": 4,
+    "fields": [
+      {
+        "name": "Id",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.ImageFormat",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.ImageFormat"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.IndexBufferHandle_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.IndexBufferHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.JointMotion",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.JointMotion"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "KeyValues3Type_t",
+    "underlying": "byte",
+    "declared": [
+      "KeyValues3Type_t"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.LightSourceShape_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.LightSourceShape_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.Rendering.Stage",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.Rendering.Stage"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "ManagedRenderSetup_t",
+    "underlying": null,
+    "declared": [
+      "ManagedRenderSetup_t"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "renderContext",
+        "offset": 0,
+        "type": "NativeEngine.IRenderContext",
+        "count": 1
+      },
+      {
+        "name": "sceneView",
+        "offset": 8,
+        "type": "NativeEngine.ISceneView",
+        "count": 1
+      },
+      {
+        "name": "sceneLayer",
+        "offset": 16,
+        "type": "NativeEngine.ISceneLayer",
+        "count": 1
+      },
+      {
+        "name": "colorImageFormat",
+        "offset": 24,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "msaaLevel",
+        "offset": 28,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "stats",
+        "offset": 32,
+        "type": "SceneSystemPerFrameStats_t",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.MaterialSystem2AppSystemDictCreateInfo",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.MaterialSystem2AppSystemDictCreateInfo"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "iFlags",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "nSteamAppId",
+        "offset": 4,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "hInstance",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "hPrevInstance",
+        "offset": 16,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "nCmdShow",
+        "offset": 24,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "MeshTraceInput",
+    "underlying": null,
+    "declared": [
+      "MeshTraceInput"
+    ],
+    "size": 136,
+    "fields": [
+      {
+        "name": "start",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "end",
+        "offset": 12,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "tagRequire",
+        "offset": 24,
+        "type": "uint",
+        "count": 8
+      },
+      {
+        "name": "tagAny",
+        "offset": 56,
+        "type": "uint",
+        "count": 8
+      },
+      {
+        "name": "tagExclude",
+        "offset": 88,
+        "type": "uint",
+        "count": 8
+      },
+      {
+        "name": "cullMode",
+        "offset": 120,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "filterDelegate",
+        "offset": 128,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "MeshTraceOutput",
+    "underlying": null,
+    "declared": [
+      "MeshTraceOutput"
+    ],
+    "size": 120,
+    "fields": [
+      {
+        "name": "distance",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "position",
+        "offset": 4,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "normal",
+        "offset": 16,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "material",
+        "offset": 32,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "transform",
+        "offset": 40,
+        "type": "Transform",
+        "count": 1
+      },
+      {
+        "name": "sceneobjectHandle",
+        "offset": 80,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "triangleIndex",
+        "offset": 84,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "uv",
+        "offset": 88,
+        "type": "Vector2",
+        "count": 1
+      },
+      {
+        "name": "v0",
+        "offset": 96,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "v1",
+        "offset": 104,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "v2",
+        "offset": 112,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.PhysicsBodySettings",
+    "underlying": null,
+    "declared": [
+      "Sandbox.PhysicsBodySettings"
+    ],
+    "size": 100,
+    "fields": [
+      {
+        "name": "BodyType",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "Position",
+        "offset": 4,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Rotation",
+        "offset": 16,
+        "type": "Rotation",
+        "count": 1
+      },
+      {
+        "name": "Velocity",
+        "offset": 32,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "AngularVelocity",
+        "offset": 44,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "LinearDamping",
+        "offset": 56,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "AngularDamping",
+        "offset": 60,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "GravityScale",
+        "offset": 64,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "SleepThreshold",
+        "offset": 68,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Mass",
+        "offset": 72,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "InertiaScale",
+        "offset": 76,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "MassCenter",
+        "offset": 80,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Flags",
+        "offset": 92,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "MotionLocks",
+        "offset": 96,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.PhysicsBodyType",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.PhysicsBodyType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.PhysicsJointType",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.PhysicsJointType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.PhysicsMotionType",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.PhysicsMotionType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.PhysicsShapeSettings",
+    "underlying": null,
+    "declared": [
+      "Sandbox.PhysicsShapeSettings"
+    ],
+    "size": 112,
+    "fields": [
+      {
+        "name": "SurfaceIndices",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "Tags",
+        "offset": 8,
+        "type": "uint",
+        "count": 16
+      },
+      {
+        "name": "SurfaceVelocity",
+        "offset": 72,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Friction",
+        "offset": 84,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Elasticity",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "RollingResistance",
+        "offset": 92,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "SurfaceIndex",
+        "offset": 96,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "CollisionFunctionMask",
+        "offset": 100,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Flags",
+        "offset": 104,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "SurfaceCount",
+        "offset": 108,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.PhysicsShapeType",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.PhysicsShapeType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.PhysicsSimulationMode",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.PhysicsSimulationMode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Angles",
+    "underlying": null,
+    "declared": [
+      "Angles"
+    ],
+    "size": 12,
+    "fields": [
+      {
+        "name": "pitch",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "yaw",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "roll",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Rotation",
+    "underlying": null,
+    "declared": [
+      "Rotation"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "_quat",
+        "offset": 0,
+        "type": "System.Numerics.Quaternion",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Rect3D",
+    "underlying": null,
+    "declared": [
+      "Rect3D"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "x",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "y",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "z",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "width",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "height",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "depth",
+        "offset": 20,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeRect",
+    "underlying": null,
+    "declared": [
+      "NativeRect"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "x",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "y",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "w",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "h",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.RenderBarrierAccessFlags_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderBarrierAccessFlags_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderBarrierPipelineStageFlags_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderBarrierPipelineStageFlags_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderBufferFlags",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderBufferFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderBufferHandle_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.RenderBufferHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.RenderBufferType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderBufferType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderColorSpace",
+    "underlying": "byte",
+    "declared": [
+      "NativeEngine.RenderColorSpace"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderDeviceAPI_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderDeviceAPI_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "RenderDeviceInfo_t",
+    "underlying": null,
+    "declared": [
+      "RenderDeviceInfo_t"
+    ],
+    "size": 28,
+    "fields": [
+      {
+        "name": "m_DisplayMode",
+        "offset": 0,
+        "type": "RenderDisplayMode_t",
+        "count": 1
+      },
+      {
+        "name": "m_nMultisampleType",
+        "offset": 20,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nModeUsage",
+        "offset": 24,
+        "type": "enum:byte",
+        "count": 1
+      },
+      {
+        "name": "m_bWaitForVSync",
+        "offset": 25,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "m_bIsMainWindow",
+        "offset": 26,
+        "type": "byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.RenderImageLayout_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderImageLayout_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderInputLayout_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.RenderInputLayout_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.RenderMultisampleType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderMultisampleType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderPrimitiveType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderPrimitiveType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderSemaphoreHandle_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.RenderSemaphoreHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.RenderShaderHandle_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.RenderShaderHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.RenderShaderType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderShaderType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderSystemAssetFileLoadMode",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.RenderSystemAssetFileLoadMode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderTextureDimension",
+    "underlying": "sbyte",
+    "declared": [
+      "NativeEngine.RenderTextureDimension"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RenderViewport",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.RenderViewport"
+    ],
+    "size": 28,
+    "fields": [
+      {
+        "name": "\u003Cm_nVersion\u003Ek__BackingField",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "\u003Cm_nTopLeftX\u003Ek__BackingField",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "\u003Cm_nTopLeftY\u003Ek__BackingField",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "\u003Cm_nWidth\u003Ek__BackingField",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "\u003Cm_nHeight\u003Ek__BackingField",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "\u003CMinZ\u003Ek__BackingField",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "\u003CMaxZ\u003Ek__BackingField",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "PhysicsTrace.Request",
+    "underlying": null,
+    "declared": [
+      "PhysicsTrace.Request"
+    ],
+    "size": 208,
+    "fields": [
+      {
+        "name": "World",
+        "offset": 0,
+        "type": "IPhysicsWorld",
+        "count": 1
+      },
+      {
+        "name": "Body",
+        "offset": 8,
+        "type": "NativeEngine.IPhysicsBody",
+        "count": 1
+      },
+      {
+        "name": "StartPos",
+        "offset": 16,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "EndPos",
+        "offset": 28,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "TagRequire",
+        "offset": 40,
+        "type": "uint",
+        "count": 8
+      },
+      {
+        "name": "TagAny",
+        "offset": 72,
+        "type": "uint",
+        "count": 8
+      },
+      {
+        "name": "TagExclude",
+        "offset": 104,
+        "type": "uint",
+        "count": 8
+      },
+      {
+        "name": "FilterDelegate",
+        "offset": 136,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "TriggerFilter",
+        "offset": 144,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "ObjectSetMask",
+        "offset": 146,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "UseHitPosition",
+        "offset": 148,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "StartShape",
+        "offset": 152,
+        "type": "PhysicsTrace.Request.Shape",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "PhysicsTrace.Result",
+    "underlying": null,
+    "declared": [
+      "PhysicsTrace.Result"
+    ],
+    "size": 136,
+    "fields": [
+      {
+        "name": "StartPos",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "EndPos",
+        "offset": 12,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "HitPos",
+        "offset": 24,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Normal",
+        "offset": 36,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Fraction",
+        "offset": 48,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "StartedInSolid",
+        "offset": 52,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "PhysicsBodyHandle",
+        "offset": 56,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "PhysicsShapeHandle",
+        "offset": 60,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "SurfaceProperty",
+        "offset": 64,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "TriangleIndex",
+        "offset": 68,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Tags",
+        "offset": 72,
+        "type": "uint",
+        "count": 16
+      }
+    ]
+  },
+  {
+    "managed": "Capsule",
+    "underlying": null,
+    "declared": [
+      "Capsule"
+    ],
+    "size": 28,
+    "fields": [
+      {
+        "name": "CenterA",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "CenterB",
+        "offset": 12,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Radius",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Sphere",
+    "underlying": null,
+    "declared": [
+      "Sandbox.Sphere"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "Center",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Radius",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.ComparisonMode",
+    "underlying": "byte",
+    "declared": [
+      "NativeEngine.ComparisonMode"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.Rendering.FilterMode",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.Rendering.FilterMode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.Rendering.TextureAddressMode",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.Rendering.TextureAddressMode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.RuntimeTextureSpecificationFlags",
+    "underlying": "uint",
+    "declared": [
+      "NativeEngine.RuntimeTextureSpecificationFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.Sdl.CommonEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.CommonEvent"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "Type",
+        "offset": 0,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "Reserved",
+        "offset": 4,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Timestamp",
+        "offset": 8,
+        "type": "ulong",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.DialogFileFilter",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.DialogFileFilter"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "Name",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "Pattern",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.DisplayMode",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.DisplayMode"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "Display",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Format",
+        "offset": 4,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Width",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Height",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "PixelDensity",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "RefreshRate",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "RefreshRateNumerator",
+        "offset": 24,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "RefreshRateDenominator",
+        "offset": 28,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Internal",
+        "offset": 32,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.DropEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.DropEvent"
+    ],
+    "size": 48,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "X",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Source",
+        "offset": 32,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "Data",
+        "offset": 40,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.Event",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.Event"
+    ],
+    "size": 128,
+    "fields": [
+      {
+        "name": "Type",
+        "offset": 0,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "Key",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.KeyboardEvent",
+        "count": 1
+      },
+      {
+        "name": "Text",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.TextInputEvent",
+        "count": 1
+      },
+      {
+        "name": "Edit",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.TextEditingEvent",
+        "count": 1
+      },
+      {
+        "name": "Motion",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.MouseMotionEvent",
+        "count": 1
+      },
+      {
+        "name": "Button",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.MouseButtonEvent",
+        "count": 1
+      },
+      {
+        "name": "Wheel",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.MouseWheelEvent",
+        "count": 1
+      },
+      {
+        "name": "Drop",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.DropEvent",
+        "count": 1
+      },
+      {
+        "name": "GamepadDevice",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.GamepadDeviceEvent",
+        "count": 1
+      },
+      {
+        "name": "GamepadButton",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.GamepadButtonEvent",
+        "count": 1
+      },
+      {
+        "name": "GamepadAxis",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.GamepadAxisEvent",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.ExternalDropCallbacks",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.ExternalDropCallbacks"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "OnEnter",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "OnOver",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "OnLeave",
+        "offset": 16,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "OnDrop",
+        "offset": 24,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "OnDragFrame",
+        "offset": 32,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.FlashOperation",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.Sdl.FlashOperation"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.Sdl.GamepadAxisEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.GamepadAxisEvent"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Axis",
+        "offset": 20,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Padding1",
+        "offset": 21,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Padding2",
+        "offset": 22,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Padding3",
+        "offset": 23,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Value",
+        "offset": 24,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "Padding4",
+        "offset": 26,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.GamepadButtonEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.GamepadButtonEvent"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Button",
+        "offset": 20,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Down",
+        "offset": 21,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Padding1",
+        "offset": 22,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Padding2",
+        "offset": 23,
+        "type": "byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.GamepadDeviceEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.GamepadDeviceEvent"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.GamepadType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.Sdl.GamepadType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.Sdl.InitFlags",
+    "underlying": "uint",
+    "declared": [
+      "NativeEngine.Sdl.InitFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.Sdl.KeyboardEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.KeyboardEvent"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 20,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Scancode",
+        "offset": 24,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Key",
+        "offset": 28,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Mod",
+        "offset": 32,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "Raw",
+        "offset": 34,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "Down",
+        "offset": 36,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Repeat",
+        "offset": 37,
+        "type": "byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.MouseButtonEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.MouseButtonEvent"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 20,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Button",
+        "offset": 24,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Down",
+        "offset": 25,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Clicks",
+        "offset": 26,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "Padding",
+        "offset": 27,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "X",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.MouseMotionEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.MouseMotionEvent"
+    ],
+    "size": 48,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 20,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "State",
+        "offset": 24,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "X",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "XRel",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "YRel",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.MouseWheelEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.MouseWheelEvent"
+    ],
+    "size": 56,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Which",
+        "offset": 20,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "X",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Direction",
+        "offset": 32,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "MouseX",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "MouseY",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "IntegerX",
+        "offset": 44,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "IntegerY",
+        "offset": 48,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.Point",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.Point"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "X",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.Rect",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.Rect"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "X",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Width",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Height",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.SensorType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.Sdl.SensorType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.Sdl.SystemCursor",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.Sdl.SystemCursor"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.Sdl.TextEditingEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.TextEditingEvent"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Text",
+        "offset": 24,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "Start",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Length",
+        "offset": 36,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.TextInputEvent",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.Sdl.TextInputEvent"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "Common",
+        "offset": 0,
+        "type": "NativeEngine.Sdl.CommonEvent",
+        "count": 1
+      },
+      {
+        "name": "WindowID",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "Text",
+        "offset": 24,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.Sdl.WindowFlags",
+    "underlying": "ulong",
+    "declared": [
+      "NativeEngine.Sdl.WindowFlags"
+    ],
+    "size": 8,
+    "fields": []
+  },
+  {
+    "managed": "SamplerStateHandle_t",
+    "underlying": null,
+    "declared": [
+      "SamplerStateHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.AggregateFragment",
+    "underlying": null,
+    "declared": [
+      "Sandbox.AggregateFragment"
+    ],
+    "size": 88,
+    "fields": [
+      {
+        "name": "Transform",
+        "offset": 0,
+        "type": "Transform",
+        "count": 1
+      },
+      {
+        "name": "BoundsMin",
+        "offset": 40,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "BoundsMax",
+        "offset": 52,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Tint",
+        "offset": 64,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "DrawDescriptorIndex",
+        "offset": 80,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Flags",
+        "offset": 84,
+        "type": "enum:int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.Vertex",
+    "underlying": null,
+    "declared": [
+      "Sandbox.Vertex"
+    ],
+    "size": 76,
+    "fields": [
+      {
+        "name": "Position",
+        "offset": 0,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Color",
+        "offset": 12,
+        "type": "Color32",
+        "count": 1
+      },
+      {
+        "name": "Normal",
+        "offset": 16,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "TexCoord0",
+        "offset": 28,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "TexCoord1",
+        "offset": 44,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "Tangent",
+        "offset": 60,
+        "type": "Vector4",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.SceneDeformationVolumeData",
+    "underlying": null,
+    "declared": [
+      "Sandbox.SceneDeformationVolumeData"
+    ],
+    "size": 208,
+    "fields": [
+      {
+        "name": "ModelToVolumeRow0",
+        "offset": 0,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "ModelToVolumeRow1",
+        "offset": 16,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "ModelToVolumeRow2",
+        "offset": 32,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "VolumeToModelRow0",
+        "offset": 48,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "VolumeToModelRow1",
+        "offset": 64,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "VolumeToModelRow2",
+        "offset": 80,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "SizeRadius",
+        "offset": 96,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "AmountFalloff",
+        "offset": 112,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "WeightOperation",
+        "offset": 128,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "CenterShape",
+        "offset": 144,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "TransformRow0",
+        "offset": 160,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "TransformRow1",
+        "offset": 176,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "TransformRow2",
+        "offset": 192,
+        "type": "Vector4",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.SceneLayerMSAAMode_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SceneLayerMSAAMode_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.SceneSystemGPUProfilerMode",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SceneSystemGPUProfilerMode"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.SceneSystemRenderTargetSize",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SceneSystemRenderTargetSize"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.GpuTimestampEventData",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.GpuTimestampEventData"
+    ],
+    "size": 96,
+    "fields": [
+      {
+        "name": "Kind",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "SubmissionId",
+        "offset": 8,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "EndSubmissionId",
+        "offset": 16,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "WaitForSubmissionId",
+        "offset": 24,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "WaitStageMask",
+        "offset": 32,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "DeviationMs",
+        "offset": 40,
+        "type": "double",
+        "count": 1
+      },
+      {
+        "name": "CommandBuffers",
+        "offset": 48,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "WaitForAcquire",
+        "offset": 52,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "StartMs",
+        "offset": 56,
+        "type": "double",
+        "count": 1
+      },
+      {
+        "name": "EndMs",
+        "offset": 64,
+        "type": "double",
+        "count": 1
+      },
+      {
+        "name": "Parent",
+        "offset": 72,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Queue",
+        "offset": 76,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "HostTicks",
+        "offset": 80,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "SubmitTag",
+        "offset": 88,
+        "type": "ulong",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.SceneSystemWellKnownMaterialObjectID",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SceneSystemWellKnownMaterialObjectID"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.SceneSystemWellKnownTextureObjectID",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SceneSystemWellKnownTextureObjectID"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "SceneTonemapParameters_t",
+    "underlying": null,
+    "declared": [
+      "SceneTonemapParameters_t"
+    ],
+    "size": 44,
+    "fields": [
+      {
+        "name": "m_flAutoExposureMin",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flAutoExposureMax",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flExposureCompensationScalar",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flTonemapPercentTarget",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flTonemapPercentBrightPixels",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flTonemapMinAvgLum",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flRate",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flAccelerateExposureDown",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flExposureAdaptationSpeedUp",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flExposureAdaptationSpeedDown",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flTonemapEVSmoothingRange",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.SceneViewFlags",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SceneViewFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.SceneVolumetricFogParameters",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.SceneVolumetricFogParameters"
+    ],
+    "size": 28,
+    "fields": [
+      {
+        "name": "m_bFogEnabled",
+        "offset": 0,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "m_flAnisotropy",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flScattering",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flDrawDistance",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flFadeInStart",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flFadeInEnd",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flIndirectStrength",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.SceneVolumetricFogVolume",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.SceneVolumetricFogVolume"
+    ],
+    "size": 116,
+    "fields": [
+      {
+        "name": "m_uID",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_fStrength",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_fExponent",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_vColor",
+        "offset": 12,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "m_vMin",
+        "offset": 24,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "m_vMax",
+        "offset": 36,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "m_bSpherical",
+        "offset": 48,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "m_matWorldToVolume",
+        "offset": 52,
+        "type": "Matrix",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "SheetFrameImage_t",
+    "underlying": null,
+    "declared": [
+      "SheetFrameImage_t"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "uv1",
+        "offset": 0,
+        "type": "Vector4",
+        "count": 1
+      },
+      {
+        "name": "uv2",
+        "offset": 16,
+        "type": "Vector4",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Steamworks.Data.SteamNetConnectionRealTimeStatus_t",
+    "underlying": null,
+    "declared": [
+      "Steamworks.Data.SteamNetConnectionRealTimeStatus_t"
+    ],
+    "size": 120,
+    "fields": [
+      {
+        "name": "m_eState",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nPing",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_flConnectionQualityLocal",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flConnectionQualityRemote",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flOutPacketsPerSec",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flOutBytesPerSec",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flInPacketsPerSec",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_flInBytesPerSec",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m_nSendRateBytesPerSecond",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_cbPendingUnreliable",
+        "offset": 36,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_cbPendingReliable",
+        "offset": 40,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_cbSentUnackedReliable",
+        "offset": 44,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_usecQueueTime",
+        "offset": 48,
+        "type": "long",
+        "count": 1
+      },
+      {
+        "name": "m_usecMaxJitter",
+        "offset": 56,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "reserved",
+        "offset": 60,
+        "type": "uint",
+        "count": 15
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.SwapChainBuffer",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.SwapChainBuffer"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "SwapChainHandle_t",
+    "underlying": null,
+    "declared": [
+      "SwapChainHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.TextureCreationConfig_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.TextureCreationConfig_t"
+    ],
+    "size": 44,
+    "fields": [
+      {
+        "name": "m_nWidth",
+        "offset": 0,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nHeight",
+        "offset": 2,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nDepth",
+        "offset": 4,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nNumMipLevels",
+        "offset": 6,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nDecodeFlags",
+        "offset": 8,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nImageFormat",
+        "offset": 12,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nFlags",
+        "offset": 16,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "m_nDisplayRectWidth",
+        "offset": 20,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nDisplayRectHeight",
+        "offset": 22,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nMotionVectorsMaxDistanceInPixels",
+        "offset": 24,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "m_nMultisampleType",
+        "offset": 28,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nUsage",
+        "offset": 32,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nScope",
+        "offset": 36,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_compressionType",
+        "offset": 40,
+        "type": "enum:int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.TextureDecodingFlags",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.TextureDecodingFlags"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.TextureOnDiskCompressionType",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.TextureOnDiskCompressionType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.TextureScope",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.TextureScope"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.TextureUsage",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.TextureUsage"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Matrix",
+    "underlying": null,
+    "declared": [
+      "Matrix"
+    ],
+    "size": 64,
+    "fields": [
+      {
+        "name": "_numerics",
+        "offset": 0,
+        "type": "System.Numerics.Matrix4x4",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Vector3",
+    "underlying": null,
+    "declared": [
+      "Vector3"
+    ],
+    "size": 12,
+    "fields": [
+      {
+        "name": "_vec",
+        "offset": 0,
+        "type": "System.Numerics.Vector3",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Vector2",
+    "underlying": null,
+    "declared": [
+      "Vector2"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "_vec",
+        "offset": 0,
+        "type": "System.Numerics.Vector2",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Vector4",
+    "underlying": null,
+    "declared": [
+      "Vector4"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "_vec",
+        "offset": 0,
+        "type": "System.Numerics.Vector4",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.VertexBufferHandle_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.VertexBufferHandle_t"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.VertexField",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.VertexField"
+    ],
+    "size": 20,
+    "fields": [
+      {
+        "name": "Format",
+        "offset": 0,
+        "type": "enum:uint",
+        "count": 1
+      },
+      {
+        "name": "Offset",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "NameSize",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "NameOffset",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "SemanticIndex",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.VfxCompileTarget_t",
+    "underlying": "int",
+    "declared": [
+      "NativeEngine.VfxCompileTarget_t"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.ShaderProgramType",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.ShaderProgramType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.VulkanDeviceSpecificTexture_t",
+    "underlying": null,
+    "declared": [
+      "NativeEngine.VulkanDeviceSpecificTexture_t"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "m_pImage",
+        "offset": 0,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "m_nFormat",
+        "offset": 8,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_nWidth",
+        "offset": 12,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_nHeight",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "audio_source_indexstate_t",
+    "underlying": null,
+    "declared": [
+      "audio_source_indexstate_t"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "m_nPacketIndex",
+        "offset": 0,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_nBufferSampleOffset",
+        "offset": 4,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_nSampleFracOffset",
+        "offset": 8,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "m_nDelaySamples",
+        "offset": 12,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2AABB",
+    "underlying": null,
+    "declared": [
+      "b2AABB"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "lowerBound",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "upperBound",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2BodyDef",
+    "underlying": null,
+    "declared": [
+      "b2BodyDef"
+    ],
+    "size": 80,
+    "fields": [
+      {
+        "name": "type",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "position",
+        "offset": 4,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "rotation",
+        "offset": 12,
+        "type": "b2Rot",
+        "count": 1
+      },
+      {
+        "name": "linearVelocity",
+        "offset": 20,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "angularVelocity",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "linearDamping",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "angularDamping",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "gravityScale",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "sleepThreshold",
+        "offset": 44,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "name",
+        "offset": 48,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "userData",
+        "offset": 56,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "motionLocks",
+        "offset": 64,
+        "type": "b2MotionLocks",
+        "count": 1
+      },
+      {
+        "name": "enableSleep",
+        "offset": 67,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "isAwake",
+        "offset": 68,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "isBullet",
+        "offset": 69,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "isEnabled",
+        "offset": 70,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "allowFastRotation",
+        "offset": 71,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 72,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2BodyEvents",
+    "underlying": null,
+    "declared": [
+      "b2BodyEvents"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "moveEvents",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "moveCount",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2BodyId",
+    "underlying": null,
+    "declared": [
+      "b2BodyId"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "index1",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "world0",
+        "offset": 4,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "generation",
+        "offset": 6,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2BodyType",
+    "underlying": "int",
+    "declared": [
+      "b2BodyType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "b2Capacity",
+    "underlying": null,
+    "declared": [
+      "b2Capacity"
+    ],
+    "size": 20,
+    "fields": [
+      {
+        "name": "staticShapeCount",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "dynamicShapeCount",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "staticBodyCount",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "dynamicBodyCount",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "contactCount",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Capsule",
+    "underlying": null,
+    "declared": [
+      "b2Capsule"
+    ],
+    "size": 20,
+    "fields": [
+      {
+        "name": "center1",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "center2",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "radius",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2CastOutput",
+    "underlying": null,
+    "declared": [
+      "b2CastOutput"
+    ],
+    "size": 28,
+    "fields": [
+      {
+        "name": "normal",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "point",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "fraction",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "iterations",
+        "offset": 20,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "hit",
+        "offset": 24,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ChainDef",
+    "underlying": null,
+    "declared": [
+      "b2ChainDef"
+    ],
+    "size": 72,
+    "fields": [
+      {
+        "name": "userData",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "points",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "count",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "materials",
+        "offset": 24,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "materialCount",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "filter",
+        "offset": 40,
+        "type": "b2Filter",
+        "count": 1
+      },
+      {
+        "name": "isLoop",
+        "offset": 64,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enableSensorEvents",
+        "offset": 65,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 68,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ChainId",
+    "underlying": null,
+    "declared": [
+      "b2ChainId"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "index1",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "world0",
+        "offset": 4,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "generation",
+        "offset": 6,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ChainSegment",
+    "underlying": null,
+    "declared": [
+      "b2ChainSegment"
+    ],
+    "size": 36,
+    "fields": [
+      {
+        "name": "ghost1",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "segment",
+        "offset": 8,
+        "type": "b2Segment",
+        "count": 1
+      },
+      {
+        "name": "ghost2",
+        "offset": 24,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "chainId",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Circle",
+    "underlying": null,
+    "declared": [
+      "b2Circle"
+    ],
+    "size": 12,
+    "fields": [
+      {
+        "name": "center",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "radius",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ContactData",
+    "underlying": null,
+    "declared": [
+      "b2ContactData"
+    ],
+    "size": 148,
+    "fields": [
+      {
+        "name": "contactId",
+        "offset": 0,
+        "type": "b2ContactId",
+        "count": 1
+      },
+      {
+        "name": "shapeIdA",
+        "offset": 12,
+        "type": "b2ShapeId",
+        "count": 1
+      },
+      {
+        "name": "shapeIdB",
+        "offset": 20,
+        "type": "b2ShapeId",
+        "count": 1
+      },
+      {
+        "name": "manifold",
+        "offset": 28,
+        "type": "b2Manifold",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ContactEvents",
+    "underlying": null,
+    "declared": [
+      "b2ContactEvents"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "beginEvents",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "endEvents",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "hitEvents",
+        "offset": 16,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "beginCount",
+        "offset": 24,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "endCount",
+        "offset": 28,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "hitCount",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ContactId",
+    "underlying": null,
+    "declared": [
+      "b2ContactId"
+    ],
+    "size": 12,
+    "fields": [
+      {
+        "name": "index1",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "world0",
+        "offset": 4,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "padding",
+        "offset": 6,
+        "type": "short",
+        "count": 1
+      },
+      {
+        "name": "generation",
+        "offset": 8,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Counters",
+    "underlying": null,
+    "declared": [
+      "b2Counters"
+    ],
+    "size": 144,
+    "fields": [
+      {
+        "name": "bodyCount",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "shapeCount",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "contactCount",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "jointCount",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "islandCount",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "stackUsed",
+        "offset": 20,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "staticTreeHeight",
+        "offset": 24,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "treeHeight",
+        "offset": 28,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "byteCount",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "taskCount",
+        "offset": 36,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount0",
+        "offset": 40,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount1",
+        "offset": 44,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount2",
+        "offset": 48,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount3",
+        "offset": 52,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount4",
+        "offset": 56,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount5",
+        "offset": 60,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount6",
+        "offset": 64,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount7",
+        "offset": 68,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount8",
+        "offset": 72,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount9",
+        "offset": 76,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount10",
+        "offset": 80,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount11",
+        "offset": 84,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount12",
+        "offset": 88,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount13",
+        "offset": 92,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount14",
+        "offset": 96,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount15",
+        "offset": 100,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount16",
+        "offset": 104,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount17",
+        "offset": 108,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount18",
+        "offset": 112,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount19",
+        "offset": 116,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount20",
+        "offset": 120,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount21",
+        "offset": 124,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount22",
+        "offset": 128,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "colorCount23",
+        "offset": 132,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "awakeContactCount",
+        "offset": 136,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "recycledContactCount",
+        "offset": 140,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2DistanceJointDef",
+    "underlying": null,
+    "declared": [
+      "b2DistanceJointDef"
+    ],
+    "size": 136,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "length",
+        "offset": 80,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableSpring",
+        "offset": 84,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "lowerSpringForce",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "upperSpringForce",
+        "offset": 92,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "hertz",
+        "offset": 96,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "dampingRatio",
+        "offset": 100,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableLimit",
+        "offset": 104,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "minLength",
+        "offset": 108,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "maxLength",
+        "offset": 112,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableMotor",
+        "offset": 116,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "maxMotorForce",
+        "offset": 120,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "motorSpeed",
+        "offset": 124,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 128,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ExplosionDef",
+    "underlying": null,
+    "declared": [
+      "b2ExplosionDef"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "maskBits",
+        "offset": 0,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "position",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "radius",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "falloff",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "impulsePerLength",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Filter",
+    "underlying": null,
+    "declared": [
+      "b2Filter"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "categoryBits",
+        "offset": 0,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "maskBits",
+        "offset": 8,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "groupIndex",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2FilterJointDef",
+    "underlying": null,
+    "declared": [
+      "b2FilterJointDef"
+    ],
+    "size": 88,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 80,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Hull",
+    "underlying": null,
+    "declared": [
+      "b2Hull"
+    ],
+    "size": 68,
+    "fields": [
+      {
+        "name": "p0",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p1",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p2",
+        "offset": 16,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p3",
+        "offset": 24,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p4",
+        "offset": 32,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p5",
+        "offset": 40,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p6",
+        "offset": 48,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p7",
+        "offset": 56,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "count",
+        "offset": 64,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2JointEvents",
+    "underlying": null,
+    "declared": [
+      "b2JointEvents"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "jointEvents",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "count",
+        "offset": 8,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2JointId",
+    "underlying": null,
+    "declared": [
+      "b2JointId"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "index1",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "world0",
+        "offset": 4,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "generation",
+        "offset": 6,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2JointType",
+    "underlying": "int",
+    "declared": [
+      "b2JointType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "b2MassData",
+    "underlying": null,
+    "declared": [
+      "b2MassData"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "mass",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "center",
+        "offset": 4,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "rotationalInertia",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2MotionLocks",
+    "underlying": null,
+    "declared": [
+      "b2MotionLocks"
+    ],
+    "size": 3,
+    "fields": [
+      {
+        "name": "linearX",
+        "offset": 0,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "linearY",
+        "offset": 1,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "angularZ",
+        "offset": 2,
+        "type": "byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2MotorJointDef",
+    "underlying": null,
+    "declared": [
+      "b2MotorJointDef"
+    ],
+    "size": 128,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "linearVelocity",
+        "offset": 80,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "maxVelocityForce",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "angularVelocity",
+        "offset": 92,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "maxVelocityTorque",
+        "offset": 96,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "linearHertz",
+        "offset": 100,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "linearDampingRatio",
+        "offset": 104,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "maxSpringForce",
+        "offset": 108,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "angularHertz",
+        "offset": 112,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "angularDampingRatio",
+        "offset": 116,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "maxSpringTorque",
+        "offset": 120,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 124,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Polygon",
+    "underlying": null,
+    "declared": [
+      "b2Polygon"
+    ],
+    "size": 144,
+    "fields": [
+      {
+        "name": "v0",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v1",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v2",
+        "offset": 16,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v3",
+        "offset": 24,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v4",
+        "offset": 32,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v5",
+        "offset": 40,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v6",
+        "offset": 48,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "v7",
+        "offset": 56,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n0",
+        "offset": 64,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n1",
+        "offset": 72,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n2",
+        "offset": 80,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n3",
+        "offset": 88,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n4",
+        "offset": 96,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n5",
+        "offset": 104,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n6",
+        "offset": 112,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "n7",
+        "offset": 120,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "centroid",
+        "offset": 128,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "radius",
+        "offset": 136,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "count",
+        "offset": 140,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2PrismaticJointDef",
+    "underlying": null,
+    "declared": [
+      "b2PrismaticJointDef"
+    ],
+    "size": 128,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "enableSpring",
+        "offset": 80,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "hertz",
+        "offset": 84,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "dampingRatio",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "targetTranslation",
+        "offset": 92,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableLimit",
+        "offset": 96,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "lowerTranslation",
+        "offset": 100,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "upperTranslation",
+        "offset": 104,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableMotor",
+        "offset": 108,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "maxMotorForce",
+        "offset": 112,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "motorSpeed",
+        "offset": 116,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 120,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Profile",
+    "underlying": null,
+    "declared": [
+      "b2Profile"
+    ],
+    "size": 92,
+    "fields": [
+      {
+        "name": "step",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "pairs",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "collide",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "solve",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "solverSetup",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "constraints",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "prepareConstraints",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "integrateVelocities",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "warmStart",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "solveImpulses",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "integratePositions",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "relaxImpulses",
+        "offset": 44,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "applyRestitution",
+        "offset": 48,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "storeImpulses",
+        "offset": 52,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "splitIslands",
+        "offset": 56,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "transforms",
+        "offset": 60,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "sensorHits",
+        "offset": 64,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "jointEvents",
+        "offset": 68,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "hitEvents",
+        "offset": 72,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "refit",
+        "offset": 76,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "bullets",
+        "offset": 80,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "sleepIslands",
+        "offset": 84,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "sensors",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2QueryFilter",
+    "underlying": null,
+    "declared": [
+      "b2QueryFilter"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "categoryBits",
+        "offset": 0,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "maskBits",
+        "offset": 8,
+        "type": "ulong",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2RayCastInput",
+    "underlying": null,
+    "declared": [
+      "b2RayCastInput"
+    ],
+    "size": 20,
+    "fields": [
+      {
+        "name": "origin",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "translation",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "maxFraction",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2RayResult",
+    "underlying": null,
+    "declared": [
+      "b2RayResult"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "shapeId",
+        "offset": 0,
+        "type": "b2ShapeId",
+        "count": 1
+      },
+      {
+        "name": "point",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "normal",
+        "offset": 16,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "fraction",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "nodeVisits",
+        "offset": 28,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "leafVisits",
+        "offset": 32,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "hit",
+        "offset": 36,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2RevoluteJointDef",
+    "underlying": null,
+    "declared": [
+      "b2RevoluteJointDef"
+    ],
+    "size": 128,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "targetAngle",
+        "offset": 80,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableSpring",
+        "offset": 84,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "hertz",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "dampingRatio",
+        "offset": 92,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableLimit",
+        "offset": 96,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "lowerAngle",
+        "offset": 100,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "upperAngle",
+        "offset": 104,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableMotor",
+        "offset": 108,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "maxMotorTorque",
+        "offset": 112,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "motorSpeed",
+        "offset": 116,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 120,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Rot",
+    "underlying": null,
+    "declared": [
+      "b2Rot"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "c",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "s",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Segment",
+    "underlying": null,
+    "declared": [
+      "b2Segment"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "point1",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "point2",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2SensorEvents",
+    "underlying": null,
+    "declared": [
+      "b2SensorEvents"
+    ],
+    "size": 24,
+    "fields": [
+      {
+        "name": "beginEvents",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "endEvents",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "beginCount",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "endCount",
+        "offset": 20,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ShapeDef",
+    "underlying": null,
+    "declared": [
+      "b2ShapeDef"
+    ],
+    "size": 88,
+    "fields": [
+      {
+        "name": "userData",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "material",
+        "offset": 8,
+        "type": "b2SurfaceMaterial",
+        "count": 1
+      },
+      {
+        "name": "density",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "filter",
+        "offset": 48,
+        "type": "b2Filter",
+        "count": 1
+      },
+      {
+        "name": "enableCustomFiltering",
+        "offset": 72,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "isSensor",
+        "offset": 73,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enableSensorEvents",
+        "offset": 74,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enableContactEvents",
+        "offset": 75,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enableHitEvents",
+        "offset": 76,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enablePreSolveEvents",
+        "offset": 77,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "invokeContactCreation",
+        "offset": 78,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "updateBodyMass",
+        "offset": 79,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 80,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ShapeId",
+    "underlying": null,
+    "declared": [
+      "b2ShapeId"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "index1",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "world0",
+        "offset": 4,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "generation",
+        "offset": 6,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ShapeProxy",
+    "underlying": null,
+    "declared": [
+      "b2ShapeProxy"
+    ],
+    "size": 72,
+    "fields": [
+      {
+        "name": "p0",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p1",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p2",
+        "offset": 16,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p3",
+        "offset": 24,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p4",
+        "offset": 32,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p5",
+        "offset": 40,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p6",
+        "offset": 48,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "p7",
+        "offset": 56,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "count",
+        "offset": 64,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "radius",
+        "offset": 68,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ShapeType",
+    "underlying": "int",
+    "declared": [
+      "b2ShapeType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "b2SurfaceMaterial",
+    "underlying": null,
+    "declared": [
+      "b2SurfaceMaterial"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "friction",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "restitution",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "rollingResistance",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "tangentSpeed",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "userMaterialId",
+        "offset": 16,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "customColor",
+        "offset": 24,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Transform",
+    "underlying": null,
+    "declared": [
+      "b2Transform"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "p",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "q",
+        "offset": 8,
+        "type": "b2Rot",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2TreeStats",
+    "underlying": null,
+    "declared": [
+      "b2TreeStats"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "nodeVisits",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "leafVisits",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Vec2",
+    "underlying": null,
+    "declared": [
+      "b2Vec2"
+    ],
+    "size": 8,
+    "fields": [
+      {
+        "name": "x",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "y",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2WeldJointDef",
+    "underlying": null,
+    "declared": [
+      "b2WeldJointDef"
+    ],
+    "size": 104,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "linearHertz",
+        "offset": 80,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "angularHertz",
+        "offset": 84,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "linearDampingRatio",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "angularDampingRatio",
+        "offset": 92,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 96,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2WheelJointDef",
+    "underlying": null,
+    "declared": [
+      "b2WheelJointDef"
+    ],
+    "size": 120,
+    "fields": [
+      {
+        "name": "baseDef",
+        "offset": 0,
+        "type": "b2JointDef",
+        "count": 1
+      },
+      {
+        "name": "enableSpring",
+        "offset": 80,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "hertz",
+        "offset": 84,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "dampingRatio",
+        "offset": 88,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableLimit",
+        "offset": 92,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "lowerTranslation",
+        "offset": 96,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "upperTranslation",
+        "offset": 100,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "enableMotor",
+        "offset": 104,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "maxMotorTorque",
+        "offset": 108,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "motorSpeed",
+        "offset": 112,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 116,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2WorldDef",
+    "underlying": null,
+    "declared": [
+      "b2WorldDef"
+    ],
+    "size": 112,
+    "fields": [
+      {
+        "name": "gravity",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "restitutionThreshold",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "hitEventThreshold",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "contactHertz",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "contactDampingRatio",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "contactSpeed",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "maximumLinearSpeed",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "frictionCallback",
+        "offset": 32,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "restitutionCallback",
+        "offset": 40,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "enableSleep",
+        "offset": 48,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enableContinuous",
+        "offset": 49,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "enableContactSoftening",
+        "offset": 50,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "workerCount",
+        "offset": 52,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "enqueueTask",
+        "offset": 56,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "finishTask",
+        "offset": 64,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "userTaskContext",
+        "offset": 72,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "userData",
+        "offset": 80,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "capacity",
+        "offset": 88,
+        "type": "b2Capacity",
+        "count": 1
+      },
+      {
+        "name": "internalValue",
+        "offset": 108,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2WorldId",
+    "underlying": null,
+    "declared": [
+      "b2WorldId"
+    ],
+    "size": 4,
+    "fields": [
+      {
+        "name": "index1",
+        "offset": 0,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "generation",
+        "offset": 2,
+        "type": "ushort",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Color24",
+    "underlying": null,
+    "declared": [
+      "Color24"
+    ],
+    "size": 3,
+    "fields": [
+      {
+        "name": "r",
+        "offset": 0,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "g",
+        "offset": 1,
+        "type": "byte",
+        "count": 1
+      },
+      {
+        "name": "b",
+        "offset": 2,
+        "type": "byte",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.Event",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.Event"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "type",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "data",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Sandbox.VR.FingerValue",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.VR.FingerValue"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Facepunch.XR.GraphicsAPI",
+    "underlying": "int",
+    "declared": [
+      "Facepunch.XR.GraphicsAPI"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.VR.MotionRange",
+    "underlying": "int",
+    "declared": [
+      "Sandbox.VR.MotionRange"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Facepunch.XR.InputBooleanActionState",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InputBooleanActionState"
+    ],
+    "size": 12,
+    "fields": [
+      {
+        "name": "isActive",
+        "offset": 0,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "state",
+        "offset": 4,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "changedThisFrame",
+        "offset": 8,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.InputFloatActionState",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InputFloatActionState"
+    ],
+    "size": 12,
+    "fields": [
+      {
+        "name": "isActive",
+        "offset": 0,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "value",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "changedThisFrame",
+        "offset": 8,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.InputPoseActionState",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InputPoseActionState"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "isActive",
+        "offset": 0,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "pose",
+        "offset": 4,
+        "type": "Facepunch.XR.TrackedDevicePose",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.InputPoseHandState",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InputPoseHandState"
+    ],
+    "size": 732,
+    "fields": [
+      {
+        "name": "handPoseLevel",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "joint0",
+        "offset": 4,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint1",
+        "offset": 32,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint2",
+        "offset": 60,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint3",
+        "offset": 88,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint4",
+        "offset": 116,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint5",
+        "offset": 144,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint6",
+        "offset": 172,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint7",
+        "offset": 200,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint8",
+        "offset": 228,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint9",
+        "offset": 256,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint10",
+        "offset": 284,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint11",
+        "offset": 312,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint12",
+        "offset": 340,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint13",
+        "offset": 368,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint14",
+        "offset": 396,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint15",
+        "offset": 424,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint16",
+        "offset": 452,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint17",
+        "offset": 480,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint18",
+        "offset": 508,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint19",
+        "offset": 536,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint20",
+        "offset": 564,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint21",
+        "offset": 592,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint22",
+        "offset": 620,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint23",
+        "offset": 648,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint24",
+        "offset": 676,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      },
+      {
+        "name": "joint25",
+        "offset": 704,
+        "type": "Facepunch.XR.HandPoseJoint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.InputSource",
+    "underlying": "int",
+    "declared": [
+      "Facepunch.XR.InputSource"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Facepunch.XR.InputVector2ActionState",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InputVector2ActionState"
+    ],
+    "size": 16,
+    "fields": [
+      {
+        "name": "isActive",
+        "offset": 0,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "x",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "y",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "changedThisFrame",
+        "offset": 12,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.InstanceInfo",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InstanceInfo"
+    ],
+    "size": 648,
+    "fields": [
+      {
+        "name": "appName",
+        "offset": 0,
+        "type": "byte",
+        "count": 128
+      },
+      {
+        "name": "useDebugMessenger",
+        "offset": 128,
+        "type": "bool",
+        "count": 1
+      },
+      {
+        "name": "graphicsApi",
+        "offset": 132,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "actionManifestPath",
+        "offset": 136,
+        "type": "byte",
+        "count": 512
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.InstanceProperties",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.InstanceProperties"
+    ],
+    "size": 257,
+    "fields": [
+      {
+        "name": "systemName",
+        "offset": 0,
+        "type": "byte",
+        "count": 256
+      },
+      {
+        "name": "supportsHandTracking",
+        "offset": 256,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.XrMatrix",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.XrMatrix"
+    ],
+    "size": 64,
+    "fields": [
+      {
+        "name": "m0",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m1",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m2",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m3",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m4",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m5",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m6",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m7",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m8",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m9",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m10",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m11",
+        "offset": 44,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m12",
+        "offset": 48,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m13",
+        "offset": 52,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m14",
+        "offset": 56,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "m15",
+        "offset": 60,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.XRResult",
+    "underlying": "int",
+    "declared": [
+      "Facepunch.XR.XRResult"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Facepunch.XR.SessionState",
+    "underlying": "int",
+    "declared": [
+      "Facepunch.XR.SessionState"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Facepunch.XR.TextureSubmitInfo",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.TextureSubmitInfo"
+    ],
+    "size": 96,
+    "fields": [
+      {
+        "name": "image",
+        "offset": 0,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "depthImage",
+        "offset": 8,
+        "type": "ulong",
+        "count": 1
+      },
+      {
+        "name": "sampleCount",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "format",
+        "offset": 24,
+        "type": "long",
+        "count": 1
+      },
+      {
+        "name": "depthFormat",
+        "offset": 32,
+        "type": "long",
+        "count": 1
+      },
+      {
+        "name": "poseLeft",
+        "offset": 40,
+        "type": "Facepunch.XR.TrackedDevicePose",
+        "count": 1
+      },
+      {
+        "name": "poseRight",
+        "offset": 68,
+        "type": "Facepunch.XR.TrackedDevicePose",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.ViewInfo",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.ViewInfo"
+    ],
+    "size": 44,
+    "fields": [
+      {
+        "name": "fovUp",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "fovDown",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "fovLeft",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "fovRight",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "pose",
+        "offset": 16,
+        "type": "Facepunch.XR.TrackedDevicePose",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.VulkanInfo",
+    "underlying": null,
+    "declared": [
+      "Facepunch.XR.VulkanInfo"
+    ],
+    "size": 32,
+    "fields": [
+      {
+        "name": "vkInstance",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "vkPhysicalDevice",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "vkDevice",
+        "offset": 16,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "vkQueueIndex",
+        "offset": 24,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "vkQueueFamilyIndex",
+        "offset": 28,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "OVRLipSync.AudioDataType",
+    "underlying": "int",
+    "declared": [
+      "OVRLipSync.AudioDataType"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "OVRLipSync.ContextProvider",
+    "underlying": "int",
+    "declared": [
+      "OVRLipSync.ContextProvider"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "OVRLipSync.Frame",
+    "underlying": null,
+    "declared": [
+      "OVRLipSync.Frame"
+    ],
+    "size": 40,
+    "fields": [
+      {
+        "name": "FrameNumber",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "FrameDelay",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "Visemes",
+        "offset": 8,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "VisemesLength",
+        "offset": 16,
+        "type": "uint",
+        "count": 1
+      },
+      {
+        "name": "LaughterScore",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "LaughterCategories",
+        "offset": 24,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "LaughterCategoriesLength",
+        "offset": 32,
+        "type": "uint",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "OVRLipSync.Result",
+    "underlying": "int",
+    "declared": [
+      "OVRLipSync.Result"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "OVRLipSync.Signals",
+    "underlying": "int",
+    "declared": [
+      "OVRLipSync.Signals"
+    ],
+    "size": 4,
+    "fields": []
+  },
+  {
+    "managed": "Sandbox.SoundFormat",
+    "underlying": "byte",
+    "declared": [
+      "Sandbox.SoundFormat"
+    ],
+    "size": 1,
+    "fields": []
+  },
+  {
+    "managed": "NativeEngine.IRenderContext",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.ISceneView",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.ISceneLayer",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "SceneSystemPerFrameStats_t",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "System.Numerics.Quaternion",
+    "underlying": null,
+    "declared": [],
+    "size": 16,
+    "fields": [
+      {
+        "name": "X",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Z",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "W",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "RenderDisplayMode_t",
+    "underlying": null,
+    "declared": [],
+    "size": 20,
+    "fields": [
+      {
+        "name": "m_nWidth",
+        "offset": 0,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_nHeight",
+        "offset": 4,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_Format",
+        "offset": 8,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "m_nRefreshRateNumerator",
+        "offset": 12,
+        "type": "int",
+        "count": 1
+      },
+      {
+        "name": "m_nRefreshRateDenominator",
+        "offset": 16,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "IPhysicsWorld",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "NativeEngine.IPhysicsBody",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "self",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "PhysicsTrace.Request.Shape",
+    "underlying": null,
+    "declared": [],
+    "size": 52,
+    "fields": [
+      {
+        "name": "Type",
+        "offset": 0,
+        "type": "enum:int",
+        "count": 1
+      },
+      {
+        "name": "StartRot",
+        "offset": 4,
+        "type": "Rotation",
+        "count": 1
+      },
+      {
+        "name": "Mins",
+        "offset": 20,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Maxs",
+        "offset": 32,
+        "type": "Vector3",
+        "count": 1
+      },
+      {
+        "name": "Radius",
+        "offset": 44,
+        "type": "Vector2",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "System.Numerics.Matrix4x4",
+    "underlying": null,
+    "declared": [],
+    "size": 64,
+    "fields": [
+      {
+        "name": "M11",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M12",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M13",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M14",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M21",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M22",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M23",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M24",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M31",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M32",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M33",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M34",
+        "offset": 44,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M41",
+        "offset": 48,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M42",
+        "offset": 52,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M43",
+        "offset": 56,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "M44",
+        "offset": 60,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "System.Numerics.Vector3",
+    "underlying": null,
+    "declared": [],
+    "size": 12,
+    "fields": [
+      {
+        "name": "X",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Z",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "System.Numerics.Vector2",
+    "underlying": null,
+    "declared": [],
+    "size": 8,
+    "fields": [
+      {
+        "name": "X",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "System.Numerics.Vector4",
+    "underlying": null,
+    "declared": [],
+    "size": 16,
+    "fields": [
+      {
+        "name": "X",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Y",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "Z",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "W",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2Manifold",
+    "underlying": null,
+    "declared": [],
+    "size": 120,
+    "fields": [
+      {
+        "name": "normal",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "rollingImpulse",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "p0",
+        "offset": 12,
+        "type": "b2ManifoldPoint",
+        "count": 1
+      },
+      {
+        "name": "p1",
+        "offset": 64,
+        "type": "b2ManifoldPoint",
+        "count": 1
+      },
+      {
+        "name": "pointCount",
+        "offset": 116,
+        "type": "int",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2JointDef",
+    "underlying": null,
+    "declared": [],
+    "size": 80,
+    "fields": [
+      {
+        "name": "userData",
+        "offset": 0,
+        "type": "IntPtr",
+        "count": 1
+      },
+      {
+        "name": "bodyIdA",
+        "offset": 8,
+        "type": "b2BodyId",
+        "count": 1
+      },
+      {
+        "name": "bodyIdB",
+        "offset": 16,
+        "type": "b2BodyId",
+        "count": 1
+      },
+      {
+        "name": "localFrameA",
+        "offset": 24,
+        "type": "b2Transform",
+        "count": 1
+      },
+      {
+        "name": "localFrameB",
+        "offset": 40,
+        "type": "b2Transform",
+        "count": 1
+      },
+      {
+        "name": "forceThreshold",
+        "offset": 56,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "torqueThreshold",
+        "offset": 60,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "constraintHertz",
+        "offset": 64,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "constraintDampingRatio",
+        "offset": 68,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "drawScale",
+        "offset": 72,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "collideConnected",
+        "offset": 76,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.TrackedDevicePose",
+    "underlying": null,
+    "declared": [],
+    "size": 28,
+    "fields": [
+      {
+        "name": "posx",
+        "offset": 0,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "posy",
+        "offset": 4,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "posz",
+        "offset": 8,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "rotx",
+        "offset": 12,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "roty",
+        "offset": 16,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "rotz",
+        "offset": 20,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "rotw",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "Facepunch.XR.HandPoseJoint",
+    "underlying": null,
+    "declared": [],
+    "size": 28,
+    "fields": [
+      {
+        "name": "pose",
+        "offset": 0,
+        "type": "Facepunch.XR.TrackedDevicePose",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "managed": "b2ManifoldPoint",
+    "underlying": null,
+    "declared": [],
+    "size": 52,
+    "fields": [
+      {
+        "name": "clipPoint",
+        "offset": 0,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "anchorA",
+        "offset": 8,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "anchorB",
+        "offset": 16,
+        "type": "b2Vec2",
+        "count": 1
+      },
+      {
+        "name": "separation",
+        "offset": 24,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "baseSeparation",
+        "offset": 28,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "normalImpulse",
+        "offset": 32,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "tangentImpulse",
+        "offset": 36,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "totalNormalImpulse",
+        "offset": 40,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "normalVelocity",
+        "offset": 44,
+        "type": "float",
+        "count": 1
+      },
+      {
+        "name": "id",
+        "offset": 48,
+        "type": "ushort",
+        "count": 1
+      },
+      {
+        "name": "persisted",
+        "offset": 50,
+        "type": "bool",
+        "count": 1
+      }
+    ]
+  }
+]
