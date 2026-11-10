@@ -26,18 +26,23 @@ fn sweep(req: &Request) -> Sweep {
         _ if s.radius.vec.y == 0.0 => Some(Shape::Cone { half_height: maxs.z, radius: s.radius.vec.x }),
         _ => Some(Shape::Cylinder { half_height: maxs.z, radius: s.radius.vec.x }),
     };
-    let probe = traced_body(req).and_then(|b| b.shapes.lock().unwrap().first().and_then(|s| shape::get(*s))).map(|s| s.geometry.lock().unwrap().clone()).or(probe);
+    let probe = traced_body(req).map(body_probe).or(probe);
     Sweep { probe, rotation: to_rot(s.start_rot), start: to_vec(req.start_pos), end: to_vec(req.end_pos) }
 }
 
+/// Every shape on a traced body, as one compound probe.
+fn body_probe(body: std::sync::Arc<body::Body>) -> Shape {
+    let shapes = body.shapes.lock().unwrap().clone();
+    Shape::Compound(shapes.into_iter().filter_map(shape::get).map(|s| s.geometry.lock().unwrap().clone()).collect())
+}
+
 /// The body a `Body(...)` trace sweeps; it never hits itself.
-// TODO: sweep every shape on the body as a compound, not just its first.
 fn traced_body(req: &Request) -> Option<std::sync::Arc<body::Body>> {
     body::get(NativeRef::from_raw(req.body.self_ as *mut _))
 }
 
 /// Whether native-side filters let the trace hit `c`. Takes no managed call.
-fn passes(req: &Request, sim: &physics::World, own: Option<physics::BodyId>, c: &Collider) -> bool {
+fn passes(req: &Request, sim: &physics::World, own: Option<physics::BodyId>, id: ShapeId, c: &Collider) -> bool {
     let sensor_ok = match req.trigger_filter {
         0 => !c.is_sensor(),
         2 => c.is_sensor(),
@@ -56,9 +61,9 @@ fn passes(req: &Request, sim: &physics::World, own: Option<physics::BodyId>, c: 
         return false;
     }
     let Some(s) = shape::get(shape::from_user_data(c.user_data)) else { return false };
-    let state = s.state.lock().unwrap();
-    let has = |tag: &u32| state.tags.contains(tag);
-    !state.ignore_traces
+    let Some(meta) = sim.shape_meta(id) else { return false };
+    let has = |tag: &u32| meta.tags.contains(tag);
+    !s.state.lock().unwrap().ignore_traces
         && tags(&req.tag_require).all(has)
         && (tags(&req.tag_any).next().is_none() || tags(&req.tag_any).any(has))
         && !tags(&req.tag_exclude).any(has)
@@ -69,8 +74,8 @@ fn tags(list: &[u32; 8]) -> impl Iterator<Item = &u32> {
     list.iter().filter(|t| **t != 0)
 }
 
-/// A hit and the shape object it landed on (from its collider's user_data, see shape::add).
-type Found = (Hit, shape::Ref);
+/// A hit, the shape object it landed on (from its collider's user_data, see shape::add) and its tags.
+type Found = (Hit, shape::Ref, Vec<u32>);
 
 /// Every candidate hit (or just the nearest, without a managed filter), with the world locked.
 fn candidates(req: &Request, all: bool) -> Vec<Found> {
@@ -79,10 +84,11 @@ fn candidates(req: &Request, all: bool) -> Vec<Found> {
     let wants_all = all || TraceFilter::from_raw(req.filter_delegate).is_some();
     world::with_sim(NativeRef::from_raw(req.world.self_ as *mut _), |sim| {
         let sim: &physics::World = sim;
-        let keep = |_: ShapeId, c: &Collider| passes(req, sim, own, c);
+        let keep = |id: ShapeId, c: &Collider| passes(req, sim, own, id, c);
         let hits = if wants_all { sim.trace_all(&sweep, &keep) } else { sim.trace(&sweep, &keep).into_iter().collect() };
         let owner = |h: &Hit| shape::from_user_data(sim.shape(h.shape).map_or(0, |c| c.user_data));
-        hits.into_iter().map(|h| (h, owner(&h))).collect()
+        let tags = |h: &Hit| sim.shape_meta(h.shape).map(|m| m.tags.clone()).unwrap_or_default();
+        hits.into_iter().map(|h| (h, owner(&h), tags(&h))).collect()
     })
 }
 
@@ -94,7 +100,7 @@ fn result(req: &Request, found: Option<&Found>) -> PhysicsTrace_Result {
     let mut out = PhysicsTrace_Result::default();
     (out.start_pos, out.end_pos, out.hit_pos, out.fraction) = (req.start_pos, req.end_pos, req.end_pos, 1.0);
     (out.physics_body_handle, out.physics_shape_handle, out.surface_property, out.triangle_index) = (-1, -1, -1, -1);
-    let Some((hit, owner)) = found else { return out };
+    let Some((hit, owner, tags)) = found else { return out };
     out.end_pos = from_vec(hit.position);
     out.hit_pos = from_vec(if req.use_hit_position != 0 { hit.point } else { hit.position });
     out.normal = from_vec(hit.normal);
@@ -103,9 +109,9 @@ fn result(req: &Request, found: Option<&Found>) -> PhysicsTrace_Result {
     if let Some(s) = shape::get(*owner) {
         out.physics_shape_handle = s.handle.id::<()>().id;
         out.physics_body_handle = body::get(s.body).map_or(-1, |b| b.handle.id::<()>().id);
-        for (slot, tag) in out.tags.iter_mut().zip(s.state.lock().unwrap().tags.iter()) {
-            *slot = *tag;
-        }
+    }
+    for (slot, tag) in out.tags.iter_mut().zip(tags) {
+        *slot = *tag;
     }
     out
 }
@@ -113,7 +119,7 @@ fn result(req: &Request, found: Option<&Found>) -> PhysicsTrace_Result {
 /// The hits managed's filter (if any) allows, nearest first. Runs with no lock held.
 fn allowed(req: &Request, found: Vec<Found>) -> impl Iterator<Item = Found> {
     let filter = TraceFilter::from_raw(req.filter_delegate);
-    found.into_iter().filter(move |(_, s)| filter.is_none_or(|f| f.allows(handle_id(*s))))
+    found.into_iter().filter(move |(_, s, _)| filter.is_none_or(|f| f.allows(handle_id(*s))))
 }
 
 fn trace(req: Request) -> PhysicsTrace_Result {
