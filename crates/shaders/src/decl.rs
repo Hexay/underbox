@@ -2,7 +2,9 @@
 //! inputs and external descriptor sets. `extract` records them and blanks them out of the text,
 //! leaving HLSL (plus annotations; see `annotation.rs`).
 
-use crate::scan::{blank_bytes, blank_comments, ident_at, line_of, match_close, skip_trivia, split_args, unquote};
+use crate::scan::{
+    blank_bytes, blank_comments, ident_at, is_ident, is_ident_start, line_of, match_close, skip_trivia, split_args, unquote,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,14 +69,19 @@ pub struct Decls {
 pub fn extract(text: &str, decls: &mut Decls) -> Result<String, String> {
     let s = blank_comments(text);
     let mut out = s.clone().into_bytes();
-    let mut line_start = 0;
-    while line_start < s.len() {
-        let line_end = s[line_start..].find('\n').map_or(s.len(), |n| line_start + n);
-        let i = line_start + (s[line_start..line_end].len() - s[line_start..line_end].trim_start().len());
-        line_start = line_end + 1;
-        let Some(word) = ident_at(&s, i) else { continue };
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        let at_word = is_ident_start(b[i]) && (i == 0 || !is_ident(b[i - 1]));
+        let Some(word) = ident_at(&s, i).filter(|_| at_word && statement_start(&s, i)) else {
+            i += 1;
+            continue;
+        };
         let err = |m: String| format!("line {}: {word}: {m}", line_of(&s, i));
         if word == "ExternalDescriptorSet" {
+            if !s[s[..i].rfind('\n').map_or(0, |p| p + 1)..i].trim().is_empty() {
+                return Err(err("must start its line".into()));
+            }
             let end = s[i..].find(';').map(|n| i + n).ok_or_else(|| err("missing ;".into()))?;
             let parts: Vec<&str> = s[i + word.len()..end].split_whitespace().collect();
             let [name, "Slot", slot] = parts[..] else { return Err(err(format!("bad form {parts:?}"))) };
@@ -87,24 +94,28 @@ pub fn extract(text: &str, decls: &mut Decls) -> Result<String, String> {
             } else {
                 return Err(err("must fit on one line".into()));
             }
-            line_start = line_start.max(end + 1);
-            continue;
-        }
-        if !is_statement(word) {
+            i = end + 1;
             continue;
         }
         let open = skip_trivia(&s, i + word.len());
-        if s.as_bytes().get(open) != Some(&b'(') {
+        if !is_statement(word) || b.get(open) != Some(&b'(') {
+            i += word.len();
             continue;
         }
         let close = match_close(&s, open, false).ok_or_else(|| err("unclosed (".into()))?;
         let semi = skip_trivia(&s, close + 1);
-        let end = if s.as_bytes().get(semi) == Some(&b';') { semi } else { close };
+        let end = if b.get(semi) == Some(&b';') { semi } else { close };
         record(word, &s[open + 1..close], decls).map_err(err)?;
         blank_bytes(&mut out[i..=end]);
-        line_start = line_start.max(end + 1);
+        i = end + 1;
     }
     String::from_utf8(out).map_err(|e| e.to_string())
+}
+
+/// Whether `i` begins a statement: first on its line, or after `;`, `{` or `}`.
+fn statement_start(s: &str, i: usize) -> bool {
+    let before = s[..i].trim_end_matches([' ', '\t', '\r']);
+    before.is_empty() || before.ends_with(['\n', ';', '{', '}'])
 }
 
 fn is_statement(word: &str) -> bool {
