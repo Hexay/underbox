@@ -16,6 +16,8 @@ fn main() {
         .define("BUILD_TESTS", "OFF")
         .define("BUILD_TOOLS", "OFF")
         .define("ENABLE_ICE", "OFF")
+        // Always Release: on MSVC a Debug build uses /MDd and won't link with Rust's and vcpkg's /MD.
+        .profile("Release")
         .build_target("GameNetworkingSockets_s");
     if windows {
         let vcpkg = PathBuf::from(std::env::var("VCPKG_ROOT").expect("set VCPKG_ROOT (protobuf from vcpkg)"));
