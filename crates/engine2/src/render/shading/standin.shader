@@ -144,11 +144,31 @@ PS
 		return l.Color * saturate( dot( vNormalWs, vDir ) ) * flCone * flFalloff;
 	}
 
+	// The sun's one cascade (render/lighting/shadow.rs): matrix 0 maps world to uv and depth.
+	Texture2D g_tUnderboxSunShadow < Attribute( "g_tUnderboxSunShadow" ); >;
+	SamplerComparisonState g_sUnderboxSunShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( LESS_EQUAL ); >;
+
+	float SunVisibility( float3 vPositionWs, float3 vNormalWs )
+	{
+		if ( g_DirectionalLightCascadeCount == 0 )
+			return 1.0;
+		float4x4 m = g_DirectionalLightWorldToShadowViewMatrices[0];
+		float flTexelWs = g_DirectionalLightInverseShadowMapSize / length( m[0].xyz );
+		float3 vShadow = mul( m, float4( vPositionWs + vNormalWs * flTexelWs * 1.5, 1.0 ) ).xyz;
+		if ( any( vShadow.xy < 0.0 ) || any( vShadow.xy > 1.0 ) || vShadow.z > 1.0 )
+			return 1.0;
+		float flSum = 0.0;
+		for ( int y = -1; y <= 1; y++ )
+			for ( int x = -1; x <= 1; x++ )
+				flSum += g_tUnderboxSunShadow.SampleCmpLevelZero( g_sUnderboxSunShadow, vShadow.xy + float2( x, y ) * g_DirectionalLightInverseShadowMapSize, vShadow.z - 0.0005 );
+		return flSum / 9.0;
+	}
+
 	float3 Irradiance( float3 vPositionWs, float3 vNormalWs )
 	{
 		float3 vLight = AmbientLightColor.rgb;
 		if ( g_DirectionalLightEnabled )
-			vLight += g_DirectionalLightColor.rgb * saturate( dot( vNormalWs, -g_DirectionalLightDirection.xyz ) );
+			vLight += g_DirectionalLightColor.rgb * saturate( dot( vNormalWs, -g_DirectionalLightDirection.xyz ) ) * SunVisibility( vPositionWs, vNormalWs );
 		for ( int n = 0; n < NumLights.x; n++ )
 			vLight += BinnedLightDiffuse( BinnedLightBufferV2[n], vPositionWs, vNormalWs );
 		return vLight;

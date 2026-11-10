@@ -7,12 +7,12 @@
 //! [`Lighting::fallback`], the fixed light the stand-in shader used to hard-code, rather than black.
 
 mod blocks;
+pub mod shadow;
 
 pub use blocks::BLOCKS;
 
 use crate::scene::light::{self, Type};
 use crate::scene::{object, world};
-use abi::NativeRef;
 use glam::{Quat, Vec3, Vec4};
 
 /// lightbinner.hlsl's `LightType`.
@@ -50,6 +50,8 @@ pub struct Lighting {
     pub ambient: Vec4,
     pub sun: Option<Light>,
     pub lights: Vec<Light>,
+    /// The sun's shadow map, once shadow.rs has drawn it for the view.
+    pub shadow: Option<shadow::SunShadow>,
 }
 
 impl Lighting {
@@ -58,7 +60,7 @@ impl Lighting {
         let toward = Vec3::new(0.4, 0.3, 0.85).normalize();
         let rotation = Quat::from_rotation_arc(Vec3::X, -toward);
         let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, linear: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false };
-        Lighting { ambient: Vec4::new(0.3, 0.3, 0.3, 1.0), sun: Some(sun), lights: Vec::new() }
+        Lighting { ambient: Vec4::new(0.3, 0.3, 0.3, 1.0), sun: Some(sun), ..Default::default() }
     }
 
     fn is_dark(&self) -> bool {
@@ -68,21 +70,16 @@ impl Lighting {
     /// The rendering lights of `worlds` and the camera's `ambient` (managed's `ambientColor`).
     pub fn collect(worlds: &[world::Ref], ambient: Vec4) -> Lighting {
         let mut out = Lighting { ambient, ..Default::default() };
-        for w in worlds {
-            let Some(world) = world::get(*w) else { continue };
-            let addrs = world.objects.lock().unwrap().clone();
-            for addr in addrs {
-                let Some(obj) = object::get(NativeRef::from_raw(addr as *mut _)) else { continue };
-                let (rendering, p) = {
-                    let s = obj.state.lock().unwrap();
-                    (s.rendering, s.transform.position.vec)
-                };
-                let Some(l) = obj.light.as_ref().filter(|_| rendering) else { continue };
-                let l = from_scene(&l.lock().unwrap(), Vec3::new(p.x, p.y, p.z));
-                match l.kind {
-                    kind::DIRECTIONAL if out.sun.is_none() => out.sun = Some(l),
-                    _ => out.lights.push(l),
-                }
+        for obj in object::in_worlds(worlds) {
+            let (rendering, p) = {
+                let s = obj.state.lock().unwrap();
+                (s.rendering, s.transform.position.vec)
+            };
+            let Some(l) = obj.light.as_ref().filter(|_| rendering) else { continue };
+            let l = from_scene(&l.lock().unwrap(), Vec3::new(p.x, p.y, p.z));
+            match l.kind {
+                kind::DIRECTIONAL if out.sun.is_none() => out.sun = Some(l),
+                _ => out.lights.push(l),
             }
         }
         if out.is_dark() { Lighting::fallback() } else { out }

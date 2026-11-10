@@ -14,7 +14,7 @@
           "FogMode": "Enabled",
           "FogStrength": 1,
           "LightColor": "1,0.97,0.9,1",
-          "Shadows": false,
+          "Shadows": true,
           "SkyColor": "0.25,0.3,0.35,1"
         }
       ]

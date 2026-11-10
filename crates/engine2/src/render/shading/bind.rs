@@ -69,10 +69,12 @@ enum Resource {
     Sampler(wgpu::Sampler),
 }
 
-fn material_view(inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
+/// The draw's texture for `b`: the material's by name, else the lighting's (shadow maps).
+fn texture_view(inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
     let B::Texture { sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false } = b.ty else { return None };
+    let t = inputs.textures.get(&b.name).copied().or_else(|| inputs.lighting.texture(&b.name))?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
-    let t = texture::resolve(*inputs.textures.get(&b.name)?).filter(|t| !t.is_error())?;
+    let t = texture::resolve(t).filter(|t| !t.is_error())?;
     let gpu = t.gpu.as_ref()?;
     let ok = match (gpu.desc.format.sample_type(None, None)?, sample_type) {
         (wgpu::TextureSampleType::Float { filterable }, wgpu::TextureSampleType::Float { filterable: want }) => filterable || !want,
@@ -102,7 +104,7 @@ fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Res
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
         B::Texture { sample_type, view_dimension, .. } => {
-            Resource::View(material_view(inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
+            Resource::View(texture_view(inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }
         B::Sampler(kind) => Resource::Sampler(defaults::sampler(gpu, kind)),
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),

@@ -7,8 +7,9 @@
 //! the radius (`LinearFalloff = l / r`, `QuadraticFalloff = q / r²`) and `FalloffBias` is the
 //! curve's value at the radius, so `saturate(1 / (l·d + q·d²) - bias)` reaches 0 there.
 
-use super::{Light, Lighting};
+use super::{Light, Lighting, shadow};
 use crate::render::shading::layout::{Block, Value};
+use crate::render::texture;
 use glam::{Mat4, Vec4};
 
 /// Uniform blocks this module fills.
@@ -87,12 +88,21 @@ impl Lighting {
     fn sun_constant(&self, name: &str) -> Option<Value> {
         let sun = self.sun.as_ref()?;
         let (c, d) = (sun.color, sun.forward());
+        let shadow = self.shadow.as_ref();
         match name {
             "g_DirectionalLightColor" => v(c.x, c.y, c.z, sun.fog),
             "g_DirectionalLightDirection" => v(d.x, d.y, d.z, 0.0),
             "g_DirectionalLightEnabled" => s(1.0),
+            "g_DirectionalLightCascadeCount" => s(shadow.map_or(0.0, |_| 1.0)),
+            "g_DirectionalLightWorldToShadowViewMatrices" => shadow.map(|sh| Value::Array(vec![Value::Mat(sh.world_to_shadow)])),
+            "g_DirectionalLightInverseShadowMapSize" => s(1.0 / shadow::SIZE as f32),
             _ => None,
         }
+    }
+
+    /// A texture the lighting supplies by shader name (the sun's shadow map).
+    pub fn texture(&self, name: &str) -> Option<texture::Ref> {
+        self.shadow.as_ref().filter(|_| name == shadow::TEXTURE).map(|s| s.map)
     }
 
     /// A structured buffer's bytes for elements laid out as `element`; `None` for buffers this

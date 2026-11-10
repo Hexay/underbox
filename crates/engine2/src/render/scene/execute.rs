@@ -6,12 +6,12 @@ use super::layer::{self, Kind, flags, layer_type};
 use super::view::{self, SceneView};
 use crate::handles::Kind as ObjectKind;
 use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
-use crate::render::lighting::Lighting;
+use crate::render::lighting::{Lighting, shadow};
 use crate::render::{context, device, texture};
 use crate::scene::object;
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
 use abi::structs::{ISceneLayer, ISceneView, IRenderContext, ManagedRenderSetup_t, SceneSystemPerFrameStats_t};
-use abi::{NativeRef, StringToken};
+use abi::StringToken;
 use glam::{Mat4, Vec3};
 use render::pass::{DrawUniforms, Load};
 use render::{BufferKind, Placeholder, RasterState, Semantic};
@@ -41,7 +41,9 @@ pub fn run(v: view::Ref) {
         let s = view.state.lock().unwrap();
         (s.layers.clone(), s.worlds.clone())
     };
-    immediate::set_view(ctx, view.view_proj, Arc::new(Lighting::collect(&worlds, view.ambient)));
+    let mut lighting = Lighting::collect(&worlds, view.ambient);
+    shadow::render(&mut lighting, &worlds, view.view_proj);
+    immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {
         run_layer(&view, v, ctx, l);
     }
@@ -134,35 +136,26 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
     let (mut draws, mut managed) = (Vec::new(), Vec::new());
     let sky_layer = f.match_id == StringToken::of("SkyBox").0;
     let worlds = view.state.lock().unwrap().worlds.clone();
-    for w in worlds {
-        let Some(world) = crate::scene::world::get(w) else { continue };
-        let addrs = world.objects.lock().unwrap().clone();
-        for addr in addrs {
-            let Some(obj) = object::get(NativeRef::from_raw(addr as *mut _)) else { continue };
-            let s = obj.state.lock().unwrap();
-            if !s.rendering || !tags_pass(view, &s.tags) {
-                continue;
+    for obj in object::in_worlds(&worlds) {
+        let s = obj.state.lock().unwrap();
+        if !s.rendering || !tags_pass(view, &s.tags) {
+            continue;
+        }
+        if obj.kind == ObjectKind::SceneSkyBoxObject {
+            if sky_layer {
+                draws.extend(sky(model_draw::tint(s.tint)));
             }
-            if obj.kind == ObjectKind::SceneSkyBoxObject {
-                if sky_layer {
-                    draws.extend(sky(model_draw::tint(s.tint)));
-                }
-                continue;
-            }
-            let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };
-            let flags = s.flags | if s.model.is_null() { 0 } else { IS_OPAQUE };
-            if !matched || flags & f.required != f.required || flags & f.excluded != 0 {
-                continue;
-            }
-            match obj.kind {
-                ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
-                _ if f.translucent => {}
-                _ => {
-                    if let Some(model) = crate::model::get(s.model) {
-                        draws.extend(model_draw::draws(&model, model_draw::matrix(&s.transform), view.view_proj, model_draw::tint(s.tint), s.mesh_groups, s.material_override.as_ref()));
-                    }
-                }
-            }
+            continue;
+        }
+        let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };
+        let flags = s.flags | if s.model.is_null() { 0 } else { IS_OPAQUE };
+        if !matched || flags & f.required != f.required || flags & f.excluded != 0 {
+            continue;
+        }
+        match obj.kind {
+            ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
+            _ if f.translucent => {}
+            _ => draws.extend(model_draw::object(&s, view.view_proj)),
         }
     }
     (draws, managed)

@@ -50,6 +50,12 @@ pub fn draw_call(mesh: &RenderMesh, call: &DrawCall, uniforms: DrawUniforms, vie
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
 }
 
+/// A scene object's model draws, seen through `view_proj`; none without a model.
+pub fn object(s: &crate::scene::object::State, view_proj: Mat4) -> Vec<Draw> {
+    let Some(model) = crate::model::get(s.model) else { return Vec::new() };
+    draws(&model, matrix(&s.transform), view_proj, tint(s.tint), s.mesh_groups, s.material_override.as_ref())
+}
+
 /// Every draw of `model` placed at `world` (model to world), seen through `view_proj`, each with
 /// its own material unless `material` overrides them all.
 pub fn draws(model: &Model, world: Mat4, view_proj: Mat4, tint: [f32; 4], mesh_groups: u64, material: Option<&Arc<MaterialRef>>) -> Vec<Draw> {

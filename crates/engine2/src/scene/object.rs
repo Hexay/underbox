@@ -104,6 +104,12 @@ pub fn create_with<C: NativeClass, D>(world: world::Ref, kind: Kind, state: Stat
     object.handle.register(r, kind)
 }
 
+/// The live objects of `worlds`, each world's in creation order.
+pub fn in_worlds(worlds: &[world::Ref]) -> Vec<Arc<SceneObject>> {
+    let addrs = worlds.iter().filter_map(|w| world::get(*w)).flat_map(|w| w.objects.lock().unwrap().clone());
+    addrs.filter_map(|a| get(NativeRef::from_raw(a as *mut _))).collect()
+}
+
 /// Remove an object from its world and parent, tell managed, and free it.
 pub fn delete(r: Ref) {
     let Some(object) = get(r) else { return };
