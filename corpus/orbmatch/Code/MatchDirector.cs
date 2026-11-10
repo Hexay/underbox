@@ -56,6 +56,8 @@ public sealed class MatchDirector : Component
 		var bot = go.Components.Create<OrbBot>();
 		bot.Team = team;
 		bot.Home = go.WorldPosition;
+		// Trailing bots run faster so they rear-end their teammate before anyone reaches the goal and respawns.
+		bot.Speed = 200f + index * 100f;
 		return bot;
 	}
 
