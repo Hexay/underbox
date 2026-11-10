@@ -11,6 +11,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 abi = { path = "../abi" }
 assets = { path = "../assets" }
+gns = { path = "../gns" }
+lz4_flex = "0.14.0"
 objects = { path = "../objects" }
 physics = { path = "../physics" }
 platform = { path = "../platform" }

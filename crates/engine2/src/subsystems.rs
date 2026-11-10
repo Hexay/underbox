@@ -20,6 +20,8 @@ pub fn register(r: &mut Registry) {
     crate::physics::register(r);
     crate::audio::register(r);
     crate::steam::register(r);
+    crate::net::register(r);
+    crate::compress::register(r);
     // Last: fills only the field accessors no subsystem bound.
     abi::bind_fields(r);
 }

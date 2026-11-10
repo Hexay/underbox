@@ -1,0 +1,42 @@
+{
+  "__guid": "4d7f2a61-0c3e-4b8e-9a52-6f1e0b7c9d10",
+  "GameObjects": [
+    {
+      "__guid": "8a1c5e2f-3b4d-4f6a-9e7b-2c0d1f3a5b6c",
+      "Flags": 0,
+      "Name": "Network",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.NetworkHelper",
+          "__guid": "c3e9f1a7-5d2b-4c8e-8f0a-1b2d3e4f5a6b",
+          "OnComponentDestroy": null,
+          "OnComponentDisabled": null,
+          "OnComponentEnabled": null,
+          "OnComponentFixedUpdate": null,
+          "OnComponentStart": null,
+          "OnComponentUpdate": null,
+          "PlayerPrefab": null,
+          "SpawnPoints": [],
+          "StartServer": true
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}
