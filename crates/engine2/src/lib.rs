@@ -14,6 +14,8 @@ mod interfaces;
 pub mod physics;
 pub mod render;
 pub mod resource;
+mod compress;
+mod net;
 mod resource_system;
 mod steam;
 pub mod scene;

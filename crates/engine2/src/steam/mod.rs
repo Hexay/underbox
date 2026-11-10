@@ -31,6 +31,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, global::STEAM_USER, NativeRef::null);
     bind!(r, global::STEAM_APPS, NativeRef::null);
     bind!(r, global::STEAM_NETWORKING_UTILS, NativeRef::null);
+    bind!(r, global::STEAM_UTILS, NativeRef::null);
     // The workshop: none on the offline platform, so nothing subscribed or downloaded.
     bind!(r, ugc::INIT_WORKSHOP_FOR_GAME_SERVER, |_| true);
     bind!(r, ugc::GET_SUBSCRIBED_JSON, || StrRet::from(c"[]"));

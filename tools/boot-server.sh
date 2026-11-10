@@ -33,7 +33,8 @@ sh "$ROOT/tools/nuget-file.sh" SkiaSharp.NativeAssets.Linux 3.116.0 runtimes/lin
     "$NATIVE/libSkiaSharp.so"
 
 cd "$SBOX/game"
-timeout -s INT "$SECS" dotnet sbox-server.dll "$@" > "$OUT/server.log" 2>&1 || echo "exit: $?"
+# TERM, not INT: a `&` background sh job inherits SIGINT ignored, and .NET then never hooks it.
+timeout -s TERM -k 10 "$SECS" dotnet sbox-server.dll "$@" > "$OUT/server.log" 2>&1 || echo "exit: $?"
 
 echo "== engine2"; grep -E '^engine2:' "$OUT/server.log" | head -n 5 || true
 echo "== first stubs called"; grep -E '^\[Warn\] stub:' "$OUT/server.log" | head -n 15 || true
