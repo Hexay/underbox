@@ -91,13 +91,21 @@ native model one to one, so managed's pipeline code runs unchanged:
    Render → the worlds' objects that pass tags, layer match id and required/excluded flags (a model
    counts as `IsOpaque`); depth prepass, light binner setup and translucent model draws are
    skipped under the placeholder; managed objects call back `RenderObject` (47); Procedural →
-   managed's `void(ManagedRenderSetup_t)` pointer; Blit → texture copy. Then
-   `OnSceneViewSubmitted` (36).
+   managed's `void(ManagedRenderSetup_t)` pointer; Blit → texture copy, or a `render::Blitter`
+   draw when formats or sizes differ (ResolveHDRToFinalSDR: Rgba16Float → Rgba8Unorm). Then
+   `OnSceneViewSubmitted` (36). `UNDERBOX_LAYERS=log` prints one line per layer (target, draws,
+   draws with a material).
 4. A model becomes one `Draw` per mesh draw call (LOD 0, enabled mesh groups): MeshGlue buffers
-   upload by version (`draw/gpu_mesh.rs`), the mesh layout maps position/normal/color onto the
-   placeholder, per-draw MVP/model/tint go into a dynamic uniform slice.
+   upload by version (`draw/gpu_mesh.rs`). The call's material (loaded with the model, or the
+   object's `SetMaterialOverrideForMeshInstances`) resolves to a program (`draw/shaded.rs`, see
+   Shaders); without one, the mesh layout maps position/normal/color onto the placeholder.
 5. `RenderTools.DrawModel`, `SetRenderState` + `Draw*`, `DrawSceneObject`, `DrawSkyBox` are the same
-   path entered from managed with explicit state.
+   path entered from managed with explicit state. `IMaterial2.GetMode` returns one
+   `IMaterialMode` per material (`material_mode.rs`). `SetRenderState` draws stay on the
+   placeholder: shading them before their `CRenderAttributes` reach the binder washed the
+   showroom frame out white (post-process and UI programs read zeroed inputs).
+6. Scene objects own a copy of their model handle (`model::copy`): managed's `FromNative` wrappers
+   destroy what they're handed, which used to empty the object.
 
 Contexts and views execute eagerly on the queue, so `Begin/FinishRenderingViews` only bracket the
 frame (Finish prunes dead GPU meshes) and async readbacks complete inside the call. Display lists
@@ -121,7 +129,16 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
   light probe, lightmap, fog) define buffer layouts the renderer must fill; several are stubs.
 - `isnan(x)` is lowered to `x != x`: never enable fast-math in the backend.
 - Expect naga to reject some DXC output (bindless arrays, `OpSpecConstantOp`, push constants);
-  those combos should fall back to the placeholder with a logged warning, never a crash.
+  those combos fall back to the placeholder with a warning logged once per shader, never a crash
+  (`Program::try_pipeline`, bind groups under `gpu.checked`).
+- Core material shaders that ship without source (complex, generic, simple, skin, unlit, ...)
+  draw with a stand-in (`shading/standin.shader`, map in `standin.rs`): `g_tColor` × tint ×
+  vertex tint × a fixed directional light, or unlit. Pixel bindings that collide with a
+  different vertex binding are moved apart after translation (`shading/stages.rs`).
+- Coverage over sbox-public's vmats: `sh tools/test.sh engine2 material_coverage -- --ignored`
+  writes `target/material-coverage.tsv`. Main gaps: bindless samplers (blendable, glass, water,
+  fur, line), shaders without source and no stand-in (tools_sprite, sky, ui, tools_wireframe),
+  compute-only shaders.
 
 ## Headless path and frame-hash tests
 
@@ -145,7 +162,11 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
   (`UNDERBOX_BLESS=1 sh tools/test.sh engine2 camera_draws` records).
 - A booted client logs or dumps presented frames: `UNDERBOX_FRAMES=log` prints
   `frame: <swap chain> #<n> <w>x<h> <blake3>`, a directory writes PPMs;
-  `UNDERBOX_FRAMES_EVERY=n` samples.
+  `UNDERBOX_FRAMES_EVERY=n` samples, `UNDERBOX_FRAMES_LAST=1` keeps one `<swap chain>.ppm`;
+  `tools/ppm2png.py` converts.
+- `tools/client-frame.sh` boots the client on `corpus/showroom` (camera, sun, three dev boxes on
+  a plane), checks the last frames settled on one hash and compares it with
+  `corpus/showroom/golden.tsv` per adapter (`UNDERBOX_BLESS=1` records); `target/client-frame/frame.png`.
 
 ## Windows and input (SDL)
 
@@ -220,17 +241,15 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. Client boot (`tools/boot-client.sh`) reaches presented frames on orbmatch; its scene has no
-   camera or renderers, so every frame is black. Add a corpus scene with a camera and dev models
-   (`models/dev/box.vmdl`) and record its frame hashes as a golden test.
-2. Materials: `shading/` builds and binds scene_renderer_mesh on a real device
-   (`shading/tests.rs`). Wire it into draws: `MeshDraw.shaded` (`render::pass::Shaded`) from the
-   draw call's material (shader path, params snapshot), the view's matrices and instance
-   transforms, placeholder on failure. Combos are always 0/0 (TODO). Core material shaders
-   (complex, generic, unlit, ...) ship without source, so most vmats need a stand-in mapping to a
-   shader we can compile. Then `BindTexture` and `SetConstantBufferData` (still no-ops).
-3. `Sandbox.SceneRenderer` (managed's own renderer: `SceneMirror`, `RenderContext.cs`) reads native
-   per-object draws (`GetSceneObjectDraw`, bound) and draws with `DrawModelDrawCall` (answers
-   false): implement once materials bind.
-4. Translucent and depth-prepass layers, shadows (`AddShadowView` returns null), MSAA, cube and
-   stereo renders, GPU timestamps, mip generation, scaled blits.
+1. Lighting: the stand-in's light is fixed; feed the scene's lights (`PackSceneLight` answers
+   -1, `ViewLightingConfigV2`/`DirectionalLightCB` are unfilled) and shadows (`AddShadowView`
+   returns null). Combos are always 0/0 (TODO).
+2. `SetConstantBufferData` / `SetDynamicConstantBufferData`: keep the bytes per block name on the
+   attributes and let `shading/bind.rs` prefer them over its own fill. `BindTexture` per slot.
+   `BindVertexShader`/`BindPixelShader` take a `RenderShaderHandle_t` nothing produces: record only.
+3. `Sandbox.SceneRenderer` (`r_managed_scene`, off by default) draws with `DrawModelDrawCall`
+   (answers false): the given material and mode, instance transforms from the `g_TransformBuffer`
+   attribute or the instance-id buffer, then needs 2's constant buffers.
+4. Coverage gaps (see Shaders): bindless samplers, a stand-in for tools_sprite/sky/ui.
+5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
+   generation, sRGB-aware scaled blits (`RenderTools.BlitTexture` still copies same-size only).

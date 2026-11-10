@@ -5,7 +5,7 @@
 # adapter. The frame is written as $OUT/frame.png (OUT defaults to target/client-frame).
 # usage: [UNDERBOX_BLESS=1] tools/client-frame.sh [max-s=240] [sbox-public]
 # UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
-# boot-client.sh takes the boot lock itself: don't wrap this in flock.
+# Don't wrap this in flock: boot-client.sh runs in this worktree's own game dir (docs/dev-loop.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 OUT=${OUT:-$ROOT/target/client-frame}

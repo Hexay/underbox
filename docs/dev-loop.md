@@ -5,6 +5,7 @@
 | Unit tests | `tools/test.sh <crate> [test-filter]`: failures and totals only, exits with cargo's status |
 | Boot the server | `tools/boot-server.sh [max-s] [sbox-public]` |
 | Boot the client | `tools/boot-client.sh [max-s] [sbox-public] [-- args]` (headless, logs frame hashes to `target/client/frames.tsv`) |
+| Golden client frame | `tools/client-frame.sh` (showroom; `UNDERBOX_BLESS=1` records; PNG in `target/client-frame/`) |
 | Scripted match | `tools/match.sh` (stops at `MATCH:END`) |
 | Net probe | `tools/net-probe.sh` |
 | Shared-build lock | `tools/boot-lock.sh <cmd...>` (only for scripts that write `sbox-public/game`) |

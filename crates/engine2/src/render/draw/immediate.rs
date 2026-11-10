@@ -6,10 +6,7 @@
 //! (scene/execute.rs), identity otherwise. TODO: screen-space (UI) draws need their material's
 //! projection once translated shaders bind attributes.
 
-use super::{Draw, gpu_mesh, model as model_draw, shaded, topology};
-use crate::render::material::Material;
-use crate::render::material_mode;
-use crate::render::shading::bind::Instance;
+use super::{Draw, gpu_mesh, model as model_draw, topology};
 use crate::mesh::buffers::{self, IndexBuffer, VertexBuffer};
 use crate::mesh::layout::{self, Layout};
 use crate::render::{buffers as gpu_buffers, context, device, swap_chain};
@@ -37,7 +34,6 @@ enum Indices {
 /// the view transform.
 pub struct DrawState {
     layout: Option<Arc<Layout>>,
-    material: Option<Arc<Material>>,
     vertices: Option<(Vertices, u64)>,
     indices: Option<Indices>,
     pub view_proj: Mat4,
@@ -45,15 +41,7 @@ pub struct DrawState {
 
 impl Default for DrawState {
     fn default() -> Self {
-        DrawState { layout: None, material: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY }
-    }
-}
-
-impl DrawState {
-    /// The `SetRenderState` material's program for `layout`, or None for the placeholder.
-    fn shaded(&self, layout: &Layout) -> Option<shaded::Shaded> {
-        let instance = Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
-        shaded::resolve(self.material.clone()?, layout, instance, self.view_proj)
+        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY }
     }
 }
 
@@ -81,11 +69,10 @@ pub fn submit(c: Ctx, draws: &[Draw]) {
     }
 }
 
-fn set_render_state(c: Ctx, _attrs: NativeRef<class::CRenderAttributes>, mode: NativeRef<class::IMaterialMode>, l: layout::Ref) -> bool {
-    with(c, |s| {
-        s.layout = layout::get(l);
-        s.material = material_mode::material(mode);
-    });
+// TODO: draw with the mode's program (material_mode::material) once `attrs` reach the binder;
+// without them post-process and UI programs read zeroed inputs and wash the frame out (showroom).
+fn set_render_state(c: Ctx, _attrs: NativeRef<class::CRenderAttributes>, _mode: NativeRef<class::IMaterialMode>, l: layout::Ref) -> bool {
+    with(c, |s| s.layout = layout::get(l));
     device::gpu().is_some()
 }
 
@@ -106,8 +93,7 @@ fn draw_dynamic(c: Ctx, prim: i64, l: layout::Ref, vertices: RawPtr<c_void>, n: 
     });
     let range = 0..if ib.is_some() { n_indices as u32 } else { n as u32 };
     let state = RasterState { topology: topology(prim), ..Default::default() };
-    let shaded = with(c, |s| s.shaded(&layout));
-    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded };
+    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded: None };
     submit(c, &[draw]);
 }
 
@@ -132,8 +118,7 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
     let uniforms = DrawUniforms { mvp: s.view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
     let state = RasterState { topology: topology(prim), ..Default::default() };
     let vertex = gpu_mesh::vertex_keys(&layout)?;
-    let shaded = s.shaded(&layout);
-    Some(Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded })
+    Some(Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None })
 }
 
 fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {
