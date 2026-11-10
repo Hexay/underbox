@@ -56,18 +56,29 @@ fn encode(e: &Event) -> (i32, Vec<u8>) {
     }
 }
 
+fn deliver(e: &Event, is_server: bool) {
+    let (kind, mut data) = encode(e);
+    on_client_callback(kind, RawPtr::from_raw(data.as_mut_ptr().cast()), data.len() as i32, is_server);
+}
+
 /// Deliver pending platform events; runs managed code, so no engine lock may be held.
 fn run_server_callbacks() {
     for e in platform::get().poll() {
-        let (kind, mut data) = encode(&e);
-        on_client_callback(kind, RawPtr::from_raw(data.as_mut_ptr().cast()), data.len() as i32, true);
+        deliver(&e, true);
     }
+}
+
+/// The local user's events, then the backend's own callbacks verbatim (managed decodes those).
+fn run_client_callbacks() {
+    let Some(client) = super::client::local() else { return };
+    // Managed only reads the struct; the pointer is mutable because the callback's signature says so.
+    let mut raw = |kind, data: &[u8]| on_client_callback(kind, RawPtr::from_raw(data.as_ptr().cast_mut().cast()), data.len() as i32, false);
+    client.run_callbacks(&mut |e| deliver(&e, false), &mut raw);
 }
 
 pub fn register(r: &mut Registry) {
     bind!(r, global::STEAM_GAME_SERVER_RUN_CALLBACKS, run_server_callbacks);
-    // Client callbacks come from a Steam client, which the offline platform has none of.
-    bind!(r, global::STEAM_API_RUN_CALLBACKS, || {});
+    bind!(r, global::STEAM_API_RUN_CALLBACKS, run_client_callbacks);
 }
 
 #[cfg(test)]

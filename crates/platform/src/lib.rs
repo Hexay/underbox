@@ -1,12 +1,18 @@
 //! Platform services behind one trait (docs/PLAN.md): Steam, offline/dev, or custom backends.
 //! The engine core talks only to [`Platform`]; native's Steam slots are a view over it.
 
+mod client;
 mod offline;
+mod offline_client;
 #[cfg(feature = "steam")]
 mod steam;
+#[cfg(feature = "steam")]
+mod steam_client;
 mod steam_id;
 
+pub use client::{Apps, Client, CloudStorage, Friends, TextFilter, Ticket};
 pub use offline::Offline;
+pub use offline_client::OfflineClient;
 #[cfg(feature = "steam")]
 pub use steam::Steam;
 pub use steam_id::SteamId;
@@ -90,6 +96,10 @@ pub trait Platform: Send + Sync {
     fn end_auth(&self, user: SteamId);
 
     fn poll(&self) -> Vec<Event>;
+
+    /// The local user's services, started on first call. Only a game client asks; a dedicated
+    /// server never does, so it never claims a user identity.
+    fn client(&self) -> &dyn Client;
 }
 
 static INSTALLED: OnceLock<Arc<dyn Platform>> = OnceLock::new();
