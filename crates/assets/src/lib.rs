@@ -2,5 +2,6 @@
 
 pub mod container;
 pub mod game_resource;
+pub mod model;
 pub mod project;
 mod redi;
