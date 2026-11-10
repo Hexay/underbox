@@ -5,7 +5,7 @@
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 SECS=${1:-90}
-SBOX=${2:-$ROOT/../sbox-public}
+SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 OUT=$ROOT/target/match
 LOG=$OUT/server.log
 PORT=${PORT:-27215}
