@@ -441,6 +441,7 @@ dependencies = [
  "abi",
  "anim",
  "assets",
+ "audio",
  "box2d-sys",
  "glam 0.33.12",
  "gns",

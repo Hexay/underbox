@@ -2,19 +2,13 @@
 //! chat, and device enumeration. A cpal stream isn't `Send` everywhere, so each lives on its own
 //! thread until its handle drops.
 
+use crate::DeviceInfo;
 use crate::convert::Converter;
 use crate::output::Queue;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeviceInfo {
-    pub id: String,
-    pub name: String,
-    pub is_default: bool,
-}
 
 fn info(d: &cpal::Device, default: Option<&str>) -> DeviceInfo {
     let id = d.id().map(|i| i.to_string()).unwrap_or_default();

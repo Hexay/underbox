@@ -27,6 +27,14 @@ pub type Block = [f32; BLOCK];
 
 pub const SILENT: Block = [0.0; BLOCK];
 
+/// An output or input device as the OS lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+}
+
 /// `channels` silent blocks.
 pub fn blocks(channels: usize) -> Vec<Block> {
     vec![SILENT; channels]
