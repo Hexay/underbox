@@ -28,6 +28,7 @@ pub struct Program {
     pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,
     layout: wgpu::PipelineLayout,
     pipelines: Mutex<HashMap<PipelineKey, wgpu::RenderPipeline>>,
+    failed: Mutex<HashMap<PipelineKey, String>>,
 }
 
 impl Program {
@@ -42,7 +43,7 @@ impl Program {
     pub fn from_stages(gpu: &Gpu, label: &str, vertex: Stage, fragment: Option<Stage>, bind_group_layouts: Vec<wgpu::BindGroupLayout>) -> Program {
         let refs: Vec<_> = bind_group_layouts.iter().map(Some).collect();
         let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some(label), bind_group_layouts: &refs, immediate_size: 0 });
-        Program { label: label.into(), vertex, fragment, bind_group_layouts, layout, pipelines: Mutex::default() }
+        Program { label: label.into(), vertex, fragment, bind_group_layouts, layout, pipelines: Mutex::default(), failed: Mutex::default() }
     }
 
     /// The pipeline drawing [`Vertex`] meshes into `color` + [`DEPTH_FORMAT`] with default state.
@@ -61,6 +62,27 @@ impl Program {
         let p = self.build(gpu, key);
         cache.insert(key.clone(), p.clone());
         p
+    }
+
+    /// The pipeline for `key`, or the validation error building it. A failed key is remembered,
+    /// so draws that fall back on it don't rebuild it every frame.
+    pub fn try_pipeline(&self, gpu: &Gpu, key: &PipelineKey) -> Result<wgpu::RenderPipeline, String> {
+        if let Some(e) = self.failed.lock().unwrap().get(key) {
+            return Err(e.clone());
+        }
+        if let Some(p) = self.pipelines.lock().unwrap().get(key) {
+            return Ok(p.clone());
+        }
+        match gpu.checked(|| self.build(gpu, key)) {
+            Ok(p) => {
+                self.pipelines.lock().unwrap().insert(key.clone(), p.clone());
+                Ok(p)
+            }
+            Err(e) => {
+                self.failed.lock().unwrap().insert(key.clone(), e.clone());
+                Err(e)
+            }
+        }
     }
 
     fn build(&self, gpu: &Gpu, key: &PipelineKey) -> wgpu::RenderPipeline {

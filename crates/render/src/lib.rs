@@ -9,6 +9,7 @@
 //!   translated combos exist; [`ForwardPass`] is the same for [`Mesh`]es.
 //! - [`Frame`]: a read-back image with hashing and tolerant comparison, for frame-hash tests.
 
+mod blit;
 mod buffer;
 mod forward;
 mod frame;
@@ -21,6 +22,7 @@ mod state;
 mod surface;
 mod texture;
 
+pub use blit::Blitter;
 pub use buffer::{Buffer, BufferKind};
 pub use forward::{Camera, DrawItem, ForwardPass};
 pub use frame::{Comparison, Frame};
