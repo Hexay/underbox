@@ -27,6 +27,8 @@ fn main() {
         cfg.define("USE_CRYPTO", "BCrypt")
             .define("CMAKE_TOOLCHAIN_FILE", vcpkg.join("scripts/buildsystems/vcpkg.cmake"))
             .define("VCPKG_TARGET_TRIPLET", "x64-windows-static-md")
+            // GNS's vcpkg.json would rebuild protobuf/openssl/abseil (~55 min) instead of using VCPKG_ROOT's.
+            .define("VCPKG_MANIFEST_MODE", "OFF")
             .define("MSVC_CRT_STATIC", "OFF")
             // Default OFF defines PROTOBUF_USE_DLLS, so every protobuf symbol would be a dllimport.
             .define("Protobuf_USE_STATIC_LIBS", "ON");

@@ -12,10 +12,18 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # No debuginfo: smaller rust-cache, faster links (most of all MSVC's PDBs).
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
   linux:
     runs-on: ubuntu-24.04
+    # clippy's workspace wrapper gives workspace crates their own build-script runs, so the GNS and
+    # SDL cmake builds would compile twice per job; sccache serves the second (and the next run's).
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      CMAKE_C_COMPILER_LAUNCHER: sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: sccache
     steps:
       - uses: actions/checkout@v5
         with:
@@ -29,9 +37,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      - run: cargo test --workspace --no-fail-fast
+      - run: sccache --show-stats
 
   windows:
     runs-on: windows-2022
@@ -55,8 +67,9 @@ jobs:
           path: C:\vcpkg\installed
           key: vcpkg-protobuf-x64-windows-static-md-v1
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      # Without cache-on-failure a red job saves nothing and the next run is cold again.
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+        with:
+          cache-on-failure: true
+      # No clippy here: Linux lints the same code, and a check pass shares no artifacts with test.
+      - run: cargo test --workspace --no-fail-fast

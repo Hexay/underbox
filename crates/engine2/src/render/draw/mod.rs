@@ -82,6 +82,7 @@ pub fn execute(target: &Target, load: Load, draws: &[Draw]) {
             instances: d.instances,
             uniforms: d.uniforms,
             state: RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state },
+            shaded: None,
         })
         .collect();
     let load = Load { color: load.color.filter(|_| targets.color.is_some()), depth: load.depth.filter(|_| targets.depth.is_some()) };

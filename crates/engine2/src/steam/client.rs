@@ -99,7 +99,8 @@ pub fn register(r: &mut Registry) {
     static STORAGE: OnceLock<usize> = OnceLock::new();
     static UTILS: OnceLock<usize> = OnceLock::new();
     bind!(r, global::STEAM_USER, || -> NativeRef<class::ISteamUser> { offered(&USER, local().is_some()) });
-    bind!(r, global::STEAM_FRIENDS, || -> NativeRef<class::ISteamFriends> { offered(&FRIENDS, friend(|_| true)) });
+    // Never null: the game instance sets rich presence every frame unchecked (SteamRichPresenceSystem).
+    bind!(r, global::STEAM_FRIENDS, || -> NativeRef<class::ISteamFriends> { interface(&FRIENDS) });
     bind!(r, global::STEAM_APPS, || -> NativeRef<class::ISteamApps> { offered(&APPS, app(|_| true)) });
     bind!(r, global::STEAM_REMOTE_STORAGE, || -> NativeRef<class::ISteamRemoteStorage> { offered(&STORAGE, storage(|_| true)) });
     bind!(r, global::STEAM_UTILS, || -> NativeRef<class::ISteamUtils> { offered(&UTILS, filter(|_| true)) });
@@ -111,7 +112,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, user::CANCEL_AUTH_TICKET, |_, h| user(|c| c.cancel_ticket(h.value)));
     bind!(r, user::END_AUTH_SESSION, |_, id| user(|c| c.end_auth(SteamId(id))));
 
-    bind!(r, friends::GET_PERSONA_NAME, |_| StrRet::from(friend(|f| Some(f.persona_name()))));
+    bind!(r, friends::GET_PERSONA_NAME, |_| StrRet::from(friend(|f| Some(f.persona_name())).unwrap_or_else(|| "Player".into())));
     bind!(r, friends::SET_RICH_PRESENCE, |_, k, v| friend(|f| f.set_rich_presence(&text(k), v.map(|v| v.to_string_lossy()).as_deref())));
     bind!(r, friends::CLEAR_RICH_PRESENCE, |_| friend(|f| f.clear_rich_presence()));
     bind!(r, friends::REQUEST_EQUIPPED_PROFILE_ITEMS, |_, id| friend(|f| f.request_profile_items(SteamId(id))));

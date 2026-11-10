@@ -5,6 +5,7 @@
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 LOG=$(mktemp); trap 'rm -f "$LOG"' EXIT
+sh "$ROOT/tools/submodules.sh"
 status=0
 # see docs/dev-loop.md (incremental)
 env -u CARGO_INCREMENTAL cargo test -q --manifest-path "$ROOT/Cargo.toml" -p "$1" -j4 -- ${2:+"$2"} > "$LOG" 2>&1 || status=$?

@@ -4,6 +4,8 @@
 
 mod client;
 mod dispatch;
+#[cfg(not(feature = "steam"))]
+mod flat_api;
 mod game_server;
 mod ugc;
 mod unavailable;
