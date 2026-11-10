@@ -101,8 +101,22 @@ impl Texture {
 
     /// Copy mip 0 back to the CPU, tightly packed. Blocks until the GPU is done.
     pub fn read_back(&self, gpu: &Gpu) -> Frame {
-        let texel = self.texel_size().expect("read-back needs an uncompressed colour format");
-        let (w, h) = (self.desc.width, self.desc.height);
+        self.read_region(gpu, 0, [0, 0, self.desc.width, self.desc.height]).expect("read-back needs an uncompressed colour format")
+    }
+
+    /// The size of `mip`.
+    pub fn mip_size(&self, mip: u32) -> (u32, u32) {
+        ((self.desc.width >> mip).max(1), (self.desc.height >> mip).max(1))
+    }
+
+    /// Copy `[x, y, w, h]` of `mip` back to the CPU, tightly packed; `None` for a format without
+    /// a texel size or a rect outside the mip. Blocks until the GPU is done.
+    pub fn read_region(&self, gpu: &Gpu, mip: u32, [x, y, w, h]: [u32; 4]) -> Option<Frame> {
+        let texel = self.texel_size()?;
+        let (mw, mh) = self.mip_size(mip);
+        if mip >= self.desc.mips.max(1) || w == 0 || h == 0 || x + w > mw || y + h > mh {
+            return None;
+        }
         let row = w * texel;
         // Gotcha: buffer copies need rows padded to COPY_BYTES_PER_ROW_ALIGNMENT (256).
         let padded = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
@@ -114,7 +128,7 @@ impl Texture {
         });
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_buffer(
-            self.texture.as_image_copy(),
+            wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All },
             wgpu::TexelCopyBufferInfo {
                 buffer: &staging,
                 layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None },
@@ -128,7 +142,7 @@ impl Texture {
             let start = y * padded as usize;
             pixels.extend_from_slice(&bytes[start..start + row as usize]);
         }
-        Frame { width: w, height: h, texel_size: texel, pixels }
+        Some(Frame { width: w, height: h, texel_size: texel, pixels })
     }
 }
 
