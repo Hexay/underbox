@@ -1,7 +1,7 @@
 //! Swap chains (`SwapChainHandle_t`): a colour and a depth render target every view of a window
-//! draws into, presented to the window's surface when there is one. Without a window (or before
-//! the window lane registers a [`WindowSource`]) a swap chain is purely offscreen, so a client runs
-//! headless and every presented frame can be read back and hashed (see [`frames`]).
+//! draws into, presented to the window's surface when there is one. A window without a native
+//! surface (SDL's offscreen driver, headless) or no window at all gives a purely offscreen swap
+//! chain, so a client runs headless and presented frames can be read back and hashed ([`frames`]).
 
 use crate::render::{device, frames, texture};
 use abi::slots::{g_p_render_device as dev, g_p_scene_system as scene};
@@ -10,18 +10,15 @@ use abi::{PtrHandle, RawPtr, Registry, bind, handle};
 use std::collections::HashMap;
 use std::ffi::{CStr, c_void};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 
 pub type Handle = PtrHandle<handle::SwapChainHandle_t>;
 
-/// Turns managed's `SDL_Window*` into something wgpu can make a surface on; `None` keeps the swap
-/// chain offscreen. The window crate installs one with [`set_window_source`].
-pub type WindowSource = Box<dyn Fn(RawPtr<c_void>) -> Option<render::SurfaceTarget<'static>> + Send + Sync>;
-
-static WINDOWS: OnceLock<WindowSource> = OnceLock::new();
-
-pub fn set_window_source(source: WindowSource) {
-    let _ = WINDOWS.set(source);
+/// A surface on managed's `SDL_Window*`, when SDL gives it native handles.
+fn surface(gpu: &render::Gpu, w: RawPtr<c_void>, width: u32, height: u32, vsync: bool) -> Option<Result<render::Surface, render::SurfaceError>> {
+    let h = window::handle::native(window::Window::from_ptr(w.as_ptr()))?;
+    // SAFETY: managed destroys the swap chain (and so the surface) before its SDL window.
+    Some(unsafe { render::Surface::from_raw(gpu, h.window, h.display, width, height, vsync) })
 }
 
 /// `SwapChainBuffer`: which of a swap chain's textures `GetSwapChainTexture` returns.
@@ -84,12 +81,10 @@ pub fn create(window: RawPtr<c_void>, info: RenderDeviceInfo_t, name: Option<&CS
     let name = name.map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "swapchain".into());
     let mut chain = SwapChain { name, info, color: Default::default(), depth: Default::default(), surface: None, presented: 0 };
     let (w, h) = chain.size();
-    let target = if window.is_null() { None } else { WINDOWS.get().and_then(|source| source(window)) };
-    if let Some(target) = target {
-        match render::Surface::new(gpu, target, w, h, info.m_b_wait_for_v_sync != 0) {
-            Ok(s) => chain.surface = Some(s),
-            Err(e) => abi::rt::log::log(abi::rt::log::Level::Warn, &format!("swap chain '{}' stays offscreen: {e}", chain.name)),
-        }
+    match surface(gpu, window, w, h, info.m_b_wait_for_v_sync != 0) {
+        Some(Ok(s)) => chain.surface = Some(s),
+        Some(Err(e)) => abi::rt::log::log(abi::rt::log::Level::Warn, &format!("swap chain '{}' stays offscreen: {e}", chain.name)),
+        None => abi::rt::log::log(abi::rt::log::Level::Info, &format!("swap chain '{}' is offscreen ({w}x{h})", chain.name)),
     }
     chain.make_targets();
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -148,11 +143,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, dev::GET_BACKBUFFER_DIMENSIONS, |h| {
         let (w, hgt) = get(h).map_or((0, 0), |c| c.lock().unwrap().size());
         Vector2 { vec: abi::structs::System_Numerics_Vector2 { x: w as f32, y: hgt as f32 } }
-    });
-    // TODO: GPU timestamps; managed shows the frame time only when this answers true.
-    bind!(r, dev::GET_GPU_FRAME_TIME_MS, |_, ms, frame| {
-        (*ms, *frame) = (0.0, 0);
-        false
     });
     bind!(r, scene::SET_MAIN_SWAP_CHAIN, |h| *MAIN.lock().unwrap() = h);
     bind!(r, scene::GET_MAIN_SWAP_CHAIN_MULTISAMPLE_TYPE, || {

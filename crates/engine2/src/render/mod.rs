@@ -17,6 +17,7 @@ pub mod scene;
 pub mod stats;
 pub mod swap_chain;
 pub mod texture;
+mod tools;
 pub mod vfx;
 
 use abi::{Registry, bind};
@@ -37,5 +38,6 @@ pub fn register(r: &mut Registry) {
     stats::register(r);
     swap_chain::register(r);
     texture::register(r);
+    tools::register(r);
     vfx::register(r);
 }

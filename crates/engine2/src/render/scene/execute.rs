@@ -162,7 +162,7 @@ fn tags_pass(view: &SceneView, tags: &[u32]) -> bool {
 }
 
 /// A full-screen triangle at the far plane, behind everything drawn with depth.
-fn sky(tint: [f32; 4]) -> Option<Draw> {
+pub(crate) fn sky(tint: [f32; 4]) -> Option<Draw> {
     static TRIANGLE: OnceLock<Arc<render::Buffer>> = OnceLock::new();
     let gpu = device::gpu()?;
     let p: [f32; 9] = [-1.0, -1.0, 1.0, 3.0, -1.0, 1.0, -1.0, 3.0, 1.0];

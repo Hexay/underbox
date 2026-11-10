@@ -103,6 +103,11 @@ impl Texture {
     /// formats differ or the rect falls outside either texture.
     pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
         let fits = |t: &Texture, x: u32, y: u32| x + w <= t.desc.width && y + h <= t.desc.height;
+        // Depth and stencil copies must cover whole subresources (wgpu validation).
+        let whole = |t: &Texture| [x, y, dx, dy] == [0; 4] && (w, h) == (t.desc.width, t.desc.height);
+        if self.desc.format.has_depth_aspect() && !(whole(self) && whole(dst)) {
+            return false;
+        }
         if self.desc.format != dst.desc.format || w == 0 || h == 0 || !fits(self, x, y) || !fits(dst, dx, dy) {
             return false;
         }

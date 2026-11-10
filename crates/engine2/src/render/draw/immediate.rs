@@ -150,7 +150,7 @@ fn draw_model(c: Ctx, m: crate::model::Ref, xforms: Vec<Mat4>) {
     submit(c, &draws);
 }
 
-fn draw_scene_object(c: Ctx, o: crate::scene::object::Ref, t: Transform, color: Vector4) {
+pub(crate) fn draw_scene_object(c: Ctx, o: crate::scene::object::Ref, t: Transform, color: Vector4) {
     let Some(obj) = crate::scene::object::get(o) else { return };
     let (m, groups, tint) = {
         let s = obj.state.lock().unwrap();

@@ -18,7 +18,7 @@ static CONFIG: LazyLock<Option<Config>> = LazyLock::new(|| {
 
 pub fn on_present(gpu: &render::Gpu, name: &str, n: u64, color: &render::Texture) {
     let Some(config) = CONFIG.as_ref() else { return };
-    if n % config.every != 0 {
+    if !n.is_multiple_of(config.every) {
         return;
     }
     let Some(frame) = color.read_region(gpu, 0, [0, 0, color.desc.width, color.desc.height]) else { return };
