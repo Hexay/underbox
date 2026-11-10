@@ -22,6 +22,7 @@ physics = { path = "../physics" }
 platform = { path = "../platform" }
 render = { path = "../render" }
 serde_json.workspace = true
+window = { path = "../window" }
 
 [features]
 steam = ["platform/steam"]
