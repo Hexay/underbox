@@ -11,7 +11,9 @@ shift $(( $# > 2 ? 2 : $# ))
 OUT=${OUT:-$ROOT/target/boot}
 mkdir -p "$OUT"
 
-if [ ! -f "$SBOX/game/sbox-server.dll" ]; then
+sh "$ROOT/tools/prepare-sbox.sh" "$SBOX"
+# Rebuild when missing or when prepare-sbox.sh added EmbeddedRefs after the last build.
+if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/EmbeddedRefs" -nt "$SBOX/game/sbox-server.dll" ]; then
     echo "== building sbox-server (~2 min)"
     # The icon isn't in the public repo; an empty property skips it without patching their csproj.
     dotnet build "$SBOX/engine/Launcher/SboxServer/Sbox-Server.csproj" -c Release -m:4 -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
