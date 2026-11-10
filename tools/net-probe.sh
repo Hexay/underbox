@@ -5,7 +5,7 @@
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 HOLD=${1:-5}
-SBOX=${2:-$ROOT/../sbox-public}
+SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 OUT=$ROOT/target/net-probe
 PORT=27115
 mkdir -p "$OUT"

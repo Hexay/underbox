@@ -5,7 +5,7 @@
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 SECS=${1:-60}
-SBOX=$(cd -- "${2:-$ROOT/../sbox-public}" && pwd)
+SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 shift $(( $# > 2 ? 2 : $# ))
 [ "${1:-}" = "--" ] && shift
 OUT=${OUT:-$ROOT/target/boot}
