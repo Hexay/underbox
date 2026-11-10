@@ -3,6 +3,8 @@
 //! Gotcha: commands execute eagerly on the device's queue rather than into a display list, so
 //! `Submit` only orders against later reads; the order managed issues them in is kept.
 
+use crate::render::draw::Target;
+use crate::render::draw::immediate::DrawState;
 use crate::render::{attributes, device, texture};
 use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools as tools};
 use abi::structs::{NativeRect, RenderViewport, Vector4};
@@ -20,15 +22,36 @@ struct Bindings {
 }
 
 pub struct RenderContext {
-    attributes: attributes::Ref,
+    pub attributes: attributes::Ref,
     bindings: Mutex<Bindings>,
+    pub draw: Mutex<DrawState>,
 }
 
-fn create(_flags: u32) -> Ref {
-    objects::create(RenderContext { attributes: attributes::create(), bindings: Mutex::default() })
+pub fn create(_flags: u32) -> Ref {
+    objects::create(RenderContext { attributes: attributes::create(), bindings: Mutex::default(), draw: Mutex::default() })
 }
 
-fn release(r: Ref) {
+pub fn get(r: Ref) -> Option<std::sync::Arc<RenderContext>> {
+    objects::get::<_, RenderContext>(r)
+}
+
+/// The bound targets, viewport and scissor draws go to.
+pub fn target(r: Ref) -> Target {
+    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), viewport: b.viewport, scissor: b.scissor })
+}
+
+/// Bind `t`'s targets, viewport and scissor at once.
+pub fn bind_target(r: Ref, t: &Target) {
+    bind_targets(r, t.color, t.depth);
+    with(r, |b| {
+        if t.viewport.m_n_width > 0 && t.viewport.m_n_height > 0 {
+            b.viewport = t.viewport;
+        }
+        b.scissor = t.scissor;
+    });
+}
+
+pub fn release(r: Ref) {
     if let Some(c) = objects::get::<_, RenderContext>(r) {
         objects::destroy(c.attributes);
     }
@@ -44,7 +67,7 @@ fn some(t: texture::Ref) -> Option<texture::Ref> {
 }
 
 /// Bind colour and depth targets; the viewport resets to cover the colour (or depth) target.
-fn bind_targets(r: Ref, color: texture::Ref, depth: texture::Ref) {
+pub fn bind_targets(r: Ref, color: texture::Ref, depth: texture::Ref) {
     let size = some(color).or(some(depth)).and_then(texture::resolve).and_then(|t| t.gpu.as_ref().map(|g| (g.desc.width, g.desc.height)));
     with(r, |b| {
         (b.color, b.depth, b.scissor) = (some(color), some(depth), None);

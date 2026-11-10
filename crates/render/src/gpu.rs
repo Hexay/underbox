@@ -7,11 +7,8 @@ pub struct Gpu {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub info: wgpu::AdapterInfo,
-    // Kept alive for surface creation once windows exist (docs/renderer.md, "Windows").
-    #[allow(dead_code)]
-    instance: wgpu::Instance,
-    #[allow(dead_code)]
-    adapter: wgpu::Adapter,
+    pub(crate) instance: wgpu::Instance,
+    pub(crate) adapter: wgpu::Adapter,
 }
 
 #[derive(Debug)]

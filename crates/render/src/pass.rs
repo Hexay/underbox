@@ -1,0 +1,131 @@
+//! One render pass of placeholder-shaded draws into a colour and/or depth target. Every draw
+//! carries its own vertex/index buffers, raster state and per-draw uniforms (dynamic offsets).
+
+use crate::placeholder::{DRAW_UNIFORM_SIZE, Placeholder};
+use crate::state::{PipelineKey, RasterState, VertexBufferKey};
+use crate::{Gpu, Texture};
+use glam::Mat4;
+use std::ops::Range;
+
+/// What a pass draws into, and the part of it.
+#[derive(Clone, Copy, Default)]
+pub struct Targets<'a> {
+    pub color: Option<&'a Texture>,
+    pub depth: Option<&'a Texture>,
+    /// `x, y, w, h, min_z, max_z` in pixels; the whole target when `None`.
+    pub viewport: Option<[f32; 6]>,
+    pub scissor: Option<[u32; 4]>,
+}
+
+impl Targets<'_> {
+    pub fn size(&self) -> Option<(u32, u32)> {
+        self.color.or(self.depth).map(|t| (t.desc.width, t.desc.height))
+    }
+}
+
+/// Clear values; `None` keeps what the target holds.
+#[derive(Clone, Copy, Default)]
+pub struct Load {
+    pub color: Option<wgpu::Color>,
+    pub depth: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DrawUniforms {
+    pub mvp: Mat4,
+    pub model: Mat4,
+    pub tint: [f32; 4],
+}
+
+impl DrawUniforms {
+    fn bytes(&self) -> [f32; 36] {
+        let mut d = [0f32; 36];
+        d[..16].copy_from_slice(&self.mvp.to_cols_array());
+        d[16..32].copy_from_slice(&self.model.to_cols_array());
+        d[32..].copy_from_slice(&self.tint);
+        d
+    }
+}
+
+pub struct MeshDraw<'a> {
+    /// Slot 0: the mesh's vertex buffer and byte offset; its layout is `vertex[0]`.
+    pub vertices: (&'a wgpu::Buffer, u64),
+    /// From [`Placeholder::vertex_keys`].
+    pub vertex: Vec<VertexBufferKey>,
+    pub indices: Option<(&'a wgpu::Buffer, wgpu::IndexFormat)>,
+    /// Index range when indexed, else vertex range.
+    pub range: Range<u32>,
+    pub base_vertex: i32,
+    pub instances: u32,
+    pub uniforms: DrawUniforms,
+    pub state: RasterState,
+}
+
+/// Run one pass: load or clear the targets, then draw `draws` in order.
+pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Load, draws: &[MeshDraw]) {
+    let Some((width, height)) = targets.size() else { return };
+    let stride = DRAW_UNIFORM_SIZE.next_multiple_of(u64::from(gpu.device.limits().min_uniform_buffer_offset_alignment));
+    let uniforms = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("draw uniforms"),
+        size: stride * draws.len().max(1) as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    for (i, d) in draws.iter().enumerate() {
+        gpu.queue.write_buffer(&uniforms, stride * i as u64, bytemuck::cast_slice(&d.uniforms.bytes()));
+    }
+    let program = &placeholder.program;
+    let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("draw uniforms"),
+        layout: &program.bind_group_layouts[0],
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &uniforms, offset: 0, size: wgpu::BufferSize::new(DRAW_UNIFORM_SIZE) }),
+        }],
+    });
+    let store = wgpu::StoreOp::Store;
+    let color = targets.color.map(|t| wgpu::RenderPassColorAttachment {
+        view: &t.view,
+        depth_slice: None,
+        resolve_target: None,
+        ops: wgpu::Operations { load: load.color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store },
+    });
+    let depth = targets.depth.map(|t| wgpu::RenderPassDepthStencilAttachment {
+        view: &t.view,
+        depth_ops: Some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store }),
+        stencil_ops: t.desc.format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Load, store }),
+    });
+    let color_count = usize::from(color.is_some());
+    let colors = [color];
+    let mut encoder = gpu.device.create_command_encoder(&Default::default());
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("draws"),
+            color_attachments: &colors[..color_count],
+            depth_stencil_attachment: depth,
+            ..Default::default()
+        });
+        if let Some([x, y, w, h, near, far]) = targets.viewport {
+            pass.set_viewport(x, y, w.min(width as f32 - x), h.min(height as f32 - y), near, far);
+        }
+        if let Some([x, y, w, h]) = targets.scissor {
+            let (x, y) = (x.min(width), y.min(height));
+            pass.set_scissor_rect(x, y, w.min(width - x), h.min(height - y));
+        }
+        for (i, d) in draws.iter().enumerate() {
+            let key = PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: d.vertex.clone(), state: d.state };
+            pass.set_pipeline(&program.pipeline_for(gpu, &key));
+            pass.set_bind_group(0, &bind_group, &[(stride * i as u64) as u32]);
+            pass.set_vertex_buffer(0, d.vertices.0.slice(d.vertices.1..));
+            pass.set_vertex_buffer(1, placeholder.defaults.buffer.slice(..));
+            match d.indices {
+                Some((buffer, format)) => {
+                    pass.set_index_buffer(buffer.slice(..), format);
+                    pass.draw_indexed(d.range.clone(), d.base_vertex, 0..d.instances);
+                }
+                None => pass.draw(d.range.clone(), 0..d.instances),
+            }
+        }
+    }
+    gpu.queue.submit([encoder.finish()]);
+}
