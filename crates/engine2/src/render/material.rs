@@ -119,7 +119,10 @@ pub fn register(r: &mut Registry) {
         p.strings.insert(string(n), string(v));
     }));
     bind!(r, m::GET_STRING, |h, n, d| {
-        StrRet::from(params(h, |p| p.strings.get(&string(n)).cloned()).unwrap_or_else(|| string(d)))
+        let n = string(n);
+        // Native answers the material's shader path for "shader" (managed's Material.ShaderName).
+        let shader = || (n == "shader").then(|| on(h, |mat| mat.shader.clone())).filter(|s| !s.is_empty());
+        StrRet::from(params(h, |p| p.strings.get(&n).cloned()).or_else(shader).unwrap_or_else(|| string(d)))
     });
     bind!(r, m::SET_1, |h, n, v| params(h, |p| {
         p.vectors.insert(string(n), v);

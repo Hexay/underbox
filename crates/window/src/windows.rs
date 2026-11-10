@@ -103,9 +103,6 @@ macro_rules! forward {
 forward! {
     show => SDL_ShowWindow() -> bool;
     hide => SDL_HideWindow() -> bool;
-    minimize => SDL_MinimizeWindow() -> bool;
-    maximize => SDL_MaximizeWindow() -> bool;
-    restore => SDL_RestoreWindow() -> bool;
     raise => SDL_RaiseWindow() -> bool;
     sync => SDL_SyncWindow() -> bool;
     pixel_density => SDL_GetWindowPixelDensity() -> f32;
@@ -113,14 +110,36 @@ forward! {
     set_minimum_size => SDL_SetWindowMinimumSize(w: i32 => w, h: i32 => h) -> bool;
     set_maximum_size => SDL_SetWindowMaximumSize(w: i32 => w, h: i32 => h) -> bool;
     set_size => SDL_SetWindowSize(w: i32 => w, h: i32 => h) -> bool;
-    set_position => SDL_SetWindowPosition(x: i32 => x, y: i32 => y) -> bool;
-    set_always_on_top => SDL_SetWindowAlwaysOnTop(on: bool => on) -> bool;
-    set_opacity => SDL_SetWindowOpacity(opacity: f32 => opacity) -> bool;
     set_aspect_ratio => SDL_SetWindowAspectRatio(min: f32 => min, max: f32 => max) -> bool;
     set_parent => SDL_SetWindowParent(parent: Window => parent.0) -> bool;
-    set_modal => SDL_SetWindowModal(modal: bool => modal) -> bool;
-    flash => SDL_FlashWindow(op: i32 => SDL_FlashOperation(op)) -> bool;
-    set_bordered => SDL_SetWindowBordered(bordered: bool => bordered) -> bool;
-    set_resizable => SDL_SetWindowResizable(resizable: bool => resizable) -> bool;
     set_fullscreen => SDL_SetWindowFullscreen(fullscreen: bool => fullscreen) -> bool;
+}
+
+/// Window-manager requests. A driver without a window manager (SDL's offscreen driver) has no hook
+/// for them and SDL answers "unsupported"; there they are accepted no-ops, as a WM may ignore them.
+macro_rules! forward_wm {
+    ($($name:ident => $sdl:ident($($arg:ident: $ty:ty => $conv:expr),*);)*) => {$(
+        pub fn $name(window: Window $(, $arg: $ty)*) -> bool {
+            // SAFETY: SDL validates the window; the other arguments are plain values.
+            let ok = unsafe { $sdl(window.0 $(, $conv)*) };
+            ok || no_window_manager()
+        }
+    )*};
+}
+
+pub(crate) fn no_window_manager() -> bool {
+    video::current_driver().as_deref() == Some(video::FALLBACK_DRIVER.to_str().unwrap_or_default())
+}
+
+forward_wm! {
+    set_position => SDL_SetWindowPosition(x: i32 => x, y: i32 => y);
+    minimize => SDL_MinimizeWindow();
+    maximize => SDL_MaximizeWindow();
+    restore => SDL_RestoreWindow();
+    set_always_on_top => SDL_SetWindowAlwaysOnTop(on: bool => on);
+    set_opacity => SDL_SetWindowOpacity(opacity: f32 => opacity);
+    set_modal => SDL_SetWindowModal(modal: bool => modal);
+    flash => SDL_FlashWindow(op: i32 => SDL_FlashOperation(op));
+    set_bordered => SDL_SetWindowBordered(bordered: bool => bordered);
+    set_resizable => SDL_SetWindowResizable(resizable: bool => resizable);
 }

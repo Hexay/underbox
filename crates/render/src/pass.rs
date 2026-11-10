@@ -3,7 +3,7 @@
 
 use crate::placeholder::{DRAW_UNIFORM_SIZE, Placeholder};
 use crate::state::{PipelineKey, RasterState, VertexBufferKey};
-use crate::{Gpu, Texture};
+use crate::{Gpu, Program, Texture};
 use glam::Mat4;
 use std::ops::Range;
 
@@ -47,18 +47,29 @@ impl DrawUniforms {
     }
 }
 
+/// A draw shaded by its own program (a translated material) instead of the placeholder.
+pub struct Shaded<'a> {
+    pub program: &'a Program,
+    /// Bound at group index = position; the caller built them against `program`'s layouts.
+    pub bind_groups: &'a [wgpu::BindGroup],
+    /// Vertex slots 1.. (instance streams, attribute defaults), laid out as `vertex[1..]`.
+    pub buffers: Vec<(&'a wgpu::Buffer, u64)>,
+}
+
 pub struct MeshDraw<'a> {
     /// Slot 0: the mesh's vertex buffer and byte offset; its layout is `vertex[0]`.
     pub vertices: (&'a wgpu::Buffer, u64),
-    /// From [`Placeholder::vertex_keys`].
+    /// From [`Placeholder::vertex_keys`], or the material program's inputs.
     pub vertex: Vec<VertexBufferKey>,
     pub indices: Option<(&'a wgpu::Buffer, wgpu::IndexFormat)>,
     /// Index range when indexed, else vertex range.
     pub range: Range<u32>,
     pub base_vertex: i32,
     pub instances: u32,
+    /// The placeholder's per-draw data; unused by [`Shaded`] draws.
     pub uniforms: DrawUniforms,
     pub state: RasterState,
+    pub shaded: Option<Shaded<'a>>,
 }
 
 /// Run one pass: load or clear the targets, then draw `draws` in order.
@@ -114,10 +125,23 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         }
         for (i, d) in draws.iter().enumerate() {
             let key = PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: d.vertex.clone(), state: d.state };
-            pass.set_pipeline(&program.pipeline_for(gpu, &key));
-            pass.set_bind_group(0, &bind_group, &[(stride * i as u64) as u32]);
             pass.set_vertex_buffer(0, d.vertices.0.slice(d.vertices.1..));
-            pass.set_vertex_buffer(1, placeholder.defaults.buffer.slice(..));
+            match &d.shaded {
+                Some(s) => {
+                    pass.set_pipeline(&s.program.pipeline_for(gpu, &key));
+                    for (g, bg) in s.bind_groups.iter().enumerate() {
+                        pass.set_bind_group(g as u32, bg, &[]);
+                    }
+                    for (slot, (b, offset)) in s.buffers.iter().enumerate() {
+                        pass.set_vertex_buffer(slot as u32 + 1, b.slice(*offset..));
+                    }
+                }
+                None => {
+                    pass.set_pipeline(&program.pipeline_for(gpu, &key));
+                    pass.set_bind_group(0, &bind_group, &[(stride * i as u64) as u32]);
+                    pass.set_vertex_buffer(1, placeholder.defaults.buffer.slice(..));
+                }
+            }
             match d.indices {
                 Some((buffer, format)) => {
                     pass.set_index_buffer(buffer.slice(..), format);
