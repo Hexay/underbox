@@ -43,9 +43,9 @@ impl Xform {
         self.pos + self.rot * (p * self.scale)
     }
 
-    /// Linear position/scale, shortest-arc normalised lerp for rotation.
+    /// Linear position/scale, shortest-arc slerp for rotation.
     pub fn lerp(&self, other: &Xform, t: f32) -> Xform {
-        Xform { pos: self.pos.lerp(other.pos, t), rot: nlerp(self.rot, other.rot, t), scale: self.scale + (other.scale - self.scale) * t }
+        Xform { pos: self.pos.lerp(other.pos, t), rot: self.rot.slerp(other.rot, t).normalize(), scale: self.scale + (other.scale - self.scale) * t }
     }
 
     /// The change from `base` to `self`, for additive layers: `base.add(&self.delta(base)) == self`.
@@ -59,11 +59,6 @@ impl Xform {
         let d = Xform::IDENTITY.lerp(delta, w);
         Xform { pos: self.pos + d.pos, rot: (self.rot * d.rot).normalize(), scale: self.scale * d.scale }
     }
-}
-
-pub fn nlerp(a: Quat, b: Quat, t: f32) -> Quat {
-    let b = if a.dot(b) < 0.0 { -b } else { b };
-    (a * (1.0 - t) + b * t).normalize()
 }
 
 #[cfg(test)]
