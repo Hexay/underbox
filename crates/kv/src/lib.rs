@@ -2,8 +2,10 @@
 //! authored in (KeyValues1 `.vmat`, KeyValues3 `.vmdl`/`.vpcf`...).
 
 mod cursor;
+pub mod json;
 pub mod kv1;
 pub mod kv3;
+pub mod write;
 
 /// A KeyValues value. KV1 produces only `String` and `Object`.
 #[derive(Debug, Clone, PartialEq)]
