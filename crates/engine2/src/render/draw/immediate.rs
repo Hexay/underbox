@@ -3,17 +3,19 @@
 //! `DrawSceneObject`. Each executes at once into the context's bound targets (context.rs).
 //!
 //! Positions go through the context's `view_proj`: the view's camera while a layer callback runs
-//! (scene/execute.rs), identity otherwise. TODO: screen-space (UI) draws need their material's
-//! projection once translated shaders bind attributes.
+//! (scene/execute.rs), identity otherwise. After `SetRenderState`, `Draw` and `Draw*` shade with
+//! that mode's material program and attributes; the placeholder when it doesn't build or bind.
 
 use super::{Draw, gpu_mesh, model as model_draw, topology};
 use crate::mesh::buffers::{self, IndexBuffer, VertexBuffer};
 use crate::mesh::layout::{self, Layout};
+use super::shaded::{self, ContextBindings, Shaded};
 use crate::render::lighting::Lighting;
-use crate::render::{buffers as gpu_buffers, context, device, swap_chain};
+use crate::render::shading::bind::Instance;
+use crate::render::{attributes, buffers as gpu_buffers, context, device, material_mode, swap_chain, texture};
 use abi::slots::{i_render_context as ctx, render_tools as tools};
 use abi::structs::{Transform, Vector4};
-use abi::{NativeRef, RawPtr, Registry, bind, class};
+use abi::{RawPtr, Registry, bind};
 use glam::Mat4;
 use render::pass::{DrawUniforms, Load};
 use render::wgpu::IndexFormat;
@@ -40,17 +42,22 @@ pub struct DrawState {
     pub view_proj: Mat4,
     /// The view's lights while a layer runs, [`Lighting::fallback`] otherwise.
     pub lighting: Arc<Lighting>,
+    /// `SetRenderState`'s attributes and material mode, which later draws shade with.
+    render_state: Option<(attributes::Ref, material_mode::Ref)>,
+    /// `BindTexture` textures by slot.
+    pub slots: Vec<(u32, texture::Ref)>,
 }
 
 impl Default for DrawState {
     fn default() -> Self {
-        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting: Arc::new(Lighting::fallback()) }
+        let lighting = Arc::new(Lighting::fallback());
+        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting, render_state: None, slots: Vec::new() }
     }
 }
 
 type Ctx = context::Ref;
 
-fn with<R: Default>(c: Ctx, f: impl FnOnce(&mut DrawState) -> R) -> R {
+pub(crate) fn with<R: Default>(c: Ctx, f: impl FnOnce(&mut DrawState) -> R) -> R {
     context::get(c).map(|c| f(&mut c.draw.lock().unwrap())).unwrap_or_default()
 }
 
@@ -77,11 +84,22 @@ pub fn submit(c: Ctx, draws: &[Draw]) {
     }
 }
 
-// TODO: draw with the mode's program (material_mode::material) once `attrs` reach the binder;
-// without them post-process and UI programs read zeroed inputs and wash the frame out (showroom).
-fn set_render_state(c: Ctx, _attrs: NativeRef<class::CRenderAttributes>, _mode: NativeRef<class::IMaterialMode>, l: layout::Ref) -> bool {
-    with(c, |s| s.layout = layout::get(l));
+fn set_render_state(c: Ctx, attrs: attributes::Ref, mode: material_mode::Ref, l: layout::Ref) -> bool {
+    with(c, |s| (s.layout, s.render_state) = (layout::get(l), Some((attrs, mode))));
     device::gpu().is_some()
+}
+
+/// The `SetRenderState` material's program for a draw of `layout` on `c`, bound with its
+/// attributes, the context's and the `BindTexture` slots; `None` draws the placeholder.
+fn render_state_shading(c: Ctx, layout: &Layout) -> Option<Shaded> {
+    let ctx = context::get(c)?;
+    let (state, slots, view_proj) = {
+        let s = ctx.draw.lock().unwrap();
+        (s.render_state, s.slots.clone(), s.view_proj)
+    };
+    let (attrs, mode) = state?;
+    let bindings = ContextBindings { attributes: vec![attrs, ctx.attributes], slots, instance_ids: None };
+    shaded::resolve(material_mode::material(mode)?, layout, Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }, view_proj, bindings)
 }
 
 /// `RenderTools.Draw`: managed's vertex (and optional u16 index) arrays, uploaded per call.
@@ -101,17 +119,19 @@ fn draw_dynamic(c: Ctx, prim: i64, l: layout::Ref, vertices: RawPtr<c_void>, n: 
     });
     let range = 0..if ib.is_some() { n_indices as u32 } else { n as u32 };
     let state = RasterState { topology: topology(prim), ..Default::default() };
-    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded: None };
+    let shaded = render_state_shading(c, &layout);
+    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded };
     submit(c, &[draw]);
 }
 
 /// A draw from the bound buffers: `range` is indices when an index buffer is bound and `indexed`.
 fn draw_bound(c: Ctx, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) {
-    let Some(draw) = with(c, |s| bound_draw(s, prim, range, instances, base_vertex, indexed)) else { return };
+    let Some((mut draw, layout)) = with(c, |s| bound_draw(s, prim, range, instances, base_vertex, indexed)) else { return };
+    draw.shaded = render_state_shading(c, &layout);
     submit(c, &[draw]);
 }
 
-fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) -> Option<Draw> {
+fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) -> Option<(Draw, Arc<Layout>)> {
     let (src, offset) = s.vertices.as_ref()?;
     let (vertices, layout) = match src {
         Vertices::Mesh(b) => (gpu_mesh::vertices(b)?, s.layout.clone().unwrap_or_else(|| b.meta.clone())),
@@ -126,7 +146,7 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
     let uniforms = DrawUniforms { mvp: s.view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
     let state = RasterState { topology: topology(prim), ..Default::default() };
     let vertex = gpu_mesh::vertex_keys(&layout)?;
-    Some(Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None })
+    Some((Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None }, layout))
 }
 
 fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {

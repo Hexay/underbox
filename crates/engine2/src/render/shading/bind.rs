@@ -8,7 +8,7 @@ use super::layout::Value;
 use super::program::Shading;
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting};
-use crate::render::texture;
+use crate::render::{attributes, buffers as gpu_buffers, texture};
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
 use render::wgpu::{self, BindingType as B};
@@ -33,6 +33,28 @@ pub struct Inputs<'a> {
     pub textures: &'a HashMap<String, texture::Ref>,
     /// Material and draw values by HLSL or attribute name; draw values first.
     pub values: &'a [&'a HashMap<String, Vec4>],
+    /// Render attributes (`SetRenderState`'s, then the context's), searched before `values` for
+    /// values and textures by HLSL or attribute name, and for whole constant blocks by block name.
+    pub attributes: &'a [attributes::Ref],
+    /// `BindTexture` textures by slot, for texture bindings at that binding number nothing names.
+    pub slots: &'a [(u32, texture::Ref)],
+}
+
+impl Inputs<'_> {
+    fn constant_buffer(&self, block: &str) -> Option<std::sync::Arc<[u8]>> {
+        self.attributes.iter().find_map(|a| attributes::constant_buffer(*a, block))
+    }
+
+    /// A GPU buffer an attribute names (managed's `g_TransformBuffer` for instanced draws).
+    fn gpu_buffer(&self, name: &str) -> Option<wgpu::Buffer> {
+        let handle = self.attributes.iter().find_map(|a| attributes::buffer(*a, name))?;
+        gpu_buffers::get(gpu_buffers::Handle::new(handle)).map(|b| b.buffer.clone())
+    }
+}
+
+/// The names a reflected resource answers to: its HLSL name and its vfx `Attribute( "..." )`.
+fn names<'a>(s: &'a Shading, name: &'a str) -> impl Iterator<Item = &'a str> {
+    std::iter::once(name).chain(s.attributes.get(name).and_then(|a| a.attribute.as_deref()))
 }
 
 fn transforms(instances: &[Instance]) -> Vec<u8> {
@@ -51,10 +73,17 @@ fn transforms(instances: &[Instance]) -> Vec<u8> {
 }
 
 fn uniform_value(s: &Shading, inputs: &Inputs, name: &str) -> Option<Value> {
-    let attr = s.attributes.get(name);
-    let names = [Some(name), attr.and_then(|a| a.attribute.as_deref())];
-    let given = inputs.values.iter().find_map(|m| names.iter().flatten().find_map(|n| m.get(*n)));
-    given.copied().or_else(|| attr.and_then(|a| a.default)).map(Value::Vec)
+    let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
+    let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
+    let default = || s.attributes.get(name).and_then(|a| a.default);
+    from_attributes().or_else(given).or_else(default).map(Value::Vec)
+}
+
+/// Managed's bytes for a whole block, sized to the block.
+fn block_bytes(bytes: &[u8], size: u32) -> Vec<u8> {
+    let mut out = bytes.to_vec();
+    out.resize(size.max(16) as usize, 0);
+    out
 }
 
 fn buffer(gpu: &render::Gpu, label: &str, usage: wgpu::BufferUsages, bytes: &[u8]) -> wgpu::Buffer {
@@ -69,10 +98,14 @@ enum Resource {
     Sampler(wgpu::Sampler),
 }
 
-/// The draw's texture for `b`: the material's by name, else the lighting's (shadow maps).
-fn texture_view(inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
+/// The draw's texture for `b`: a render attribute's or the material's by name, the lighting's
+/// (shadow maps), else a `BindTexture` slot at its binding.
+fn texture_view(s: &Shading, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
     let B::Texture { sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false } = b.ty else { return None };
-    let t = inputs.textures.get(&b.name).copied().or_else(|| inputs.lighting.texture(&b.name))?;
+    let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n)));
+    let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
+    let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
+    let t = from_attributes().or_else(from_material).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
     let gpu = t.gpu.as_ref()?;
@@ -87,14 +120,18 @@ fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Res
     Ok(match b.ty {
         B::Buffer { ty: wgpu::BufferBindingType::Uniform, .. } => {
             let block = s.blocks.get(&(b.group, b.binding)).ok_or_else(|| format!("no layout for block {}", b.name))?;
-            let bytes = match b.name.as_str() {
-                view::BLOCK => block.fill(|n| inputs.view.constant(n)),
-                name if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n)),
-                _ => block.fill(|n| uniform_value(s, inputs, n)),
+            let bytes = match (inputs.constant_buffer(&b.name), b.name.as_str()) {
+                (Some(given), _) => block_bytes(&given, block.size),
+                (None, view::BLOCK) => block.fill(|n| inputs.view.constant(n)),
+                (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n)),
+                (None, _) => block.fill(|n| uniform_value(s, inputs, n)),
             };
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::UNIFORM, &bytes))
         }
         B::Buffer { ty: wgpu::BufferBindingType::Storage { .. }, min_binding_size, .. } => {
+            if let Some(given) = inputs.gpu_buffer(&b.name) {
+                return Ok(Resource::Buffer(given));
+            }
             let element = s.storage.get(&(b.group, b.binding));
             let bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
                 Some(bytes) => bytes,
@@ -104,7 +141,7 @@ fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Res
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
         B::Texture { sample_type, view_dimension, .. } => {
-            Resource::View(texture_view(inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
+            Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }
         B::Sampler(kind) => Resource::Sampler(defaults::sampler(gpu, kind)),
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),

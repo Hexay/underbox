@@ -74,26 +74,6 @@ fn draw_sky_box(c: context::Ref, tint: Vector4) -> bool {
     true
 }
 
-/// Allocations managed asked for with `CreateConstantBuffer`, by address, with their layouts.
-static CONSTANT_BUFFERS: LazyLock<Mutex<HashMap<usize, std::alloc::Layout>>> = LazyLock::new(Default::default);
-
-fn create_constant_buffer(size: i32) -> RawPtr<c_void> {
-    let Ok(layout) = std::alloc::Layout::from_size_align(size.max(1) as usize, 16) else { return RawPtr::NULL };
-    // SAFETY: layout has a nonzero size.
-    let p = unsafe { std::alloc::alloc_zeroed(layout) };
-    if !p.is_null() {
-        CONSTANT_BUFFERS.lock().unwrap().insert(p as usize, layout);
-    }
-    RawPtr::from_raw(p.cast())
-}
-
-fn destroy_constant_buffer(p: RawPtr<c_void>) {
-    if let Some(layout) = CONSTANT_BUFFERS.lock().unwrap().remove(&(p.as_ptr() as usize)) {
-        // SAFETY: allocated by create_constant_buffer with this layout.
-        unsafe { std::alloc::dealloc(p.as_ptr().cast(), layout) };
-    }
-}
-
 /// Managed's material-bind block (zeroed by managed): full and similar-material bind counts.
 const MATERIAL_BIND_SIZE: i32 = 16;
 
@@ -181,22 +161,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::RESET_MATERIAL_BIND, |_| {});
     bind!(r, tools::GET_MATERIAL_BIND_COUNTS, material_bind_counts);
     bind!(r, tools::GET_MATERIAL_SIMILARITY_KEY, |m| m.addr() as u64);
-    bind!(r, tools::CREATE_CONSTANT_BUFFER, create_constant_buffer);
-    bind!(r, tools::DESTROY_CONSTANT_BUFFER, destroy_constant_buffer);
-    // TODO: constant buffers, shaders and textures bind once materials run translated shaders.
-    bind!(r, tools::SET_CONSTANT_BUFFER_DATA, |_, _, _, _, _, _| {});
-    bind!(r, tools::SET_DYNAMIC_CONSTANT_BUFFER_DATA, |_, _, _, _, _| {});
-    bind!(r, ctx::SET_DYNAMIC_CONSTANT_BUFFER_DATA, |_, _, _, _, _| {});
-    bind!(r, ctx::BIND_VERTEX_SHADER, |_, _, _| {});
-    bind!(r, ctx::BIND_PIXEL_SHADER, |_, _| {});
-    bind!(r, ctx::BIND_TEXTURE, |_, _, _| {});
     // Model draw calls through managed's material system; without it these draw nothing.
     bind!(r, tools::BIND_MODEL_DRAW_CALL, |_, _, _, _, _| false);
     bind!(r, tools::BIND_MODEL_DRAW_CALL_VERTEX_IDS, |_, _, _, _, _| false);
     bind!(r, tools::SET_RENDER_STATE_FOR_MODEL_DRAW_CALL, |_, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL_INDIRECT, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL_MULTI_INDIRECT, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
     // No skinning, morphs, compute, ray tracing or auto exposure on the placeholder renderer.
     bind!(r, tools::GET_MODEL_MESH_SKINNING, |_, _, _, _| -1);
     bind!(r, tools::GET_MODEL_MESH_SKINNING_BONES, |_, _, _, _, _| false);

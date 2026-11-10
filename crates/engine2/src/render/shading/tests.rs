@@ -40,7 +40,7 @@ fn scene_renderer_mesh_builds_and_binds() {
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
     let lighting = Lighting::fallback();
-    let draw = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values] };
+    let draw = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values], attributes: &[], slots: &[] };
     let groups = gpu.checked(|| bind::bind_groups(&gpu, &s, &draw)).unwrap().unwrap();
     assert_eq!(groups.len(), s.program.bind_group_layouts.len());
 }
@@ -71,7 +71,7 @@ fn standin_draws_a_tinted_cube() {
     let mat = material::load_path("materials/test/standin.vmat");
     let values = HashMap::from([("UncompressedTangentFrame".to_owned(), Vec4::ONE)]);
     let instance = bind::Instance { world: Mat4::IDENTITY, tint: red };
-    d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj });
+    d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default() });
 
     let (color, depth) = (texture::create_target("standin", 64, 64, 0), texture::create_target("standin depth", 64, 64, 62));
     let target = Target { color, depth, ..Default::default() };

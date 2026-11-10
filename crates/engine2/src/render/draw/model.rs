@@ -46,7 +46,7 @@ pub fn draw_call(mesh: &RenderMesh, call: &DrawCall, uniforms: DrawUniforms, vie
     }
     let state = RasterState { topology: topology(call.prim.into()), ..state };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
-    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj));
+    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj, Default::default()));
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
 }
 

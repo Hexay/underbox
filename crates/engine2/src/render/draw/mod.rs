@@ -3,6 +3,7 @@
 //! holds the RenderTools / IRenderContext draw slots. Draws with a material shade through
 //! [`shaded`]; the rest, and any that fail to bind, use the placeholder.
 
+pub mod draw_call;
 pub mod gpu_mesh;
 pub mod immediate;
 pub mod model;
@@ -102,7 +103,10 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
                 instances: d.instances,
                 uniforms: d.uniforms,
                 state: state(d),
-                shaded: material.map(|(s, groups)| Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![(&defaults.buffer, 0), (&ids.buffer, 0)] }),
+                shaded: material.map(|(s, groups)| {
+                    let ids = s.context.instance_ids.as_ref().map_or((&ids.buffer, 0), |(b, offset)| (&b.buffer, *offset));
+                    Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![(&defaults.buffer, 0), ids] }
+                }),
             }
         })
         .collect();

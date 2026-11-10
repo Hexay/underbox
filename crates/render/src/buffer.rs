@@ -18,7 +18,8 @@ impl BufferKind {
             BufferKind::Vertex => U::VERTEX | U::STORAGE,
             BufferKind::Index => U::INDEX | U::STORAGE,
             BufferKind::Uniform => U::UNIFORM,
-            BufferKind::Storage => U::STORAGE | U::INDIRECT,
+            // Vertex too: managed's instance-id buffers feed the instance stream.
+            BufferKind::Storage => U::STORAGE | U::INDIRECT | U::VERTEX,
         }
     }
 }
