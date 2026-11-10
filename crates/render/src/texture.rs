@@ -99,10 +99,45 @@ impl Texture {
         gpu.queue.submit([encoder.finish()]);
     }
 
+    /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`. False (nothing copied) when the
+    /// formats differ or the rect falls outside either texture.
+    pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
+        let fits = |t: &Texture, x: u32, y: u32| x + w <= t.desc.width && y + h <= t.desc.height;
+        // Depth and stencil copies must cover whole subresources (wgpu validation).
+        let whole = |t: &Texture| [x, y, dx, dy] == [0; 4] && (w, h) == (t.desc.width, t.desc.height);
+        if self.desc.format.has_depth_aspect() && !(whole(self) && whole(dst)) {
+            return false;
+        }
+        if self.desc.format != dst.desc.format || w == 0 || h == 0 || !fits(self, x, y) || !fits(dst, dx, dy) {
+            return false;
+        }
+        fn at(texture: &wgpu::Texture, x: u32, y: u32) -> wgpu::TexelCopyTextureInfo<'_> {
+            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All }
+        }
+        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), extent(w, h));
+        gpu.queue.submit([encoder.finish()]);
+        true
+    }
+
     /// Copy mip 0 back to the CPU, tightly packed. Blocks until the GPU is done.
     pub fn read_back(&self, gpu: &Gpu) -> Frame {
-        let texel = self.texel_size().expect("read-back needs an uncompressed colour format");
-        let (w, h) = (self.desc.width, self.desc.height);
+        self.read_region(gpu, 0, [0, 0, self.desc.width, self.desc.height]).expect("read-back needs an uncompressed colour format")
+    }
+
+    /// The size of `mip`.
+    pub fn mip_size(&self, mip: u32) -> (u32, u32) {
+        ((self.desc.width >> mip).max(1), (self.desc.height >> mip).max(1))
+    }
+
+    /// Copy `[x, y, w, h]` of `mip` back to the CPU, tightly packed; `None` for a format without
+    /// a texel size or a rect outside the mip. Blocks until the GPU is done.
+    pub fn read_region(&self, gpu: &Gpu, mip: u32, [x, y, w, h]: [u32; 4]) -> Option<Frame> {
+        let texel = self.texel_size()?;
+        let (mw, mh) = self.mip_size(mip);
+        if mip >= self.desc.mips.max(1) || w == 0 || h == 0 || x + w > mw || y + h > mh {
+            return None;
+        }
         let row = w * texel;
         // Gotcha: buffer copies need rows padded to COPY_BYTES_PER_ROW_ALIGNMENT (256).
         let padded = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
@@ -114,7 +149,7 @@ impl Texture {
         });
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_buffer(
-            self.texture.as_image_copy(),
+            wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All },
             wgpu::TexelCopyBufferInfo {
                 buffer: &staging,
                 layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None },
@@ -128,7 +163,7 @@ impl Texture {
             let start = y * padded as usize;
             pixels.extend_from_slice(&bytes[start..start + row as usize]);
         }
-        Frame { width: w, height: h, texel_size: texel, pixels }
+        Some(Frame { width: w, height: h, texel_size: texel, pixels })
     }
 }
 
