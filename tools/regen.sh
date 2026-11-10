@@ -11,15 +11,7 @@ echo "== managed bindings (InteropGen, managed side only)"
 $DUMP generate "$SBOX/engine" | grep -E 'Error|engine.def' || true
 
 # Facepunch's bootstrap downloads this into ThirdParty; NuGet's copy (MIT) compiles the same.
-SPEECH="$SBOX/engine/ThirdParty/System.Speech.dll"
-if [ ! -f "$SPEECH" ]; then
-    echo "== System.Speech.dll from NuGet"
-    TMP=$(mktemp -d)
-    curl -sfL https://api.nuget.org/v3-flatcontainer/system.speech/10.0.14/system.speech.10.0.14.nupkg -o "$TMP/pkg.zip"
-    unzip -q -j "$TMP/pkg.zip" 'lib/net10.0/System.Speech.dll' -d "$TMP"
-    cp "$TMP/System.Speech.dll" "$SPEECH"
-    rm -rf "$TMP"
-fi
+sh "$ROOT/tools/nuget-file.sh" System.Speech 10.0.14 lib/net10.0/System.Speech.dll "$SBOX/engine/ThirdParty/System.Speech.dll"
 
 echo "== Sandbox.Engine.dll (background-worthy: ~2 min cold)"
 dotnet build "$SBOX/engine/Sandbox.Engine/Sandbox.Engine.csproj" -c Release -m:4 -v q -nologo -clp:ErrorsOnly

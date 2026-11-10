@@ -4,6 +4,8 @@
 pub mod attributes;
 pub mod image;
 pub mod material;
+pub mod texture;
+pub mod vfx;
 
 use abi::slots::g_p_render_device as device;
 use abi::{Registry, bind};
@@ -22,4 +24,6 @@ pub fn register(r: &mut Registry) {
     attributes::register(r);
     image::register(r);
     material::register(r);
+    texture::register(r);
+    vfx::register(r);
 }
