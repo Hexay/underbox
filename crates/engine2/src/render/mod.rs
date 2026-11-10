@@ -4,6 +4,7 @@
 pub mod attributes;
 pub mod image;
 pub mod material;
+mod material_source;
 pub mod stats;
 pub mod texture;
 pub mod vfx;
