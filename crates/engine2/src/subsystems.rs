@@ -30,6 +30,7 @@ pub fn register(r: &mut Registry) {
     crate::bitmap::register(r);
     crate::convar::register(r);
     crate::resource_compiler::register(r);
+    crate::shader::register(r);
     // Last: fills only the field accessors no subsystem bound.
     abi::bind_fields(r);
 }
