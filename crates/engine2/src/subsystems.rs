@@ -30,6 +30,7 @@ pub fn register(r: &mut Registry) {
     crate::frustum::register(r);
     crate::bitmap::register(r);
     crate::convar::register(r);
+    crate::concommand::register(r);
     crate::resource_compiler::register(r);
     crate::shader::register(r);
     crate::video::register(r);

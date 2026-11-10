@@ -19,6 +19,7 @@ pub mod shape;
 mod shape_slots;
 pub mod surfaces;
 mod trace;
+mod triangulate;
 pub mod world;
 
 pub fn register(r: &mut abi::Registry) {
@@ -30,6 +31,7 @@ pub fn register(r: &mut abi::Registry) {
     body_query::register(r);
     shape_slots::register(r);
     surfaces::register(r);
+    triangulate::register(r);
     joint_slots::register(r);
     joint_drive_slots::register(r);
     aggregate_slots::register(r);

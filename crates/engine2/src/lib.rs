@@ -27,6 +27,7 @@ pub mod kv3;
 pub mod utl_buffer;
 pub mod frustum;
 pub mod bitmap;
+pub mod concommand;
 pub mod convar;
 pub mod resource_compiler;
 pub mod shader;
