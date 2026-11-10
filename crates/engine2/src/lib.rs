@@ -6,10 +6,14 @@ pub mod audio;
 pub mod compiled;
 pub mod containers;
 pub mod fs;
+pub mod handles;
+pub mod math;
 mod igen;
 mod interfaces;
+pub mod physics;
 pub mod render;
 pub mod resource;
+pub mod scene;
 pub mod subsystems;
 
 pub use igen::igen_engine;
