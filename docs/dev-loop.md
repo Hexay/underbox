@@ -49,3 +49,5 @@ crates once (about 5 s). Removing `CARGO_INCREMENTAL=0` from the agent environme
 Windows builds GameNetworkingSockets against the cached `VCPKG_ROOT` protobuf in classic mode;
 manifest mode (GNS ships a `vcpkg.json`) rebuilt protobuf, openssl and abseil on every cold run
 (about 55 min). Windows runs tests only; Linux runs clippy for both. rust-cache saves on failure too.
+On Linux, clippy and test each run the workspace build scripts (clippy's wrapper changes their
+hash); sccache as the cmake compiler launcher makes the second GNS build mostly cache hits.
