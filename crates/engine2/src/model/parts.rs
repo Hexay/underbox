@@ -12,12 +12,12 @@ use abi::{Registry, StrRet, StringToken, bind};
 use std::ffi::CStr;
 
 /// A body part: its name and the mesh groups that are its choices.
-struct Part {
-    name: String,
-    groups: Vec<usize>,
+pub(super) struct Part {
+    pub name: String,
+    pub groups: Vec<usize>,
 }
 
-fn parts(m: &Model) -> Vec<Part> {
+pub(super) fn parts(m: &Model) -> Vec<Part> {
     let mut parts: Vec<Part> = Vec::new();
     for (i, g) in m.content.groups.iter().enumerate() {
         let name = g.rsplit_once("_@").map_or(g.as_str(), |(p, _)| p);
@@ -46,7 +46,7 @@ fn text(s: Option<&CStr>) -> String {
 }
 
 /// Skins; a model without any has the one "default" skin.
-fn group_name(m: &Model, i: i32) -> Option<String> {
+pub(super) fn group_name(m: &Model, i: i32) -> Option<String> {
     let groups = &m.content.material_groups;
     if groups.is_empty() {
         return (i == 0).then(|| "default".to_owned());
@@ -68,13 +68,13 @@ fn materials(m: &Model) -> Vec<std::sync::Arc<material_ref::MaterialRef>> {
 }
 
 /// Highest LOD any mesh is limited to, or -1 when every mesh draws at every LOD.
-fn max_lod(m: &Model) -> i32 {
+pub(super) fn max_lod(m: &Model) -> i32 {
     let masks = m.content.meshes.iter().map(|x| x.lod_mask).filter(|&l| l != super::content::ALL_LODS);
     masks.map(|l| 7 - l.leading_zeros() as i32).max().unwrap_or(-1)
 }
 
 /// The LOD for an on-screen size: past each switch distance (a screen size) the next LOD.
-fn lod_for_screen_size(m: &Model, pixels: f32, scale: f32) -> i32 {
+pub(super) fn lod_for_screen_size(m: &Model, pixels: f32, scale: f32) -> i32 {
     let size = pixels * scale;
     let last = max_lod(m);
     let d = &m.content.lod_distances;

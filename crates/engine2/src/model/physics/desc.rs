@@ -17,8 +17,8 @@ type BodyRef = NativeRef<class::CPhysBodyDesc>;
 pub type JointRef = NativeRef<class::VPhysXJoint_t>;
 
 pub struct DescArray {
-    bodies: Vec<BodyRef>,
-    joints: Vec<JointRef>,
+    pub(crate) bodies: Vec<BodyRef>,
+    pub(crate) joints: Vec<JointRef>,
     surfaces: Mutex<Vec<i32>>,
 }
 
@@ -31,13 +31,13 @@ fn mapping(t: Transform) -> impl Fn(Vec3) -> Vec3 {
     move |x| q * (x * s) + p
 }
 
-fn create(count: i32, joints: i32) -> ArrayRef {
+pub(crate) fn create(count: i32, joints: i32) -> ArrayRef {
     let bodies = (0..count.max(0)).map(|_| objects::create(Mutex::new(Part::default()))).collect();
     let joints = (0..joints.max(0)).map(|_| objects::create_shared(Arc::new(Mutex::new(JointDesc::default())))).collect();
     objects::create(DescArray { bodies, joints, surfaces: Mutex::default() })
 }
 
-fn delete(a: ArrayRef) {
+pub(crate) fn delete(a: ArrayRef) {
     if let Some(d) = objects::get::<_, DescArray>(a) {
         d.bodies.iter().for_each(|b| {
             objects::destroy(*b);
@@ -80,7 +80,7 @@ fn add_hull(b: *mut c_void, pts: RawPtr<c_void>, n: i32, t: Transform) {
     with_body(b, |p| p.shapes.hulls.push(HullDesc { hull, ids: Default::default() }));
 }
 
-fn add_box(b: *mut c_void, half: Vector3, t: Transform) {
+pub(crate) fn add_box(b: *mut c_void, half: Vector3, t: Transform) {
     let h = v(half).abs();
     let corners: Vec<Vec3> = (0..8).map(|i| Vec3::new(if i & 1 != 0 { h.x } else { -h.x }, if i & 2 != 0 { h.y } else { -h.y }, if i & 4 != 0 { h.z } else { -h.z })).collect();
     let Some(hull) = Hull::from_points(&corners) else { return };

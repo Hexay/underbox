@@ -8,7 +8,7 @@ pub mod desc;
 pub mod hull;
 mod joint_fields;
 mod part_slots;
-mod views;
+pub(crate) mod views;
 
 pub fn register(r: &mut abi::Registry) {
     data_slots::register(r);

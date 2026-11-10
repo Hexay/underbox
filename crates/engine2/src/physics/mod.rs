@@ -3,6 +3,8 @@
 
 pub mod aggregate;
 mod aggregate_slots;
+#[cfg(test)]
+mod aggregate_tests;
 pub mod body;
 mod body_mass;
 mod body_query;

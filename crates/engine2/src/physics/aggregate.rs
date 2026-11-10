@@ -112,11 +112,13 @@ fn joint_settings(j: &JointDesc) -> Option<Joint> {
     Some(s)
 }
 
-/// Bodies at `start` × each part's bind pose, then the joints; the aggregate's managed handle.
 pub fn create(world_ref: world::Ref, data: Arc<PhysicsData>, start: Transform, motion: i64) -> HandleId<class::IPhysAggregateInstance> {
-    if world::get(world_ref).is_none() {
-        return HandleId::new(-1);
-    }
+    spawn(world_ref, data, start, motion).and_then(get).map_or(HandleId::new(-1), |a| a.handle.id())
+}
+
+/// Bodies at `start` × each part's bind pose, then the joints; the aggregate itself.
+pub fn spawn(world_ref: world::Ref, data: Arc<PhysicsData>, start: Transform, motion: i64) -> Option<Ref> {
+    world::get(world_ref)?;
     let (origin, turn) = (v3(start.position), quat(start.rotation));
     let mut bodies = Vec::with_capacity(data.parts.len());
     for p in &data.parts {
@@ -136,7 +138,8 @@ pub fn create(world_ref: world::Ref, data: Arc<PhysicsData>, start: Transform, m
     let aggregate = Arc::new(Aggregate { world: world_ref, handle: Handle::default(), data, bodies, joints: Mutex::new(joints) });
     let r: Ref = objects::create_shared(aggregate.clone());
     OWNERS.lock().unwrap().extend(aggregate.bodies.iter().map(|(_, b)| (b.addr(), r)));
-    aggregate.handle.register(r, Kind::PhysicsAggregate)
+    aggregate.handle.register::<_, class::IPhysAggregateInstance>(r, Kind::PhysicsAggregate);
+    Some(r)
 }
 
 /// Remove the aggregate's joints and bodies from its world, and the aggregate itself.

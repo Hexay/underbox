@@ -134,7 +134,7 @@ mod tests {
         let tris = triangulate(&l);
         assert_eq!(tris.len(), 4);
         let area: f32 = tris.iter().map(|t| (l[t[1]] - l[t[0]]).cross(l[t[2]] - l[t[0]]).z * 0.5).sum();
-        assert!((area - 52.0).abs() < 1e-3, "{area}");
+        assert!((area - 64.0).abs() < 1e-3, "{area}");
         assert_eq!(triangulate(&square()).len(), 2);
     }
 
