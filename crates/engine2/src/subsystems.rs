@@ -11,6 +11,8 @@ pub fn register(r: &mut Registry) {
     abi::bind_casts(r);
     crate::app::register(r);
     crate::render::register(r);
+    crate::containers::register(r);
+    crate::audio::register(r);
 }
 
 /// Slot 0: managed reports an interop failure (a binding it couldn't make).
