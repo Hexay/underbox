@@ -22,7 +22,7 @@ done
 OUT=${OUT:-$ROOT/target/boot}
 mkdir -p "$OUT"
 t0=$(date +%s.%N)
-lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; t0=$(date +%s.%N); }
+lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
 sh "$ROOT/tools/prepare-sbox.sh" "$SBOX"
 # Rebuild when missing or when prepare-sbox.sh added EmbeddedRefs after the last build.
@@ -34,11 +34,11 @@ if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/Em
     dotnet build "$SBOX/engine/Launcher/SboxServer/Sbox-Server.csproj" -c Release -m:4 -nodeReuse:false -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
     touch "$STAMP"
 fi
-T_PREP=$(lap prepare)
+T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
 # see docs/dev-loop.md (incremental)
 env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
-T_CARGO=$(lap cargo)
+T_CARGO=$(lap cargo); t0=$(date +%s.%N)
 NATIVE="$SBOX/game/bin/linuxsteamrt64"
 mkdir -p "$NATIVE"
 # Rename, not overwrite: a server still mapping the old file would crash on an in-place rewrite.
