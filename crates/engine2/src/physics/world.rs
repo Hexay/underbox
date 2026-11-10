@@ -1,6 +1,6 @@
 //! `IPhysicsWorld`: one per scene, over a [`physics::World`].
 
-use super::body;
+use super::{body, events, joint};
 use crate::handles::{Handle, Kind};
 use crate::math::{from_vec, to_rot, to_vec};
 use abi::slots::{g_p_physics_system as system, i_physics_world as w};
@@ -18,6 +18,7 @@ pub struct PhysicsWorld {
     pub handle: Handle,
     pub sim: Mutex<physics::World>,
     pub bodies: Mutex<Vec<body::Ref>>,
+    pub joints: Mutex<Vec<joint::Ref>>,
     reference: Mutex<body::Ref>,
     debug_scene: Mutex<NativeRef<class::ISceneWorld>>,
     simulation: AtomicI64,
@@ -41,6 +42,10 @@ fn create() -> HandleId<class::IPhysicsWorld> {
 
 fn destroy(r: Ref) {
     let Some(world) = get(r) else { return };
+    let joints = std::mem::take(&mut *world.joints.lock().unwrap());
+    for j in joints {
+        joint::delete(j);
+    }
     let bodies = std::mem::take(&mut *world.bodies.lock().unwrap());
     for b in bodies {
         body::delete(b);
@@ -87,13 +92,14 @@ pub fn register(r: &mut Registry) {
     bind!(r, w::ENABLE_SLEEPING, |r| with_sim(r, |s| s.set_sleeping_enabled(true)));
     bind!(r, w::DISABLE_SLEEPING, |r| with_sim(r, |s| s.set_sleeping_enabled(false)));
     bind!(r, w::IS_SLEEPING_ENABLED, |r| with_sim(r, |s| s.sleeping_enabled()));
-    // TODO: clamp body speeds in step.
-    bind!(r, w::SET_MAXIMUM_LINEAR_SPEED, |_, _| {});
-    // TODO: collision rules (tag pairs → collide/trigger/ignore) as Rapier collision groups.
-    bind!(r, w::SET_COLLISION_RULES_FROM_JSON, |_, _| {});
-    bind!(r, w::STEP_SIMULATION, |r, dt, substeps| with_sim(r, |s| s.step(dt, substeps.max(1) as u32)));
-    // TODO: touch/trigger events back to managed (callbacks), once contacts are collected in step.
-    bind!(r, w::PROCESS_INTERSECTIONS, |_, _| {});
+    bind!(r, w::SET_MAXIMUM_LINEAR_SPEED, |r, v| with_sim(r, |s| s.set_max_speed(v)));
+    bind!(r, w::SET_COLLISION_RULES_FROM_JSON, |r, json| {
+        if let Some(rules) = json.and_then(|j| j.to_str().ok()).and_then(super::rules::parse) {
+            with_sim(r, |s| s.set_collision_rules(rules));
+        }
+    });
+    bind!(r, w::STEP_SIMULATION, |r, dt, substeps| events::step(r, dt, substeps.max(1) as u32));
+    bind!(r, w::PROCESS_INTERSECTIONS, events::process_intersections);
     bind!(r, w::SET_DEBUG_SCENE, |r, scene| get(r).into_iter().for_each(|w| *w.debug_scene.lock().unwrap() = scene));
     bind!(r, w::GET_DEBUG_SCENE, |r| {
         let scene = get(r).map(|w| *w.debug_scene.lock().unwrap()).unwrap_or_default();
