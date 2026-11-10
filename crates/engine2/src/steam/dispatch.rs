@@ -7,9 +7,9 @@ use abi::{RawPtr, Registry, bind};
 use platform::Event;
 
 const SERVERS_CONNECTED: i32 = 101;
+const SERVER_CONNECT_FAILURE: i32 = 102;
+const SERVERS_DISCONNECTED: i32 = 103;
 const VALIDATE_AUTH_TICKET_RESPONSE: i32 = 143;
-const AUTH_OK: i32 = 0;
-const AUTH_TICKET_INVALID: i32 = 8;
 
 /// Managed's `Platform.StructPlatformPackSize`: Steam packs callback structs to 4 on Linux/macOS, 8 on Windows.
 const PACK: usize = if cfg!(windows) { 8 } else { 4 };
@@ -43,8 +43,13 @@ impl Packed {
 fn encode(e: &Event) -> (i32, Vec<u8>) {
     match *e {
         Event::ServerConnected => (SERVERS_CONNECTED, Packed::default().finish()),
-        Event::AuthResult { user, owner, ok } => {
-            let response = if ok { AUTH_OK } else { AUTH_TICKET_INVALID };
+        // Managed marshals StillRetrying as I1: one byte.
+        Event::ServerConnectFailure { result, retrying } => {
+            (SERVER_CONNECT_FAILURE, Packed::default().field(&result.to_le_bytes()).field(&[retrying as u8]).finish())
+        }
+        Event::ServersDisconnected { result } => (SERVERS_DISCONNECTED, Packed::default().field(&result.to_le_bytes()).finish()),
+        Event::AuthResult { user, owner, response } => {
+            let response = response as i32;
             let data = Packed::default().field(&user.0.to_le_bytes()).field(&response.to_le_bytes()).field(&owner.0.to_le_bytes());
             (VALIDATE_AUTH_TICKET_RESPONSE, data.finish())
         }
@@ -68,16 +73,19 @@ pub fn register(r: &mut Registry) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use platform::SteamId;
+    use platform::{AuthResponse, SteamId};
 
     #[test]
     fn auth_response_matches_managed_layout() {
-        let (kind, data) = encode(&Event::AuthResult { user: SteamId(1), owner: SteamId(2), ok: true });
+        let (kind, data) = encode(&Event::AuthResult { user: SteamId(1), owner: SteamId(2), response: AuthResponse::VacBanned });
         assert_eq!(kind, 143);
         // ulong, AuthResponse (int), ulong: Pack=4 gives 0/8/12 (20 bytes), Pack=8 gives 0/8/16 (24).
         let owner_at = if cfg!(windows) { 16 } else { 12 };
         assert_eq!(data.len(), owner_at + 8);
-        assert_eq!(data[owner_at], 2);
+        assert_eq!((data[8], data[owner_at]), (3, 2));
         assert_eq!(encode(&Event::ServerConnected).1, [0]);
+        // EResult (int) + I1 bool, padded to the int's alignment: 8 bytes on both packs.
+        assert_eq!(encode(&Event::ServerConnectFailure { result: 3, retrying: true }), (102, vec![3, 0, 0, 0, 1, 0, 0, 0]));
+        assert_eq!(encode(&Event::ServersDisconnected { result: 3 }), (103, vec![3, 0, 0, 0]));
     }
 }
