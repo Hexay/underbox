@@ -1,0 +1,93 @@
+// underbox replacement for Valve's closed math_general.fxc: the helpers the s&box core shaders
+// call, written from their call sites and the standard definitions. See crates/shaders/hlsl/README.md.
+#ifndef MATH_GENERAL_FXC
+#define MATH_GENERAL_FXC
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+// Detail textures store 0.5 as identity ("mod2x").
+#define MOD2X_SCALAR 2.0
+
+float ClampToPositive( float x ) { return max( x, 0.0 ); }
+float2 ClampToPositive( float2 x ) { return max( x, 0.0 ); }
+float3 ClampToPositive( float3 x ) { return max( x, 0.0 ); }
+float4 ClampToPositive( float4 x ) { return max( x, 0.0 ); }
+
+float RemapVal( float v, float a, float b, float c, float d )
+{
+	return ( a == b ) ? ( v >= b ? d : c ) : c + ( d - c ) * ( v - a ) / ( b - a );
+}
+
+float RemapValClamped( float v, float a, float b, float c, float d )
+{
+	if ( a == b )
+		return v >= b ? d : c;
+	return c + ( d - c ) * saturate( ( v - a ) / ( b - a ) );
+}
+
+float2 NormalizeSafe( float2 v ) { float l = dot( v, v ); return l > 0.0 ? v * rsqrt( l ) : float2( 0, 0 ); }
+float3 NormalizeSafe( float3 v ) { float l = dot( v, v ); return l > 0.0 ? v * rsqrt( l ) : float3( 0, 0, 0 ); }
+
+// Rec. 709 luma of linear colour.
+float Luminance( float3 c ) { return dot( c, float3( 0.2126, 0.7152, 0.0722 ) ); }
+
+// IEC 61966-2-1 sRGB transfer functions (exact piecewise curves).
+float SrgbGammaToLinear( float c ) { return c <= 0.04045 ? c / 12.92 : pow( ( c + 0.055 ) / 1.055, 2.4 ); }
+float3 SrgbGammaToLinear( float3 c ) { return float3( SrgbGammaToLinear( c.r ), SrgbGammaToLinear( c.g ), SrgbGammaToLinear( c.b ) ); }
+float4 SrgbGammaToLinear( float4 c ) { return float4( SrgbGammaToLinear( c.rgb ), c.a ); }
+float SrgbLinearToGamma( float c ) { c = max( c, 0.0 ); return c <= 0.0031308 ? c * 12.92 : 1.055 * pow( c, 1.0 / 2.4 ) - 0.055; }
+float3 SrgbLinearToGamma( float3 c ) { return float3( SrgbLinearToGamma( c.r ), SrgbLinearToGamma( c.g ), SrgbLinearToGamma( c.b ) ); }
+float4 SrgbLinearToGamma( float4 c ) { return float4( SrgbLinearToGamma( c.rgb ), c.a ); }
+
+// [-1,1] vector to [0,1] colour, for debug views.
+float3 PackToColor( float3 v ) { return v * 0.5 + 0.5; }
+
+// TODO: confirm the range against a real RGBM sky texture; 6 is the common Valve choice.
+#define RGBM_RANGE 6.0
+float3 RGBMDecode( float4 rgbm ) { return rgbm.rgb * ( rgbm.a * RGBM_RANGE ); }
+
+float3 RgbToHsv( float3 c )
+{
+	float4 k = float4( 0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0 );
+	float4 p = c.g < c.b ? float4( c.bg, k.wz ) : float4( c.gb, k.xy );
+	float4 q = c.r < p.x ? float4( p.xyw, c.r ) : float4( c.r, p.yzx );
+	float d = q.x - min( q.w, q.y );
+	float e = 1.0e-10;
+	return float3( abs( q.z + ( q.w - q.y ) / ( 6.0 * d + e ) ), d / ( q.x + e ), q.x );
+}
+
+float3 HsvToRgb( float3 c )
+{
+	float3 p = abs( frac( c.xxx + float3( 1.0, 2.0 / 3.0, 1.0 / 3.0 ) ) * 6.0 - 3.0 );
+	return c.z * lerp( float3( 1, 1, 1 ), saturate( p - 1.0 ), c.y );
+}
+
+// Rotation of `flAngleDegrees` about unit `vAxis` (Rodrigues), as Source's MatrixBuildRotationAboutAxis.
+float3x3 MatrixBuildRotationAboutAxis( float3 vAxis, float flAngleDegrees )
+{
+	float s, c;
+	sincos( radians( flAngleDegrees ), s, c );
+	float3 a = vAxis;
+	float t = 1.0 - c;
+	return float3x3(
+		t * a.x * a.x + c,       t * a.x * a.y - s * a.z, t * a.x * a.z + s * a.y,
+		t * a.x * a.y + s * a.z, t * a.y * a.y + c,       t * a.y * a.z - s * a.x,
+		t * a.x * a.z - s * a.y, t * a.y * a.z + s * a.x, t * a.z * a.z + c );
+}
+
+// Source AngleMatrix: angles = ( pitch, yaw, roll ) in degrees; rows are forward, left, up.
+float3x3 RotationMatrixFromAngles( float3 vAngles )
+{
+	float sp, cp, sy, cy, sr, cr;
+	sincos( radians( vAngles.x ), sp, cp );
+	sincos( radians( vAngles.y ), sy, cy );
+	sincos( radians( vAngles.z ), sr, cr );
+	return float3x3(
+		cp * cy, cp * sy, -sp,
+		sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, sr * cp,
+		cr * sp * cy + sr * sy, cr * sp * sy - sr * cy, cr * cp );
+}
+
+#endif // MATH_GENERAL_FXC

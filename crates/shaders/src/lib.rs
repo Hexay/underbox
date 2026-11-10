@@ -3,6 +3,7 @@
 
 pub mod annotation;
 pub mod blocks;
+mod builtin;
 pub mod cache;
 pub mod combo;
 mod compat;

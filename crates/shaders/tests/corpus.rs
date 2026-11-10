@@ -86,4 +86,4 @@ fn core_shaders_default_combo() {
 }
 
 /// Stages that reached validated WGSL when this floor was last raised.
-const MIN_OK_STAGES: usize = 53;
+const MIN_OK_STAGES: usize = 71;
