@@ -1,0 +1,3 @@
+forward_quads_depth_tested	vulkan/llvmpipe (LLVM 21.1.8, 256 bits)	399312e181c218d465477107ff446bb24f3bbb16e4e45ba46c4ea3eaf39e1eb7
+forward_transforms_and_tints	vulkan/llvmpipe (LLVM 21.1.8, 256 bits)	593b1edf6e4f771a523c72a6f226e4d30de5dd662014ceb274c18a769ec408fd
+perspective_is_deterministic	vulkan/llvmpipe (LLVM 21.1.8, 256 bits)	b2f71ca316c6481efb537fe57d12d3a5a5f231920a4d8f6f4f5df75a66f5fe8c
