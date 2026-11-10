@@ -4,4 +4,5 @@
 # Without --all only classes with stubs are listed (most stubs first); the total line follows.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
-exec cargo run -q --manifest-path "$ROOT/Cargo.toml" -p engine2 --bin coverage -j4 -- "$@"
+# see docs/dev-loop.md (incremental)
+exec env -u CARGO_INCREMENTAL cargo run -q --manifest-path "$ROOT/Cargo.toml" -p engine2 --bin coverage -j4 -- "$@"

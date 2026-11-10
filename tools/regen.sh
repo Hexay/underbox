@@ -3,7 +3,7 @@
 # usage: tools/regen.sh [path/to/sbox-public]   (default: ../sbox-public)
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
-SBOX=$(cd -- "${1:-$ROOT/../sbox-public}" && pwd)
+SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${1:-}")
 DUMP="dotnet run --project $ROOT/tools/interop-dump -c Release -p:SboxPublic=$SBOX --"
 mkdir -p "$ROOT/abi"
 
