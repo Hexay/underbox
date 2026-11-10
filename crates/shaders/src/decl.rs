@@ -112,6 +112,8 @@ fn is_statement(word: &str) -> bool {
         word,
         "StaticCombo"
             | "DynamicCombo"
+            | "SpecializationCombo"
+            | "DynamicComboFromFeature"
             | "Feature"
             | "FeatureRule"
             | "StaticComboRule"
@@ -125,8 +127,11 @@ fn record(word: &str, inner: &str, d: &mut Decls) -> Result<(), String> {
     let args = split_args(inner);
     let arg = |n: usize| args.get(n).copied().ok_or_else(|| format!("missing argument {}", n + 1));
     match word {
-        "StaticCombo" | "DynamicCombo" => {
-            let combo = ComboDecl { name: arg(0)?.into(), range: combo_range(arg(1)?)?, sys: sys(args.get(2)) };
+        // SpecializationCombo and DynamicComboFromFeature vary per draw like dynamic combos; we
+        // compile each value as its own module rather than as a spec constant.
+        "StaticCombo" | "DynamicCombo" | "SpecializationCombo" | "DynamicComboFromFeature" => {
+            let sys_arg = args.get(if word == "DynamicComboFromFeature" { 3 } else { 2 });
+            let combo = ComboDecl { name: arg(0)?.into(), range: combo_range(arg(1)?)?, sys: sys(sys_arg) };
             let list = if word == "StaticCombo" { &mut d.static_combos } else { &mut d.dynamic_combos };
             if !list.iter().any(|c| c.name == combo.name) {
                 list.push(combo);
@@ -177,7 +182,9 @@ fn combo_range(arg: &str) -> Result<ComboRange, String> {
 }
 
 /// `0..2` or `0..2 ( 0="Normal", 1="Multiply", 2="Lighten" )`.
-fn values_with_labels(arg: &str) -> Result<(u32, u32, Vec<(u32, String)>), String> {
+type Labels = Vec<(u32, String)>;
+
+fn values_with_labels(arg: &str) -> Result<(u32, u32, Labels), String> {
     let (range, labels) = match arg.find('(') {
         Some(p) => (&arg[..p], arg[p + 1..].trim().strip_suffix(')').ok_or("unclosed label list")?),
         None => (arg, ""),

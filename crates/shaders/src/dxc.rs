@@ -6,10 +6,12 @@ use std::path::{Path, PathBuf};
 /// The release `tools/fetch-dxc.sh` pins.
 pub const DXC_TAG: &str = "v1.9.2609";
 
-/// Flags for every combo. SM 6.0 Vulkan like native (`VfxCompileTarget_t.SM_6_0_VULKAN`), DX
-/// constant-buffer packing so CPU-side attribute layouts match D3D's, and `-fspv-reflect` for
-/// input semantics (stripped again in `spirv::strip_reflection`).
-pub const ARGS: &[&str] = &["-spirv", "-HV", "2021", "-fspv-target-env=vulkan1.1", "-fvk-use-dx-layout", "-fspv-reflect"];
+/// Flags for every combo: SM 6.0 Vulkan like native (`VfxCompileTarget_t.SM_6_0_VULKAN`); HLSL
+/// 2018 because the sources use per-component vector `?:`, which 2021 rejects; and
+/// `-fspv-reflect` for input semantics (stripped again in `spirv::strip_reflection`). Buffers use
+/// strict std140/std430 (`-fvk-use-gl-layout`), which is WGSL's layout: DXC's default "relaxed"
+/// Vulkan layout and `-fvk-use-dx-layout` both put vectors at offsets WGSL rejects.
+pub const ARGS: &[&str] = &["-spirv", "-HV", "2018", "-fspv-target-env=vulkan1.1", "-fvk-use-gl-layout", "-fspv-reflect"];
 
 pub struct Dxc {
     lib: hassle_rs::Dxc,
@@ -53,7 +55,7 @@ impl Dxc {
                 if bytes.len() % 4 != 0 {
                     return Err("DXC returned a truncated SPIR-V module".into());
                 }
-                Ok(bytes.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect())
+                Ok(bytes.as_chunks::<4>().0.iter().map(|c| u32::from_le_bytes(*c)).collect())
             }
             Err((result, hr)) => {
                 let msg = result

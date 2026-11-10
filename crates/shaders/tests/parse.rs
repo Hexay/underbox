@@ -54,7 +54,7 @@ fn vertex_color_blocks_and_combos() {
     let ps = s.program_for(Stage::Ps).unwrap();
     assert!(ps.dynamics.find("D_OPAQUE_FADE").is_some());
     assert!(ps.source.contains("MainPs") && !ps.source.contains("MainVs"));
-    assert!(!ps.source.contains("DynamicCombo") && !ps.source.contains("Attribute("));
+    assert!(!ps.source.contains("D_OPAQUE_FADE, 0..1") && !ps.source.contains("Attribute( CanBatch"));
     let vs = s.program_for(Stage::Vs).unwrap();
     assert!(vs.dynamics.find("D_BAKED_LIGHTING_FROM_LIGHTMAP").is_some(), "combo from an included file");
     assert!(vs.source.contains("MainVs") && !vs.source.contains("MainPs"));

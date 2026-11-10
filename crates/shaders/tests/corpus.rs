@@ -5,7 +5,7 @@
 
 mod common;
 
-use shaders::{Compiler, Phase, VfxShader, cache::Cache};
+use shaders::{Compiler, Phase, Variant, VfxShader, cache::Cache};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -31,7 +31,7 @@ fn run(core: &std::path::Path, compiler: &Compiler) -> Vec<Row> {
                         Err(e) => out.push(Row { shader: rel.clone(), stage: "-".into(), result: Err((Phase::Dxc, format!("parse: {e}"))) }),
                         Ok(shader) => {
                             for p in &shader.programs {
-                                let result = compiler.compile(&shader, p, 0, 0).map(|_| ()).map_err(|e| (e.phase, e.message));
+                                let result = compiler.compile(&shader, p, &Variant::default()).map(|_| ()).map_err(|e| (e.phase, e.message));
                                 out.push(Row { shader: rel.clone(), stage: format!("{:?}", p.stage), result });
                             }
                         }
@@ -60,6 +60,9 @@ fn core_shaders_default_combo() {
     compiler.cache = Some(Cache::new(concat!(env!("CARGO_TARGET_TMPDIR"), "/shader-cache")));
     let rows = run(&core, &compiler);
 
+    let full_errors: String =
+        rows.iter().filter_map(|r| r.result.as_ref().err().map(|(p, m)| format!("== {} {} {p:?}\n{m}\n", r.shader, r.stage))).collect();
+    std::fs::write(concat!(env!("CARGO_TARGET_TMPDIR"), "/corpus-errors.txt"), full_errors).unwrap();
     let mut tsv = String::from("shader\tstage\tresult\tdetail\n");
     let mut by_phase: BTreeMap<String, usize> = BTreeMap::new();
     let mut shaders_ok: BTreeMap<&str, bool> = BTreeMap::new();
@@ -83,4 +86,4 @@ fn core_shaders_default_combo() {
 }
 
 /// Stages that reached validated WGSL when this floor was last raised.
-const MIN_OK_STAGES: usize = 0;
+const MIN_OK_STAGES: usize = 53;
