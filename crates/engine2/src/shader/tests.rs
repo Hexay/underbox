@@ -7,7 +7,7 @@ const SRC: &str = "FEATURES { Feature( F_A, 0..1, \"G\" ); }\n\
 fn loaded() -> Vfx {
     let path = std::env::temp_dir().join(format!("underbox-vfx-{}.shader", std::process::id()));
     std::fs::write(&path, SRC).unwrap();
-    let v = Vfx { name: "test".into(), shader: RwLock::new(None) };
+    let v = Vfx { name: "test".into(), resource: None, shader: RwLock::new(None) };
     assert!(load(&v, &path.to_string_lossy()));
     let _ = std::fs::remove_file(path);
     v
@@ -25,7 +25,14 @@ fn loads_source_and_describes_combos() {
 
 #[test]
 fn missing_file_is_an_error() {
-    let v = Vfx { name: "missing".into(), shader: RwLock::new(None) };
+    let v = Vfx { name: "missing".into(), resource: None, shader: RwLock::new(None) };
     assert!(!load(&v, "/nonexistent/x.shader"));
     assert!(v.is_error());
+}
+
+#[test]
+fn resource_paths_normalise() {
+    for p in ["postprocess/cmaa2_cs", "shaders/postprocess/cmaa2_cs.shader", "/shaders/postprocess/cmaa2_cs.shader_c", "postprocess/cmaa2_cs.shader"] {
+        assert_eq!(resource_path(p), "shaders/postprocess/cmaa2_cs.shader", "{p}");
+    }
 }

@@ -24,7 +24,9 @@ pub fn focus() -> Window {
 
 pub fn set_relative_mode(window: Window, relative: bool) -> bool {
     // SAFETY: SDL validates the window.
-    unsafe { SDL_SetWindowRelativeMouseMode(window.0, relative) }
+    let ok = unsafe { SDL_SetWindowRelativeMouseMode(window.0, relative) };
+    // No pointer to capture without a window manager (see windows::no_window_manager).
+    ok || crate::windows::no_window_manager()
 }
 
 pub fn relative_mode(window: Window) -> bool {

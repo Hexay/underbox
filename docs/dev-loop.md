@@ -4,6 +4,7 @@
 | --- | --- |
 | Unit tests | `tools/test.sh <crate> [test-filter]`: failures and totals only, exits with cargo's status |
 | Boot the server | `flock -o /srv/agents/cache/underbox-boot.lock sh tools/boot-server.sh [max-s] [sbox-public]` |
+| Boot the client | `tools/boot-client.sh [max-s] [sbox-public] [-- args]` (takes the lock; headless, logs frame hashes to `target/client/frames.tsv`) |
 | Scripted match | `tools/match.sh` (takes the lock, stops at `MATCH:END`) |
 | Net probe | `tools/net-probe.sh` (takes the lock) |
 | Measure a loop | `tools/loop-bench.sh <runs> <file> <cmd...>` (median and spread) |
