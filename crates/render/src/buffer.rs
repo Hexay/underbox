@@ -52,13 +52,26 @@ impl Buffer {
 
     /// Write `data` at `offset`. wgpu needs 4-byte multiples, so a ragged tail is zero-padded.
     pub fn write(&self, gpu: &Gpu, offset: u64, data: &[u8]) {
-        if data.len() % 4 == 0 {
+        if data.len().is_multiple_of(4) {
             gpu.queue.write_buffer(&self.buffer, offset, data);
         } else {
             let mut padded = data.to_vec();
             padded.resize(align4(data.len() as u64) as usize, 0);
             gpu.queue.write_buffer(&self.buffer, offset, &padded);
         }
+    }
+
+    /// Fill the whole buffer with a repeated 32-bit value.
+    pub fn fill(&self, gpu: &Gpu, value: u32) {
+        let words = vec![value; (self.size() / 4) as usize];
+        gpu.queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&words));
+    }
+
+    /// Copy `len` bytes from this buffer at `src_offset` to `dst` at `dst_offset` (4-byte aligned).
+    pub fn copy_to(&self, gpu: &Gpu, dst: &Buffer, src_offset: u64, dst_offset: u64, len: u64) {
+        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        encoder.copy_buffer_to_buffer(&self.buffer, src_offset, &dst.buffer, dst_offset, len);
+        gpu.queue.submit([encoder.finish()]);
     }
 
     /// Copy `len` bytes at `offset` back to the CPU. Blocks until the GPU is done.

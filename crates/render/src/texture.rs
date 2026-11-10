@@ -72,17 +72,28 @@ impl Texture {
         );
     }
 
-    /// Clear mip 0 to an RGBA colour with an empty render pass.
-    pub fn clear(&self, gpu: &Gpu, color: wgpu::Color) {
+    /// Clear mip 0 with an empty render pass: to `color` for a colour format, or to `depth` (and
+    /// stencil 0) for a depth format. The value for the other kind is ignored.
+    pub fn clear(&self, gpu: &Gpu, color: wgpu::Color, depth: f32) {
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        let format = self.desc.format;
+        let color_attachment = [Some(wgpu::RenderPassColorAttachment {
+            view: &self.view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations { load: wgpu::LoadOp::Clear(color), store: wgpu::StoreOp::Store },
+        })];
+        let store = wgpu::StoreOp::Store;
+        let depth_attachment = wgpu::RenderPassDepthStencilAttachment {
+            view: &self.view,
+            depth_ops: format.has_depth_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(depth), store }),
+            stencil_ops: format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store }),
+        };
+        let is_depth = format.is_depth_stencil_format();
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("clear"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &self.view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(color), store: wgpu::StoreOp::Store },
-            })],
+            color_attachments: if is_depth { &[] } else { &color_attachment },
+            depth_stencil_attachment: is_depth.then_some(depth_attachment),
             ..Default::default()
         });
         gpu.queue.submit([encoder.finish()]);

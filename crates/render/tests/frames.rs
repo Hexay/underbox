@@ -43,7 +43,7 @@ const GREEN: [u8; 4] = [0, 255, 0, 255];
 fn clear_reads_back() {
     let gpu = gpu();
     let (color, _) = targets(gpu);
-    color.clear(gpu, wgpu::Color { r: 1.0, g: 0.5, b: 0.0, a: 1.0 });
+    color.clear(gpu, wgpu::Color { r: 1.0, g: 0.5, b: 0.0, a: 1.0 }, 1.0);
     let frame = color.read_back(gpu);
     assert_eq!(frame.compare(&Frame::filled(SIZE, SIZE, &[255, 128, 0, 255]), 1).differing, 0);
 }

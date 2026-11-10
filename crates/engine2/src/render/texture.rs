@@ -1,15 +1,18 @@
-//! Textures (`ITexture` handles over `CTextureBase`). With the empty device a texture is its
-//! description plus a CPU copy of the pixels managed uploads; the GPU side comes with M2.
+//! Textures (`ITexture` handles over `CTextureBase`): the description, a CPU copy of the pixels
+//! managed uploads, and, when a client device exists, the GPU texture (see device.rs).
 
-use crate::render::image;
+use crate::render::{device, formats, image};
 use crate::resource::{self, ByName, Resource};
-use abi::slots::{g_p_render_device as device, glue_resources as glue};
-use abi::structs::{CTextureDesc, Rect3D, TextureCreationConfig_t};
+use abi::slots::{g_p_render_device as device_slots, glue_resources as glue};
+use abi::structs::{CTextureDesc, Color32, Rect3D, TextureCreationConfig_t};
 use abi::{Guid, NativeRef, RawPtr, Registry, bind, class};
 use std::ffi::CStr;
 use std::sync::{Arc, Mutex};
 
 pub type Ref = NativeRef<class::CTextureBase>;
+
+/// `RuntimeTextureSpecificationFlags.TSPEC_RENDER_TARGET`.
+const TSPEC_RENDER_TARGET: u32 = 0x0001;
 
 pub struct Texture {
     #[allow(dead_code)]
@@ -18,6 +21,7 @@ pub struct Texture {
     // Boxed: GetTextureDesc hands managed a pointer that must outlive this call.
     desc: Box<CTextureDesc>,
     data: Mutex<Vec<u8>>,
+    pub gpu: Option<render::Texture>,
     error: bool,
     guid: Guid,
 }
@@ -31,6 +35,12 @@ impl Resource for Texture {
     }
 }
 
+impl Texture {
+    pub fn is_render_target(&self) -> bool {
+        self.config.m_n_flags & TSPEC_RENDER_TARGET != 0
+    }
+}
+
 static LOADED: ByName<Texture> = ByName::new();
 
 /// The texture at a resource path. Nothing loads compiled textures yet (TODO: assets subsystem),
@@ -40,9 +50,15 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let texture = LOADED.find_or_insert(&name, || {
         let mut config = TextureCreationConfig_t::default();
         (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (1, 1, 1, 1);
-        Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(vec![255, 0, 255, 255]), error: true, guid }
+        let data = vec![255, 0, 255, 255];
+        let gpu = gpu_texture(&name, &config, &data);
+        Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(data), gpu, error: true, guid }
     });
     resource::new_handle(texture)
+}
+
+pub fn resolve(t: Ref) -> Option<Arc<Texture>> {
+    resource::resolve::<_, Texture>(t)
 }
 
 fn desc_of(c: &TextureCreationConfig_t) -> CTextureDesc {
@@ -65,13 +81,37 @@ fn mem_size(c: &TextureCreationConfig_t) -> i32 {
     image::mem_required(c.m_n_width as i32, c.m_n_height as i32, c.m_n_depth as i32, Some(mips), c.m_n_image_format as i64)
 }
 
-fn create(name: Option<&CStr>, _anonymous: bool, config: TextureCreationConfig_t, data: &mut [u8]) -> Ref {
-    let bytes = data.to_vec();
+/// The GPU side of a 2D texture, when a device exists and the format maps. Volumes, arrays and
+/// cubes stay CPU-only for now (TODO).
+fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8]) -> Option<render::Texture> {
+    let gpu = device::gpu()?;
+    let format = formats::to_wgpu(c.m_n_image_format)?;
+    if c.m_n_depth > 1 || c.m_n_width <= 0 || c.m_n_height <= 0 {
+        return None;
+    }
+    let desc = render::TextureDesc {
+        label: name.into(),
+        width: c.m_n_width as u32,
+        height: c.m_n_height as u32,
+        format,
+        mips: c.m_n_num_mip_levels.max(1) as u32,
+        render_target: c.m_n_flags & TSPEC_RENDER_TARGET != 0 || format.is_depth_stencil_format(),
+    };
+    let texture = render::Texture::new(gpu, desc);
+    if texture.texel_size().is_some_and(|t| data.len() == (t * texture.desc.width * texture.desc.height) as usize) {
+        texture.upload(gpu, data);
+    }
+    Some(texture)
+}
+
+pub(crate) fn create(name: Option<&CStr>, _anonymous: bool, config: TextureCreationConfig_t, data: &mut [u8]) -> Ref {
+    let name = name.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = Texture {
-        name: name.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
+        gpu: gpu_texture(&name, &config, data),
+        name,
         desc: Box::new(desc_of(&config)),
         config,
-        data: Mutex::new(bytes),
+        data: Mutex::new(data.to_vec()),
         error: false,
         guid: Guid::default(),
     };
@@ -79,29 +119,49 @@ fn create(name: Option<&CStr>, _anonymous: bool, config: TextureCreationConfig_t
 }
 
 fn on<R: Default>(t: Ref, f: impl FnOnce(&Texture) -> R) -> R {
-    resource::resolve::<_, Texture>(t).map(|t| f(&t)).unwrap_or_default()
+    resolve(t).map(|t| f(&t)).unwrap_or_default()
+}
+
+/// Fill the whole texture with one colour: on the GPU when it has a side there, and always in the
+/// CPU copy of 4-byte formats so reads without a device agree.
+pub fn clear(t: Ref, c: Color32) {
+    on(t, |t| {
+        if let (Some(gpu), Some(tex)) = (device::gpu(), &t.gpu)
+            && !tex.desc.format.is_depth_stencil_format()
+        {
+            let unit = |v: u8| f64::from(v) / 255.0;
+            tex.clear(gpu, render::wgpu::Color { r: unit(c.r), g: unit(c.g), b: unit(c.b), a: unit(c.a) }, 1.0);
+        }
+        let mut d = t.data.lock().unwrap();
+        if t.config.m_n_image_format == 0 && d.len() % 4 == 0 {
+            for px in d.chunks_mut(4) {
+                px.copy_from_slice(&[c.r, c.g, c.b, c.a]);
+            }
+        }
+    });
 }
 
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::c_texture_base, Texture);
-    bind!(r, device::FIND_OR_CREATE_TEXTURE2, create);
+    bind!(r, device_slots::FIND_OR_CREATE_TEXTURE2, create);
     bind!(r, glue::GET_TEXTURE, load);
-    bind!(r, device::FIND_OR_CREATE_FILE_TEXTURE, |path, _flags| load(path, Guid::default()));
-    bind!(r, device::GET_TEXTURE_DESC, |t| on(t, |t| RawPtr::from_raw(&*t.desc as *const _ as *mut _)));
-    bind!(r, device::GET_ON_DISK_TEXTURE_DESC, |t| on(t, |t| RawPtr::from_raw(&*t.desc as *const _ as *mut _)));
-    bind!(r, device::GET_TEXTURE_MULTISAMPLE_TYPE, |t| on(t, |t| t.config.m_n_multisample_type as i64));
-    bind!(r, device::COMPUTE_TEXTURE_MEMORY_SIZE, |t| on(t, |t| mem_size(&t.config) as u32));
-    bind!(r, device::IS_TEXTURE_RENDER_TARGET, |_| false);
+    bind!(r, device_slots::FIND_OR_CREATE_FILE_TEXTURE, |path, _flags| load(path, Guid::default()));
+    bind!(r, device_slots::GET_TEXTURE_DESC, |t| on(t, |t| RawPtr::from_raw(&*t.desc as *const _ as *mut _)));
+    bind!(r, device_slots::GET_ON_DISK_TEXTURE_DESC, |t| on(t, |t| RawPtr::from_raw(&*t.desc as *const _ as *mut _)));
+    bind!(r, device_slots::GET_TEXTURE_MULTISAMPLE_TYPE, |t| on(t, |t| t.config.m_n_multisample_type as i64));
+    bind!(r, device_slots::COMPUTE_TEXTURE_MEMORY_SIZE, |t| on(t, |t| mem_size(&t.config) as u32));
+    bind!(r, device_slots::IS_TEXTURE_RENDER_TARGET, |t| on(t, Texture::is_render_target));
+    bind!(r, device_slots::CLEAR_TEXTURE, clear);
     // Sequences are sprite-sheet animations, read from compiled textures (none load yet).
-    bind!(r, device::GET_SEQUENCE_COUNT, |_| 0);
-    bind!(r, device::GET_TEXTURE_LAST_USED, |_| 0);
-    bind!(r, device::MARK_TEXTURE_USED, |_, _| {});
-    bind!(r, device::GET_NUM_TEXTURE_LOADS_IN_FLIGHT, || 0);
-    bind!(r, device::UN_THROTTLE_TEXTURE_STREAMING_FOR_N_FRAMES, |_| {});
-    bind!(r, device::GET_TEXTURE_POOL_STATS, |a, b, c| {
+    bind!(r, device_slots::GET_SEQUENCE_COUNT, |_| 0);
+    bind!(r, device_slots::GET_TEXTURE_LAST_USED, |_| 0);
+    bind!(r, device_slots::MARK_TEXTURE_USED, |_, _| {});
+    bind!(r, device_slots::GET_NUM_TEXTURE_LOADS_IN_FLIGHT, || 0);
+    bind!(r, device_slots::UN_THROTTLE_TEXTURE_STREAMING_FOR_N_FRAMES, |_| {});
+    bind!(r, device_slots::GET_TEXTURE_POOL_STATS, |a, b, c| {
         (*a, *b, *c) = (0, 0, 0);
     });
-    bind!(r, device::ASYNC_SET_TEXTURE_DATA2, set_data);
+    bind!(r, device_slots::ASYNC_SET_TEXTURE_DATA2, set_data);
 }
 
 /// Replace the texels in `rect` (only whole-texture uploads are kept for now).
@@ -110,6 +170,9 @@ fn set_data(t: Ref, bytes: &mut [u8], _rect: Rect3D) {
         let mut d = t.data.lock().unwrap();
         if bytes.len() == d.len() {
             d.copy_from_slice(bytes);
+            if let (Some(gpu), Some(tex)) = (device::gpu(), &t.gpu) {
+                tex.upload(gpu, bytes);
+            }
         }
     });
 }
