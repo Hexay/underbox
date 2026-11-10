@@ -1,7 +1,8 @@
 //! `#include "x"` expansion with the same search order as managed `ShaderPreprocessor` (relative to
 //! the including file, then each content root, then `<root>/shaders/`) and plain C semantics:
 //! a file is pasted every time it is included. The one shortcut is a file wrapped in an include
-//! guard that was already pasted, which expands to nothing either way.
+//! guard that was already pasted, which expands to nothing either way. Includes found nowhere fall
+//! back to our built-in replacements for Valve's closed core headers (`builtin`).
 
 use std::path::{Path, PathBuf};
 
@@ -22,6 +23,15 @@ impl IncludePaths {
         std::iter::once(parent.join(name))
             .chain(self.roots.iter().flat_map(|r| [r.join(name), r.join("shaders").join(name)]))
             .find(|p| p.is_file())
+            .or_else(|| crate::builtin::get(name).map(|_| Path::new(crate::builtin::PREFIX).join(name)))
+    }
+}
+
+/// A resolved include's text: a built-in (see `builtin`) or a file.
+fn read(path: &Path) -> Result<String, String> {
+    match path.strip_prefix(crate::builtin::PREFIX).ok().and_then(|n| crate::builtin::get(&n.to_string_lossy())) {
+        Some(text) => Ok(text.into()),
+        None => std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display())),
     }
 }
 
@@ -85,7 +95,7 @@ impl<'a> Expander<'a> {
         if self.guards_done.iter().any(|p| p == path) {
             return Ok(());
         }
-        let src = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let src = read(path)?;
         if !self.deps.iter().any(|d| d.path == path) {
             self.deps.push(Dependency { path: path.into(), hash: blake3::hash(src.as_bytes()) });
         }
