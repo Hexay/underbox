@@ -127,7 +127,9 @@ name = "engine2"
 version = "0.1.0"
 dependencies = [
  "abi",
+ "anim",
  "assets",
+ "glam 0.33.12",
  "gns",
  "lz4_flex",
  "objects",

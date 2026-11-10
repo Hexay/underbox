@@ -35,7 +35,7 @@ fn bbox(bounds: Option<([f32; 3], [f32; 3])>) -> BBox {
 }
 
 /// The source file for a resource path managed asks for (it may name the compiled `_c`).
-fn source_path(path: &str) -> String {
+pub fn source_path(path: &str) -> String {
     let path = path.strip_suffix("_c").unwrap_or(path);
     if path.ends_with(".vmdl") { path.to_owned() } else { format!("{path}.vmdl") }
 }
@@ -60,6 +60,22 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
         Model { name: name.clone(), meshes, bounds, error, guid }
     });
     resource::new_handle(model)
+}
+
+/// A model made at runtime (`CModelBuilder`); meshless ones get the stand-in so they still draw.
+// TODO: meshes from ADD_RUN_TIME_MESH.
+pub fn create_runtime(name: &str) -> Ref {
+    let model = LOADED.find_or_insert(name, || {
+        let meshes = vec![source::stand_in()];
+        let bounds = bbox(source::bounds(&meshes));
+        Model { name: name.to_owned(), meshes, bounds, error: false, guid: Guid::default() }
+    });
+    resource::new_handle(model)
+}
+
+/// A live model's resource name.
+pub fn name(r: Ref) -> Option<String> {
+    on(r, |m| Some(m.name.clone()))
 }
 
 /// A model's render bounds; zero for a dead handle.
