@@ -1,0 +1,22 @@
+// underbox replacement for Valve's ambient_cube.fxc. Faces are +X, -X, +Y, -Y, +Z, -Z, weighted
+// by the squared normal.
+#ifndef AMBIENT_CUBE_FXC
+#define AMBIENT_CUBE_FXC
+
+float3 SampleIrradiance( float3 vCube[6], float3 n )
+{
+	float3 w = n * n;
+	return w.x * ( n.x >= 0.0 ? vCube[0] : vCube[1] )
+		+ w.y * ( n.y >= 0.0 ? vCube[2] : vCube[3] )
+		+ w.z * ( n.z >= 0.0 ? vCube[4] : vCube[5] );
+}
+
+// Grey levels per axis: vPositive for +X/+Y/+Z, vNegative for -X/-Y/-Z.
+float EvalGreyAmbientCube( float3 n, float3 vPositive, float3 vNegative )
+{
+	float3 w = n * n;
+	float3 g = float3( n.x >= 0.0 ? vPositive.x : vNegative.x, n.y >= 0.0 ? vPositive.y : vNegative.y, n.z >= 0.0 ? vPositive.z : vNegative.z );
+	return dot( w, g );
+}
+
+#endif // AMBIENT_CUBE_FXC

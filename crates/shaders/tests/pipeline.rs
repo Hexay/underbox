@@ -77,7 +77,7 @@ fn vertex_and_pixel_to_wgsl() {
     assert_eq!(ps_program.decls.render_states, [("CullMode".to_string(), "NONE".to_string())]);
     let mode = ps_program.annotations.iter().find(|a| a.name == "Mode").unwrap();
     assert_eq!(mode.spec_id, Some(0));
-    assert!(ps.wgsl.contains("3i") || ps.wgsl.contains("3.0") || ps.wgsl.contains("f32(3)"), "default baked:\n{}", ps.wgsl);
+    assert!(ps.wgsl.contains("* 3f)"), "default baked:\n{}", ps.wgsl);
 }
 
 #[test]

@@ -1,0 +1,10 @@
+// underbox replacement for Valve's baked_lighting_constants.fxc.
+#ifndef BAKED_LIGHTING_CONSTANTS_FXC
+#define BAKED_LIGHTING_CONSTANTS_FXC
+
+// Bindless Texture2DArray indices: 0 light indices, 1 light strengths, 2 irradiance,
+// 3 AHD (xy highlight direction * 0.5 + 0.5, z ambient ratio, w AO).
+int4 g_nLightmapTextureIndices < Attribute( "LightmapTextureIndices" ); >;
+float4 g_vLightmapUvScale < Attribute( "LightmapUvScale" ); Default4( 1, 1, 0, 0 ); >;
+
+#endif // BAKED_LIGHTING_CONSTANTS_FXC
