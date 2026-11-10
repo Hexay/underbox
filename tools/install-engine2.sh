@@ -1,16 +1,16 @@
 #!/bin/sh
-# Build our libengine2 and install it (plus the natives managed loads by name) into sbox-public.
-# usage: tools/install-engine2.sh <sbox-public>   (call under the boot lock: the tree is shared)
+# Build our libengine2 and install it (plus the natives managed loads by name) into a game dir.
+# usage: tools/install-engine2.sh <game-dir>   (this worktree's copy, from tools/game-dir.sh)
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
-SBOX=$1
+GAME=$1
 
 # see docs/dev-loop.md (incremental)
 env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
-NATIVE="$SBOX/game/bin/linuxsteamrt64"
+NATIVE="$GAME/bin/linuxsteamrt64"
 mkdir -p "$NATIVE"
 # Rename, not overwrite: a process still mapping the old file would crash on an in-place rewrite.
-cp "${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so" "$NATIVE/.libengine2.so.$$"
+cp --reflink=auto "${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so" "$NATIVE/.libengine2.so.$$"
 mv -f "$NATIVE/.libengine2.so.$$" "$NATIVE/libengine2.so"
 # Managed loads these modules by name for their CreateInterface; they're all engine2, and the
 # loader dedupes symlinks by inode so they share its state. TODO(windows): needs forwarder DLLs.
