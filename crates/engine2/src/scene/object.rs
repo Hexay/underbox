@@ -95,13 +95,18 @@ pub fn create<C: NativeClass, D>(world: world::Ref, kind: Kind, state: State) ->
 
 /// As [`create`], for a light.
 pub fn create_with<C: NativeClass, D>(world: world::Ref, kind: Kind, state: State, light: Option<super::light::Light>) -> HandleId<D> {
+    create_native::<C, D>(world, kind, state, light).1
+}
+
+/// As [`create_with`], also returning the object's native reference (for native owners such as map worlds).
+pub fn create_native<C: NativeClass, D>(world: world::Ref, kind: Kind, state: State, light: Option<super::light::Light>) -> (Ref, HandleId<D>) {
     let light = light.map(Mutex::new);
     let object = Arc::new(SceneObject { kind, world, handle: Handle::default(), attributes: attributes::create(), state: Mutex::new(state), light });
     let r: NativeRef<C> = objects::create_shared(object.clone());
     if let Some(w) = world::get(world) {
         w.objects.lock().unwrap().push(r.addr());
     }
-    object.handle.register(r, kind)
+    (NativeRef::from_raw(r.as_raw().cast()), object.handle.register(r, kind))
 }
 
 /// Remove an object from its world and parent, tell managed, and free it.

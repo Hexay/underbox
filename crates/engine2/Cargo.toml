@@ -26,6 +26,7 @@ serde.workspace = true
 serde_json.workspace = true
 shaders = { path = "../shaders" }
 window = { path = "../window" }
+world = { path = "../world" }
 
 [features]
 default = ["audio-device"]
