@@ -215,7 +215,7 @@ fn emit_thunks(planned: &[Planned]) -> Result<String, String> {
                     writeln!(out, "            let mut s{n} = Default::default();").unwrap();
                     format!("unsafe {{ out_ref(a{n}, &mut s{n}) }}")
                 }
-                Conv::Slice => format!("unsafe {{ slice_arg(a{n}, a{}) }}", n + 1),
+                Conv::Slice(len) => format!("unsafe {{ slice_arg(a{n}, a{len}) }}"),
                 Conv::Len => continue,
                 Conv::StrOut => return Err(format!("slot {i}: string-return conversion on an argument")),
             };

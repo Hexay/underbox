@@ -3,11 +3,13 @@
 
 pub mod body;
 mod body_slots;
+mod query;
 pub mod shape;
 pub mod world;
 
 pub fn register(r: &mut abi::Registry) {
     world::register(r);
+    query::register(r);
     body_slots::register(r);
     shape::register(r);
 }

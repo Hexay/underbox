@@ -13072,8 +13072,7 @@ pub mod i_physics_body {
             NativeRef<class::IPhysicsBody>,
             Vector3,
             Rotation,
-            i32,
-            RawPtr<c_void>,
+            &mut [Vector3],
             PhysicsShapeSettings,
         ) -> HandleId<class::IPhysicsShape>,
     > = Slot::new(2868);
@@ -13099,10 +13098,8 @@ pub mod i_physics_body {
     pub const ADD_MESH_SHAPE: Slot<
         fn(
             NativeRef<class::IPhysicsBody>,
-            i32,
-            RawPtr<c_void>,
-            i32,
-            RawPtr<c_void>,
+            &mut [Vector3],
+            &mut [i32],
             i32,
             PhysicsShapeSettings,
         ) -> HandleId<class::IPhysicsShape>,
@@ -13595,7 +13592,7 @@ pub mod i_physics_shape {
     pub const GET_TYPE: Slot<fn(NativeRef<class::IPhysicsShape>) -> i64> = Slot::new(3028);
     /// `IPhysicsShape_UpdateMeshShape`
     pub const UPDATE_MESH_SHAPE: Slot<
-        fn(NativeRef<class::IPhysicsShape>, i32, RawPtr<c_void>, i32, RawPtr<c_void>),
+        fn(NativeRef<class::IPhysicsShape>, &mut [Vector3], &mut [i32]),
     > = Slot::new(3029);
     /// `IPhysicsShape_UpdateHeightShape`
     pub const UPDATE_HEIGHT_SHAPE: Slot<
@@ -13620,7 +13617,7 @@ pub mod i_physics_shape {
     > = Slot::new(3032);
     /// `IPhysicsShape_UpdateHullShape`
     pub const UPDATE_HULL_SHAPE: Slot<
-        fn(NativeRef<class::IPhysicsShape>, Vector3, Rotation, i32, RawPtr<c_void>),
+        fn(NativeRef<class::IPhysicsShape>, Vector3, Rotation, &mut [Vector3]),
     > = Slot::new(3033);
     /// `IPhysicsShape_ManagedObject`
     pub const MANAGED_OBJECT: Slot<

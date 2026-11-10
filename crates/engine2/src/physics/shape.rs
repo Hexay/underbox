@@ -17,6 +17,17 @@ enum Type {
     Sphere = 0,
     Capsule = 1,
     Hull = 2,
+    Mesh = 3,
+}
+
+fn hull(position: abi::structs::Vector3, rotation: abi::structs::Rotation, points: &[abi::structs::Vector3]) -> Geometry {
+    Geometry::Hull { pose: physics::Pose::from_parts(to_vec(position), to_rot(rotation)), points: points.iter().copied().map(to_vec).collect() }
+}
+
+/// Triangles from a flat index list; a trailing partial triangle or a negative index is dropped.
+fn mesh(vertices: &[abi::structs::Vector3], indices: &[i32]) -> Geometry {
+    let triangles = indices.chunks_exact(3).filter_map(|t| Some([t[0].try_into().ok()?, t[1].try_into().ok()?, t[2].try_into().ok()?]));
+    Geometry::Mesh { vertices: vertices.iter().copied().map(to_vec).collect(), triangles: triangles.collect() }
 }
 
 /// managed's `PhysicsShapeCreationFlags`.
@@ -44,6 +55,11 @@ pub fn get(r: Ref) -> Option<Arc<Shape>> {
     objects::get::<_, Shape>(r)
 }
 
+/// The shape a collider belongs to: `add` stores its object's address in `user_data`.
+pub fn from_user_data(data: u128) -> Ref {
+    Ref::from_raw(data as usize as *mut _)
+}
+
 fn with_state<R: Default>(r: Ref, f: impl FnOnce(&mut State) -> R) -> R {
     get(r).map(|s| f(&mut s.state.lock().unwrap())).unwrap_or_default()
 }
@@ -64,6 +80,7 @@ fn add(body_ref: body::Ref, kind: Type, geometry: Geometry, settings: PhysicsSha
     let state = State { tags, collision_mask: settings.collision_function_mask as u8, ignore_traces: settings.flags & IGNORE_TRACES != 0, ..Default::default() };
     let shape = Arc::new(Shape { body: body_ref, id, kind, handle: Handle::default(), geometry: Mutex::new(geometry), state: Mutex::new(state) });
     let r: Ref = objects::create_shared(shape.clone());
+    body::with_sim(body_ref, |sim, _| sim.shape_mut(id).map(|c| c.user_data = r.addr() as u128));
     if let Some(body) = body::get(body_ref) {
         body.shapes.lock().unwrap().push(r);
     }
@@ -118,6 +135,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::ADD_BOX_SHAPE, |body, center, rotation, half, settings| {
         add(body, Type::Hull, Geometry::Box { center: to_vec(center), rotation: to_rot(rotation), half_extents: to_vec(half) }, settings)
     });
+    bind!(r, b::ADD_HULL_SHAPE, |body, position, rotation, points, settings| add(body, Type::Hull, hull(position, rotation, points), settings));
+    // TODO: per-triangle surfaces (material count + surface indices in settings).
+    bind!(r, b::ADD_MESH_SHAPE, |body, vertices, indices, _materials, settings| add(body, Type::Mesh, mesh(vertices, indices), settings));
     bind!(r, b::REMOVE_SHAPE, remove);
     bind!(r, b::PURGE_SHAPES, |body| {
         let shapes = body::get(body).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
@@ -169,6 +189,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::UPDATE_BOX_SHAPE, |r, center, rotation, half| {
         update(r, Geometry::Box { center: to_vec(center), rotation: to_rot(rotation), half_extents: to_vec(half) })
     });
+    bind!(r, s::UPDATE_HULL_SHAPE, |r, position, rotation, points| update(r, hull(position, rotation, points)));
+    bind!(r, s::UPDATE_MESH_SHAPE, |r, vertices, indices| update(r, mesh(vertices, indices)));
     bind!(r, s::AS_SPHERE, |r| match get(r).map(|s| s.geometry.lock().unwrap().clone()) {
         Some(Geometry::Sphere { center, radius }) => Sphere { center: from_vec(center), radius },
         _ => Sphere::default(),

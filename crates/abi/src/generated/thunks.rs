@@ -21142,8 +21142,7 @@ pub(crate) unsafe extern "C" fn s2868(
             NativeRef::from_raw(a0),
             unsafe { by_val(a1) },
             unsafe { by_val(a2) },
-            a3,
-            RawPtr::from_raw(a4),
+            unsafe { slice_arg(a4, a3) },
             unsafe { by_val(a5) },
         ),
         None => unbound(2868),
@@ -21196,10 +21195,8 @@ pub(crate) unsafe extern "C" fn s2871(
     match bound(slots::i_physics_body::ADD_MESH_SHAPE) {
         Some(f) => f(
             NativeRef::from_raw(a0),
-            a1,
-            RawPtr::from_raw(a2),
-            a3,
-            RawPtr::from_raw(a4),
+            unsafe { slice_arg(a2, a1) },
+            unsafe { slice_arg(a4, a3) },
             a5,
             unsafe { by_val(a6) },
         ),
@@ -22442,10 +22439,8 @@ pub(crate) unsafe extern "C" fn s3029(
     match bound(slots::i_physics_shape::UPDATE_MESH_SHAPE) {
         Some(f) => f(
             NativeRef::from_raw(a0),
-            a1,
-            RawPtr::from_raw(a2),
-            a3,
-            RawPtr::from_raw(a4),
+            unsafe { slice_arg(a2, a1) },
+            unsafe { slice_arg(a4, a3) },
         ),
         None => unbound(3029),
     }
@@ -22514,8 +22509,7 @@ pub(crate) unsafe extern "C" fn s3033(
             NativeRef::from_raw(a0),
             unsafe { by_val(a1) },
             unsafe { by_val(a2) },
-            a3,
-            RawPtr::from_raw(a4),
+            unsafe { slice_arg(a4, a3) },
         ),
         None => unbound(3033),
     }
