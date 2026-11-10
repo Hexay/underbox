@@ -34,6 +34,7 @@ if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/Em
     dotnet build "$SBOX/engine/Launcher/SboxServer/Sbox-Server.csproj" -c Release -m:4 -nodeReuse:false -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
     touch "$STAMP"
 fi
+sh "$ROOT/tools/r2r-managed.sh" "$SBOX"
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
 # see docs/dev-loop.md (incremental)
