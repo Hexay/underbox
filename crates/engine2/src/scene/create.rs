@@ -25,7 +25,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, mesh::CREATE_SCENE_OBJECT, |model, transform, desc, flags, _type_flags, w, _unused| {
         // Animatable objects (SceneModel) ask by descriptor name; plain ones pass none.
         let animatable = desc.is_some_and(|d| d.to_bytes() == b"AnimatableSceneObjectDesc");
-        let state = State { model, transform, flags, original_flags: flags, ..State::default() };
+        let state = State { model, transform, flags, original_flags: flags, bounds: crate::model::bounds(model), ..State::default() };
         match animatable {
             true => object::create::<class::CSceneAnimatableObject, _>(w, Kind::SceneAnimatableObject, state),
             false => object::create::<class::CSceneObject, _>(w, Kind::SceneObject, state),
