@@ -2,6 +2,13 @@
 
 use std::fmt;
 
+/// What s&box's lit shaders need (bindless texture and sampler arrays, wave ops), taken when the
+/// adapter has it.
+const OPTIONAL: wgpu::Features = wgpu::Features::TEXTURE_BINDING_ARRAY
+    .union(wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING)
+    .union(wgpu::Features::PARTIALLY_BOUND_BINDING_ARRAY)
+    .union(wgpu::Features::SUBGROUP);
+
 /// One device and its queue. Everything else in this crate borrows it.
 pub struct Gpu {
     pub device: wgpu::Device,
@@ -40,9 +47,20 @@ impl Gpu {
             apply_limit_buckets: false,
         };
         let adapter = pollster::block_on(instance.request_adapter(&options)).map_err(GpuError::NoAdapter)?;
+        let (supported, limits) = (adapter.features(), adapter.limits());
         let desc = wgpu::DeviceDescriptor {
             label: Some("underbox"),
-            required_limits: wgpu::Limits::default().using_resolution(adapter.limits()),
+            required_features: supported & OPTIONAL,
+            required_limits: wgpu::Limits {
+                max_binding_array_elements_per_shader_stage: limits.max_binding_array_elements_per_shader_stage,
+                max_binding_array_sampler_elements_per_shader_stage: limits.max_binding_array_sampler_elements_per_shader_stage,
+                // s&box's lit shaders bind more per stage than wgpu's portable defaults (14+ storage buffers).
+                max_storage_buffers_per_shader_stage: limits.max_storage_buffers_per_shader_stage,
+                max_sampled_textures_per_shader_stage: limits.max_sampled_textures_per_shader_stage,
+                max_samplers_per_shader_stage: limits.max_samplers_per_shader_stage,
+                max_uniform_buffers_per_shader_stage: limits.max_uniform_buffers_per_shader_stage,
+                ..wgpu::Limits::default().using_resolution(limits)
+            },
             ..Default::default()
         };
         let (device, queue) = pollster::block_on(adapter.request_device(&desc)).map_err(GpuError::Device)?;

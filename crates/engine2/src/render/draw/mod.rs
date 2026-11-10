@@ -49,10 +49,28 @@ pub fn placeholder() -> Option<&'static Placeholder> {
     Some(PLACEHOLDER.get_or_init(|| Placeholder::new(gpu)))
 }
 
-pub fn blitter() -> Option<&'static render::Blitter> {
+fn blitter() -> Option<&'static render::Blitter> {
     static BLITTER: OnceLock<render::Blitter> = OnceLock::new();
     let gpu = device::gpu()?;
     Some(BLITTER.get_or_init(|| render::Blitter::new(gpu)))
+}
+
+/// A viewport's `[x, y, w, h]` on `t`; an empty viewport covers the rest of `t` from its corner.
+pub fn viewport_rect(t: &render::Texture, v: &abi::structs::RenderViewport) -> [u32; 4] {
+    let (x, y) = (v.m_n_top_left_x.max(0) as u32, v.m_n_top_left_y.max(0) as u32);
+    if v.m_n_width > 0 && v.m_n_height > 0 {
+        [x, y, v.m_n_width as u32, v.m_n_height as u32]
+    } else {
+        [x, y, t.desc.width.saturating_sub(x), t.desc.height.saturating_sub(y)]
+    }
+}
+
+/// `src_rect` of `src` into `dst_rect` of `dst` (`[x, y, w, h]`): a copy when sizes and formats
+/// match, else a draw that scales and converts.
+pub fn blit(src: &render::Texture, src_rect: [u32; 4], dst: &render::Texture, dst_rect: [u32; 4]) -> bool {
+    let Some(gpu) = device::gpu() else { return false };
+    let same_size = src_rect[2..] == dst_rect[2..];
+    (same_size && src.copy_to(gpu, dst, src_rect, (dst_rect[0], dst_rect[1]))) || blitter().is_some_and(|b| b.blit(gpu, src, src_rect, dst, dst_rect))
 }
 
 /// `RenderPrimitiveType` to a wgpu topology; patches and adjacency draw as triangle lists.

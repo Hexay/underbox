@@ -13,8 +13,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::SET_FLAGS, |s, f| with(s, |st| st.flags |= f));
     bind!(r, o::CLEAR_FLAGS, |s, f| with(s, |st| st.flags &= !f));
     bind!(r, o::CHANGE_FLAGS, |s, set, clear| with(s, |st| st.flags = (st.flags & !clear) | set));
-    bind!(r, o::HAS_FLAGS, |s, f| with(s, |st| st.flags & f == f));
-    bind!(r, o::GET_FLAGS, |s| with(s, |st| st.flags));
+    bind!(r, o::HAS_FLAGS, |s, f| with(s, |st| st.effective_flags() & f == f));
+    bind!(r, o::GET_FLAGS, |s| with(s, |st| st.effective_flags()));
     bind!(r, o::GET_ORIGINAL_FLAGS, |s| with(s, |st| st.original_flags));
     bind!(r, o::UPDATE_FLAGS_BASED_ON_MATERIAL, |_| {});
 

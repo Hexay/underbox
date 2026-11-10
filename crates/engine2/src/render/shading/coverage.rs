@@ -42,7 +42,8 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
     let built = shader.and_then(|sh| program::build(gpu, compiler, &sh, stem, &shaders::Variant::default()));
     let s = match built {
         Ok(s) => s,
-        Err(e) => return format!("placeholder: {}", e.lines().next().unwrap_or_default()),
+        // wgpu's first line is only "Validation Error"; the cause follows.
+        Err(e) => return format!("placeholder: {}", e.lines().map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(" ")),
     };
     if vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).is_none() {
         return "placeholder: mesh layout can't feed its vertex inputs".into();

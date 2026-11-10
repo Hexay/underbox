@@ -22,6 +22,7 @@ pub mod shading;
 pub mod stats;
 pub mod swap_chain;
 pub mod texture;
+mod texture_generated;
 mod tools;
 pub mod vfx;
 

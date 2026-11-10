@@ -77,6 +77,13 @@ pub fn bind_targets(r: Ref, color: texture::Ref, depth: texture::Ref) {
     });
 }
 
+/// Whether draws on `r` are reverse-Z (near = 1, depth cleared to 0). Managed's scene renderer
+/// (`r_managed_scene`) binds its own `PerViewConstantBuffer_t` and projects reverse-Z like native;
+/// the views we build ourselves (scene/execute.rs) are forward-Z.
+pub fn reverse_z(r: Ref) -> bool {
+    get(r).is_some_and(|c| attributes::constant_buffer(c.attributes, crate::render::shading::view::BLOCK).is_some())
+}
+
 /// TODO: clears cover the whole target; a viewport or scissor smaller than it needs a quad draw.
 fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
     let Some(gpu) = device::gpu() else { return };
@@ -88,7 +95,7 @@ fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_st
         tex.clear(gpu, rgba, 1.0);
     }
     if clear_depth && let Some(t) = gpu_of(depth) && let Some(tex) = &t.gpu {
-        tex.clear(gpu, rgba, 1.0);
+        tex.clear(gpu, rgba, if reverse_z(r) { 0.0 } else { 1.0 });
     }
 }
 

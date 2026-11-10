@@ -17,8 +17,7 @@ use render::pass::{DrawUniforms, Load};
 use render::{BufferKind, Placeholder, RasterState, Semantic};
 use std::sync::{Arc, OnceLock};
 
-/// `SceneObjectFlags.IsOpaque`: what every model draws as under the placeholder.
-const IS_OPAQUE: i64 = 0x1;
+use crate::scene::object::IS_OPAQUE;
 /// Placeholder sky colour, times the sky object's tint. TODO: the sky material.
 const SKY: [f32; 4] = [0.45, 0.6, 0.85, 1.0];
 
@@ -105,15 +104,10 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             f(setup(ctx, v, l, t.color));
         }
         Kind::Blit { src, src_viewport: s } => {
-            let (Some(gpu), Some(src), Some(dst)) = (device::gpu(), texture::resolve(src), texture::resolve(t.color)) else { return };
+            let (Some(src), Some(dst)) = (texture::resolve(src), texture::resolve(t.color)) else { return };
             let (Some(a), Some(b)) = (src.gpu.as_ref(), dst.gpu.as_ref()) else { return };
             let rect = if s.m_n_width > 0 { [s.m_n_top_left_x as u32, s.m_n_top_left_y as u32, s.m_n_width as u32, s.m_n_height as u32] } else { [0, 0, a.desc.width, a.desc.height] };
-            let at = (t.viewport.m_n_top_left_x.max(0) as u32, t.viewport.m_n_top_left_y.max(0) as u32);
-            let dst_size = if t.viewport.m_n_width > 0 { (t.viewport.m_n_width as u32, t.viewport.m_n_height as u32) } else { (b.desc.width - at.0.min(b.desc.width), b.desc.height - at.1.min(b.desc.height)) };
-            let same_size = (rect[2], rect[3]) == dst_size;
-            if !(same_size && a.copy_to(gpu, b, rect, at)) && let Some(blitter) = draw::blitter() {
-                blitter.blit(gpu, a, rect, b, [at.0, at.1, dst_size.0, dst_size.1]);
-            }
+            draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport));
         }
         Kind::Procedural(_) | Kind::Label => {}
     }
@@ -148,7 +142,7 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
             continue;
         }
         let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };
-        let flags = s.flags | if s.model.is_null() { 0 } else { IS_OPAQUE };
+        let flags = s.effective_flags();
         if !matched || flags & f.required != f.required || flags & f.excluded != 0 {
             continue;
         }

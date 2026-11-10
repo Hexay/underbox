@@ -5,7 +5,7 @@
 
 use super::defaults;
 use super::layout::Value;
-use super::program::Shading;
+use super::program::{self, Shading};
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting};
 use crate::render::{attributes, buffers as gpu_buffers, texture};
@@ -96,6 +96,9 @@ enum Resource {
     Buffer(wgpu::Buffer),
     View(wgpu::TextureView),
     Sampler(wgpu::Sampler),
+    /// A bindless array, every element the same default.
+    Views(Vec<wgpu::TextureView>),
+    Samplers(Vec<wgpu::Sampler>),
 }
 
 /// The draw's texture for `b`: a render attribute's or the material's by name, the lighting's
@@ -140,6 +143,11 @@ fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Res
             };
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
+        // TODO: managed's bindless indices name its global descriptor set; elements are defaults.
+        B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => {
+            Resource::Views(vec![defaults::texture(gpu, view_dimension, sample_type); program::array_len(b) as usize])
+        }
+        B::Sampler(kind) if b.count.is_some() => Resource::Samplers(vec![defaults::sampler(gpu, kind); program::array_len(b) as usize]),
         B::Texture { sample_type, view_dimension, .. } => {
             Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }
@@ -154,15 +162,26 @@ pub fn bind_groups(gpu: &render::Gpu, s: &Shading, inputs: &Inputs) -> Result<Ve
     for (g, layout) in s.program.bind_group_layouts.iter().enumerate() {
         let mine: Vec<&Binding> = s.bindings.iter().filter(|b| b.group == g as u32).collect();
         let resources = mine.iter().map(|b| resource(gpu, s, inputs, b)).collect::<Result<Vec<_>, _>>()?;
+        // wgpu's array resources borrow slices of references, which must outlive the entries.
+        let arrays: Vec<(Vec<&wgpu::TextureView>, Vec<&wgpu::Sampler>)> = resources
+            .iter()
+            .map(|r| match r {
+                Resource::Views(v) => (v.iter().collect(), Vec::new()),
+                Resource::Samplers(v) => (Vec::new(), v.iter().collect()),
+                _ => Default::default(),
+            })
+            .collect();
         let entries: Vec<_> = mine
             .iter()
-            .zip(&resources)
-            .map(|(b, r)| wgpu::BindGroupEntry {
+            .zip(resources.iter().zip(&arrays))
+            .map(|(b, (r, (views, samplers)))| wgpu::BindGroupEntry {
                 binding: b.binding,
                 resource: match r {
                     Resource::Buffer(buf) => buf.as_entire_binding(),
                     Resource::View(v) => wgpu::BindingResource::TextureView(v),
                     Resource::Sampler(smp) => wgpu::BindingResource::Sampler(smp),
+                    Resource::Views(_) => wgpu::BindingResource::TextureViewArray(views),
+                    Resource::Samplers(_) => wgpu::BindingResource::SamplerArray(samplers),
                 },
             })
             .collect();

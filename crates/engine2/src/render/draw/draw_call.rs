@@ -12,6 +12,7 @@ use abi::slots::render_tools as tools;
 use abi::{Registry, bind};
 use glam::Mat4;
 use render::RasterState;
+use render::wgpu::CompareFunction;
 use render::pass::DrawUniforms;
 
 #[allow(clippy::too_many_arguments)]
@@ -23,7 +24,9 @@ fn draw_model_draw_call(c: context::Ref, attrs: attributes::Ref, mat: material::
     dc.material = None;
     let view_proj = immediate::view_proj(c);
     let uniforms = DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
-    let Some(mut draw) = model_draw::draw_call(&entry.mesh, &dc, uniforms, view_proj, RasterState::default()) else { return false };
+    let depth_compare = if context::reverse_z(c) { CompareFunction::GreaterEqual } else { CompareFunction::LessEqual };
+    let raster = RasterState { depth_compare, ..Default::default() };
+    let Some(mut draw) = model_draw::draw_call(&entry.mesh, &dc, uniforms, view_proj, raster) else { return false };
     let bindings = ContextBindings {
         attributes: vec![attrs, context::get(c).map(|x| x.attributes).unwrap_or_default()],
         slots: immediate::with(c, |s| s.slots.clone()),

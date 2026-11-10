@@ -35,6 +35,17 @@ pub struct State {
     pub material_override: Option<Arc<crate::mesh::material_ref::MaterialRef>>,
 }
 
+/// `SceneObjectFlags.IsOpaque`.
+pub const IS_OPAQUE: i64 = 0x1;
+
+impl State {
+    /// The flags managed reads: a model object also reports `IsOpaque`, which native derives from
+    /// its draws' materials (`UpdateFlagsBasedOnMaterial`). TODO: translucent materials.
+    pub fn effective_flags(&self) -> i64 {
+        self.flags | if self.model.is_null() { 0 } else { IS_OPAQUE }
+    }
+}
+
 impl Default for State {
     fn default() -> Self {
         Self {

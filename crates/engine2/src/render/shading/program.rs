@@ -35,8 +35,26 @@ fn stage(compiler: &Compiler, shader: &VfxShader, stage: Stage, v: &Variant) -> 
 }
 
 /// Bindings the per-draw binder can't fill: bindless arrays, storage images, external textures.
-fn supported(b: &Binding) -> bool {
-    b.count.is_none() && matches!(b.ty, wgpu::BindingType::Buffer { .. } | wgpu::BindingType::Texture { .. } | wgpu::BindingType::Sampler(_))
+/// Elements bound for a runtime-sized (bindless) array; every one is a default texture or sampler.
+pub const RUNTIME_ARRAY_LEN: u32 = 64;
+
+/// The element count bound for `b`: 1 for a plain binding.
+pub fn array_len(b: &Binding) -> u32 {
+    match b.count {
+        Some(0) => RUNTIME_ARRAY_LEN,
+        Some(n) => n,
+        None => 1,
+    }
+}
+
+fn supported(gpu: &render::Gpu, b: &Binding) -> bool {
+    match b.ty {
+        wgpu::BindingType::Texture { .. } | wgpu::BindingType::Sampler(_) => {
+            b.count.is_none() || gpu.device.features().contains(wgpu::Features::TEXTURE_BINDING_ARRAY)
+        }
+        wgpu::BindingType::Buffer { .. } => b.count.is_none(),
+        _ => false,
+    }
 }
 
 fn parse_default(args: &str) -> Option<Vec4> {
@@ -61,7 +79,7 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     super::stages::separate(&vs, &mut ps)?;
     let mut bindings: Vec<Binding> = Vec::new();
     for b in vs.reflection.bindings.iter().chain(&ps.reflection.bindings) {
-        if !supported(b) {
+        if !supported(gpu, b) {
             return Err(format!("unsupported binding {} ({:?})", b.name, b.ty));
         }
         if !bindings.iter().any(|x| (x.group, x.binding) == (b.group, b.binding)) {
@@ -69,7 +87,7 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
         }
     }
     let program = gpu.checked(|| {
-        let layouts = shaders::bind_group_layouts(&[&vs.reflection, &ps.reflection], 1)
+        let layouts = shaders::bind_group_layouts(&[&vs.reflection, &ps.reflection], RUNTIME_ARRAY_LEN)
             .iter()
             .map(|entries| gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries }))
             .collect();

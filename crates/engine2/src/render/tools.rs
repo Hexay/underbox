@@ -3,11 +3,11 @@
 //! and bindless ids, and the GPU features the placeholder renderer doesn't have (compute, ray
 //! tracing, skinning, morphs, lightmaps), which answer "none" so managed skips them.
 
-use crate::render::draw::{immediate, model as model_draw};
+use crate::render::draw::{self, immediate, model as model_draw};
 use crate::render::{context, device, texture};
 use crate::scene::object;
 use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools as tools};
-use abi::structs::{NativeRect, Vector3, Vector4};
+use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
 use abi::{NativeRef, PtrHandle, RawPtr, Registry, bind, class};
 use std::collections::HashMap;
 use std::ffi::c_void;
@@ -34,6 +34,14 @@ fn copy_texture(src: texture::Ref, dst: texture::Ref, r: NativeRect, dx: i32, dy
     let r = rect(r).filter(|r| r[2] > 0 && r[3] > 0).unwrap_or([0, 0, a.desc.width, a.desc.height]);
     // TODO: mip and array slices (always 0 here).
     a.copy_to(gpu, b, r, (dx.max(0) as u32, dy.max(0) as u32));
+}
+
+/// `BlitTexture`: all of `src` into `viewport` of the bound colour target, scaled and converted
+/// (managed's HDR-to-swap-chain copy).
+fn blit_texture(c: context::Ref, src: texture::Ref, viewport: RenderViewport) -> bool {
+    let (Some(s), Some(d)) = (texture::resolve(src), texture::resolve(context::target(c).color)) else { return false };
+    let (Some(a), Some(b)) = (s.gpu.as_ref(), d.gpu.as_ref()) else { return false };
+    draw::blit(a, [0, 0, a.desc.width, a.desc.height], b, draw::viewport_rect(b, &viewport))
 }
 
 /// `GetSceneObjectDraw`: the `index`th draw call over the object's model meshes (LOD 0, enabled
@@ -133,12 +141,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::MAKE_FRAME_BUFFER_COPY, |c, t, x, y, w, h| {
         copy_from_target(c, t, Some([x.max(0) as u32, y.max(0) as u32, w.max(0) as u32, h.max(0) as u32]), false);
     });
-    // TODO: a scaled blit (and the sRGB transfer) needs a draw; same-size copies only for now.
-    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, _srgb| {
-        let t = context::target(c);
-        copy_texture(src, t.color, NativeRect { x: 0, y: 0, w, h }, x, y);
-        true
-    });
+    // TODO: the sRGB transfer flag; the blit draw writes linear values as they are.
+    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, _srgb| blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }));
     bind!(r, tools::COPY_TEXTURE, |_, src, dst, r, dx, dy, _, _, _, _| copy_texture(src, dst, r, dx, dy));
     bind!(r, tools::DRAW_SKY_BOX, |c, _attrs, _mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
