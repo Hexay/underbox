@@ -1,0 +1,13 @@
+[package]
+name = "render"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "underbox's renderer: wgpu device, textures, buffers, render targets and the forward pass"
+
+[dependencies]
+blake3 = "1.8"
+bytemuck = { version = "1.25", features = ["derive"] }
+glam = "0.33"
+pollster = "1.0"
+wgpu = "30.0.1"
