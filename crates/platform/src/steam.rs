@@ -1,23 +1,23 @@
 //! A real Steam game server through steamworks-rs. Steam starts in `server_init` (it needs the ports);
-//! before that, or if it fails (no steamclient, no app id), every call goes to an [`Offline`] fallback.
-//! Steam needs the app id from `steam_appid.txt` in the working directory or `SteamAppId` in the env.
+//! before that, after `server_shutdown`, or if it fails (no steamclient, no app id), every call goes to
+//! an [`Offline`] fallback. Steam needs the app id from `steam_appid.txt` in the working directory or
+//! `SteamAppId` in the env, and `libsteam_api.so` on the loader path.
 
-use crate::{BeginAuth, Event, Offline, Platform, ServerInfo, SteamId};
+use crate::{AuthResponse, BeginAuth, Event, Offline, Platform, ServerInfo, SteamId, SteamResult};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, Mutex, OnceLock};
 use steamworks::{
-    AuthSessionError, CallbackHandle, Server, ServerMode, SteamServersConnected, ValidateAuthTicketResponse, sys,
+    AuthSessionError, AuthSessionValidateError as V, CallbackHandle, Server, ServerMode, SteamError,
+    SteamServerConnectFailure, SteamServersConnected, SteamServersDisconnected, ValidateAuthTicketResponse, sys,
 };
-
-// TODO: carry managed's SteamGameServer_Init version through server_init; Steam's browser matches clients on it.
-const VERSION: &str = "1.0.0.0";
 
 type Events = Arc<Mutex<Vec<Event>>>;
 
 #[derive(Default)]
 pub struct Steam {
-    /// Set once by `server_init`; `None` inside means Steam failed to start.
-    live: OnceLock<Option<Live>>,
+    started: OnceLock<()>,
+    /// Dropping it shuts Steam down (steamworks' Manager calls SteamGameServer_Shutdown).
+    live: Mutex<Option<Live>>,
     fallback: Offline,
     info: Mutex<ServerInfo>,
     events: Events,
@@ -25,13 +25,13 @@ pub struct Steam {
 
 struct Live {
     server: Server,
-    _callbacks: [CallbackHandle; 2],
+    _callbacks: [CallbackHandle; 4],
 }
 
 impl Live {
-    fn start(port: u16, query_port: u16, events: &Events) -> Option<Self> {
+    fn start(port: u16, query_port: u16, version: &str, events: &Events) -> Option<Self> {
         // TODO: AuthenticationAndSecure once VAC is wanted; game_server.rs reports bSecure false to match.
-        match Server::init(Ipv4Addr::UNSPECIFIED, port, query_port, ServerMode::Authentication, VERSION) {
+        match Server::init(Ipv4Addr::UNSPECIFIED, port, query_port, ServerMode::Authentication, version) {
             Ok((server, _client)) => {
                 let _callbacks = listen(&server, events);
                 Some(Self { server, _callbacks })
@@ -50,21 +50,42 @@ impl Live {
 }
 
 /// Queue the callbacks the trait reports; they fire inside `run_callbacks` (from `poll`).
-fn listen(server: &Server, events: &Events) -> [CallbackHandle; 2] {
+fn listen(server: &Server, events: &Events) -> [CallbackHandle; 4] {
     let sink = || {
         let events = events.clone();
         move |e: Event| events.lock().unwrap().push(e)
     };
-    let (connected, auth) = (sink(), sink());
-    // TODO: SteamServerConnectFailure/SteamServersDisconnected have no Event yet; managed never sees them.
+    let (connected, failed, lost, auth) = (sink(), sink(), sink(), sink());
     [
         server.register_callback(move |_: SteamServersConnected| connected(Event::ServerConnected)),
+        server.register_callback(move |f: SteamServerConnectFailure| {
+            failed(Event::ServerConnectFailure { result: result_code(f.reason), retrying: f.still_retrying })
+        }),
+        server.register_callback(move |d: SteamServersDisconnected| lost(Event::ServersDisconnected { result: result_code(d.reason) })),
         server.register_callback(move |r: ValidateAuthTicketResponse| auth(auth_event(&r))),
     ]
 }
 
+/// steamworks only converts EResult → SteamError, so invert it by search; unknown codes become Fail (2).
+fn result_code(e: SteamError) -> SteamResult {
+    (1..=130).find(|&n| SteamError::try_from(n as i64).ok() == Some(e)).unwrap_or(2)
+}
+
 fn auth_event(r: &ValidateAuthTicketResponse) -> Event {
-    Event::AuthResult { user: SteamId(r.steam_id.raw()), owner: SteamId(r.owner_steam_id.raw()), ok: r.response.is_ok() }
+    let response = match r.response {
+        Ok(()) => AuthResponse::Ok,
+        Err(V::UserNotConnectedToSteam) => AuthResponse::UserNotConnectedToSteam,
+        Err(V::NoLicenseOrExpired) => AuthResponse::NoLicenseOrExpired,
+        Err(V::VACBanned) => AuthResponse::VacBanned,
+        Err(V::LoggedInElseWhere) => AuthResponse::LoggedInElsewhere,
+        Err(V::VACCheckTimedOut) => AuthResponse::VacCheckTimedOut,
+        Err(V::AuthTicketCancelled) => AuthResponse::TicketCanceled,
+        Err(V::AuthTicketInvalidAlreadyUsed) => AuthResponse::TicketAlreadyUsed,
+        Err(V::PublisherIssuedBan) => AuthResponse::PublisherIssuedBan,
+        Err(V::AuthTicketNetworkIdentityFailure) => AuthResponse::NetworkIdentityFailure,
+        Err(_) => AuthResponse::TicketInvalid,
+    };
+    Event::AuthResult { user: SteamId(r.steam_id.raw()), owner: SteamId(r.owner_steam_id.raw()), response }
 }
 
 fn begin_result(r: Result<(), AuthSessionError>) -> BeginAuth {
@@ -114,8 +135,9 @@ fn push_info(server: &Server, old: Option<&ServerInfo>, new: &ServerInfo) {
 }
 
 impl Steam {
-    fn live(&self) -> Option<&Live> {
-        self.live.get().and_then(Option::as_ref)
+    /// `f` on the live server, or `None` when Steam isn't running.
+    fn with<R>(&self, f: impl FnOnce(&Live) -> R) -> Option<R> {
+        self.live.lock().unwrap().as_ref().map(f)
     }
 }
 
@@ -124,135 +146,76 @@ impl Platform for Steam {
         "steam"
     }
 
-    fn server_init(&self, port: u16, query_port: u16) {
-        let live = self.live.get_or_init(|| Live::start(port, query_port, &self.events));
-        if let Some(live) = live {
-            push_info(&live.server, None, &self.info.lock().unwrap());
-        }
+    fn server_init(&self, port: u16, query_port: u16, version: &str) {
+        self.started.get_or_init(|| {
+            let live = Live::start(port, query_port, version, &self.events);
+            if let Some(l) = &live {
+                push_info(&l.server, None, &self.info.lock().unwrap());
+            }
+            *self.live.lock().unwrap() = live;
+        });
+    }
+
+    fn server_shutdown(&self) {
+        self.live.lock().unwrap().take();
+        self.events.lock().unwrap().clear();
+        self.fallback.server_shutdown();
     }
 
     fn server_log_on(&self, token: Option<&str>) {
-        match (self.live(), token) {
-            (Some(l), Some(token)) => l.server.log_on(token),
-            (Some(l), None) => l.server.log_on_anonymous(),
-            (None, _) => self.fallback.server_log_on(token),
-        }
+        let live = self.with(|l| match token {
+            Some(token) => l.server.log_on(token),
+            None => l.server.log_on_anonymous(),
+        });
+        live.unwrap_or_else(|| self.fallback.server_log_on(token))
     }
 
     fn server_log_off(&self) {
-        match self.live() {
-            // SAFETY: a live server pointer.
-            Some(l) => unsafe { sys::SteamAPI_ISteamGameServer_LogOff(l.raw()) },
-            None => self.fallback.server_log_off(),
-        }
+        // SAFETY: a live server pointer.
+        self.with(|l| unsafe { sys::SteamAPI_ISteamGameServer_LogOff(l.raw()) }).unwrap_or_else(|| self.fallback.server_log_off())
     }
 
     fn server_logged_on(&self) -> bool {
-        match self.live() {
-            // SAFETY: a live server pointer.
-            Some(l) => unsafe { sys::SteamAPI_ISteamGameServer_BLoggedOn(l.raw()) },
-            None => self.fallback.server_logged_on(),
-        }
+        // SAFETY: a live server pointer.
+        self.with(|l| unsafe { sys::SteamAPI_ISteamGameServer_BLoggedOn(l.raw()) }).unwrap_or_else(|| self.fallback.server_logged_on())
     }
 
     fn server_id(&self) -> SteamId {
-        match self.live() {
-            Some(l) => SteamId(l.server.steam_id().raw()),
-            None => self.fallback.server_id(),
-        }
+        self.with(|l| SteamId(l.server.steam_id().raw())).unwrap_or_else(|| self.fallback.server_id())
     }
 
     fn server_public_ip(&self) -> Option<String> {
         // SAFETY: a live server pointer.
-        self.live().and_then(|l| ip_string(unsafe { sys::SteamAPI_ISteamGameServer_GetPublicIP(l.raw()) }))
+        self.with(|l| ip_string(unsafe { sys::SteamAPI_ISteamGameServer_GetPublicIP(l.raw()) })).flatten()
     }
 
     fn server_info(&self, edit: &mut dyn FnMut(&mut ServerInfo)) {
         let mut info = self.info.lock().unwrap();
         let old = info.clone();
         edit(&mut info);
-        if let Some(l) = self.live() {
-            push_info(&l.server, Some(&old), &info);
-        }
+        self.with(|l| push_info(&l.server, Some(&old), &info));
     }
 
     fn begin_auth(&self, user: SteamId, ticket: &[u8]) -> BeginAuth {
-        match self.live() {
-            Some(l) => begin_result(l.server.begin_authentication_session(steamworks::SteamId::from_raw(user.0), ticket)),
-            None => self.fallback.begin_auth(user, ticket),
-        }
+        let id = steamworks::SteamId::from_raw(user.0);
+        self.with(|l| begin_result(l.server.begin_authentication_session(id, ticket)))
+            .unwrap_or_else(|| self.fallback.begin_auth(user, ticket))
     }
 
     fn end_auth(&self, user: SteamId) {
-        match self.live() {
-            Some(l) => l.server.end_authentication_session(steamworks::SteamId::from_raw(user.0)),
-            None => self.fallback.end_auth(user),
-        }
+        let id = steamworks::SteamId::from_raw(user.0);
+        self.with(|l| l.server.end_authentication_session(id)).unwrap_or_else(|| self.fallback.end_auth(user))
     }
 
     fn poll(&self) -> Vec<Event> {
-        match self.live() {
-            Some(l) => {
-                l.server.run_callbacks();
-                std::mem::take(&mut self.events.lock().unwrap())
-            }
+        // Callbacks push into `events` (its own lock), so running them under the live lock is fine.
+        match self.with(|l| l.server.run_callbacks()) {
+            Some(()) => std::mem::take(&mut self.events.lock().unwrap()),
             None => self.fallback.poll(),
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use steamworks::AuthSessionValidateError;
-
-    #[test]
-    fn maps_begin_auth_results() {
-        assert_eq!(begin_result(Ok(())), BeginAuth::Ok);
-        assert_eq!(begin_result(Err(AuthSessionError::DuplicateRequest)), BeginAuth::DuplicateRequest);
-        assert_eq!(begin_result(Err(AuthSessionError::ExpiredTicket)) as i64, 5);
-    }
-
-    #[test]
-    fn maps_auth_ticket_response() {
-        let r = |response| ValidateAuthTicketResponse {
-            steam_id: steamworks::SteamId::from_raw(1),
-            owner_steam_id: steamworks::SteamId::from_raw(2),
-            response,
-        };
-        let (user, owner) = (SteamId(1), SteamId(2));
-        assert_eq!(auth_event(&r(Ok(()))), Event::AuthResult { user, owner, ok: true });
-        let banned = auth_event(&r(Err(AuthSessionValidateError::VACBanned)));
-        assert_eq!(banned, Event::AuthResult { user, owner, ok: false });
-    }
-
-    #[test]
-    fn formats_public_ip() {
-        let v4 = |ip: u32| sys::SteamIPAddress_t {
-            __bindgen_anon_1: sys::SteamIPAddress_t__bindgen_ty_1 { m_unIPv4: ip },
-            m_eType: sys::ESteamIPType::k_ESteamIPTypeIPv4,
-        };
-        assert_eq!(ip_string(v4(0x7f00_0001)).as_deref(), Some("127.0.0.1"));
-        assert_eq!(ip_string(v4(0)), None);
-    }
-
-    #[test]
-    fn acts_offline_before_init() {
-        let p = Steam::default();
-        p.server_info(&mut |i| i.max_players = 8);
-        p.server_log_on(None);
-        assert!(p.server_logged_on());
-        assert_eq!(p.poll(), [Event::ServerConnected]);
-        assert_eq!(p.server_public_ip(), None);
-    }
-
-    #[test]
-    #[ignore = "calls the real SteamGameServer_Init; passes only where no Steam client is installed"]
-    fn falls_back_when_steam_init_fails() {
-        let p = Steam::default();
-        p.server_init(27015, 27016);
-        assert!(p.live().is_none());
-        p.server_log_on(None);
-        assert_eq!(p.poll(), [Event::ServerConnected]);
-    }
-}
+#[path = "steam_tests.rs"]
+mod tests;

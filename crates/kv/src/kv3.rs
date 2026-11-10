@@ -124,7 +124,7 @@ fn binary(c: &mut Cursor) -> Result<Value, Error> {
     c.expect("#[")?;
     let hex: String = c.take_until(|b| b == b']').split_whitespace().collect();
     c.expect("]")?;
-    if hex.len() % 2 != 0 {
+    if !hex.len().is_multiple_of(2) {
         return c.err("odd number of hex digits in binary blob");
     }
     let bytes = (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16));
@@ -132,6 +132,16 @@ fn binary(c: &mut Cursor) -> Result<Value, Error> {
         Ok(b) => Ok(Value::Binary(b)),
         Err(_) => c.err("bad hex digit in binary blob"),
     }
+}
+
+/// `"""` newline, text, newline `"""`: the newlines next to the quotes aren't part of the string.
+fn multiline(c: &mut Cursor) -> Result<String, Error> {
+    c.expect("\"\"\"")?;
+    let Some(text) = c.take_until_str("\"\"\"") else { return c.err("unterminated multi-line string") };
+    c.expect("\"\"\"")?;
+    let text = text.strip_prefix("\r\n").or_else(|| text.strip_prefix('\n')).unwrap_or(&text);
+    let text = text.strip_suffix("\r\n").or_else(|| text.strip_suffix('\n')).unwrap_or(text);
+    Ok(text.to_owned())
 }
 
 #[cfg(test)]
@@ -153,14 +163,4 @@ mod tests {
         assert_eq!(o.str("f"), Some("line ü"));
         assert_eq!(o.get("g"), Some(&Value::Binary(vec![0x0a, 0xff])));
     }
-}
-
-/// `"""` newline, text, newline `"""`: the newlines next to the quotes aren't part of the string.
-fn multiline(c: &mut Cursor) -> Result<String, Error> {
-    c.expect("\"\"\"")?;
-    let Some(text) = c.take_until_str("\"\"\"") else { return c.err("unterminated multi-line string") };
-    c.expect("\"\"\"")?;
-    let text = text.strip_prefix("\r\n").or_else(|| text.strip_prefix('\n')).unwrap_or(&text);
-    let text = text.strip_suffix("\r\n").or_else(|| text.strip_suffix('\n')).unwrap_or(text);
-    Ok(text.to_owned())
 }

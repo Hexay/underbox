@@ -30,11 +30,10 @@ pub fn emit(abi: &Abi, structs: &Structs) -> Result<Emitted, String> {
             markers.insert(names::type_name(&c.native));
         }
         for a in p.slot.args.iter().chain([&p.slot.ret]) {
-            if let Some(of) = &a.of {
-                if a.kind() == "DefinedClass" {
+            if let Some(of) = &a.of
+                && a.kind() == "DefinedClass" {
                     markers.insert(names::type_name(of));
                 }
-            }
             if let Some(h) = types::ptr_handle(&a.managed) {
                 handles.insert(names::type_name(h));
             }

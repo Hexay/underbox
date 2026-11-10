@@ -40,18 +40,43 @@ pub enum BeginAuth {
     ExpiredTicket = 5,
 }
 
+/// Steam's `EAuthSessionResponse`: the verdict on an auth ticket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub enum AuthResponse {
+    Ok = 0,
+    UserNotConnectedToSteam = 1,
+    NoLicenseOrExpired = 2,
+    VacBanned = 3,
+    LoggedInElsewhere = 4,
+    VacCheckTimedOut = 5,
+    TicketCanceled = 6,
+    TicketAlreadyUsed = 7,
+    TicketInvalid = 8,
+    PublisherIssuedBan = 9,
+    NetworkIdentityFailure = 10,
+}
+
+/// Steam's `EResult` as a raw code (1 is OK).
+pub type SteamResult = i32;
+
 /// Something the platform reports back asynchronously, drained by [`Platform::poll`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     ServerConnected,
+    ServerConnectFailure { result: SteamResult, retrying: bool },
+    ServersDisconnected { result: SteamResult },
     /// The verdict on a [`Platform::begin_auth`] ticket.
-    AuthResult { user: SteamId, owner: SteamId, ok: bool },
+    AuthResult { user: SteamId, owner: SteamId, response: AuthResponse },
 }
 
 pub trait Platform: Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn server_init(&self, port: u16, query_port: u16);
+    /// `version` is the game's, which Steam's server browser matches clients against.
+    fn server_init(&self, port: u16, query_port: u16, version: &str);
+    /// End the game-server session entirely; later calls behave as if never initialised.
+    fn server_shutdown(&self);
     /// Log the game server on: with a game-server token, or anonymously when `None`.
     fn server_log_on(&self, token: Option<&str>);
     fn server_log_off(&self);
