@@ -50,6 +50,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, system::DESTROY_WORLD, destroy);
     bind!(r, w::RELEASE, destroy);
     bind!(r, w::DELETE_ALL_OBJECTS, delete_all);
+    // Objects free as soon as they're deleted (see object_slots), so none wait for frame end.
+    bind!(r, w::DELETE_END_OF_FRAME_OBJECTS, |_| {});
     bind!(r, w::GET_SCENE_OBJECT_COUNT, |r| get(r).map_or(0, |w| w.objects.lock().unwrap().len() as i32));
     bind!(r, w::IS_EMPTY, |r| get(r).is_none_or(|w| w.objects.lock().unwrap().is_empty()));
     bind!(r, w::GET_WORLD_DEBUG_NAME, |r| StrRet::from(get(r).map(|w| w.name.clone())));

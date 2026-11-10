@@ -147,6 +147,14 @@ impl World {
         bounds.reduce(|(a, b), (c, d)| (a.min(c), b.max(d)))
     }
 
+    /// Shapes overlapping `probe` (in world space). Gotcha: the broad phase updates in `step`,
+    /// so shapes added or moved since the last step aren't seen yet.
+    pub fn overlapping(&self, probe: &Shape) -> Vec<ColliderHandle> {
+        let Some(probe) = probe.collider(Surface::default()).map(|b| b.build()) else { return Vec::new() };
+        let pipeline = self.inner.query_pipeline();
+        pipeline.intersect_shape(*probe.position(), probe.shape()).map(|(h, _)| h).collect()
+    }
+
     pub fn remove_shape(&mut self, id: ColliderHandle) {
         self.inner.remove_collider(id);
     }
@@ -179,6 +187,10 @@ mod tests {
         }
         let z = world.body(crate_).unwrap().translation().z;
         assert!((z - 26.0).abs() < 1.0, "resting height {z}, want ~26 (ground top 10 + half 16)");
+
+        let probe = |z| Shape::Sphere { center: Vector::new(0.0, 0.0, z), radius: 4.0 };
+        assert_eq!(world.overlapping(&probe(26.0)).len(), 1, "sphere inside the resting cube");
+        assert!(world.overlapping(&probe(1000.0)).is_empty());
     }
 
     #[test]
