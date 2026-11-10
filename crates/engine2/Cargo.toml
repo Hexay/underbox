@@ -13,3 +13,4 @@ abi = { path = "../abi" }
 assets = { path = "../assets" }
 objects = { path = "../objects" }
 physics = { path = "../physics" }
+platform = { path = "../platform" }

@@ -22,6 +22,10 @@ impl<C> NativeRef<C> {
         Self { ptr, _class: PhantomData }
     }
 
+    pub const fn null() -> Self {
+        Self::from_raw(std::ptr::null_mut())
+    }
+
     pub fn addr(self) -> usize {
         self.ptr as usize
     }

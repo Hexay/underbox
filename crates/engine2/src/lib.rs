@@ -15,6 +15,7 @@ pub mod physics;
 pub mod render;
 pub mod resource;
 mod resource_system;
+mod steam;
 pub mod scene;
 pub mod subsystems;
 
