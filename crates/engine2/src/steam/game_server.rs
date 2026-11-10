@@ -21,12 +21,12 @@ use platform::get as p;
 
 pub fn register(r: &mut Registry) {
     static SERVER: OnceLock<usize> = OnceLock::new();
-    bind!(r, global::STEAM_GAME_SERVER_INIT, |port, query, _version| p().server_init(port as u16, query as u16));
+    bind!(r, global::STEAM_GAME_SERVER_INIT, |port, query, version| p().server_init(port as u16, query as u16, &text(version)));
     bind!(r, global::STEAM_GAME_SERVER, || -> NativeRef<class::ISteamGameServer> { interface(&SERVER) });
     bind!(r, global::STEAM_GAME_SERVER_GET_STEAM_ID, || p().server_id().0);
     // Secure (VAC) means Steam vouches for the server; only a real Steam logon can.
     bind!(r, global::STEAM_GAME_SERVER_B_SECURE, || false);
-    bind!(r, global::STEAM_GAME_SERVER_SHUTDOWN, || p().server_log_off());
+    bind!(r, global::STEAM_GAME_SERVER_SHUTDOWN, || p().server_shutdown());
     bind!(r, global::STEAM_GAME_SERVER_RELEASE_CURRENT_THREAD_MEMORY, || {});
 
     bind!(r, gs::LOG_ON, |_, token| p().server_log_on(Some(&text(token))));
