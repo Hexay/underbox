@@ -31,11 +31,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/cache@v4
+      # Split restore/save: actions/cache saves only if the whole job passes; protobuf takes ~28 min.
+      - id: vcpkg-cache
+        uses: actions/cache/restore@v4
         with:
           path: C:\vcpkg\installed
           key: vcpkg-protobuf-x64-windows-static-md-v1
       - run: vcpkg install protobuf:x64-windows-static-md
+      - if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-protobuf-x64-windows-static-md-v1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
