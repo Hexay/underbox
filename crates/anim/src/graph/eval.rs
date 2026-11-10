@@ -60,6 +60,11 @@ impl Instance {
         states.get(m.current).map(|s| s.name.as_str())
     }
 
+    /// Forget every node's progress, as if just created (parameters are kept).
+    pub fn restart(&mut self) {
+        self.nodes.fill(NodeState::Idle);
+    }
+
     /// Advance by `dt` seconds and return the pose. `bind` is the skeleton's bind pose.
     pub fn update(&mut self, dt: f32, bind: &Pose) -> Pose {
         match self.def.root {

@@ -28,7 +28,8 @@ pub fn settle(r: Ref) {
 
 fn update(r: Ref, dt: f32) {
     settle(r);
-    with(r, |s| s.update(dt));
+    let character = object_xform(r);
+    with(r, |s| s.update(dt, character));
 }
 
 fn bone_by_name(r: Ref, name: Option<&CStr>) -> Option<usize> {

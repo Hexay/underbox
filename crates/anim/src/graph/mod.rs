@@ -3,9 +3,11 @@
 //! Value nodes compute bools/floats/IDs from parameters; pose nodes sample clips and combine them.
 
 mod eval;
+pub mod recording;
 mod value;
 
 pub use eval::Instance;
+pub use recording::Recording;
 
 use crate::params::{ParamDef, Value};
 use std::sync::Arc;
@@ -32,6 +34,17 @@ pub enum MathOp {
     Div,
     Min,
     Max,
+    /// Remainder with the sign of `a` (C `fmod`); 0 when `b` is 0.
+    Mod,
+    // The rest are unary: `b` is ignored.
+    Floor,
+    Ceil,
+    /// The integer part (toward zero).
+    Trunc,
+    /// `a - trunc(a)`.
+    Fract,
+    /// `1 - fract(a)`.
+    InvFract,
 }
 
 /// A node input that is either another value node or a constant.

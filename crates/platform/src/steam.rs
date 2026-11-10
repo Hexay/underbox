@@ -3,7 +3,8 @@
 //! an [`Offline`] fallback. Steam needs the app id from `steam_appid.txt` in the working directory or
 //! `SteamAppId` in the env, and `libsteam_api.so` on the loader path.
 
-use crate::{AuthResponse, BeginAuth, Event, Offline, Platform, ServerInfo, SteamId, SteamResult};
+use crate::steam_client::SteamClient;
+use crate::{AuthResponse, BeginAuth, Client, Event, Offline, Platform, ServerInfo, SteamId, SteamResult};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, Mutex, OnceLock};
 use steamworks::{
@@ -21,6 +22,7 @@ pub struct Steam {
     fallback: Offline,
     info: Mutex<ServerInfo>,
     events: Events,
+    client: OnceLock<Option<SteamClient>>,
 }
 
 struct Live {
@@ -212,6 +214,13 @@ impl Platform for Steam {
         match self.with(|l| l.server.run_callbacks()) {
             Some(()) => std::mem::take(&mut self.events.lock().unwrap()),
             None => self.fallback.poll(),
+        }
+    }
+
+    fn client(&self) -> &dyn Client {
+        match self.client.get_or_init(SteamClient::start) {
+            Some(c) => c,
+            None => self.fallback.client(),
         }
     }
 }

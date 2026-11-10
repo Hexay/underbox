@@ -2,6 +2,7 @@
 //! legacy AnimGraph1 (`.vanmgrph`, `IAnimationGraph`) of which we keep the parameter list.
 
 use super::data;
+use super::graph_builder::{self, snapshot};
 use super::values::{legacy_type, to_variant};
 use crate::resource::{self, ByName, Resource};
 use abi::slots::{c_anim_graph2_resource as g2, c_model as m, glue_resources as glue, i_anim_parameter as ip, i_anim_parameter_list as list, i_animation_graph as g1};
@@ -64,6 +65,11 @@ pub fn load2(name: &str) -> Ref2 {
     resource::new_handle(GRAPHS2.find_or_insert(name, || Graph2 { def: compile2(name) }))
 }
 
+/// An anonymous graph (from a builder or compiled bytes): never found by name.
+pub fn built(def: Definition) -> Ref2 {
+    resource::new_handle(Arc::new(Graph2 { def: Some(def.into_shared()) }))
+}
+
 pub fn definition(r: Ref2) -> Option<Arc<Definition>> {
     resource::resolve::<_, Graph2>(r)?.def.clone()
 }
@@ -113,10 +119,16 @@ fn bound(p: &ParamDef, v: f32) -> abi::structs::AnimVariant {
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::c_anim_graph2_resource, Graph2);
     bind!(r, glue::GET_ANIM_GRAPH2, |name| load2(&name.map(CStr::to_string_lossy).unwrap_or_default()));
-    // Facepunch's compiled graph definitions are their native's private format, and managed's
-    // GraphBuilder needs CGraphBuilder; both make error graphs until we can read them.
-    bind!(r, glue::CREATE_COMPILED_ANIM_GRAPH2, |_, _, _| Ref2::NULL);
-    bind!(r, glue::CREATE_BUILT_ANIM_GRAPH2, |_, _, _| Ref2::NULL);
+    bind!(r, glue::CREATE_COMPILED_ANIM_GRAPH2, |name, data, len| {
+        // SAFETY: managed passes its compiled bytes and their length for the call.
+        let bytes = unsafe { data.cast::<u8>().as_slice(len.max(0) as usize) };
+        // Facepunch's own compiled format is private to their native: no graph from it.
+        snapshot::decode(bytes).map_or(Ref2::NULL, |s| built(graph_builder::definition(&name.map(CStr::to_string_lossy).unwrap_or_default(), &s)))
+    });
+    bind!(r, glue::CREATE_BUILT_ANIM_GRAPH2, |name, b, root| {
+        let name = name.map(CStr::to_string_lossy).unwrap_or_default();
+        graph_builder::capture(b, root, "", "").map_or(Ref2::NULL, |s| built(graph_builder::definition(&name, &s)))
+    });
     bind!(r, m::GET_ANIMATION_GRAPH2, |model| data::of(model).graph2_name().map_or(Ref2::NULL, |n| load2(&n)));
     bind!(r, g2::GET_NUM_PARAMETERS, |g| definition(g).map_or(0, |d| d.params.len() as i32));
     bind!(r, g2::GET_PARAMETER_NAME, |g, i| StrRet::from(param2(g, i, |p| Some(p.name.clone()))));

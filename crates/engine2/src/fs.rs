@@ -17,6 +17,26 @@ struct Mounts {
     cloud: Vec<(String, PathBuf)>,
     /// (path ID, relative path) → real path, consulted first.
     links: HashMap<(String, String), String>,
+    /// `EngineGlue.AddSearchPath` roots (path ID, folder): ahead of everything, or behind the cloud.
+    front: Vec<(String, PathBuf)>,
+    back: Vec<(String, PathBuf)>,
+}
+
+/// Add a search root for `path_id`, ahead of the others when `front`.
+pub fn add_search_path(path_id: &str, path: &str, front: bool) {
+    let mut m = MOUNTS.write().unwrap();
+    let list = if front { &mut m.front } else { &mut m.back };
+    list.push((path_id.to_ascii_uppercase(), PathBuf::from(path)));
+}
+
+/// Drop a root [`add_search_path`] added; false if there was none.
+pub fn remove_search_path(path_id: &str, path: &str) -> bool {
+    let entry = (path_id.to_ascii_uppercase(), PathBuf::from(path));
+    let mut m = MOUNTS.write().unwrap();
+    let before = m.front.len() + m.back.len();
+    m.front.retain(|e| *e != entry);
+    m.back.retain(|e| *e != entry);
+    m.front.len() + m.back.len() < before
 }
 
 static MOUNTS: LazyLock<RwLock<Mounts>> = LazyLock::new(RwLock::default);
@@ -30,11 +50,13 @@ fn string(s: Option<&CStr>) -> String {
     s.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-/// The roots searched for a relative path, highest priority first: projects, cloud, core.
+/// The roots searched for a relative path, highest priority first: added-to-front, projects,
+/// cloud, added-to-back, core.
 pub fn search_roots() -> Vec<PathBuf> {
     let m = MOUNTS.read().unwrap();
     let core = Path::new(&crate::app::platform::game_root()).join("core");
-    m.projects.iter().rev().chain(m.cloud.iter()).map(|(_, p)| p.clone()).chain([core]).collect()
+    let ordered = m.front.iter().rev().chain(m.projects.iter().rev()).chain(m.cloud.iter()).chain(m.back.iter());
+    ordered.map(|(_, p)| p.clone()).chain([core]).collect()
 }
 
 /// The file a relative resource path names, if any root has it.

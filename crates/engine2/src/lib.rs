@@ -27,9 +27,15 @@ pub mod kv3;
 pub mod utl_buffer;
 pub mod frustum;
 pub mod bitmap;
+pub mod concommand;
 pub mod convar;
 pub mod resource_compiler;
 pub mod shader;
+mod engine_glue;
+pub mod input;
+mod video;
+mod world;
+mod xr;
 
 pub use igen::igen_engine;
 pub use interfaces::CreateInterface;

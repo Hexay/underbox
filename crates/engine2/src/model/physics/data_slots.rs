@@ -71,9 +71,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, pd::GET_JOINT_COUNT, |r| on(r, |d| d.joints.len() as i32));
     bind!(r, pd::GET_JOINT, |r, i| on(r, |d| d.joint_ref(idx(i))));
     bind!(r, pd::GET_SURFACE_PROPERTIES_COUNT, |r| on(r, |d| d.surfaces.len() as i32));
-    // TODO: surface objects need g_pPhysicsSystem's surface property controller; managed reads
-    // a null one as "default".
-    bind!(r, pd::GET_SURFACE_PROPERTIES, |_, _| NativeRef::NULL);
+    bind!(r, pd::GET_SURFACE_PROPERTIES, |r, i| {
+        on(r, |d| d.surfaces.get(idx(i)).map_or(NativeRef::NULL, |&s| crate::physics::surfaces::object(s)))
+    });
     bind!(r, pd::GET_COLLISION_ATTRIBUTE_COUNT, |r| on(r, |d| d.attributes.len() as i32));
     bind!(r, pd::GET_TAG_COUNT, |r, a| on(r, |d| d.attributes.get(idx(a)).map_or(0, |t| t.len() as i32)));
     bind!(r, pd::GET_TAG, |r, a, i| StrRet::from(on(r, |d| d.attributes.get(idx(a)).and_then(|t| t.get(idx(i)).cloned()))));

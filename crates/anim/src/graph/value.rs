@@ -23,7 +23,7 @@ pub fn compare(a: f32, cmp: Cmp, b: f32, epsilon: f32) -> bool {
     }
 }
 
-fn math(a: f32, b: f32, op: MathOp) -> f32 {
+pub(super) fn math(a: f32, b: f32, op: MathOp) -> f32 {
     match op {
         MathOp::Add => a + b,
         MathOp::Sub => a - b,
@@ -32,6 +32,13 @@ fn math(a: f32, b: f32, op: MathOp) -> f32 {
         MathOp::Div => a / b,
         MathOp::Min => a.min(b),
         MathOp::Max => a.max(b),
+        MathOp::Mod if b == 0.0 => 0.0,
+        MathOp::Mod => a % b,
+        MathOp::Floor => a.floor(),
+        MathOp::Ceil => a.ceil(),
+        MathOp::Trunc => a.trunc(),
+        MathOp::Fract => a - a.trunc(),
+        MathOp::InvFract => 1.0 - (a - a.trunc()),
     }
 }
 

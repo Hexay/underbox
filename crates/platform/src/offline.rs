@@ -1,12 +1,13 @@
 //! No platform services: the game server is "logged on" at once as an anonymous server, and every
 //! auth ticket is accepted (dev and LAN; anyone can claim any identity).
 
-use crate::{AuthResponse, BeginAuth, Event, Platform, ServerInfo, SteamId};
-use std::sync::Mutex;
+use crate::{AuthResponse, BeginAuth, Client, Event, OfflineClient, Platform, ServerInfo, SteamId};
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Default)]
 pub struct Offline {
     state: Mutex<State>,
+    client: OnceLock<OfflineClient>,
 }
 
 #[derive(Default)]
@@ -78,6 +79,10 @@ impl Platform for Offline {
 
     fn poll(&self) -> Vec<Event> {
         std::mem::take(&mut self.state().events)
+    }
+
+    fn client(&self) -> &dyn Client {
+        self.client.get_or_init(|| OfflineClient::new(OfflineClient::local_user()))
     }
 }
 

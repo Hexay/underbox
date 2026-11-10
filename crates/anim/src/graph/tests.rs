@@ -118,9 +118,47 @@ fn time_in_state_and_value_math() {
     let mut g = Instance::new(shared.clone(), clips);
     let values = value::Values { def: &shared, params: &g.params, ctx: Default::default() };
     assert_eq!((values.float(sum), values.float(remap), values.bool(is_swim)), (2.0, 15.0, true));
+    let unary = |op| value::math(-2.75, 0.0, op);
+    assert_eq!(
+        [MathOp::Floor, MathOp::Ceil, MathOp::Trunc, MathOp::Fract, MathOp::InvFract].map(unary),
+        [-3.0, -2.0, -2.0, -0.75, 1.75]
+    );
+    assert_eq!((value::math(-7.0, 3.0, MathOp::Mod), value::math(7.0, 0.0, MathOp::Mod)), (-1.0, 0.0));
     let bind = Pose::zero(1);
     g.update(0.2, &bind);
     assert_eq!(g.current_state(sm), Some("A"));
     g.update(0.1, &bind);
     assert_eq!(g.current_state(sm), Some("B"));
+}
+
+#[test]
+fn recording_replays_updates_with_their_parameters() {
+    use recording::{Seek, UpdateKind};
+    let mut def = Definition::default();
+    def.root = Some(locomotion(&mut def));
+    let mut g = Instance::new(def.into_shared(), clips);
+    let bind = Pose::zero(1);
+    let mut rec = Recording::default();
+    assert!(!rec.start_playback(), "nothing recorded yet");
+    rec.start();
+    let mut live = vec![];
+    for speed in [0.0, 50.0, 200.0] {
+        g.params.set_by_name("speed", Value::Float(speed));
+        live.push(x(&g.update(0.1, &bind)));
+        rec.record(0.1, &g.params, Xform::IDENTITY);
+    }
+    rec.stop();
+    assert_eq!((rec.len(), rec.get(0).map(|u| u.kind), rec.get(1).map(|u| u.kind)), (3, Some(UpdateKind::FullState), Some(UpdateKind::TimeStep)));
+    assert_eq!(rec.seek(1, &mut g, &bind).err(), Some(Seek::Failure), "seeking needs playback");
+    assert!(rec.start_playback());
+    for (i, want) in live.iter().enumerate() {
+        assert!((x(&rec.seek(i, &mut g, &bind).unwrap()) - want).abs() < 1e-4);
+        assert_eq!(rec.current_index(), Some(i));
+    }
+    assert_eq!(rec.seek(3, &mut g, &bind).err(), Some(Seek::Failure));
+    rec.clear();
+    assert!(rec.has_data(), "can't clear during playback");
+    rec.stop_playback();
+    rec.clear();
+    assert!(!rec.has_data());
 }
