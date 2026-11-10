@@ -1,0 +1,51 @@
+{
+  "__guid": "6b2e9d14-7a3f-4c51-b8e2-91d0c4a7f3e2",
+  "GameObjects": [
+    {
+      "__guid": "1f4a7c2e-8d3b-4e6f-a5c9-0b2d4e6f8a1c",
+      "Flags": 0,
+      "Name": "Network",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.NetworkHelper",
+          "__guid": "2e5b8d3f-9c4a-4f7e-b6d0-1c3e5f7a9b2d",
+          "PlayerPrefab": null,
+          "SpawnPoints": [],
+          "StartServer": true
+        }
+      ]
+    },
+    {
+      "__guid": "3a6c9e1b-4d7f-4a2c-8e5b-7f1a3c5e7b9d",
+      "Flags": 0,
+      "Name": "Match",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "MatchDirector",
+          "__guid": "4b7d0f2c-5e8a-4b3d-9f6c-8a2b4d6f8c0e",
+          "BotsPerTeam": 2,
+          "ScoreToWin": 3,
+          "TimeLimit": 30
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}
