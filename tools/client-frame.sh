@@ -3,17 +3,19 @@
 # plane), let it render GRACE s (default 6) past `game.load success`, and check that the last
 # presented frames settled on one hash and that it matches corpus/showroom/golden.tsv for this
 # adapter. The frame is written as $OUT/frame.png (OUT defaults to target/client-frame).
-# usage: [UNDERBOX_BLESS=1] tools/client-frame.sh [max-s=240] [sbox-public]
+# usage: [UNDERBOX_BLESS=1] [CORPUS=showroom] tools/client-frame.sh [max-s=240] [sbox-public]
+# CORPUS picks another corpus project with its own golden.tsv (mapworld: a loaded map).
 # UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
 # Don't wrap this in flock: boot-client.sh runs in this worktree's own game dir (docs/dev-loop.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
+CORPUS=${CORPUS:-showroom}
 OUT=${OUT:-$ROOT/target/client-frame}
-GOLDEN=$ROOT/corpus/showroom/golden.tsv
+GOLDEN=$ROOT/corpus/$CORPUS/golden.tsv
 SETTLE=5
 rm -rf "$OUT"; mkdir -p "$OUT/frames"
 OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL='game.load success' GRACE=${GRACE:-6} \
-    sh "$ROOT/tools/boot-client.sh" "${1:-240}" "${2:-}" -- -mcp +game "$ROOT/corpus/showroom/.sbproj" > "$OUT/boot.txt" 2>&1 || true
+    sh "$ROOT/tools/boot-client.sh" "${1:-240}" "${2:-}" -- -mcp +game "$ROOT/corpus/$CORPUS/.sbproj" > "$OUT/boot.txt" 2>&1 || true
 ADAPTER=$(grep -ohE 'render device: .*' "$OUT/client.out" | head -n 1 | sed 's/^render device: //')
 [ -n "$ADAPTER" ] || { tail -n 20 "$OUT/boot.txt"; echo "RESULT: FAIL (no render device)"; exit 1; }
 HASH=$(tail -n 1 "$OUT/frames.tsv" | cut -f2)
