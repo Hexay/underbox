@@ -62,11 +62,13 @@ pub struct ParamDef {
     pub max: f32,
     /// Enum option names (AnimGraph1) or expected IDs (AnimGraph2).
     pub options: Vec<String>,
+    /// Returns to its default after every update (AnimGraph1 triggers such as `b_jump`).
+    pub auto_reset: bool,
 }
 
 impl ParamDef {
     pub fn new(name: &str, default: Value) -> Self {
-        Self { name: name.to_owned(), default, min: 0.0, max: 0.0, options: Vec::new() }
+        Self { name: name.to_owned(), default, min: 0.0, max: 0.0, options: Vec::new(), auto_reset: false }
     }
 }
 
@@ -123,6 +125,13 @@ impl Params {
         let Some(d) = self.defs.get(i) else { return false };
         self.values[i] = d.default.clone();
         true
+    }
+
+    /// After an update: return auto-reset parameters to their defaults.
+    pub fn reset_auto(&mut self) {
+        for (v, d) in self.values.iter_mut().zip(self.defs.iter()).filter(|(_, d)| d.auto_reset) {
+            *v = d.default.clone();
+        }
     }
 
     pub fn reset_all(&mut self) {

@@ -69,6 +69,7 @@ impl Values<'_> {
                 let t = if span == 0.0 { 0.0 } else { ((self.float(*value) - from.0) / span).clamp(0.0, 1.0) };
                 Value::Float(to.0 + (to.1 - to.0) * t)
             }
+            ValueNode::Select { cond, yes, no } => Value::Float(self.operand(if self.bool(*cond) { *yes } else { *no })),
             ValueNode::TimeInState { cmp, seconds } => Value::Bool(compare(self.ctx.elapsed, *cmp, *seconds, 0.0)),
             ValueNode::StateCompleted => Value::Bool(self.ctx.completed),
         }

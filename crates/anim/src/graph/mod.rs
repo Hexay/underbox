@@ -54,6 +54,8 @@ pub enum ValueNode {
     FloatMath { a: ValueId, b: Operand, op: MathOp, abs: bool, negate: bool },
     FloatClamp { value: ValueId, min: f32, max: f32 },
     FloatRemap { value: ValueId, from: (f32, f32), to: (f32, f32) },
+    /// `yes` when `cond` holds, else `no`.
+    Select { cond: ValueId, yes: Operand, no: Operand },
     /// Seconds in the state whose transitions are being checked.
     TimeInState { cmp: Cmp, seconds: f32 },
     /// The state being left has finished playing.
