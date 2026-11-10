@@ -34,6 +34,8 @@ pub fn register(r: &mut Registry) {
     crate::shader::register(r);
     crate::video::register(r);
     crate::xr::register(r);
+    crate::world::register(r);
+    crate::engine_glue::register(r);
     // Last: fills only the field accessors no subsystem bound.
     abi::bind_fields(r);
 }

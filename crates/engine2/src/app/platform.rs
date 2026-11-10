@@ -62,7 +62,7 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, global::SOURCE_ENGINE_INIT, |_| true);
     // False asks managed's EngineLoop to quit. TODO: a client draws here (EngineLoop.OnClientOutput).
-    bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| true);
+    bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| !crate::engine_glue::exit_requested());
     bind!(r, global::SOURCE_ENGINE_SHUTDOWN, |_, _| SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::Relaxed));
 }
 
