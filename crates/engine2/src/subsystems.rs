@@ -14,6 +14,8 @@ pub fn register(r: &mut Registry) {
     crate::containers::register(r);
     crate::fs::register(r);
     crate::compiled::register(r);
+    crate::scene::register(r);
+    crate::physics::register(r);
     crate::audio::register(r);
 }
 

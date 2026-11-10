@@ -158,6 +158,30 @@ pub struct ManagedObject(pub u32);
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct StringToken(pub u32);
 
+impl StringToken {
+    /// The token managed's `StringToken.FindOrCreate` gives `s`: MurmurHash2 of the lowercased
+    /// ASCII text, seed 0x31415926 (Sandbox.System/Extend/StringExtensions.cs).
+    pub fn of(s: &str) -> Self {
+        const M: u32 = 0x5bd1_e995;
+        let bytes = s.to_ascii_lowercase().into_bytes();
+        let mut h = 0x3141_5926 ^ bytes.len() as u32;
+        let mut chunks = bytes.chunks_exact(4);
+        for c in &mut chunks {
+            let mut k = u32::from_le_bytes(c.try_into().unwrap()).wrapping_mul(M);
+            k ^= k >> 24;
+            h = h.wrapping_mul(M) ^ k.wrapping_mul(M);
+        }
+        let tail = chunks.remainder();
+        if !tail.is_empty() {
+            h ^= tail.iter().enumerate().fold(0, |acc, (i, &b)| acc | (b as u32) << (8 * i));
+            h = h.wrapping_mul(M);
+        }
+        h ^= h >> 13;
+        h = h.wrapping_mul(M);
+        Self(h ^ (h >> 15))
+    }
+}
+
 /// `System.Guid` / native `UniqueId_t`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -169,4 +193,17 @@ pub struct Guid(pub [u8; 16]);
 /// `p` is null or a NUL-terminated string that outlives `'a`.
 pub unsafe fn cstr_arg<'a>(p: *const c_char) -> Option<&'a CStr> {
     if p.is_null() { None } else { Some(unsafe { CStr::from_ptr(p) }) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StringToken;
+
+    #[test]
+    fn string_tokens_match_managed() {
+        // Values printed by managed's own MurmurHash2(str, lowercase: true).
+        for (s, token) in [("SceneWorld", 315896052), ("PhysicsWorld", 1583043591), ("a", 516911585), ("abcde", 2641694584), ("", 3050872623)] {
+            assert_eq!(StringToken::of(s).0, token, "{s:?}");
+        }
+    }
 }
