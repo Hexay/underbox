@@ -29,7 +29,7 @@ pub struct Light {
     pub rotation: Quat,
     pub color: Vec3,
     pub radius: f32,
-    pub linear: f32,
+    /// Native's raw quadratic attenuation (managed's `QuadraticAttenuation` / 10000).
     pub quadratic: f32,
     /// Spot cone half-angles (inner, outer) in degrees.
     pub cone: Option<(f32, f32)>,
@@ -59,7 +59,7 @@ impl Lighting {
     pub fn fallback() -> Lighting {
         let toward = Vec3::new(0.4, 0.3, 0.85).normalize();
         let rotation = Quat::from_rotation_arc(Vec3::X, -toward);
-        let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, linear: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false };
+        let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false };
         Lighting { ambient: Vec4::new(0.3, 0.3, 0.3, 1.0), sun: Some(sun), ..Default::default() }
     }
 
@@ -102,7 +102,6 @@ fn from_scene(l: &light::Light, position: Vec3) -> Light {
         rotation,
         color: Vec3::new(c.x, c.y, c.z),
         radius: l.radius,
-        linear: l.linear_attn,
         quadratic: l.quadratic_attn,
         cone: (kind == kind::SPOT).then_some((l.theta, l.phi)),
         fog: l.fog_strength,

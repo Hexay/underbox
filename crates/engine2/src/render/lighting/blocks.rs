@@ -3,9 +3,10 @@
 //! (Shadows/DirectionalLightShadow.hlsl) and the clustered-culling inputs
 //! (common/classes/ClusterCulling.hlsl). There is no culling: every light sits in one cluster.
 //!
-//! Distance falloff is our own packing (native's isn't public): distances are taken relative to
-//! the radius (`LinearFalloff = l / r`, `QuadraticFalloff = q / r²`) and `FalloffBias` is the
-//! curve's value at the radius, so `saturate(1 / (l·d + q·d²) - bias)` reaches 0 there.
+//! Distance falloff is packed as `CLightBinnerStandard::AddLight` does (managed's mirror:
+//! `LightBinnerFeature.Pack`): no linear term, the raw quadratic attenuation over world units, and
+//! `FalloffBias = 1 / (r²·q)` so `saturate(1 / (q·d²) - bias)` reaches 0 at the radius. Map lights
+//! carry Hammer's colour × 10000 with q = 1, so 1 at 100 units; components carry q = 1e-4.
 
 use super::{Light, Lighting, shadow};
 use crate::render::shading::layout::{Block, Value};
@@ -32,10 +33,8 @@ impl Light {
 
     /// (linear, quadratic, bias) for `CalculateDistanceFalloff`; see the module docs.
     fn falloff(&self) -> (f32, f32, f32) {
-        let r = self.radius.max(1e-3);
-        let total = self.linear + self.quadratic;
-        let bias = if total > 0.0 { 1.0 / total } else { 0.0 };
-        (self.linear / r, self.quadratic / (r * r), bias)
+        let q = self.quadratic;
+        (0.0, q, 1.0 / (f32::EPSILON + self.radius * self.radius * q))
     }
 
     /// `SpotLightInnerOuterConeCosines`; a point light's never rejects and saturates to 1.
@@ -125,16 +124,34 @@ mod tests {
     use crate::render::lighting::kind;
     use glam::{Quat, Vec3};
 
+    /// A `PointLight` component's light: `Attenuation` 1 reaches native as 1e-4.
     fn point(radius: f32) -> Light {
-        Light { kind: kind::POINT, position: Vec3::new(1.0, 2.0, 3.0), rotation: Quat::IDENTITY, color: Vec3::ONE, radius, linear: 0.0, quadratic: 1.0, cone: None, fog: 1.0, shadows: false }
+        Light { kind: kind::POINT, position: Vec3::new(1.0, 2.0, 3.0), rotation: Quat::IDENTITY, color: Vec3::ONE, radius, quadratic: 1e-4, cone: None, fog: 1.0, shadows: false }
+    }
+
+    /// The stand-in's `saturate(1 / (l·d + q·d²) - bias)` at distance `d`.
+    fn falloff_at(light: &Light, d: f32) -> f32 {
+        let (l, q, bias) = light.falloff();
+        (1.0 / (l * d + q * d * d) - bias).clamp(0.0, 1.0)
     }
 
     #[test]
     fn falloff_reaches_zero_at_the_radius() {
-        let (l, q, bias) = point(200.0).falloff();
-        let at = |d: f32| (1.0 / (l * d + q * d * d) - bias).clamp(0.0, 1.0);
-        assert_eq!((at(10.0), at(200.0)), (1.0, 0.0));
-        assert!(at(180.0) > 0.0);
+        let l = point(200.0);
+        assert_eq!((falloff_at(&l, 10.0), falloff_at(&l, 200.0)), (1.0, 0.0));
+        assert!(falloff_at(&l, 180.0) > 0.0);
+    }
+
+    /// corpus/mapworld's `light_omni` (brightness 2, range 512, attenuation2 1): managed hands
+    /// native colour × brightness × 10000 and the raw quadratic 1, so 120 units under it the
+    /// light is about 1.4× its colour, not 10⁴× (the blown-out map frame).
+    #[test]
+    fn hammer_light_is_inverse_square_from_100_units() {
+        let lamp = Light { quadratic: 1.0, color: Vec3::splat(2.0 * 10000.0), ..point(512.0) };
+        let lit = |d: f32| lamp.color.x * falloff_at(&lamp, d);
+        assert!((lit(100.0) - 2.0).abs() < 0.2, "{}", lit(100.0));
+        assert!((1.2..1.4).contains(&lit(120.0)), "{}", lit(120.0));
+        assert!(lit(400.0) < 0.1 && lit(512.0) == 0.0);
     }
 
     #[test]
