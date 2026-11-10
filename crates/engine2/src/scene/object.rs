@@ -64,6 +64,8 @@ pub struct SceneObject {
     pub handle: Handle,
     pub attributes: attributes::Ref,
     pub state: Mutex<State>,
+    /// Lights' own state (light classes only).
+    pub light: Option<Mutex<super::light::Light>>,
 }
 
 impl Drop for SceneObject {
@@ -84,7 +86,13 @@ pub fn with<R: Default>(r: Ref, f: impl FnOnce(&mut State) -> R) -> R {
 /// Make an object of native class `C` in `world`, add it there, and register it with managed.
 /// `D` is the class the creating slot returns it as (a base of `C`, or `C`).
 pub fn create<C: NativeClass, D>(world: world::Ref, kind: Kind, state: State) -> HandleId<D> {
-    let object = Arc::new(SceneObject { kind, world, handle: Handle::default(), attributes: attributes::create(), state: Mutex::new(state) });
+    create_with::<C, D>(world, kind, state, None)
+}
+
+/// As [`create`], for a light.
+pub fn create_with<C: NativeClass, D>(world: world::Ref, kind: Kind, state: State, light: Option<super::light::Light>) -> HandleId<D> {
+    let light = light.map(Mutex::new);
+    let object = Arc::new(SceneObject { kind, world, handle: Handle::default(), attributes: attributes::create(), state: Mutex::new(state), light });
     let r: NativeRef<C> = objects::create_shared(object.clone());
     if let Some(w) = world::get(world) {
         w.objects.lock().unwrap().push(r.addr());

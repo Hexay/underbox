@@ -7,6 +7,10 @@ pub enum Shape {
     Sphere { center: Vector, radius: f32 },
     Capsule { a: Vector, b: Vector, radius: f32 },
     Box { center: Vector, rotation: Rotation, half_extents: Vector },
+    /// Along Z, centred on the origin.
+    Cylinder { half_height: f32, radius: f32 },
+    /// Along Z, centred on the origin, `radius` at the base (-Z), apex at +Z.
+    Cone { half_height: f32, radius: f32 },
     Hull { pose: Pose, points: Vec<Vector> },
     Mesh { vertices: Vec<Vector>, triangles: Vec<[u32; 3]> },
 }
@@ -25,6 +29,10 @@ impl Default for Surface {
     }
 }
 
+fn y_to_z() -> Pose {
+    Pose::from_parts(Vector::ZERO, Rotation::from_rotation_x(std::f32::consts::FRAC_PI_2))
+}
+
 impl Shape {
     /// The collider for this shape; `None` for a degenerate hull or mesh.
     pub(crate) fn collider(&self, surface: Surface) -> Option<ColliderBuilder> {
@@ -34,6 +42,9 @@ impl Shape {
             Shape::Box { center, rotation, half_extents: h } => {
                 ColliderBuilder::cuboid(h.x, h.y, h.z).position(Pose::from_parts(*center, *rotation))
             }
+            // Rapier's cylinders and cones run along Y; s&box's along Z.
+            Shape::Cylinder { half_height, radius } => ColliderBuilder::cylinder(*half_height, *radius).position(y_to_z()),
+            Shape::Cone { half_height, radius } => ColliderBuilder::cone(*half_height, *radius).position(y_to_z()),
             Shape::Hull { pose, points } => ColliderBuilder::convex_hull(points)?.position(*pose),
             Shape::Mesh { vertices, triangles } => {
                 ColliderBuilder::new(SharedShape::trimesh(vertices.clone(), triangles.clone()).ok()?)

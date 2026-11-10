@@ -61,6 +61,13 @@ impl Registry {
         self.owners[slot.index] = Some(owner);
     }
 
+    /// As [`Registry::bind`], unless something already answers `slot` (generated defaults).
+    pub fn bind_default<F: Copy + 'static>(&mut self, slot: Slot<F>, f: F, owner: &'static str) {
+        if self.owners[slot.index].is_none() {
+            self.bind(slot, f, owner);
+        }
+    }
+
     /// Publish every binding. An inherited slot left unbound takes its declaring class's binding:
     /// its safe signature differs only in `NativeRef`'s marker type, which is layout-identical.
     pub fn install(mut self) {

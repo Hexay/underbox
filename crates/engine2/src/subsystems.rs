@@ -18,6 +18,8 @@ pub fn register(r: &mut Registry) {
     crate::scene::register(r);
     crate::physics::register(r);
     crate::audio::register(r);
+    // Last: fills only the field accessors no subsystem bound.
+    abi::bind_fields(r);
 }
 
 /// Slot 0: managed reports an interop failure (a binding it couldn't make).

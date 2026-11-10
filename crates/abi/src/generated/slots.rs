@@ -18325,6 +18325,5257 @@ pub fn bind_casts(r: &mut crate::Registry) {
     );
 }
 
+/// Bind every field accessor no subsystem bound to the per-object field store.
+pub fn bind_fields(r: &mut crate::Registry) {
+    use crate::rt::fields::{get, get_str, set, set_str};
+    r.bind_default(
+        c_aim_ik_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 6>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_aim_ik_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 6>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_aim_ik_node_definition::GET_M_TARGET_NODE_IDX,
+        get::<i16, 8>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_aim_ik_node_definition::SET_M_TARGET_NODE_IDX,
+        set::<i16, 8>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::GET_M_DATA_SLOT_IDX,
+        get::<i16, 133>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::SET_M_DATA_SLOT_IDX,
+        set::<i16, 133>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::GET_M_POSE_TIME_VALUE_NODE_IDX,
+        get::<i16, 135>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::SET_M_POSE_TIME_VALUE_NODE_IDX,
+        set::<i16, 135>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::GET_M_USE_FRAMES_AS_INPUT,
+        get::<bool, 137>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::SET_M_USE_FRAMES_AS_INPUT,
+        set::<bool, 137>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::GET_M_USER_SPECIFIED_TIME,
+        get::<f32, 139>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_animation_pose_node_definition::SET_M_USER_SPECIFIED_TIME,
+        set::<f32, 139>,
+        "abi::fields",
+    );
+    r.bind_default(c_attachment::GET_M_NAME, get_str::<144>, "abi::fields");
+    r.bind_default(c_attachment::SET_M_NAME, set_str::<144>, "abi::fields");
+    r.bind_default(
+        c_attachment::GET_M_N_INFLUENCES,
+        get::<u8, 146>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_attachment::SET_M_N_INFLUENCES,
+        set::<u8, 146>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_attachment::GET_M_B_IGNORE_ROTATION,
+        get::<bool, 148>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_attachment::SET_M_B_IGNORE_ROTATION,
+        set::<bool, 148>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend1_d_node_definition::GET_M_ALLOW_LOOPING,
+        get::<bool, 205>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend1_d_node_definition::SET_M_ALLOW_LOOPING,
+        set::<bool, 205>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend1_d_node_definition::GET_M_PARAMETER_VALUE_NODE_IDX,
+        get::<i16, 207>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend1_d_node_definition::SET_M_PARAMETER_VALUE_NODE_IDX,
+        set::<i16, 207>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend2_d_node_definition::GET_M_ALLOW_LOOPING,
+        get::<bool, 216>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend2_d_node_definition::SET_M_ALLOW_LOOPING,
+        set::<bool, 216>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend2_d_node_definition::GET_M_INPUT_PARAMETER_NODE_IDX0,
+        get::<i16, 218>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend2_d_node_definition::SET_M_INPUT_PARAMETER_NODE_IDX0,
+        set::<i16, 218>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend2_d_node_definition::GET_M_INPUT_PARAMETER_NODE_IDX1,
+        get::<i16, 220>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_blend2_d_node_definition::SET_M_INPUT_PARAMETER_NODE_IDX1,
+        set::<i16, 220>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_blend_node_definition::GET_M_BLEND_WEIGHT_VALUE_NODE_IDX,
+        get::<i16, 225>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_blend_node_definition::SET_M_BLEND_WEIGHT_VALUE_NODE_IDX,
+        set::<i16, 225>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_blend_node_definition::GET_M_SOURCE_MASK_NODE_IDX,
+        get::<i16, 227>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_blend_node_definition::SET_M_SOURCE_MASK_NODE_IDX,
+        set::<i16, 227>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_blend_node_definition::GET_M_TARGET_MASK_NODE_IDX,
+        get::<i16, 229>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_blend_node_definition::SET_M_TARGET_MASK_NODE_IDX,
+        set::<i16, 229>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::GET_M_BLEND_TIME,
+        get::<f32, 240>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::SET_M_BLEND_TIME,
+        set::<f32, 240>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::GET_M_DEFAULT_MASK_NODE_IDX,
+        get::<i16, 242>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::SET_M_DEFAULT_MASK_NODE_IDX,
+        set::<i16, 242>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::GET_M_PARAMETER_VALUE_NODE_IDX,
+        get::<i16, 244>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::SET_M_PARAMETER_VALUE_NODE_IDX,
+        set::<i16, 244>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::GET_M_SWITCH_DYNAMICALLY,
+        get::<bool, 246>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_selector_node_definition::SET_M_SWITCH_DYNAMICALLY,
+        set::<bool, 246>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::GET_M_BLEND_TIME,
+        get::<f32, 251>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::SET_M_BLEND_TIME,
+        set::<f32, 251>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::GET_M_FALSE_MASK_NODE_IDX,
+        get::<i16, 253>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::SET_M_FALSE_MASK_NODE_IDX,
+        set::<i16, 253>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::GET_M_SWITCH_DYNAMICALLY,
+        get::<bool, 255>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::SET_M_SWITCH_DYNAMICALLY,
+        set::<bool, 255>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::GET_M_SWITCH_VALUE_NODE_IDX,
+        get::<i16, 257>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::SET_M_SWITCH_VALUE_NODE_IDX,
+        set::<i16, 257>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::GET_M_TRUE_MASK_NODE_IDX,
+        get::<i16, 259>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_bone_mask_switch_node_definition::SET_M_TRUE_MASK_NODE_IDX,
+        set::<i16, 259>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_bool_node_definition::GET_M_CACHE_ON_INIT,
+        get::<bool, 272>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_bool_node_definition::SET_M_CACHE_ON_INIT,
+        set::<bool, 272>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_bool_node_definition::GET_M_SOURCE_NODE_IDX,
+        get::<i16, 274>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_bool_node_definition::SET_M_SOURCE_NODE_IDX,
+        set::<i16, 274>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_float_node_definition::GET_M_CACHE_ON_INIT,
+        get::<bool, 279>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_float_node_definition::SET_M_CACHE_ON_INIT,
+        set::<bool, 279>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_float_node_definition::GET_M_SOURCE_NODE_IDX,
+        get::<i16, 281>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_float_node_definition::SET_M_SOURCE_NODE_IDX,
+        set::<i16, 281>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_id_node_definition::GET_M_CACHE_ON_INIT,
+        get::<bool, 286>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_id_node_definition::SET_M_CACHE_ON_INIT,
+        set::<bool, 286>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_id_node_definition::GET_M_SOURCE_NODE_IDX,
+        get::<i16, 288>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_id_node_definition::SET_M_SOURCE_NODE_IDX,
+        set::<i16, 288>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_target_node_definition::GET_M_CACHE_ON_INIT,
+        get::<bool, 293>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_target_node_definition::SET_M_CACHE_ON_INIT,
+        set::<bool, 293>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_target_node_definition::GET_M_SOURCE_NODE_IDX,
+        get::<i16, 295>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_target_node_definition::SET_M_SOURCE_NODE_IDX,
+        set::<i16, 295>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_vector_node_definition::GET_M_CACHE_ON_INIT,
+        get::<bool, 300>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_vector_node_definition::SET_M_CACHE_ON_INIT,
+        set::<bool, 300>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_vector_node_definition::GET_M_SOURCE_NODE_IDX,
+        get::<i16, 302>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_cached_vector_node_definition::SET_M_SOURCE_NODE_IDX,
+        set::<i16, 302>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_RENDERED_PROJECTION_TO_VIEW,
+        get::<Matrix, 321>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_RENDERED_PROJECTION_TO_VIEW,
+        set::<Matrix, 321>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_RENDERED_VIEWPORT,
+        get::<Vector4, 323>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_RENDERED_VIEWPORT,
+        set::<Vector4, 323>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_RENDERED_DEPTH_RANGE,
+        get::<Vector4, 325>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_RENDERED_DEPTH_RANGE,
+        set::<Vector4, 325>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_VIEW_UNIQUE_ID,
+        get::<i32, 327>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_VIEW_UNIQUE_ID,
+        set::<i32, 327>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_CAMERA_POSITION,
+        get::<Vector3, 329>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_CAMERA_POSITION,
+        set::<Vector3, 329>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_CAMERA_ROTATION,
+        get::<Angles, 331>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_CAMERA_ROTATION,
+        set::<Angles, 331>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_FIELD_OF_VIEW,
+        get::<f32, 333>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_FIELD_OF_VIEW,
+        set::<f32, 333>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_Z_NEAR,
+        get::<f32, 335>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_Z_NEAR,
+        set::<f32, 335>,
+        "abi::fields",
+    );
+    r.bind_default(c_camera_renderer::GET_Z_FAR, get::<f32, 337>, "abi::fields");
+    r.bind_default(c_camera_renderer::SET_Z_FAR, set::<f32, 337>, "abi::fields");
+    r.bind_default(
+        c_camera_renderer::GET_RECT,
+        get::<NativeRect, 339>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_RECT,
+        set::<NativeRect, 339>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_VIEWPORT,
+        get::<Vector4, 341>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_VIEWPORT,
+        set::<Vector4, 341>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_CLIP_SPACE_BOUNDS,
+        get::<Vector4, 343>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_CLIP_SPACE_BOUNDS,
+        set::<Vector4, 343>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_ENABLE_POSTPROCESSING,
+        get::<bool, 345>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_ENABLE_POSTPROCESSING,
+        set::<bool, 345>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_ENABLE_ENGINE_OVERLAYS,
+        get::<bool, 347>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_ENABLE_ENGINE_OVERLAYS,
+        set::<bool, 347>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_ENABLE_UI,
+        get::<bool, 349>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_ENABLE_UI,
+        set::<bool, 349>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_UI_ONLY,
+        get::<bool, 351>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_UI_ONLY,
+        set::<bool, 351>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_ORTHO,
+        get::<bool, 353>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_ORTHO,
+        set::<bool, 353>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_ORTHO_SIZE,
+        get::<f32, 355>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_ORTHO_SIZE,
+        set::<f32, 355>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_NEED_TONEMAP_RENDERER,
+        get::<bool, 357>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_NEED_TONEMAP_RENDERER,
+        set::<bool, 357>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_SCENE_VIEW_FLAGS,
+        get::<i64, 359>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_SCENE_VIEW_FLAGS,
+        set::<i64, 359>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_IS_RENDERING_STEREO,
+        get::<bool, 361>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_IS_RENDERING_STEREO,
+        set::<bool, 361>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_MIDDLE_EYE_POSITION,
+        get::<Vector3, 363>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_MIDDLE_EYE_POSITION,
+        set::<Vector3, 363>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_MIDDLE_EYE_ROTATION,
+        get::<Angles, 365>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_MIDDLE_EYE_ROTATION,
+        set::<Angles, 365>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_OVERRIDE_PROJECTION,
+        get::<Matrix, 367>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_OVERRIDE_PROJECTION,
+        set::<Matrix, 367>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_HAS_OVERRIDE_PROJECTION,
+        get::<bool, 369>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_HAS_OVERRIDE_PROJECTION,
+        set::<bool, 369>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_FLIP_X,
+        get::<bool, 371>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_FLIP_X,
+        set::<bool, 371>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::GET_FLIP_Y,
+        get::<bool, 373>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_camera_renderer::SET_FLIP_Y,
+        set::<bool, 373>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_ALLOW_LOOPING,
+        get::<bool, 379>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_ALLOW_LOOPING,
+        set::<bool, 379>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_DATA_SLOT_IDX,
+        get::<i16, 381>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_DATA_SLOT_IDX,
+        set::<i16, 381>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_PLAY_IN_REVERSE_VALUE_NODE_IDX,
+        get::<i16, 383>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_PLAY_IN_REVERSE_VALUE_NODE_IDX,
+        set::<i16, 383>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_RESET_TIME_VALUE_NODE_IDX,
+        get::<i16, 385>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_RESET_TIME_VALUE_NODE_IDX,
+        set::<i16, 385>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_SAMPLE_ROOT_MOTION,
+        get::<bool, 387>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_SAMPLE_ROOT_MOTION,
+        set::<bool, 387>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_SPEED_MULTIPLIER,
+        get::<f32, 389>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_SPEED_MULTIPLIER,
+        set::<f32, 389>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::GET_M_START_SYNC_EVENT_OFFSET,
+        get::<i32, 391>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_clip_node_definition::SET_M_START_SYNC_EVENT_OFFSET,
+        set::<i32, 391>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_bool_node_definition::GET_M_VALUE,
+        get::<bool, 401>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_bool_node_definition::SET_M_VALUE,
+        set::<bool, 401>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_float_node_definition::GET_M_VALUE,
+        get::<f32, 406>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_float_node_definition::SET_M_VALUE,
+        set::<f32, 406>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::GET_M_IS_BONE_TARGET,
+        get::<bool, 416>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::SET_M_IS_BONE_TARGET,
+        set::<bool, 416>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::GET_M_IS_SET,
+        get::<bool, 418>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::SET_M_IS_SET,
+        set::<bool, 418>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::GET_M_ROTATION,
+        get::<Rotation, 420>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::SET_M_ROTATION,
+        set::<Rotation, 420>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::GET_M_TRANSLATION,
+        get::<Vector3, 422>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_target_node_definition::SET_M_TRANSLATION,
+        set::<Vector3, 422>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_vector_node_definition::GET_M_VALUE,
+        get::<Vector3, 427>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_const_vector_node_definition::SET_M_VALUE,
+        set::<Vector3, 427>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_control_parameter_bool_node_definition::GET_M_DEFAULT_VALUE,
+        get::<bool, 432>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_control_parameter_bool_node_definition::SET_M_DEFAULT_VALUE,
+        set::<bool, 432>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_control_parameter_float_node_definition::GET_M_DEFAULT_VALUE,
+        get::<f32, 437>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_control_parameter_float_node_definition::SET_M_DEFAULT_VALUE,
+        set::<f32, 437>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_control_parameter_vector_node_definition::GET_M_DEFAULT_VALUE,
+        get::<Vector3, 449>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_control_parameter_vector_node_definition::SET_M_DEFAULT_VALUE,
+        set::<Vector3, 449>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_current_sync_event_id_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 454>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_current_sync_event_id_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 454>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_current_sync_event_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 460>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_current_sync_event_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 460>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_H_COLOR,
+        get::<NativeRef<class::CTextureBase>, 526>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_H_COLOR,
+        set::<NativeRef<class::CTextureBase>, 526>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_H_NORMAL,
+        get::<NativeRef<class::CTextureBase>, 528>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_H_NORMAL,
+        set::<NativeRef<class::CTextureBase>, 528>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_H_RMO,
+        get::<NativeRef<class::CTextureBase>, 530>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_H_RMO,
+        set::<NativeRef<class::CTextureBase>, 530>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_N_SORT_ORDER,
+        get::<u32, 532>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_N_SORT_ORDER,
+        set::<u32, 532>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_N_EXCLUSION_BIT_MASK,
+        get::<u32, 534>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_N_EXCLUSION_BIT_MASK,
+        set::<u32, 534>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_V_COLOR_TINT,
+        get::<Vector4, 536>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_V_COLOR_TINT,
+        set::<Vector4, 536>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_FL_ATTENUATION_ANGLE,
+        get::<f32, 538>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_FL_ATTENUATION_ANGLE,
+        set::<f32, 538>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_FL_COLOR_MIX,
+        get::<f32, 540>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_FL_COLOR_MIX,
+        set::<f32, 540>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_H_EMISSION,
+        get::<NativeRef<class::CTextureBase>, 542>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_H_EMISSION,
+        set::<NativeRef<class::CTextureBase>, 542>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_FL_EMISSION_ENERGY,
+        get::<f32, 544>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_FL_EMISSION_ENERGY,
+        set::<f32, 544>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_N_SEQUENCE_INDEX,
+        get::<u32, 546>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_N_SEQUENCE_INDEX,
+        set::<u32, 546>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_H_HEIGHT,
+        get::<NativeRef<class::CTextureBase>, 548>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_H_HEIGHT,
+        set::<NativeRef<class::CTextureBase>, 548>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_FL_PARALLAX_STRENGTH,
+        get::<f32, 550>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_FL_PARALLAX_STRENGTH,
+        set::<f32, 550>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_N_SAMPLER_INDEX,
+        get::<i32, 552>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_N_SAMPLER_INDEX,
+        set::<i32, 552>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_FL_COVERAGE_AMOUNT,
+        get::<f32, 554>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_FL_COVERAGE_AMOUNT,
+        set::<f32, 554>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::GET_M_FL_COVERAGE_RANGE,
+        get::<f32, 556>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_decal_scene_object::SET_M_FL_COVERAGE_RANGE,
+        set::<f32, 556>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_duration_scale_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 564>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_duration_scale_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 564>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_duration_scale_node_definition::GET_M_DEFAULT_INPUT_VALUE,
+        get::<f32, 566>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_duration_scale_node_definition::SET_M_DEFAULT_INPUT_VALUE,
+        set::<f32, 566>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_duration_scale_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_duration_scale_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_dynamic_scene_object::GET_MATERIAL,
+        get::<NativeRef<class::IMaterial2>, 640>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_dynamic_scene_object::SET_MATERIAL,
+        set::<NativeRef<class::IMaterial2>, 640>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_N_PROJECTION_MODE,
+        get::<i64, 711>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_N_PROJECTION_MODE,
+        set::<i64, 711>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_V_BOX_PROJECT_MINS,
+        get::<Vector3, 713>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_V_BOX_PROJECT_MINS,
+        set::<Vector3, 713>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_V_BOX_PROJECT_MAXS,
+        get::<Vector3, 715>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_V_BOX_PROJECT_MAXS,
+        set::<Vector3, 715>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_V_COLOR,
+        get::<Vector3, 717>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_V_COLOR,
+        set::<Vector3, 717>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_N_RENDER_PRIORITY,
+        get::<i32, 719>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_N_RENDER_PRIORITY,
+        set::<i32, 719>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_H_ENV_MAP_TEXTURE,
+        get::<NativeRef<class::CTextureBase>, 721>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_H_ENV_MAP_TEXTURE,
+        set::<NativeRef<class::CTextureBase>, 721>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_V_NORMALIZATION_SH,
+        get::<Vector4, 723>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_V_NORMALIZATION_SH,
+        set::<Vector4, 723>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::GET_M_FL_FEATHERING,
+        get::<f32, 725>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_env_map_scene_object::SET_M_FL_FEATHERING,
+        set::<f32, 725>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_fixed_weight_bone_mask_node_definition::GET_M_BONE_WEIGHT,
+        get::<f32, 733>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_fixed_weight_bone_mask_node_definition::SET_M_BONE_WEIGHT,
+        set::<f32, 733>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_angle_math_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 739>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_angle_math_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 739>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_clamp_node_definition::GET_M_CLAMP_MAX,
+        get::<f32, 744>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_clamp_node_definition::SET_M_CLAMP_MAX,
+        set::<f32, 744>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_clamp_node_definition::GET_M_CLAMP_MIN,
+        get::<f32, 746>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_clamp_node_definition::SET_M_CLAMP_MIN,
+        set::<f32, 746>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_clamp_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 748>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_clamp_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 748>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::GET_M_COMPARAND_VALUE_NODE_IDX,
+        get::<i16, 754>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::SET_M_COMPARAND_VALUE_NODE_IDX,
+        set::<i16, 754>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::GET_M_COMPARISON_VALUE,
+        get::<f32, 756>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::SET_M_COMPARISON_VALUE,
+        set::<f32, 756>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::GET_M_EPSILON,
+        get::<f32, 758>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::SET_M_EPSILON,
+        set::<f32, 758>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 760>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_comparison_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 760>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_curve_event_node_definition::GET_M_DEFAULT_VALUE,
+        get::<f32, 767>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_curve_event_node_definition::SET_M_DEFAULT_VALUE,
+        set::<f32, 767>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_curve_event_node_definition::GET_M_DEFAULT_VALUE_NODE_IDX,
+        get::<i16, 769>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_curve_event_node_definition::SET_M_DEFAULT_VALUE_NODE_IDX,
+        set::<i16, 769>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_curve_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 775>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_curve_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 775>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::GET_M_EASE_TIME,
+        get::<f32, 781>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::SET_M_EASE_TIME,
+        set::<f32, 781>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 783>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 783>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::GET_M_START_VALUE,
+        get::<f32, 785>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::SET_M_START_VALUE,
+        set::<f32, 785>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::GET_M_USE_START_VALUE,
+        get::<bool, 787>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_ease_node_definition::SET_M_USE_START_VALUE,
+        set::<bool, 787>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::GET_M_INPUT_VALUE_NODE_IDX_A,
+        get::<i16, 793>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::SET_M_INPUT_VALUE_NODE_IDX_A,
+        set::<i16, 793>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::GET_M_INPUT_VALUE_NODE_IDX_B,
+        get::<i16, 795>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::SET_M_INPUT_VALUE_NODE_IDX_B,
+        set::<i16, 795>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::GET_M_RETURN_ABSOLUTE_RESULT,
+        get::<bool, 797>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::SET_M_RETURN_ABSOLUTE_RESULT,
+        set::<bool, 797>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::GET_M_RETURN_NEGATED_RESULT,
+        get::<bool, 799>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::SET_M_RETURN_NEGATED_RESULT,
+        set::<bool, 799>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::GET_M_VALUE_B,
+        get::<f32, 801>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_math_node_definition::SET_M_VALUE_B,
+        set::<f32, 801>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_random_node_definition::GET_M_MAX,
+        get::<f32, 806>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_random_node_definition::SET_M_MAX,
+        set::<f32, 806>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_random_node_definition::GET_M_MIN,
+        get::<f32, 808>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_random_node_definition::SET_M_MIN,
+        set::<f32, 808>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 813>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 813>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::GET_M_IS_INCLUSIVE_CHECK,
+        get::<bool, 815>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::SET_M_IS_INCLUSIVE_CHECK,
+        set::<bool, 815>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::GET_M_RANGE_MAX,
+        get::<f32, 817>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::SET_M_RANGE_MAX,
+        set::<f32, 817>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::GET_M_RANGE_MIN,
+        get::<f32, 819>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_range_comparison_node_definition::SET_M_RANGE_MIN,
+        set::<f32, 819>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::GET_M_INPUT_RANGE_MAX,
+        get::<f32, 824>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::SET_M_INPUT_RANGE_MAX,
+        set::<f32, 824>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::GET_M_INPUT_RANGE_MIN,
+        get::<f32, 826>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::SET_M_INPUT_RANGE_MIN,
+        set::<f32, 826>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 828>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 828>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::GET_M_OUTPUT_RANGE_MAX,
+        get::<f32, 830>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::SET_M_OUTPUT_RANGE_MAX,
+        set::<f32, 830>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::GET_M_OUTPUT_RANGE_MIN,
+        get::<f32, 832>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_remap_node_definition::SET_M_OUTPUT_RANGE_MIN,
+        set::<f32, 832>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_selector_node_definition::GET_M_DEFAULT_VALUE,
+        get::<f32, 840>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_selector_node_definition::SET_M_DEFAULT_VALUE,
+        set::<f32, 840>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_selector_node_definition::GET_M_EASE_TIME,
+        get::<f32, 842>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_selector_node_definition::SET_M_EASE_TIME,
+        set::<f32, 842>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::GET_M_DAMPING_RATIO,
+        get::<f32, 847>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::SET_M_DAMPING_RATIO,
+        set::<f32, 847>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::GET_M_HERTZ,
+        get::<f32, 849>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::SET_M_HERTZ,
+        set::<f32, 849>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 851>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 851>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::GET_M_START_VALUE,
+        get::<f32, 853>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::SET_M_START_VALUE,
+        set::<f32, 853>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::GET_M_USE_START_VALUE,
+        get::<bool, 855>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_spring_node_definition::SET_M_USE_START_VALUE,
+        set::<bool, 855>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::GET_M_FALSE_VALUE,
+        get::<f32, 860>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::SET_M_FALSE_VALUE,
+        set::<f32, 860>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::GET_M_FALSE_VALUE_NODE_IDX,
+        get::<i16, 862>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::SET_M_FALSE_VALUE_NODE_IDX,
+        set::<i16, 862>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::GET_M_SWITCH_VALUE_NODE_IDX,
+        get::<i16, 864>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::SET_M_SWITCH_VALUE_NODE_IDX,
+        set::<i16, 864>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::GET_M_TRUE_VALUE,
+        get::<f32, 866>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::SET_M_TRUE_VALUE,
+        set::<f32, 866>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::GET_M_TRUE_VALUE_NODE_IDX,
+        get::<i16, 868>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_float_switch_node_definition::SET_M_TRUE_VALUE_NODE_IDX,
+        set::<i16, 868>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_event_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 875>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_event_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 875>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::GET_M_BLEND_TIME,
+        get::<f32, 883>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::SET_M_BLEND_TIME,
+        set::<f32, 883>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 885>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 885>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::GET_M_ENABLE_NODE_IDX,
+        get::<i16, 887>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::SET_M_ENABLE_NODE_IDX,
+        set::<i16, 887>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::GET_M_IS_TARGET_IN_WORLD_SPACE,
+        get::<bool, 889>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::SET_M_IS_TARGET_IN_WORLD_SPACE,
+        set::<bool, 889>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::GET_M_LEFT_TARGET_NODE_IDX,
+        get::<i16, 891>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::SET_M_LEFT_TARGET_NODE_IDX,
+        set::<i16, 891>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::GET_M_RIGHT_TARGET_NODE_IDX,
+        get::<i16, 893>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_foot_ik_node_definition::SET_M_RIGHT_TARGET_NODE_IDX,
+        set::<i16, 893>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_footstep_event_id_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 899>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_footstep_event_id_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 899>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_footstep_event_percentage_through_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 906>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_footstep_event_percentage_through_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 906>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_graph_event_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 961>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_graph_event_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 961>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::GET_M_V_MIN_BOUNDS,
+        get::<Vector3, 964>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_V_MIN_BOUNDS,
+        set::<Vector3, 964>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::GET_M_V_MAX_BOUNDS,
+        get::<Vector3, 966>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_V_MAX_BOUNDS,
+        set::<Vector3, 966>,
+        "abi::fields",
+    );
+    r.bind_default(c_hit_box::GET_M_NAME, get_str::<968>, "abi::fields");
+    r.bind_default(c_hit_box::SET_M_NAME, set_str::<968>, "abi::fields");
+    r.bind_default(
+        c_hit_box::GET_M_S_SURFACE_PROPERTY,
+        get_str::<970>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_S_SURFACE_PROPERTY,
+        set_str::<970>,
+        "abi::fields",
+    );
+    r.bind_default(c_hit_box::GET_M_S_BONE_NAME, get_str::<972>, "abi::fields");
+    r.bind_default(c_hit_box::SET_M_S_BONE_NAME, set_str::<972>, "abi::fields");
+    r.bind_default(
+        c_hit_box::GET_M_FL_SHAPE_RADIUS,
+        get::<f32, 974>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_FL_SHAPE_RADIUS,
+        set::<f32, 974>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::GET_M_N_BONE_NAME_HASH,
+        get::<u32, 976>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_N_BONE_NAME_HASH,
+        set::<u32, 976>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::GET_M_C_RENDER_COLOR,
+        get::<Color32, 978>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_C_RENDER_COLOR,
+        set::<Color32, 978>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::GET_M_N_HIT_BOX_INDEX,
+        get::<u16, 980>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_N_HIT_BOX_INDEX,
+        set::<u16, 980>,
+        "abi::fields",
+    );
+    r.bind_default(c_hit_box::GET_M_N_SHAPE_TYPE, get::<u8, 982>, "abi::fields");
+    r.bind_default(c_hit_box::SET_M_N_SHAPE_TYPE, set::<u8, 982>, "abi::fields");
+    r.bind_default(
+        c_hit_box::GET_M_B_FORCED_TRANSFORM,
+        get::<bool, 984>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_B_FORCED_TRANSFORM,
+        set::<bool, 984>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::GET_M_B_TRANSLATION_ONLY,
+        get::<bool, 986>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box::SET_M_B_TRANSLATION_ONLY,
+        set::<bool, 986>,
+        "abi::fields",
+    );
+    r.bind_default(c_hit_box::GET_M_B_VISIBLE, get::<bool, 988>, "abi::fields");
+    r.bind_default(c_hit_box::SET_M_B_VISIBLE, set::<bool, 988>, "abi::fields");
+    r.bind_default(c_hit_box::GET_M_B_SELECTED, get::<bool, 990>, "abi::fields");
+    r.bind_default(c_hit_box::SET_M_B_SELECTED, set::<bool, 990>, "abi::fields");
+    r.bind_default(c_hit_box_set::GET_M_NAME, get_str::<994>, "abi::fields");
+    r.bind_default(c_hit_box_set::SET_M_NAME, set_str::<994>, "abi::fields");
+    r.bind_default(
+        c_hit_box_set::GET_M_SOURCE_FILENAME,
+        get_str::<996>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_hit_box_set::SET_M_SOURCE_FILENAME,
+        set_str::<996>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_clip_selector_node_definition::GET_M_FALLBACK_NODE_IDX,
+        get::<i16, 1003>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_clip_selector_node_definition::SET_M_FALLBACK_NODE_IDX,
+        set::<i16, 1003>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_clip_selector_node_definition::GET_M_IGNORE_INVALID_OPTIONS,
+        get::<bool, 1005>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_clip_selector_node_definition::SET_M_IGNORE_INVALID_OPTIONS,
+        set::<bool, 1005>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_clip_selector_node_definition::GET_M_PARAMETER_NODE_IDX,
+        get::<i16, 1007>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_clip_selector_node_definition::SET_M_PARAMETER_NODE_IDX,
+        set::<i16, 1007>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_selector_node_definition::GET_M_FALLBACK_NODE_IDX,
+        get::<i16, 1014>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_selector_node_definition::SET_M_FALLBACK_NODE_IDX,
+        set::<i16, 1014>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_selector_node_definition::GET_M_IGNORE_INVALID_OPTIONS,
+        get::<bool, 1016>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_selector_node_definition::SET_M_IGNORE_INVALID_OPTIONS,
+        set::<bool, 1016>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_selector_node_definition::GET_M_PARAMETER_NODE_IDX,
+        get::<i16, 1018>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_based_selector_node_definition::SET_M_PARAMETER_NODE_IDX,
+        set::<i16, 1018>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_comparison_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 1025>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_comparison_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 1025>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_event_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 1032>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_event_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 1032>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_event_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 1039>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_event_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 1039>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_event_percentage_through_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 1046>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_event_percentage_through_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 1046>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_switch_node_definition::GET_M_FALSE_VALUE_NODE_IDX,
+        get::<i16, 1059>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_switch_node_definition::SET_M_FALSE_VALUE_NODE_IDX,
+        set::<i16, 1059>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_switch_node_definition::GET_M_SWITCH_VALUE_NODE_IDX,
+        get::<i16, 1061>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_switch_node_definition::SET_M_SWITCH_VALUE_NODE_IDX,
+        set::<i16, 1061>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_switch_node_definition::GET_M_TRUE_VALUE_NODE_IDX,
+        get::<i16, 1063>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_switch_node_definition::SET_M_TRUE_VALUE_NODE_IDX,
+        set::<i16, 1063>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_to_float_node_definition::GET_M_DEFAULT_VALUE,
+        get::<f32, 1070>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_to_float_node_definition::SET_M_DEFAULT_VALUE,
+        set::<f32, 1070>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_to_float_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 1072>,
+        "abi::fields",
+    );
+    r.bind_default(
+        cid_to_float_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 1072>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_is_external_graph_slot_filled_node_definition::GET_M_EXTERNAL_GRAPH_NODE_IDX,
+        get::<i16, 1077>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_is_external_graph_slot_filled_node_definition::SET_M_EXTERNAL_GRAPH_NODE_IDX,
+        set::<i16, 1077>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_is_target_set_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 1082>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_is_target_set_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 1082>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_definition::GET_M_BASE_NODE_IDX,
+        get::<i16, 1088>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_definition::SET_M_BASE_NODE_IDX,
+        set::<i16, 1088>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_definition::GET_M_ONLY_SAMPLE_BASE_ROOT_MOTION,
+        get::<bool, 1090>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_definition::SET_M_ONLY_SAMPLE_BASE_ROOT_MOTION,
+        set::<bool, 1090>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_BONE_MASK_VALUE_NODE_IDX,
+        get::<i16, 1093>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_BONE_MASK_VALUE_NODE_IDX,
+        set::<i16, 1093>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_IGNORE_EVENTS,
+        get::<bool, 1095>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_IGNORE_EVENTS,
+        set::<bool, 1095>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_INPUT_NODE_IDX,
+        get::<i16, 1097>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_INPUT_NODE_IDX,
+        set::<i16, 1097>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_IS_STATE_MACHINE_LAYER,
+        get::<bool, 1099>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_IS_STATE_MACHINE_LAYER,
+        set::<bool, 1099>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_IS_SYNCHRONIZED,
+        get::<bool, 1101>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_IS_SYNCHRONIZED,
+        set::<bool, 1101>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_ROOT_MOTION_WEIGHT_VALUE_NODE_IDX,
+        get::<i16, 1103>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_ROOT_MOTION_WEIGHT_VALUE_NODE_IDX,
+        set::<i16, 1103>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::GET_M_WEIGHT_VALUE_NODE_IDX,
+        get::<i16, 1105>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_layer_blend_node_layer_definition::SET_M_WEIGHT_VALUE_NODE_IDX,
+        set::<i16, 1105>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 1113>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 1113>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_PITCH_LIMIT,
+        get::<f32, 1115>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_PITCH_LIMIT,
+        set::<f32, 1115>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_PITCH_NODE_IDX,
+        get::<i16, 1117>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_PITCH_NODE_IDX,
+        set::<i16, 1117>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_REFERENCE_ROTATION,
+        get::<Rotation, 1119>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_REFERENCE_ROTATION,
+        set::<Rotation, 1119>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_WEIGHT_NODE_IDX,
+        get::<i16, 1121>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_WEIGHT_NODE_IDX,
+        set::<i16, 1121>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_YAW_LIMIT,
+        get::<f32, 1123>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_YAW_LIMIT,
+        set::<f32, 1123>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::GET_M_YAW_NODE_IDX,
+        get::<i16, 1125>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_look_at_chain_node_definition::SET_M_YAW_NODE_IDX,
+        set::<i16, 1125>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_not_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 1335>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_not_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 1335>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::GET_M_CLIP_REFERENCE_NODE_IDX,
+        get::<i16, 1346>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::SET_M_CLIP_REFERENCE_NODE_IDX,
+        set::<i16, 1346>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::GET_M_IS_OFFSET_NODE,
+        get::<bool, 1348>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::SET_M_IS_OFFSET_NODE,
+        set::<bool, 1348>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::GET_M_IS_OFFSET_RELATIVE_TO_CHARACTER,
+        get::<bool, 1350>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::SET_M_IS_OFFSET_RELATIVE_TO_CHARACTER,
+        set::<bool, 1350>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::GET_M_TARGET_VALUE_NODE_IDX,
+        get::<i16, 1352>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_orientation_warp_node_definition::SET_M_TARGET_VALUE_NODE_IDX,
+        set::<i16, 1352>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::GET_M_INPUT_IDX0,
+        get::<i16, 1354>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::SET_M_INPUT_IDX0,
+        set::<i16, 1354>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::GET_M_INPUT_IDX1,
+        get::<i16, 1356>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::SET_M_INPUT_IDX1,
+        set::<i16, 1356>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::GET_M_PARAM_RANGE_END,
+        get::<f32, 1358>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::SET_M_PARAM_RANGE_END,
+        set::<f32, 1358>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::GET_M_PARAM_RANGE_START,
+        get::<f32, 1360>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_blend_node_blend_range::SET_M_PARAM_RANGE_START,
+        set::<f32, 1360>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_clip_selector_node_definition::GET_M_HAS_WEIGHTS_SET,
+        get::<bool, 1367>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_clip_selector_node_definition::SET_M_HAS_WEIGHTS_SET,
+        set::<bool, 1367>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_clip_selector_node_definition::GET_M_IGNORE_INVALID_OPTIONS,
+        get::<bool, 1369>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_clip_selector_node_definition::SET_M_IGNORE_INVALID_OPTIONS,
+        set::<bool, 1369>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_clip_selector_node_definition::GET_M_PARAMETER_NODE_IDX,
+        get::<i16, 1371>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_clip_selector_node_definition::SET_M_PARAMETER_NODE_IDX,
+        set::<i16, 1371>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_selector_node_definition::GET_M_HAS_WEIGHTS_SET,
+        get::<bool, 1378>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_selector_node_definition::SET_M_HAS_WEIGHTS_SET,
+        set::<bool, 1378>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_selector_node_definition::GET_M_IGNORE_INVALID_OPTIONS,
+        get::<bool, 1380>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_selector_node_definition::SET_M_IGNORE_INVALID_OPTIONS,
+        set::<bool, 1380>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_selector_node_definition::GET_M_PARAMETER_NODE_IDX,
+        get::<i16, 1382>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_parameterized_selector_node_definition::SET_M_PARAMETER_NODE_IDX,
+        set::<i16, 1382>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_passthrough_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 1387>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_passthrough_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 1387>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::GET_M_FL_MASS,
+        get::<f32, 1401>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::SET_M_FL_MASS,
+        set::<f32, 1401>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::GET_M_FL_INERTIA_SCALE,
+        get::<f32, 1403>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::SET_M_FL_INERTIA_SCALE,
+        set::<f32, 1403>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::GET_M_FL_LINEAR_DAMPING,
+        get::<f32, 1405>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::SET_M_FL_LINEAR_DAMPING,
+        set::<f32, 1405>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::GET_M_FL_ANGULAR_DAMPING,
+        get::<f32, 1407>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_body_desc::SET_M_FL_ANGULAR_DAMPING,
+        set::<f32, 1407>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_NAME,
+        get_str::<1415>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_NAME,
+        set_str::<1415>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_NAME_HASH,
+        get::<u32, 1417>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_NAME_HASH,
+        set::<u32, 1417>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_BASE_NAME_HASH,
+        get::<u32, 1419>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_BASE_NAME_HASH,
+        set::<u32, 1419>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_N_INDEX,
+        get::<i32, 1421>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_N_INDEX,
+        set::<i32, 1421>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_N_BASE_INDEX,
+        get::<i32, 1423>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_N_BASE_INDEX,
+        set::<i32, 1423>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_AUDIO_SURFACE,
+        get::<i32, 1425>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_AUDIO_SURFACE,
+        set::<i32, 1425>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_B_HAS_SCRAPE_SOUNDS,
+        get::<bool, 1427>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_B_HAS_SCRAPE_SOUNDS,
+        set::<bool, 1427>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_B_HIDDEN,
+        get::<bool, 1429>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_B_HIDDEN,
+        set::<bool, 1429>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::GET_M_DESCRIPTION,
+        get_str::<1431>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_phys_surface_properties::SET_M_DESCRIPTION,
+        set_str::<1431>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_physics_data::GET_M_N_FLAGS,
+        get::<u16, 1455>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_physics_data::SET_M_N_FLAGS,
+        set::<u16, 1455>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_referenced_graph_node_definition::GET_M_FALLBACK_NODE_IDX,
+        get::<i16, 1482>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_referenced_graph_node_definition::SET_M_FALLBACK_NODE_IDX,
+        set::<i16, 1482>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_referenced_graph_node_definition::GET_M_REFERENCED_GRAPH_IDX,
+        get::<i16, 1484>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_referenced_graph_node_definition::SET_M_REFERENCED_GRAPH_IDX,
+        set::<i16, 1484>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_P_VIEW,
+        get::<NativeRef<class::ISceneView>, 1542>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_P_VIEW,
+        set::<NativeRef<class::ISceneView>, 1542>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_P_ATTRIBUTES,
+        get::<NativeRef<class::CRenderAttributes>, 1544>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_P_ATTRIBUTES,
+        set::<NativeRef<class::CRenderAttributes>, 1544>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_VIEWPORT,
+        get::<RenderViewport, 1546>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_VIEWPORT,
+        set::<RenderViewport, 1546>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_SKY_VIEWPORT,
+        get::<RenderViewport, 1548>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_SKY_VIEWPORT,
+        set::<RenderViewport, 1548>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_SCREEN_VIEWPORT,
+        get::<RenderViewport, 1550>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_SCREEN_VIEWPORT,
+        set::<RenderViewport, 1550>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_COLOR,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1552>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_COLOR,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1552>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_DEPTH,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1554>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_DEPTH,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1554>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_FINAL_COLOR,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1556>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_FINAL_COLOR,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1556>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_FINAL_DEPTH,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1558>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_FINAL_DEPTH,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1558>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_WIDTH,
+        get::<i32, 1560>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_WIDTH,
+        set::<i32, 1560>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_HEIGHT,
+        get::<i32, 1562>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_HEIGHT,
+        set::<i32, 1562>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_OUTPUT_MSAA,
+        get::<i64, 1564>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_OUTPUT_MSAA,
+        set::<i64, 1564>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_DEPTH_FORMAT,
+        get::<i64, 1566>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_DEPTH_FORMAT,
+        set::<i64, 1566>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_REFRACT_COLOR,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_REFRACT_COLOR,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_MSAA,
+        get::<i64, 1570>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_MSAA,
+        set::<i64, 1570>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_COLOR_SPACE,
+        get::<i64, 1572>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_COLOR_SPACE,
+        set::<i64, 1572>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_CLEAR_FLAGS,
+        get::<i32, 1574>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_CLEAR_FLAGS,
+        set::<i32, 1574>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_V_CLEAR_COLOR,
+        get::<Vector4, 1576>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_V_CLEAR_COLOR,
+        set::<Vector4, 1576>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_TOOLS_VIEW,
+        get::<bool, 1578>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_TOOLS_VIEW,
+        set::<bool, 1578>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_RENDER_SKY,
+        get::<bool, 1580>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_RENDER_SKY,
+        set::<bool, 1580>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_RENDER_OPAQUE,
+        get::<bool, 1582>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_RENDER_OPAQUE,
+        set::<bool, 1582>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_RENDER_DYNAMIC_OBJECTS,
+        get::<bool, 1584>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_RENDER_DYNAMIC_OBJECTS,
+        set::<bool, 1584>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_DRAW_OVERLAYS,
+        get::<bool, 1586>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_DRAW_OVERLAYS,
+        set::<bool, 1586>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_RENDER_DECALS,
+        get::<bool, 1588>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_RENDER_DECALS,
+        set::<bool, 1588>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_RENDER_TRANSLUCENT,
+        get::<bool, 1590>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_RENDER_TRANSLUCENT,
+        set::<bool, 1590>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_WIREFRAME,
+        get::<bool, 1592>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_WIREFRAME,
+        set::<bool, 1592>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_RESOLVE_TO_FINAL,
+        get::<bool, 1594>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_RESOLVE_TO_FINAL,
+        set::<bool, 1594>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_MANAGED_HOOKS,
+        get::<bool, 1596>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_MANAGED_HOOKS,
+        set::<bool, 1596>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_B_DEPTH_PREPASS,
+        get::<bool, 1598>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_B_DEPTH_PREPASS,
+        set::<bool, 1598>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_FL_DEPTH_PREPASS_CULL_THRESHOLD,
+        get::<f32, 1600>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_FL_DEPTH_PREPASS_CULL_THRESHOLD,
+        set::<f32, 1600>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_UPSCALER_MODE,
+        get::<i32, 1602>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_UPSCALER_MODE,
+        set::<i32, 1602>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_UPSCALE_VIEWPORT,
+        get::<RenderViewport, 1604>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_UPSCALE_VIEWPORT,
+        set::<RenderViewport, 1604>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_UPSCALE_RENDER_WIDTH,
+        get::<i32, 1606>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_UPSCALE_RENDER_WIDTH,
+        set::<i32, 1606>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_N_UPSCALE_RENDER_HEIGHT,
+        get::<i32, 1608>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_N_UPSCALE_RENDER_HEIGHT,
+        set::<i32, 1608>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_UPSCALE_COLOR,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1610>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_UPSCALE_COLOR,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1610>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_UPSCALE_DEPTH,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1612>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_UPSCALE_DEPTH,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1612>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_H_FSR1_INTERMEDIATE_COLOR,
+        get::<PtrHandle<handle::HSceneViewRenderTarget>, 1614>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_H_FSR1_INTERMEDIATE_COLOR,
+        set::<PtrHandle<handle::HSceneViewRenderTarget>, 1614>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::GET_M_FL_FSR1_SHARPNESS,
+        get::<f32, 1616>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_render_pipeline_setup::SET_M_FL_FSR1_SHARPNESS,
+        set::<f32, 1616>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_ANGULAR_VELOCITY_LIMIT_NODE_IDX,
+        get::<i16, 1624>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_ANGULAR_VELOCITY_LIMIT_NODE_IDX,
+        set::<i16, 1624>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 1626>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 1626>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_DESIRED_FACING_DIRECTION_NODE_IDX,
+        get::<i16, 1628>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_DESIRED_FACING_DIRECTION_NODE_IDX,
+        set::<i16, 1628>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_DESIRED_MOVING_VELOCITY_NODE_IDX,
+        get::<i16, 1630>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_DESIRED_MOVING_VELOCITY_NODE_IDX,
+        set::<i16, 1630>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_LINEAR_VELOCITY_LIMIT_NODE_IDX,
+        get::<i16, 1632>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_LINEAR_VELOCITY_LIMIT_NODE_IDX,
+        set::<i16, 1632>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_MAX_ANGULAR_VELOCITY,
+        get::<f32, 1634>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_MAX_ANGULAR_VELOCITY,
+        set::<f32, 1634>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_MAX_LINEAR_VELOCITY,
+        get::<f32, 1636>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_MAX_LINEAR_VELOCITY,
+        set::<f32, 1636>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::GET_M_OVERRIDE_FLAGS,
+        get::<u8, 1638>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_root_motion_override_node_definition::SET_M_OVERRIDE_FLAGS,
+        set::<u8, 1638>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scale_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 1643>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scale_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 1643>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scale_node_definition::GET_M_ENABLE_NODE_IDX,
+        get::<i16, 1645>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scale_node_definition::SET_M_ENABLE_NODE_IDX,
+        set::<i16, 1645>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scale_node_definition::GET_M_MASK_NODE_IDX,
+        get::<i16, 1647>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scale_node_definition::SET_M_MASK_NODE_IDX,
+        set::<i16, 1647>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_animatable_object::GET_M_FL_DELTA_TIME,
+        get::<f32, 1782>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_animatable_object::SET_M_FL_DELTA_TIME,
+        set::<f32, 1782>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_animatable_object::GET_M_WORLD_BOUNDS,
+        get::<BBox, 1784>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_animatable_object::SET_M_WORLD_BOUNDS,
+        set::<BBox, 1784>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_animatable_object::GET_M_LOCAL_BOUNDS,
+        get::<BBox, 1786>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_animatable_object::SET_M_LOCAL_BOUNDS,
+        set::<BBox, 1786>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_V_BOX_MINS,
+        get::<Vector3, 1974>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_V_BOX_MINS,
+        set::<Vector3, 1974>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_V_BOX_MAXS,
+        get::<Vector3, 1976>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_V_BOX_MAXS,
+        set::<Vector3, 1976>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_N_HANDSHAKE,
+        get::<i32, 1978>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_N_HANDSHAKE,
+        set::<i32, 1978>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_N_RENDER_PRIORITY,
+        get::<i32, 1980>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_N_RENDER_PRIORITY,
+        set::<i32, 1980>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_H_LIGHT_PROBE_TEXTURE,
+        get::<NativeRef<class::CTextureBase>, 1982>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_H_LIGHT_PROBE_TEXTURE,
+        set::<NativeRef<class::CTextureBase>, 1982>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_H_LIGHT_PROBE_DIRECT_LIGHT_INDICES_TEXTURE,
+        get::<NativeRef<class::CTextureBase>, 1984>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_H_LIGHT_PROBE_DIRECT_LIGHT_INDICES_TEXTURE,
+        set::<NativeRef<class::CTextureBase>, 1984>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::GET_M_H_LIGHT_PROBE_DIRECT_LIGHT_SCALARS_TEXTURE,
+        get::<NativeRef<class::CTextureBase>, 1986>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_scene_light_probe_volume_object::SET_M_H_LIGHT_PROBE_DIRECT_LIGHT_SCALARS_TEXTURE,
+        set::<NativeRef<class::CTextureBase>, 1986>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::GET_M_N_FORMAT,
+        get::<u32, 2151>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::SET_M_N_FORMAT,
+        set::<u32, 2151>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::GET_M_N_SAMPLE_RATE,
+        get::<u32, 2153>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::SET_M_N_SAMPLE_RATE,
+        set::<u32, 2153>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::GET_M_N_CHANNELS,
+        get::<u32, 2155>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::SET_M_N_CHANNELS,
+        set::<u32, 2155>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::GET_M_N_SAMPLE_COUNT,
+        get::<u32, 2157>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::SET_M_N_SAMPLE_COUNT,
+        set::<u32, 2157>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::GET_M_N_BITS,
+        get::<u32, 2159>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::SET_M_N_BITS,
+        set::<u32, 2159>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::GET_M_FL_DURATION,
+        get::<f32, 2161>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_simple_pcm_wave_data::SET_M_FL_DURATION,
+        set::<f32, 2161>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_speed_scale_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2166>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_speed_scale_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2166>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_speed_scale_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2168>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_speed_scale_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2168>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_completed_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 2173>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_completed_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 2173>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_completed_condition_node_definition::GET_M_TRANSITION_DURATION,
+        get::<f32, 2175>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_completed_condition_node_definition::SET_M_TRANSITION_DURATION,
+        set::<f32, 2175>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_completed_condition_node_definition::GET_M_TRANSITION_DURATION_OVERRIDE_NODE_IDX,
+        get::<i16, 2177>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_completed_condition_node_definition::SET_M_TRANSITION_DURATION_OVERRIDE_NODE_IDX,
+        set::<i16, 2177>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_definition::GET_M_DEFAULT_STATE_INDEX,
+        get::<i16, 2183>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_definition::SET_M_DEFAULT_STATE_INDEX,
+        set::<i16, 2183>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_state_definition::GET_M_ENTRY_CONDITION_NODE_IDX,
+        get::<i16, 2186>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_state_definition::SET_M_ENTRY_CONDITION_NODE_IDX,
+        set::<i16, 2186>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_state_definition::GET_M_STATE_NODE_IDX,
+        get::<i16, 2188>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_state_definition::SET_M_STATE_NODE_IDX,
+        set::<i16, 2188>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::GET_M_CAN_BE_FORCED,
+        get::<bool, 2190>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::SET_M_CAN_BE_FORCED,
+        set::<bool, 2190>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::GET_M_CONDITION_NODE_IDX,
+        get::<i16, 2192>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::SET_M_CONDITION_NODE_IDX,
+        set::<i16, 2192>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::GET_M_TARGET_STATE_IDX,
+        get::<i16, 2194>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::SET_M_TARGET_STATE_IDX,
+        set::<i16, 2194>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::GET_M_TRANSITION_NODE_IDX,
+        get::<i16, 2196>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_machine_node_transition_definition::SET_M_TRANSITION_NODE_IDX,
+        set::<i16, 2196>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2206>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2206>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::GET_M_IS_OFF_STATE,
+        get::<bool, 2208>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::SET_M_IS_OFF_STATE,
+        set::<bool, 2208>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::GET_M_LAYER_BONE_MASK_NODE_IDX,
+        get::<i16, 2210>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::SET_M_LAYER_BONE_MASK_NODE_IDX,
+        set::<i16, 2210>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::GET_M_LAYER_ROOT_MOTION_WEIGHT_NODE_IDX,
+        get::<i16, 2212>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::SET_M_LAYER_ROOT_MOTION_WEIGHT_NODE_IDX,
+        set::<i16, 2212>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::GET_M_LAYER_WEIGHT_NODE_IDX,
+        get::<i16, 2214>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::SET_M_LAYER_WEIGHT_NODE_IDX,
+        set::<i16, 2214>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::GET_M_USE_ACTUAL_ELAPSED_TIME_IN_STATE_FOR_TIMED_EVENTS,
+        get::<bool, 2216>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_definition::SET_M_USE_ACTUAL_ELAPSED_TIME_IN_STATE_FOR_TIMED_EVENTS,
+        set::<bool, 2216>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_timed_event::GET_M_TIME_VALUE,
+        get::<f32, 2220>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_state_node_timed_event::SET_M_TIME_VALUE,
+        set::<f32, 2220>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_sync_event_index_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 2237>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_sync_event_index_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 2237>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_sync_event_index_condition_node_definition::GET_M_SYNC_EVENT_IDX,
+        get::<i32, 2239>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_sync_event_index_condition_node_definition::SET_M_SYNC_EVENT_IDX,
+        set::<i32, 2239>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_info_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2245>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_info_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2245>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_info_node_definition::GET_M_IS_WORLD_SPACE_TARGET,
+        get::<bool, 2247>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_info_node_definition::SET_M_IS_WORLD_SPACE_TARGET,
+        set::<bool, 2247>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2252>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2252>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::GET_M_IS_BONE_SPACE_OFFSET,
+        get::<bool, 2254>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::SET_M_IS_BONE_SPACE_OFFSET,
+        set::<bool, 2254>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::GET_M_ROTATION_OFFSET,
+        get::<Rotation, 2256>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::SET_M_ROTATION_OFFSET,
+        set::<Rotation, 2256>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::GET_M_TRANSLATION_OFFSET,
+        get::<Vector3, 2258>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::SET_M_TRANSLATION_OFFSET,
+        set::<Vector3, 2258>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::GET_M_TRANSLATION_OFFSET_NODE_IDX,
+        get::<i16, 2260>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_offset_node_definition::SET_M_TRANSLATION_OFFSET_NODE_IDX,
+        set::<i16, 2260>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_point_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2265>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_point_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2265>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_point_node_definition::GET_M_IS_WORLD_SPACE_TARGET,
+        get::<bool, 2267>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_point_node_definition::SET_M_IS_WORLD_SPACE_TARGET,
+        set::<bool, 2267>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::GET_M_IGNORE_INVALID_OPTIONS,
+        get::<bool, 2274>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::SET_M_IGNORE_INVALID_OPTIONS,
+        set::<bool, 2274>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::GET_M_IS_WORLD_SPACE_TARGET,
+        get::<bool, 2276>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::SET_M_IS_WORLD_SPACE_TARGET,
+        set::<bool, 2276>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::GET_M_ORIENTATION_SCORE_WEIGHT,
+        get::<f32, 2278>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::SET_M_ORIENTATION_SCORE_WEIGHT,
+        set::<f32, 2278>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::GET_M_PARAMETER_NODE_IDX,
+        get::<i16, 2280>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::SET_M_PARAMETER_NODE_IDX,
+        set::<i16, 2280>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::GET_M_POSITION_SCORE_WEIGHT,
+        get::<f32, 2282>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_selector_node_definition::SET_M_POSITION_SCORE_WEIGHT,
+        set::<f32, 2282>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_ALIGN_WITH_TARGET_AT_LAST_WARP_EVENT,
+        get::<bool, 2290>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_ALIGN_WITH_TARGET_AT_LAST_WARP_EVENT,
+        set::<bool, 2290>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_ALLOW_TARGET_UPDATE,
+        get::<bool, 2292>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_ALLOW_TARGET_UPDATE,
+        set::<bool, 2292>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_CLIP_REFERENCE_NODE_IDX,
+        get::<i16, 2294>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_CLIP_REFERENCE_NODE_IDX,
+        set::<i16, 2294>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_LERP_FALLBACK_DISTANCE_THRESHOLD,
+        get::<f32, 2296>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_LERP_FALLBACK_DISTANCE_THRESHOLD,
+        set::<f32, 2296>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_MAX_TANGENT_LENGTH,
+        get::<f32, 2298>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_MAX_TANGENT_LENGTH,
+        set::<f32, 2298>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_SAMPLING_POSITION_ERROR_THRESHOLD_SQ,
+        get::<f32, 2300>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_SAMPLING_POSITION_ERROR_THRESHOLD_SQ,
+        set::<f32, 2300>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_TARGET_UPDATE_ANGLE_THRESHOLD_RADIANS,
+        get::<f32, 2302>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_TARGET_UPDATE_ANGLE_THRESHOLD_RADIANS,
+        set::<f32, 2302>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_TARGET_UPDATE_DISTANCE_THRESHOLD,
+        get::<f32, 2304>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_TARGET_UPDATE_DISTANCE_THRESHOLD,
+        set::<f32, 2304>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::GET_M_TARGET_VALUE_NODE_IDX,
+        get::<i16, 2306>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_target_warp_node_definition::SET_M_TARGET_VALUE_NODE_IDX,
+        set::<i16, 2306>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_condition_node_definition::GET_M_COMPARAND,
+        get::<f32, 2320>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_condition_node_definition::SET_M_COMPARAND,
+        set::<f32, 2320>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_condition_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2322>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_condition_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2322>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 2324>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 2324>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::GET_M_DATA_SLOT_IDX,
+        get::<i16, 2330>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::SET_M_DATA_SLOT_IDX,
+        set::<i16, 2330>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::GET_M_PLAY_IN_REVERSE_VALUE_NODE_IDX,
+        get::<i16, 2332>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::SET_M_PLAY_IN_REVERSE_VALUE_NODE_IDX,
+        set::<i16, 2332>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::GET_M_SAMPLE_ROOT_MOTION,
+        get::<bool, 2334>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::SET_M_SAMPLE_ROOT_MOTION,
+        set::<bool, 2334>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::GET_M_TIME_VALUE_NODE_IDX,
+        get::<i16, 2336>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_time_controlled_clip_node_definition::SET_M_TIME_VALUE_NODE_IDX,
+        set::<i16, 2336>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_event_condition_node_definition::GET_M_SOURCE_STATE_NODE_IDX,
+        get::<i16, 2344>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_event_condition_node_definition::SET_M_SOURCE_STATE_NODE_IDX,
+        set::<i16, 2344>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_BONE_MASK_BLEND_IN_TIME_PERCENTAGE,
+        get::<f32, 2351>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_BONE_MASK_BLEND_IN_TIME_PERCENTAGE,
+        set::<f32, 2351>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_DURATION,
+        get::<f32, 2353>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_DURATION,
+        set::<f32, 2353>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_DURATION_OVERRIDE_NODE_IDX,
+        get::<i16, 2355>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_DURATION_OVERRIDE_NODE_IDX,
+        set::<i16, 2355>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_START_BONE_MASK_NODE_IDX,
+        get::<i16, 2357>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_START_BONE_MASK_NODE_IDX,
+        set::<i16, 2357>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_TARGET_STATE_NODE_IDX,
+        get::<i16, 2359>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_TARGET_STATE_NODE_IDX,
+        set::<i16, 2359>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_TARGET_SYNC_ID_NODE_IDX,
+        get::<i16, 2361>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_TARGET_SYNC_ID_NODE_IDX,
+        set::<i16, 2361>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_TIME_OFFSET,
+        get::<f32, 2363>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_TIME_OFFSET,
+        set::<f32, 2363>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_TIME_OFFSET_OVERRIDE_NODE_IDX,
+        get::<i16, 2365>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_TIME_OFFSET_OVERRIDE_NODE_IDX,
+        set::<i16, 2365>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::GET_M_TRANSITION_OPTIONS,
+        get::<u32, 2367>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_transition_node_definition::SET_M_TRANSITION_OPTIONS,
+        set::<u32, 2367>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_BLEND_TIME,
+        get::<f32, 2374>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_BLEND_TIME,
+        set::<f32, 2374>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_CHAIN_ROTATION_WEIGHT,
+        get::<f32, 2376>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_CHAIN_ROTATION_WEIGHT,
+        set::<f32, 2376>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2378>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2378>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_EFFECTOR_TARGET_NODE_IDX,
+        get::<i16, 2380>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_EFFECTOR_TARGET_NODE_IDX,
+        set::<i16, 2380>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_ENABLE_NODE_IDX,
+        get::<i16, 2382>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_ENABLE_NODE_IDX,
+        set::<i16, 2382>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_IS_TARGET_IN_WORLD_SPACE,
+        get::<bool, 2384>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_IS_TARGET_IN_WORLD_SPACE,
+        set::<bool, 2384>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::GET_M_WEIGHT_NODE_IDX,
+        get::<i16, 2386>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_two_bone_ik_node_definition::SET_M_WEIGHT_NODE_IDX,
+        set::<i16, 2386>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::GET_M_INPUT_VALUE_X_NODE_IDX,
+        get::<i16, 2441>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::SET_M_INPUT_VALUE_X_NODE_IDX,
+        set::<i16, 2441>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::GET_M_INPUT_VALUE_Y_NODE_IDX,
+        get::<i16, 2443>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::SET_M_INPUT_VALUE_Y_NODE_IDX,
+        set::<i16, 2443>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::GET_M_INPUT_VALUE_Z_NODE_IDX,
+        get::<i16, 2445>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::SET_M_INPUT_VALUE_Z_NODE_IDX,
+        set::<i16, 2445>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::GET_M_INPUT_VECTOR_VALUE_NODE_IDX,
+        get::<i16, 2447>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_create_node_definition::SET_M_INPUT_VECTOR_VALUE_NODE_IDX,
+        set::<i16, 2447>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_info_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2453>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_info_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2453>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_negate_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2458>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vector_negate_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2458>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_based_speed_scale_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2463>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_based_speed_scale_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2463>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_based_speed_scale_node_definition::GET_M_DEFAULT_INPUT_VALUE,
+        get::<f32, 2465>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_based_speed_scale_node_definition::SET_M_DEFAULT_INPUT_VALUE,
+        set::<f32, 2465>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_based_speed_scale_node_definition::GET_M_INPUT_VALUE_NODE_IDX,
+        get::<i16, 2467>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_based_speed_scale_node_definition::SET_M_INPUT_VALUE_NODE_IDX,
+        set::<i16, 2467>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_blend_node_definition::GET_M_PARAMETER_VALUE_NODE_IDX,
+        get::<i16, 2473>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_velocity_blend_node_definition::SET_M_PARAMETER_VALUE_NODE_IDX,
+        set::<i16, 2473>,
+        "abi::fields",
+    );
+    r.bind_default(c_vfx_combo::GET_M_N_MIN, get::<u8, 2505>, "abi::fields");
+    r.bind_default(c_vfx_combo::SET_M_N_MIN, set::<u8, 2505>, "abi::fields");
+    r.bind_default(c_vfx_combo::GET_M_N_MAX, get::<u8, 2507>, "abi::fields");
+    r.bind_default(c_vfx_combo::SET_M_N_MAX, set::<u8, 2507>, "abi::fields");
+    r.bind_default(
+        c_vfx_program_data::GET_M_B_LOADED_FROM_VCS_FILE,
+        get::<bool, 2517>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_vfx_program_data::SET_M_B_LOADED_FROM_VCS_FILE,
+        set::<bool, 2517>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_bone_mask_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2558>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_bone_mask_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2558>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_bool_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2563>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_bool_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2563>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_float_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_float_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_id_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2573>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_id_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2573>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_target_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2578>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_target_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2578>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_vector_node_definition::GET_M_CHILD_NODE_IDX,
+        get::<i16, 2583>,
+        "abi::fields",
+    );
+    r.bind_default(
+        c_virtual_parameter_vector_node_definition::SET_M_CHILD_NODE_IDX,
+        set::<i16, 2583>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::GET_M_IN_TANGENT,
+        get::<f32, 2669>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::SET_M_IN_TANGENT,
+        set::<f32, 2669>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::GET_M_OUT_TANGENT,
+        get::<f32, 2671>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::SET_M_OUT_TANGENT,
+        set::<f32, 2671>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::GET_M_PARAMETER,
+        get::<f32, 2673>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::SET_M_PARAMETER,
+        set::<f32, 2673>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::GET_M_VALUE,
+        get::<f32, 2675>,
+        "abi::fields",
+    );
+    r.bind_default(
+        float_curve_t_point::SET_M_VALUE,
+        set::<f32, 2675>,
+        "abi::fields",
+    );
+    r.bind_default(float_range_t::GET_M_BEGIN, get::<f32, 2677>, "abi::fields");
+    r.bind_default(float_range_t::SET_M_BEGIN, set::<f32, 2677>, "abi::fields");
+    r.bind_default(float_range_t::GET_M_END, get::<f32, 2679>, "abi::fields");
+    r.bind_default(float_range_t::SET_M_END, set::<f32, 2679>, "abi::fields");
+    r.bind_default(
+        i_scene_layer::GET_M_N_LAYER_FLAGS,
+        get::<i64, 3169>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::SET_M_N_LAYER_FLAGS,
+        set::<i64, 3169>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::GET_LAYER_ENUM,
+        get::<i64, 3171>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::SET_LAYER_ENUM,
+        set::<i64, 3171>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::GET_M_VIEWPORT,
+        get::<RenderViewport, 3173>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::SET_M_VIEWPORT,
+        set::<RenderViewport, 3173>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::GET_M_N_CLEAR_FLAGS,
+        get::<i32, 3175>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_layer::SET_M_N_CLEAR_FLAGS,
+        set::<i32, 3175>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_view::GET_M_VIEW_UNIQUE_ID,
+        get::<i32, 3204>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_view::SET_M_VIEW_UNIQUE_ID,
+        set::<i32, 3204>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_view::GET_M_MANAGED_CAMERA_ID,
+        get::<i32, 3206>,
+        "abi::fields",
+    );
+    r.bind_default(
+        i_scene_view::SET_M_MANAGED_CAMERA_ID,
+        set::<i32, 3206>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_capsule_desc_t::GET_M_CAPSULE,
+        get::<Capsule, 3521>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_capsule_desc_t::SET_M_CAPSULE,
+        set::<Capsule, 3521>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_capsule_desc_t::GET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        get::<u32, 3523>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_capsule_desc_t::SET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        set::<u32, 3523>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_capsule_desc_t::GET_M_N_SURFACE_PROPERTY_INDEX,
+        get::<u32, 3525>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_capsule_desc_t::SET_M_N_SURFACE_PROPERTY_INDEX,
+        set::<u32, 3525>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_hull_desc_t::GET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        get::<u32, 3528>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_hull_desc_t::SET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        set::<u32, 3528>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_hull_desc_t::GET_M_N_SURFACE_PROPERTY_INDEX,
+        get::<u32, 3530>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_hull_desc_t::SET_M_N_SURFACE_PROPERTY_INDEX,
+        set::<u32, 3530>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_mesh_desc_t::GET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        get::<u32, 3543>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_mesh_desc_t::SET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        set::<u32, 3543>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_mesh_desc_t::GET_M_N_SURFACE_PROPERTY_INDEX,
+        get::<u32, 3545>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_mesh_desc_t::SET_M_N_SURFACE_PROPERTY_INDEX,
+        set::<u32, 3545>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_sphere_desc_t::GET_M_SPHERE,
+        get::<Sphere, 3558>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_sphere_desc_t::SET_M_SPHERE,
+        set::<Sphere, 3558>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_sphere_desc_t::GET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        get::<u32, 3560>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_sphere_desc_t::SET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        set::<u32, 3560>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_sphere_desc_t::GET_M_N_SURFACE_PROPERTY_INDEX,
+        get::<u32, 3562>,
+        "abi::fields",
+    );
+    r.bind_default(
+        rn_sphere_desc_t::SET_M_N_SURFACE_PROPERTY_INDEX,
+        set::<u32, 3562>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_TRIANGLES_RENDERED,
+        get::<u32, 3564>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_TRIANGLES_RENDERED,
+        set::<u32, 3564>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_ARTIST_TRIANGLES_RENDERED,
+        get::<u32, 3566>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_ARTIST_TRIANGLES_RENDERED,
+        set::<u32, 3566>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_RENDER_BATCH_DRAWS,
+        get::<u32, 3568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_RENDER_BATCH_DRAWS,
+        set::<u32, 3568>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_DRAW_CALLS,
+        get::<u32, 3570>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_DRAW_CALLS,
+        set::<u32, 3570>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_DRAW_PRIMITIVES,
+        get::<u32, 3572>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_DRAW_PRIMITIVES,
+        set::<u32, 3572>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_BASE_SCENE_OBJECT_PRIM_DRAWS,
+        get::<u32, 3574>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_BASE_SCENE_OBJECT_PRIM_DRAWS,
+        set::<u32, 3574>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_ANIMATABLE_OBJECT_PRIM_DRAWS,
+        get::<u32, 3576>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_ANIMATABLE_OBJECT_PRIM_DRAWS,
+        set::<u32, 3576>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_AGGREGATE_SCENE_OBJECT_PRIM_DRAWS,
+        get::<u32, 3578>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_AGGREGATE_SCENE_OBJECT_PRIM_DRAWS,
+        set::<u32, 3578>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_AGGREGATE_SCENE_OBJECTS_FULLY_CULLED,
+        get::<u32, 3580>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_AGGREGATE_SCENE_OBJECTS_FULLY_CULLED,
+        set::<u32, 3580>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_AGGREGATE_SCENE_OBJECT_DRAW_CALLS,
+        get::<u32, 3582>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_AGGREGATE_SCENE_OBJECT_DRAW_CALLS,
+        set::<u32, 3582>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_AGGREGATE_SCENE_OBJECT_INDIRECT_SUBMITS,
+        get::<u32, 3584>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_AGGREGATE_SCENE_OBJECT_INDIRECT_SUBMITS,
+        set::<u32, 3584>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_AGGREGATE_SCENE_OBJECT_INDIRECT_FRAGMENTS,
+        get::<u32, 3586>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_AGGREGATE_SCENE_OBJECT_INDIRECT_FRAGMENTS,
+        set::<u32, 3586>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_MATERIAL_COMPUTE,
+        get::<u32, 3588>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_MATERIAL_COMPUTE,
+        set::<u32, 3588>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_MATERIAL_SET,
+        get::<u32, 3590>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_MATERIAL_SET,
+        set::<u32, 3590>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_SIMILAR_MATERIAL_SET,
+        get::<u32, 3592>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_SIMILAR_MATERIAL_SET,
+        set::<u32, 3592>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_TEXTURE_ONLY_MATERIAL_SET,
+        get::<u32, 3594>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_TEXTURE_ONLY_MATERIAL_SET,
+        set::<u32, 3594>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_VFX_EVAL,
+        get::<u32, 3596>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_VFX_EVAL,
+        set::<u32, 3596>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_VFX_RULE,
+        get::<u32, 3598>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_VFX_RULE,
+        set::<u32, 3598>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_CONSTANT_BUFFER_UPDATES,
+        get::<u32, 3600>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_CONSTANT_BUFFER_UPDATES,
+        set::<u32, 3600>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_CONSTANT_BUFFER_BYTES,
+        get::<u32, 3602>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_CONSTANT_BUFFER_BYTES,
+        set::<u32, 3602>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_MATERIAL_CHANGES_NON_SHADOW,
+        get::<u32, 3604>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_MATERIAL_CHANGES_NON_SHADOW,
+        set::<u32, 3604>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_MATERIAL_CHANGES_NON_SHADOW_INITIAL,
+        get::<u32, 3606>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_MATERIAL_CHANGES_NON_SHADOW_INITIAL,
+        set::<u32, 3606>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_MATERIAL_CHANGES_SHADOW,
+        get::<u32, 3608>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_MATERIAL_CHANGES_SHADOW,
+        set::<u32, 3608>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_MATERIAL_CHANGES_SHADOW_INITIAL,
+        get::<u32, 3610>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_MATERIAL_CHANGES_SHADOW_INITIAL,
+        set::<u32, 3610>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_MATERIAL_CHANGES_SHADOW_ALPHA_TESTED,
+        get::<u32, 3612>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_MATERIAL_CHANGES_SHADOW_ALPHA_TESTED,
+        set::<u32, 3612>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_COPY_MATERIAL_CHANGES_NON_SHADOW,
+        get::<u32, 3614>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_COPY_MATERIAL_CHANGES_NON_SHADOW,
+        set::<u32, 3614>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_MAX_TRANSFORM_ROW,
+        get::<u32, 3616>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_MAX_TRANSFORM_ROW,
+        set::<u32, 3616>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_ROWS_USED,
+        get::<u32, 3618>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_ROWS_USED,
+        set::<u32, 3618>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_TESTED,
+        get::<u32, 3620>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_TESTED,
+        set::<u32, 3620>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_PRE_CULL_CHECK,
+        get::<u32, 3622>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_PRE_CULL_CHECK,
+        set::<u32, 3622>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_PASSING_CULL_CHECK,
+        get::<u32, 3624>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_PASSING_CULL_CHECK,
+        set::<u32, 3624>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_VERTICES_REFERENCED,
+        get::<u32, 3626>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_VERTICES_REFERENCED,
+        set::<u32, 3626>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_PRIMARY_CONTEXTS,
+        get::<u32, 3628>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_PRIMARY_CONTEXTS,
+        set::<u32, 3628>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_SECONDARY_CONTEXTS,
+        get::<u32, 3630>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_SECONDARY_CONTEXTS,
+        set::<u32, 3630>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_DISPLAY_LISTS_SUBMITTED,
+        get::<u32, 3632>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_DISPLAY_LISTS_SUBMITTED,
+        set::<u32, 3632>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_VIEWS_RENDERED,
+        get::<i32, 3634>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_VIEWS_RENDERED,
+        set::<i32, 3634>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_RESOLVES,
+        get::<u32, 3636>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_RESOLVES,
+        set::<u32, 3636>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_CULL_BOXES,
+        get::<u32, 3638>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_CULL_BOXES,
+        set::<u32, 3638>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_CULLING_BOX_CYCLE_COUNT,
+        get::<u64, 3640>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_CULLING_BOX_CYCLE_COUNT,
+        set::<u64, 3640>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_TESTED_AGAINST_CULLING_BOXES,
+        get::<u32, 3642>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_TESTED_AGAINST_CULLING_BOXES,
+        set::<u32, 3642>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_REJECTED_BY_BOUNDS_INDEX,
+        get::<u32, 3644>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_REJECTED_BY_BOUNDS_INDEX,
+        set::<u32, 3644>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_REJECTED_BY_CULL_BOXES,
+        get::<u32, 3646>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_REJECTED_BY_CULL_BOXES,
+        set::<u32, 3646>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_REJECTED_BY_VIS,
+        get::<u32, 3648>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_REJECTED_BY_VIS,
+        set::<u32, 3648>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_REJECTED_BY_BACKFACE_CULLING,
+        get::<u32, 3650>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_REJECTED_BY_BACKFACE_CULLING,
+        set::<u32, 3650>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_REJECTED_BY_SCREEN_SIZE_CULLING,
+        get::<u32, 3652>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_REJECTED_BY_SCREEN_SIZE_CULLING,
+        set::<u32, 3652>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_OBJECTS_REJECTED_BY_FADING,
+        get::<u32, 3654>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_OBJECTS_REJECTED_BY_FADING,
+        set::<u32, 3654>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_FADING_OBJECTS,
+        get::<u32, 3656>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_FADING_OBJECTS,
+        set::<u32, 3656>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_UNIQUE_MATERIALS_SEEN,
+        get::<u32, 3658>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_UNIQUE_MATERIALS_SEEN,
+        set::<u32, 3658>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_UNSHADOWED_LIGHTS_IN_VIEW,
+        get::<u32, 3660>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_UNSHADOWED_LIGHTS_IN_VIEW,
+        set::<u32, 3660>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_SHADOWED_LIGHTS_IN_VIEW,
+        get::<u32, 3662>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_SHADOWED_LIGHTS_IN_VIEW,
+        set::<u32, 3662>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_SHADOW_MAPS,
+        get::<u32, 3664>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_SHADOW_MAPS,
+        set::<u32, 3664>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_NUM_RENDER_TARGET_BINDS,
+        get::<u32, 3666>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_NUM_RENDER_TARGET_BINDS,
+        set::<u32, 3666>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::GET_M_N_PUSH_CONSTANT_SETS,
+        get::<u32, 3668>,
+        "abi::fields",
+    );
+    r.bind_default(
+        scene_system_per_frame_stats_t::SET_M_N_PUSH_CONSTANT_SETS,
+        set::<u32, 3668>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_frame_t::GET_M_FL_DISPLAY_TIME,
+        get::<f32, 3678>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_frame_t::SET_M_FL_DISPLAY_TIME,
+        set::<f32, 3678>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::GET_M_N_ID,
+        get::<u32, 3681>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::SET_M_N_ID,
+        set::<u32, 3681>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::GET_M_B_CLAMP,
+        get::<bool, 3683>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::SET_M_B_CLAMP,
+        set::<bool, 3683>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::GET_M_B_ALPHA_CROP,
+        get::<bool, 3685>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::SET_M_B_ALPHA_CROP,
+        set::<bool, 3685>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::GET_M_B_NO_COLOR,
+        get::<bool, 3687>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::SET_M_B_NO_COLOR,
+        set::<bool, 3687>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::GET_M_B_NO_ALPHA,
+        get::<bool, 3689>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::SET_M_B_NO_ALPHA,
+        set::<bool, 3689>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::GET_M_FL_TOTAL_TIME,
+        get::<f32, 3691>,
+        "abi::fields",
+    );
+    r.bind_default(
+        sheet_sequence_t::SET_M_FL_TOTAL_TIME,
+        set::<f32, 3691>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_query::GET_M_COMPLETE,
+        get::<bool, 3708>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_query::SET_M_COMPLETE,
+        set::<bool, 3708>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_query::GET_M_SUCCESS,
+        get::<bool, 3710>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_query::SET_M_SUCCESS,
+        set::<bool, 3710>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_query::GET_M_RESULT_CODE,
+        get::<i32, 3712>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_query::SET_M_RESULT_CODE,
+        set::<i32, 3712>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_CREATING,
+        get::<bool, 3752>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_CREATING,
+        set::<bool, 3752>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_CREATED,
+        get::<bool, 3754>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_CREATED,
+        set::<bool, 3754>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_SUBMITTED,
+        get::<bool, 3756>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_SUBMITTED,
+        set::<bool, 3756>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_COMPLETE,
+        get::<bool, 3758>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_COMPLETE,
+        set::<bool, 3758>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_SUCCESS,
+        get::<bool, 3760>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_SUCCESS,
+        set::<bool, 3760>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_B_NEEDS_LEGAL_AGREEMENT,
+        get::<bool, 3762>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_B_NEEDS_LEGAL_AGREEMENT,
+        set::<bool, 3762>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::GET_M_RESULT_CODE,
+        get::<i32, 3764>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_update::SET_M_RESULT_CODE,
+        set::<i32, 3764>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::GET_M_COMPLETE,
+        get::<bool, 3769>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::SET_M_COMPLETE,
+        set::<bool, 3769>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::GET_M_SUCCESS,
+        get::<bool, 3771>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::SET_M_SUCCESS,
+        set::<bool, 3771>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::GET_M_RESULT_CODE,
+        get::<i32, 3773>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::SET_M_RESULT_CODE,
+        set::<i32, 3773>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::GET_M_VOTED_UP,
+        get::<bool, 3775>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::SET_M_VOTED_UP,
+        set::<bool, 3775>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::GET_M_VOTED_DOWN,
+        get::<bool, 3777>,
+        "abi::fields",
+    );
+    r.bind_default(
+        steam_ugc_c_ugc_vote::SET_M_VOTED_DOWN,
+        set::<bool, 3777>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_N_FLAGS,
+        get::<u32, 3792>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_N_FLAGS,
+        set::<u32, 3792>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_FL_MASS,
+        get::<f32, 3794>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_FL_MASS,
+        set::<f32, 3794>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        get::<u16, 3796>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_N_COLLISION_ATTRIBUTE_INDEX,
+        set::<u16, 3796>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_FL_INERTIA_SCALE,
+        get::<f32, 3798>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_FL_INERTIA_SCALE,
+        set::<f32, 3798>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_FL_LINEAR_DAMPING,
+        get::<f32, 3800>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_FL_LINEAR_DAMPING,
+        set::<f32, 3800>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_FL_ANGULAR_DAMPING,
+        get::<f32, 3802>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_FL_ANGULAR_DAMPING,
+        set::<f32, 3802>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_FL_GRAVITY_SCALE,
+        get::<f32, 3804>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_FL_GRAVITY_SCALE,
+        set::<f32, 3804>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_B_OVERRIDE_MASS_CENTER,
+        get::<bool, 3806>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_B_OVERRIDE_MASS_CENTER,
+        set::<bool, 3806>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::GET_M_V_MASS_CENTER_OVERRIDE,
+        get::<Vector3, 3808>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_body_part_t::SET_M_V_MASS_CENTER_OVERRIDE,
+        set::<Vector3, 3808>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_N_TYPE,
+        get::<u16, 3822>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_N_TYPE,
+        set::<u16, 3822>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_N_BODY1,
+        get::<u16, 3824>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_N_BODY1,
+        set::<u16, 3824>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_N_BODY2,
+        get::<u16, 3826>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_N_BODY2,
+        set::<u16, 3826>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_N_FLAGS,
+        get::<u16, 3828>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_N_FLAGS,
+        set::<u16, 3828>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ENABLE_COLLISION,
+        get::<bool, 3830>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ENABLE_COLLISION,
+        set::<bool, 3830>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ENABLE_LINEAR_LIMIT,
+        get::<bool, 3832>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ENABLE_LINEAR_LIMIT,
+        set::<bool, 3832>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ENABLE_LINEAR_MOTOR,
+        get::<bool, 3834>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ENABLE_LINEAR_MOTOR,
+        set::<bool, 3834>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_V_LINEAR_TARGET_VELOCITY,
+        get::<Vector3, 3836>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_V_LINEAR_TARGET_VELOCITY,
+        set::<Vector3, 3836>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_MAX_FORCE,
+        get::<f32, 3838>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_MAX_FORCE,
+        set::<f32, 3838>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ENABLE_SWING_LIMIT,
+        get::<bool, 3840>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ENABLE_SWING_LIMIT,
+        set::<bool, 3840>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ENABLE_TWIST_LIMIT,
+        get::<bool, 3842>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ENABLE_TWIST_LIMIT,
+        set::<bool, 3842>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ENABLE_ANGULAR_MOTOR,
+        get::<bool, 3844>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ENABLE_ANGULAR_MOTOR,
+        set::<bool, 3844>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_V_ANGULAR_TARGET_VELOCITY,
+        get::<Vector3, 3846>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_V_ANGULAR_TARGET_VELOCITY,
+        set::<Vector3, 3846>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_MAX_TORQUE,
+        get::<f32, 3848>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_MAX_TORQUE,
+        set::<f32, 3848>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_LINEAR_FREQUENCY,
+        get::<f32, 3850>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_LINEAR_FREQUENCY,
+        set::<f32, 3850>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_LINEAR_DAMPING_RATIO,
+        get::<f32, 3852>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_LINEAR_DAMPING_RATIO,
+        set::<f32, 3852>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_ANGULAR_FREQUENCY,
+        get::<f32, 3854>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_ANGULAR_FREQUENCY,
+        set::<f32, 3854>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_ANGULAR_DAMPING_RATIO,
+        get::<f32, 3856>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_ANGULAR_DAMPING_RATIO,
+        set::<f32, 3856>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_LINEAR_STRENGTH,
+        get::<f32, 3858>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_LINEAR_STRENGTH,
+        set::<f32, 3858>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_ANGULAR_STRENGTH,
+        get::<f32, 3860>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_ANGULAR_STRENGTH,
+        set::<f32, 3860>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_LINEAR_MOTOR_IS_SPRING,
+        get::<bool, 3862>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_LINEAR_MOTOR_IS_SPRING,
+        set::<bool, 3862>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_ANGULAR_MOTOR_IS_SPRING,
+        get::<bool, 3864>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_ANGULAR_MOTOR_IS_SPRING,
+        set::<bool, 3864>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_LINEAR_TARGET_POSITION,
+        get::<f32, 3866>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_LINEAR_TARGET_POSITION,
+        set::<f32, 3866>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_ANGULAR_TARGET_ANGLE,
+        get::<f32, 3868>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_ANGULAR_TARGET_ANGLE,
+        set::<f32, 3868>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_Q_ANGULAR_TARGET_ROTATION,
+        get::<Rotation, 3870>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_Q_ANGULAR_TARGET_ROTATION,
+        set::<Rotation, 3870>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_B_OVERRIDE_FRICTION,
+        get::<bool, 3872>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_B_OVERRIDE_FRICTION,
+        set::<bool, 3872>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FL_FRICTION,
+        get::<f32, 3874>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FL_FRICTION,
+        set::<f32, 3874>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FRAME1,
+        get::<Transform, 3876>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FRAME1,
+        set::<Transform, 3876>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::GET_M_FRAME2,
+        get::<Transform, 3878>,
+        "abi::fields",
+    );
+    r.bind_default(
+        v_phys_x_joint_t::SET_M_FRAME2,
+        set::<Transform, 3878>,
+        "abi::fields",
+    );
+    r.bind_default(vertex_layout::GET_M_SIZE, get::<i32, 3899>, "abi::fields");
+    r.bind_default(vertex_layout::SET_M_SIZE, set::<i32, 3899>, "abi::fields");
+    r.bind_default(
+        vfx_compiled_shader_info_t::GET_COMPILER_OUTPUT,
+        get_str::<3903>,
+        "abi::fields",
+    );
+    r.bind_default(
+        vfx_compiled_shader_info_t::SET_COMPILER_OUTPUT,
+        set_str::<3903>,
+        "abi::fields",
+    );
+    r.bind_default(
+        vfx_compiled_shader_info_t::GET_COMPILE_FAILED,
+        get::<bool, 3905>,
+        "abi::fields",
+    );
+    r.bind_default(
+        vfx_compiled_shader_info_t::SET_COMPILE_FAILED,
+        set::<bool, 3905>,
+        "abi::fields",
+    );
+}
+
 pub static NAMES: [&str; SLOT_COUNT] = [
     "__error",
     "AggregateGlue_CreateAggregateSceneObject",

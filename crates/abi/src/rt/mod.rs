@@ -2,6 +2,8 @@
 
 pub mod callbacks;
 pub mod casts;
+pub mod delegates;
+pub mod fields;
 pub mod log;
 pub mod registry;
 pub mod strings;

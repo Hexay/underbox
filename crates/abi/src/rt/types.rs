@@ -121,8 +121,8 @@ impl<T> Default for RawPtr<T> {
 }
 
 /// An opaque engine handle that is pointer-sized but not a pointer (`DECLARE_POINTER_HANDLE`).
+/// Traits are implemented by hand: derives would demand them of the marker `H`.
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct PtrHandle<H> {
     pub value: usize,
     _h: PhantomData<fn() -> H>,
@@ -131,6 +131,40 @@ pub struct PtrHandle<H> {
 impl<H> PtrHandle<H> {
     pub const fn new(value: usize) -> Self {
         Self { value, _h: PhantomData }
+    }
+}
+
+impl<H> Clone for PtrHandle<H> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<H> Copy for PtrHandle<H> {}
+
+impl<H> Default for PtrHandle<H> {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+impl<H> PartialEq for PtrHandle<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<H> Eq for PtrHandle<H> {}
+
+impl<H> std::hash::Hash for PtrHandle<H> {
+    fn hash<S: std::hash::Hasher>(&self, state: &mut S) {
+        self.value.hash(state);
+    }
+}
+
+impl<H> std::fmt::Debug for PtrHandle<H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PtrHandle({:#x})", self.value)
     }
 }
 
