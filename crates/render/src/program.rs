@@ -1,101 +1,91 @@
-//! A shader program: one WGSL module, its entry points and bind-group layouts, and the render
-//! pipelines built from it per target format. Translated vfx combos plug in here as further
-//! `Program`s whose layouts come from reflection; see docs/renderer.md, "Shaders".
+//! A shader program: vertex and fragment stages (one WGSL module or one per stage, as the
+//! shader translator emits them), its bind-group layouts, and the render pipelines built from it
+//! per [`PipelineKey`]. See docs/renderer.md, "Shaders".
 
+use crate::state::{PipelineKey, RasterState, VertexBufferKey};
 use crate::{DEPTH_FORMAT, Gpu, Vertex};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-pub struct Program {
-    pub label: String,
+/// One compiled stage: its module and entry point.
+pub struct Stage {
     pub module: wgpu::ShaderModule,
-    pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,
-    layout: wgpu::PipelineLayout,
-    vertex_entry: &'static str,
-    fragment_entry: &'static str,
-    pipelines: Mutex<HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>>,
+    pub entry: String,
 }
 
-/// Size of the placeholder's per-draw uniform: `mvp: mat4x4` + `tint: vec4`.
-pub(crate) const PLACEHOLDER_DRAW_SIZE: u64 = 80;
+impl Stage {
+    pub fn new(gpu: &Gpu, label: &str, wgsl: &str, entry: &str) -> Stage {
+        let module = gpu.device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some(label), source: wgpu::ShaderSource::Wgsl(wgsl.into()) });
+        Stage { module, entry: entry.into() }
+    }
+}
+
+pub struct Program {
+    pub label: String,
+    pub vertex: Stage,
+    /// `None` for depth-only programs.
+    pub fragment: Option<Stage>,
+    pub bind_group_layouts: Vec<wgpu::BindGroupLayout>,
+    layout: wgpu::PipelineLayout,
+    pipelines: Mutex<HashMap<PipelineKey, wgpu::RenderPipeline>>,
+}
 
 impl Program {
-    pub fn new(
-        gpu: &Gpu,
-        label: &str,
-        wgsl: &str,
-        bind_group_layouts: Vec<wgpu::BindGroupLayout>,
-        entries: (&'static str, &'static str),
-    ) -> Program {
-        let module = gpu.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(label),
-            source: wgpu::ShaderSource::Wgsl(wgsl.into()),
-        });
+    /// Both stages from one WGSL module.
+    pub fn new(gpu: &Gpu, label: &str, wgsl: &str, bind_group_layouts: Vec<wgpu::BindGroupLayout>, entries: (&str, &str)) -> Program {
+        let vertex = Stage::new(gpu, label, wgsl, entries.0);
+        let fragment = Stage { module: vertex.module.clone(), entry: entries.1.into() };
+        Program::from_stages(gpu, label, vertex, Some(fragment), bind_group_layouts)
+    }
+
+    /// Separately compiled stages, as translated vfx combos come (one module per stage).
+    pub fn from_stages(gpu: &Gpu, label: &str, vertex: Stage, fragment: Option<Stage>, bind_group_layouts: Vec<wgpu::BindGroupLayout>) -> Program {
         let refs: Vec<_> = bind_group_layouts.iter().map(Some).collect();
-        let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some(label),
-            bind_group_layouts: &refs,
-            immediate_size: 0,
-        });
-        Program {
-            label: label.into(),
-            module,
-            bind_group_layouts,
-            layout,
-            vertex_entry: entries.0,
-            fragment_entry: entries.1,
-            pipelines: Mutex::default(),
-        }
+        let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some(label), bind_group_layouts: &refs, immediate_size: 0 });
+        Program { label: label.into(), vertex, fragment, bind_group_layouts, layout, pipelines: Mutex::default() }
     }
 
-    /// Vertex colour times a per-draw tint, transformed by a per-draw MVP (dynamic offset).
-    pub fn placeholder(gpu: &Gpu) -> Program {
-        let draw = gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("placeholder draw"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(PLACEHOLDER_DRAW_SIZE),
-                },
-                count: None,
-            }],
-        });
-        Program::new(gpu, "placeholder", include_str!("placeholder.wgsl"), vec![draw], ("vs_main", "fs_main"))
-    }
-
-    /// The pipeline drawing into `color` + [`DEPTH_FORMAT`], built on first use.
+    /// The pipeline drawing [`Vertex`] meshes into `color` + [`DEPTH_FORMAT`] with default state.
     pub fn pipeline(&self, gpu: &Gpu, color: wgpu::TextureFormat) -> wgpu::RenderPipeline {
-        let mut cache = self.pipelines.lock().unwrap();
-        cache.entry(color).or_insert_with(|| self.build(gpu, color)).clone()
+        let layout = Vertex::layout();
+        let vertex = vec![VertexBufferKey { stride: layout.array_stride, step: layout.step_mode, attributes: layout.attributes.to_vec() }];
+        self.pipeline_for(gpu, &PipelineKey { color: Some(color), depth: Some(DEPTH_FORMAT), vertex, state: RasterState::default() })
     }
 
-    fn build(&self, gpu: &Gpu, color: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+    /// The pipeline for `key`, built on first use.
+    pub fn pipeline_for(&self, gpu: &Gpu, key: &PipelineKey) -> wgpu::RenderPipeline {
+        let mut cache = self.pipelines.lock().unwrap();
+        if let Some(p) = cache.get(key) {
+            return p.clone();
+        }
+        let p = self.build(gpu, key);
+        cache.insert(key.clone(), p.clone());
+        p
+    }
+
+    fn build(&self, gpu: &Gpu, key: &PipelineKey) -> wgpu::RenderPipeline {
+        let s = &key.state;
+        let buffers: Vec<_> = key.vertex.iter().map(|b| Some(b.as_layout())).collect();
+        let writes = if s.color_writes { wgpu::ColorWrites::ALL } else { wgpu::ColorWrites::empty() };
+        let targets = [key.color.map(|format| wgpu::ColorTargetState { format, blend: s.blend, write_mask: writes })];
         gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(&self.label),
             layout: Some(&self.layout),
-            vertex: wgpu::VertexState {
-                module: &self.module,
-                entry_point: Some(self.vertex_entry),
-                compilation_options: Default::default(),
-                buffers: &[Some(Vertex::layout())],
-            },
-            primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+            vertex: wgpu::VertexState { module: &self.vertex.module, entry_point: Some(&self.vertex.entry), compilation_options: Default::default(), buffers: &buffers },
+            primitive: wgpu::PrimitiveState { topology: s.topology, cull_mode: s.cull, ..Default::default() },
+            depth_stencil: key.depth.map(|format| wgpu::DepthStencilState {
+                format,
+                depth_write_enabled: Some(s.depth_write),
+                depth_compare: Some(s.depth_compare),
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
             multisample: Default::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &self.module,
-                entry_point: Some(self.fragment_entry),
+            fragment: self.fragment.as_ref().filter(|_| key.color.is_some()).map(|f| wgpu::FragmentState {
+                module: &f.module,
+                entry_point: Some(&f.entry),
                 compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState { format: color, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                targets: &targets,
             }),
             multiview_mask: None,
             cache: None,
