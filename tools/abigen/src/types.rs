@@ -23,6 +23,10 @@ pub enum Conv {
     ByVal,
     /// `T*` for `out`/`ref` ↔ `&mut T`.
     OutRef,
+    /// A buffer pointer whose length is the next argument ↔ `&mut [T]` (see buffers.rs).
+    Slice,
+    /// That buffer's length: folded into the slice, absent from the safe signature.
+    Len,
 }
 
 #[derive(Debug, Clone)]

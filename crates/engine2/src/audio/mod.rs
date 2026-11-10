@@ -36,11 +36,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, dsp::DISPOSE, |p| {
         objects::destroy(p);
     });
-    bind!(r, dsp::ADD_PROCESSOR, |p, kind, values, count| {
-        // SAFETY: managed passes its float[] and that array's length.
-        let params = unsafe { values.as_slice(count as usize) }.to_vec();
+    bind!(r, dsp::ADD_PROCESSOR, |p, kind, params: &mut [f32]| {
         if let Some(p) = objects::get::<_, DspPreset>(p) {
-            p.processors.lock().unwrap().push(Processor { kind, params });
+            p.processors.lock().unwrap().push(Processor { kind, params: params.to_vec() });
         }
     });
     bind!(r, dsp::FINISH_BUILDING, |p| {

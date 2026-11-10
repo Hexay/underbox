@@ -16460,7 +16460,7 @@ pub(crate) unsafe extern "C" fn s2229(a0: *mut c_void) -> u32 {
 
 pub(crate) unsafe extern "C" fn s2230(a0: *mut c_void, a1: *mut u8, a2: u32) -> i32 {
     match bound(slots::c_steam_inventory_result::SERIALIZE) {
-        Some(f) => f(NativeRef::from_raw(a0), RawPtr::from_raw(a1), a2) as i32,
+        Some(f) => f(NativeRef::from_raw(a0), unsafe { slice_arg(a1, a2) }) as i32,
         None => unbound(2230),
     }
 }
@@ -19200,7 +19200,7 @@ pub(crate) unsafe extern "C" fn s2609(a0: *mut c_void) {
 
 pub(crate) unsafe extern "C" fn s2610(a0: *mut c_void, a1: i32, a2: *mut f32, a3: u32) {
     match bound(slots::dsp_preset::ADD_PROCESSOR) {
-        Some(f) => f(NativeRef::from_raw(a0), a1, RawPtr::from_raw(a2), a3),
+        Some(f) => f(NativeRef::from_raw(a0), a1, unsafe { slice_arg(a2, a3) }),
         None => unbound(2610),
     }
 }
@@ -19284,7 +19284,7 @@ pub(crate) unsafe extern "C" fn s2621() -> u64 {
 
 pub(crate) unsafe extern "C" fn s2622(a0: *mut c_void, a1: i32) -> *const c_char {
     match bound(slots::engine_glue::READ_COMPILED_RESOURCE_FILE_JSON) {
-        Some(f) => f(RawPtr::from_raw(a0), a1).into_return(),
+        Some(f) => f(unsafe { slice_arg(a0, a1) }).into_return(),
         None => unbound(2622),
     }
 }
@@ -19298,9 +19298,11 @@ pub(crate) unsafe extern "C" fn s2623(
     match bound(slots::engine_glue::READ_COMPILED_RESOURCE_FILE_BLOCK) {
         Some(f) => {
             let mut s3 = Default::default();
-            f(unsafe { cstr_arg(a0) }, RawPtr::from_raw(a1), a2, unsafe {
-                out_ref(a3, &mut s3)
-            })
+            f(
+                unsafe { cstr_arg(a0) },
+                unsafe { slice_arg(a1, a2) },
+                unsafe { out_ref(a3, &mut s3) },
+            )
             .as_ptr()
         }
         None => unbound(2623),
@@ -28827,7 +28829,7 @@ pub(crate) unsafe extern "C" fn s3699() -> *const c_char {
 
 pub(crate) unsafe extern "C" fn s3700(a0: *mut i32, a1: i32) {
     match bound(slots::steam_inventory::CHECK_OUT) {
-        Some(f) => f(RawPtr::from_raw(a0), a1),
+        Some(f) => f(unsafe { slice_arg(a0, a1) }),
         None => unbound(3700),
     }
 }
@@ -28848,7 +28850,7 @@ pub(crate) unsafe extern "C" fn s3702() -> i32 {
 
 pub(crate) unsafe extern "C" fn s3703(a0: *mut u8, a1: u32) -> *mut c_void {
     match bound(slots::steam_inventory::DESERIALIZE) {
-        Some(f) => f(RawPtr::from_raw(a0), a1).as_raw(),
+        Some(f) => f(unsafe { slice_arg(a0, a1) }).as_raw(),
         None => unbound(3703),
     }
 }
@@ -31110,8 +31112,7 @@ pub(crate) unsafe extern "C" fn s3997(
             unsafe { cstr_arg(a0) },
             a1 != 0,
             unsafe { by_val(a2) },
-            RawPtr::from_raw(a3),
-            a4,
+            unsafe { slice_arg(a3, a4) },
         )
         .as_raw(),
         None => unbound(3997),
@@ -31132,9 +31133,11 @@ pub(crate) unsafe extern "C" fn s3999(
     a3: *const Rect3D,
 ) {
     match bound(slots::g_p_render_device::ASYNC_SET_TEXTURE_DATA2) {
-        Some(f) => f(NativeRef::from_raw(a0), RawPtr::from_raw(a1), a2, unsafe {
-            by_val(a3)
-        }),
+        Some(f) => f(
+            NativeRef::from_raw(a0),
+            unsafe { slice_arg(a1, a2) },
+            unsafe { by_val(a3) },
+        ),
         None => unbound(3999),
     }
 }

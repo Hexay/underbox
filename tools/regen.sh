@@ -20,6 +20,9 @@ echo "== abi/engine.json, abi/layouts.json"
 $DUMP dump "$SBOX/engine/Definitions/engine.def" "$ROOT/abi/engine.json"
 $DUMP layouts "$ROOT/abi/engine.json" "$DLL" "$ROOT/abi/layouts.json"
 git -C "$SBOX" rev-parse HEAD > "$ROOT/abi/SBOX_PUBLIC_COMMIT"
+# GameResource extensions engine code declares; the resource compiler compiles these (crates/assets).
+grep -rhoE '\[AssetType\([^]]*Extension *= *"[a-z0-9_]+"' "$SBOX/engine" --include=*.cs \
+    | sed -E 's/.*Extension *= *"([a-z0-9_]+)".*/\1/' | sort -u > "$ROOT/abi/game_resource_extensions.txt"
 
 echo "== crates/abi/src/generated"
 cargo run -q --manifest-path "$ROOT/Cargo.toml" -p abigen -- "$ROOT/abi" "$ROOT/crates/abi/src/generated"

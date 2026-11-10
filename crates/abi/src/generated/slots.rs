@@ -8439,9 +8439,8 @@ pub mod c_steam_inventory_result {
     pub const GET_SERIALIZED_SIZE: Slot<fn(NativeRef<class::CSteamInventoryResult>) -> u32> =
         Slot::new(2229);
     /// `CStmnvntryRslt_Serialize`
-    pub const SERIALIZE: Slot<
-        fn(NativeRef<class::CSteamInventoryResult>, RawPtr<u8>, u32) -> bool,
-    > = Slot::new(2230);
+    pub const SERIALIZE: Slot<fn(NativeRef<class::CSteamInventoryResult>, &mut [u8]) -> bool> =
+        Slot::new(2230);
 }
 
 /// `CSteamItemInstance` (managed `CSteamItemInstance`)
@@ -10190,7 +10189,7 @@ pub mod dsp_preset {
     /// `DspPreset_Dispose`
     pub const DISPOSE: Slot<fn(NativeRef<class::DspPreset>)> = Slot::new(2609);
     /// `DspPreset_AddProcessor`
-    pub const ADD_PROCESSOR: Slot<fn(NativeRef<class::DspPreset>, i32, RawPtr<f32>, u32)> =
+    pub const ADD_PROCESSOR: Slot<fn(NativeRef<class::DspPreset>, i32, &mut [f32])> =
         Slot::new(2610);
     /// `DspPreset_FinishBuilding`
     pub const FINISH_BUILDING: Slot<fn(NativeRef<class::DspPreset>)> = Slot::new(2611);
@@ -10225,11 +10224,10 @@ pub mod engine_glue {
     /// `EngineGlue_ApproximateProcessMemoryUsage`
     pub const APPROXIMATE_PROCESS_MEMORY_USAGE: Slot<fn() -> u64> = Slot::new(2621);
     /// `EngineGlue_ReadCompiledResourceFileJson`
-    pub const READ_COMPILED_RESOURCE_FILE_JSON: Slot<fn(RawPtr<c_void>, i32) -> StrRet> =
-        Slot::new(2622);
+    pub const READ_COMPILED_RESOURCE_FILE_JSON: Slot<fn(&mut [u8]) -> StrRet> = Slot::new(2622);
     /// `EngineGlue_ReadCompiledResourceFileBlock`
     pub const READ_COMPILED_RESOURCE_FILE_BLOCK: Slot<
-        fn(Option<&CStr>, RawPtr<c_void>, i32, &mut i32) -> RawPtr<c_void>,
+        fn(Option<&CStr>, &mut [u8], &mut i32) -> RawPtr<c_void>,
     > = Slot::new(2623);
     /// `EngineGlue_ReadCompiledResourceFileJsonFromFilesystem`
     pub const READ_COMPILED_RESOURCE_FILE_JSON_FROM_FILESYSTEM: Slot<fn(Option<&CStr>) -> StrRet> =
@@ -10732,16 +10730,14 @@ pub mod g_p_render_device {
             Option<&CStr>,
             bool,
             TextureCreationConfig_t,
-            RawPtr<c_void>,
-            i32,
+            &mut [u8],
         ) -> NativeRef<class::CTextureBase>,
     > = Slot::new(3997);
     /// `g_pRenderDevice_ClearTexture`
     pub const CLEAR_TEXTURE: Slot<fn(NativeRef<class::CTextureBase>, Color32)> = Slot::new(3998);
     /// `g_pRenderDevice_AsyncSetTextureData2`
-    pub const ASYNC_SET_TEXTURE_DATA2: Slot<
-        fn(NativeRef<class::CTextureBase>, RawPtr<c_void>, i32, Rect3D),
-    > = Slot::new(3999);
+    pub const ASYNC_SET_TEXTURE_DATA2: Slot<fn(NativeRef<class::CTextureBase>, &mut [u8], Rect3D)> =
+        Slot::new(3999);
     /// `g_pRenderDevice_GetSwapChainTexture`
     pub const GET_SWAP_CHAIN_TEXTURE: Slot<
         fn(PtrHandle<handle::SwapChainHandle_t>, i64) -> NativeRef<class::CTextureBase>,
@@ -16439,13 +16435,13 @@ pub mod steam_inventory {
     /// `Steam_Inventory_GetCurrency`
     pub const GET_CURRENCY: Slot<fn() -> StrRet> = Slot::new(3699);
     /// `Steam_Inventory_CheckOut`
-    pub const CHECK_OUT: Slot<fn(RawPtr<i32>, i32)> = Slot::new(3700);
+    pub const CHECK_OUT: Slot<fn(&mut [i32])> = Slot::new(3700);
     /// `Steam_Inventory_IsCheckingOut`
     pub const IS_CHECKING_OUT: Slot<fn() -> bool> = Slot::new(3701);
     /// `Steam_Inventory_WasCheckoutSuccessful`
     pub const WAS_CHECKOUT_SUCCESSFUL: Slot<fn() -> bool> = Slot::new(3702);
     /// `Steam_Inventory_Deserialize`
-    pub const DESERIALIZE: Slot<fn(RawPtr<u8>, u32) -> NativeRef<class::CSteamInventoryResult>> =
+    pub const DESERIALIZE: Slot<fn(&mut [u8]) -> NativeRef<class::CSteamInventoryResult>> =
         Slot::new(3703);
 }
 

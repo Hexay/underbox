@@ -46,16 +46,41 @@ pub fn resolve(path: &str, path_id: &str) -> Option<PathBuf> {
     search_roots().into_iter().map(|root| root.join(&rel)).find(|p| p.is_file())
 }
 
+/// `path` as it's spelled on disk, matching each missing component case-blind. Managed lowercases
+/// some paths it hands us (AddProjectPath), which only works on Windows' case-blind filesystems.
+pub fn on_disk(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        let exact = out.join(part);
+        if exact.exists() {
+            out = exact;
+            continue;
+        }
+        let wanted = part.as_os_str().to_string_lossy().to_lowercase();
+        let found = std::fs::read_dir(&out).into_iter().flatten().flatten().map(|e| e.file_name()).find(|n| n.to_string_lossy().to_lowercase() == wanted);
+        out.push(found.as_deref().unwrap_or(part.as_os_str()));
+    }
+    out
+}
+
 fn add_project_path(ident: Option<&CStr>, assets: Option<&CStr>) {
-    let assets = PathBuf::from(string(assets));
-    // TODO: compile the project's stale or missing _c outputs here (assets crate; decision: compile on mount).
+    let assets = on_disk(Path::new(&string(assets)));
+    // Managed loads the project's resources right after mounting it, so stale outputs compile now.
+    let report = assets::project::compile(&assets);
+    for (src, e) in &report.failed {
+        abi::rt::log::warn(&format!("compile {}: {e}", src.display()));
+    }
+    abi::rt::log::log(
+        abi::rt::log::Level::Info,
+        &format!("{}: {} compiled, {} up to date", assets.display(), report.compiled.len(), report.up_to_date),
+    );
     MOUNTS.write().unwrap().projects.push((string(ident), assets));
 }
 
 pub fn register(r: &mut Registry) {
     bind!(r, fs::ADD_PROJECT_PATH, add_project_path);
     bind!(r, fs::ADD_CLOUD_PATH, |ident, path| {
-        MOUNTS.write().unwrap().cloud.push((string(ident), PathBuf::from(string(path))));
+        MOUNTS.write().unwrap().cloud.push((string(ident), on_disk(Path::new(&string(path)))));
     });
     bind!(r, fs::RESET_PROJECT_PATHS, |include_cloud| {
         let mut m = MOUNTS.write().unwrap();

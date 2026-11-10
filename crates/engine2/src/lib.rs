@@ -3,6 +3,7 @@
 
 pub mod app;
 pub mod audio;
+pub mod compiled;
 pub mod containers;
 pub mod fs;
 mod igen;
