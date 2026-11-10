@@ -290,6 +290,7 @@ dependencies = [
  "objects",
  "physics",
  "platform",
+ "render",
  "serde_json",
 ]
 
