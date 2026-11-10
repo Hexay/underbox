@@ -22,6 +22,8 @@ mod resource_system;
 mod steam;
 pub mod scene;
 pub mod subsystems;
+pub mod kv3;
+pub mod utl_buffer;
 
 pub use igen::igen_engine;
 pub use interfaces::CreateInterface;

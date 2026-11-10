@@ -24,6 +24,8 @@ pub fn register(r: &mut Registry) {
     crate::steam::register(r);
     crate::net::register(r);
     crate::compress::register(r);
+    crate::kv3::register(r);
+    crate::utl_buffer::register(r);
     // Last: fills only the field accessors no subsystem bound.
     abi::bind_fields(r);
 }
