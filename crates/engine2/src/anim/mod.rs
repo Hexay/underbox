@@ -12,6 +12,7 @@ mod graph;
 mod model_slots;
 pub mod object;
 mod playback_slots;
+pub mod resources;
 mod values;
 
 #[cfg(test)]
@@ -24,5 +25,6 @@ pub fn register(r: &mut abi::Registry) {
     bone_slots::register(r);
     playback_slots::register(r);
     builder::register(r);
+    resources::register(r);
     abi::bind!(r, abi::slots::g_p_animation_system_utils::MAINTAIN_DECODE_CACHES, || {});
 }

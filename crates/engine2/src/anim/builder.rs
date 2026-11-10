@@ -1,6 +1,6 @@
 //! Runtime skeletal models: `CModelBuilder`'s bones, attachments, hitboxes and animation groups
 //! (`CAnimationGroupBuilder`), registered as the built model's animation data.
-// TODO: CModelBuilder's mesh, physics and material slots (another subsystem's data).
+// Meshes, physics and materials: see `crate::model::builder`.
 
 use super::conv::{quat, v3, xform};
 use super::data;
@@ -83,7 +83,7 @@ pub(super) fn create_model(b: Ref, name: Option<&CStr>, anonymous: bool) -> Nati
         anim
     });
     data::insert(&name, anim);
-    crate::model::create_runtime(&name)
+    crate::model::create_runtime(&name, crate::model::builder::take(b))
 }
 
 pub(super) fn on_clip(g: NativeRef<class::CAnimationGroupBuilder>, i: i32, f: impl FnOnce(&mut Clip)) {
@@ -130,6 +130,7 @@ pub(super) fn add_animation(g: NativeRef<class::CAnimationGroupBuilder>) -> i32 
 pub fn register(r: &mut Registry) {
     bind!(r, mb::CREATE, new_builder);
     bind!(r, mb::DELETE_THIS, |b| {
+        crate::model::builder::forget(b);
         objects::destroy(b);
     });
     bind!(r, mb::ADD_RUN_TIME_BONE, add_bone);

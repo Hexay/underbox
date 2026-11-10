@@ -50,15 +50,20 @@ pub fn with_sim<R: Default>(r: Ref, f: impl FnOnce(&mut physics::World, JointId)
 }
 
 pub fn create(world_ref: world::Ref, kind: JointKind, a: body::Ref, b: body::Ref, frame_a: Transform, frame_b: Transform) -> HandleId<class::IPhysicsJoint> {
-    let (Some(w), Some(ba), Some(bb)) = (world::get(world_ref), body::get(a), body::get(b)) else { return HandleId::new(-1) };
-    let settings = Settings::new(kind, pose(frame_a), pose(frame_b));
-    let Some(id) = w.sim.lock().unwrap().add_joint(ba.id, bb.id, settings) else { return HandleId::new(-1) };
+    spawn(world_ref, Settings::new(kind, pose(frame_a), pose(frame_b)), a, b).and_then(get).map_or(HandleId::new(-1), |j| j.handle.id())
+}
+
+/// A joint with full `settings`, answering the joint itself.
+pub fn spawn(world_ref: world::Ref, settings: Settings, a: body::Ref, b: body::Ref) -> Option<Ref> {
+    let (w, ba, bb) = (world::get(world_ref)?, body::get(a)?, body::get(b)?);
+    let id = w.sim.lock().unwrap().add_joint(ba.id, bb.id, settings)?;
     let joint = Arc::new(Joint { world: world_ref, id, body1: a, body2: b, handle: Handle::default() });
     let r: Ref = objects::create_shared(joint.clone());
     w.sim.lock().unwrap().set_joint_user_data(id, r.addr() as u128);
     w.joints.lock().unwrap().push(r);
     // Registered with the world unlocked: managed's RegisterHandle may call straight back in.
-    joint.handle.register(r, Kind::PhysicsJoint)
+    joint.handle.register::<_, class::IPhysicsJoint>(r, Kind::PhysicsJoint);
+    Some(r)
 }
 
 /// Remove a joint from its world and drop its object and managed handle.

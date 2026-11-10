@@ -1,6 +1,8 @@
 //! 3D physics: `IPhysicsWorld`/`IPhysicsBody`/`IPhysicsShape`/`IPhysicsJoint` over the `physics`
 //! crate (Rapier). Locking: a world's simulation mutex is never held across a call into managed.
 
+pub mod aggregate;
+mod aggregate_slots;
 pub mod body;
 mod body_mass;
 mod body_query;
@@ -26,4 +28,5 @@ pub fn register(r: &mut abi::Registry) {
     shape_slots::register(r);
     joint_slots::register(r);
     joint_drive_slots::register(r);
+    aggregate_slots::register(r);
 }
