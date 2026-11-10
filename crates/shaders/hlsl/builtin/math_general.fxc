@@ -7,8 +7,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Detail textures store 0.5 as identity ("mod2x").
-#define MOD2X_SCALAR 2.0
+// Mod2x detail: 128 in an 8-bit channel maps to exactly 1 after `* MOD2X_SCALAR` (vr_detail_texture.fxc).
+#define MOD2X_SCALAR ( 255.0 / 128.0 )
 
 float ClampToPositive( float x ) { return max( x, 0.0 ); }
 float2 ClampToPositive( float2 x ) { return max( x, 0.0 ); }
@@ -77,17 +77,25 @@ float3x3 MatrixBuildRotationAboutAxis( float3 vAxis, float flAngleDegrees )
 		t * a.x * a.z - s * a.y, t * a.y * a.z + s * a.x, t * a.z * a.z + c );
 }
 
-// Source AngleMatrix: angles = ( pitch, yaw, roll ) in degrees; rows are forward, left, up.
+// Degrees about X, Y, Z (roll, pitch, yaw: sprite_ps passes Rotation.zxy); rows are forward,
+// left, up as Source's AngleMatrix.
 float3x3 RotationMatrixFromAngles( float3 vAngles )
 {
 	float sp, cp, sy, cy, sr, cr;
-	sincos( radians( vAngles.x ), sp, cp );
-	sincos( radians( vAngles.y ), sy, cy );
-	sincos( radians( vAngles.z ), sr, cr );
+	sincos( radians( vAngles.y ), sp, cp );
+	sincos( radians( vAngles.z ), sy, cy );
+	sincos( radians( vAngles.x ), sr, cr );
 	return float3x3(
 		cp * cy, cp * sy, -sp,
 		sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, sr * cp,
 		cr * sp * cy + sr * sy, cr * sp * sy - sr * cy, cr * cp );
+}
+
+// Two-channel (BC5-style) tangent-space normal.
+float3 ComputeNormalFromRGTexture( float2 vRg )
+{
+	float2 xy = vRg * 2.0 - 1.0;
+	return float3( xy, sqrt( saturate( 1.0 - dot( xy, xy ) ) ) );
 }
 
 #endif // MATH_GENERAL_FXC

@@ -16,7 +16,7 @@ pub struct Annotated {
     pub decl: String,
     /// `(key, args)` per item: `("Attribute", "\"TextureSize\"")`.
     pub items: Vec<(String, String)>,
-    /// For `SpecializedConstant()` globals: the Vulkan constant id the declaration now carries.
+    /// For `SpecializedConstant()` globals: the index of the `UB_SPEC_<n>` define holding its value.
     pub spec_id: Option<u32>,
 }
 
@@ -24,11 +24,17 @@ impl Annotated {
     pub fn get(&self, key: &str) -> Option<&str> {
         self.items.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
     }
+
+    /// A specialized constant's default value (its `Default`, else 0).
+    pub fn default_value(&self) -> &str {
+        self.get("Default").filter(|d| !d.is_empty()).unwrap_or("0")
+    }
 }
 
 /// Removes annotations from comment-free `text`, keeping line structure. A global marked
-/// `SpecializedConstant()` becomes `[[vk::constant_id(n)]] const T name = Default;`, numbered
-/// in order, which `spirv::specialize` later bakes per combo.
+/// `SpecializedConstant()` becomes `static const T name = UB_SPEC_<n>;`, numbered in order: each
+/// variant compiles with its value defined, so no `OpSpecConstant` (and no `OpSpecConstantOp`,
+/// which naga rejects) reaches SPIR-V.
 pub fn strip(text: &str, out: &mut Vec<Annotated>) -> String {
     let b = text.as_bytes();
     let mut res = b.to_vec();
@@ -46,8 +52,7 @@ pub fn strip(text: &str, out: &mut Vec<Annotated>) -> String {
         let mut a = Annotated { name, decl, items, spec_id: None };
         blank_bytes(&mut res[lt..=gt]);
         if a.get("SpecializedConstant").is_some() {
-            let value = a.get("Default").filter(|d| !d.is_empty()).unwrap_or("0");
-            let new = format!("[[vk::constant_id({next_spec})]] const {} = {value};", a.decl);
+            let new = format!("static const {} = UB_SPEC_{next_spec};", a.decl);
             if new.len() <= semi + 1 - start && !text[start..semi].contains('\n') {
                 blank_bytes(&mut res[start..=semi]);
                 res[start..start + new.len()].copy_from_slice(new.as_bytes());
@@ -140,7 +145,7 @@ mod tests {
         let mut found = Vec::new();
         let out = strip(src, &mut found);
         let lines: Vec<_> = out.lines().map(str::trim).collect();
-        assert_eq!(lines, ["[[vk::constant_id(0)]] const int A = 2;", "[[vk::constant_id(1)]] const int B = 0;"]);
-        assert_eq!(found.iter().map(|a| a.spec_id).collect::<Vec<_>>(), [Some(0), Some(1)]);
+        assert_eq!(lines, ["static const int A = UB_SPEC_0;", "static const int B = UB_SPEC_1;"]);
+        assert_eq!(found.iter().map(|a| (a.spec_id, a.default_value())).collect::<Vec<_>>(), [(Some(0), "2"), (Some(1), "0")]);
     }
 }

@@ -74,11 +74,26 @@ fn translate(words: &[u32]) -> Result<Translated, Error> {
     let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
     // HLSL positions are already in wgpu's (D3D-style) clip space; don't flip Y.
     let options = naga::front::spv::Options { adjust_coordinate_space: false, strict_capabilities: false, block_ctx_dump_prefix: None };
-    let module = naga::front::spv::parse_u8_slice(&bytes, &options).map_err(|e| fail(Phase::SpvIn, chain(&e)))?;
+    let mut module = naga::front::spv::parse_u8_slice(&bytes, &options).map_err(|e| fail(Phase::SpvIn, chain(&e)))?;
+    lower_is_nan(&mut module);
     let info = validate(&module).map_err(|m| fail(Phase::Validate, m))?;
     let wgsl = naga::back::wgsl::write_string(&module, &info, naga::back::wgsl::WriterFlags::empty())
         .map_err(|e| fail(Phase::WgslOut, chain(&e)))?;
     let back = naga::front::wgsl::parse_str(&wgsl).map_err(|e| fail(Phase::WgslIn, e.emit_to_string(&wgsl)))?;
     validate(&back).map_err(|m| fail(Phase::WgslIn, m))?;
     Ok(Translated { module, info, wgsl })
+}
+
+/// WGSL has no `isnan`, so `isnan(x)` becomes `x != x`.
+// Gotcha: a backend compiling with fast-math may fold `x != x` to false; NaN checks are guards only.
+fn lower_is_nan(module: &mut naga::Module) {
+    use naga::{BinaryOperator, Expression, RelationalFunction};
+    let functions = module.functions.iter_mut().map(|(_, f)| f).chain(module.entry_points.iter_mut().map(|e| &mut e.function));
+    for f in functions {
+        for (_, e) in f.expressions.iter_mut() {
+            if let Expression::Relational { fun: RelationalFunction::IsNan, argument } = *e {
+                *e = Expression::Binary { op: BinaryOperator::NotEqual, left: argument, right: argument };
+            }
+        }
+    }
 }

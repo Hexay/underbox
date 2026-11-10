@@ -2,17 +2,20 @@
 //! (static, dynamic) combo with a disk cache. See research/shaders.md.
 
 pub mod annotation;
+pub mod bindings;
 pub mod blocks;
 mod builtin;
 pub mod cache;
 pub mod combo;
 mod compat;
+pub mod comparison;
 pub mod compiler;
 pub mod decl;
 pub mod dxc;
 mod formats;
 pub mod include;
 pub mod reflect;
+pub mod row_major;
 mod scan;
 pub mod shader;
 pub mod spirv;

@@ -11,7 +11,21 @@ macro_rules! builtins {
     };
 }
 
-builtins!["math_general.fxc"];
+builtins![
+    "ambient_cube.fxc",
+    "baked_lighting_constants.fxc",
+    "encoded_normals.fxc",
+    "ffd.fxc",
+    "instancing.fxc",
+    "light_probe_volume.fxc",
+    "math_general.fxc",
+    "morph.fxc",
+    "octohedral_encoding.fxc",
+    "sheet_sampling.fxc",
+    "transform_buffer.fxc",
+    "volumetric_fog.fxc",
+    "vs_decompress.fxc",
+];
 
 pub fn get(name: &str) -> Option<&'static str> {
     FILES.iter().find(|(n, _)| *n == name).map(|(_, text)| *text)

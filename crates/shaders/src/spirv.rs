@@ -20,7 +20,7 @@ const DECORATION_SPEC_ID: u32 = 1;
 const DECORATION_LOCATION: u32 = 30;
 const DECORATION_USER_SEMANTIC: u32 = 5635;
 const STORAGE_INPUT: u32 = 1;
-const HEADER_WORDS: usize = 5;
+pub(crate) const HEADER_WORDS: usize = 5;
 
 /// A shader input's location with its HLSL semantic (`POSITION`, `TEXCOORD0`) and variable name.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -30,7 +30,7 @@ pub struct InputSemantic {
     pub name: String,
 }
 
-fn instructions(words: &[u32]) -> impl Iterator<Item = &[u32]> {
+pub(crate) fn instructions(words: &[u32]) -> impl Iterator<Item = &[u32]> {
     let mut i = HEADER_WORDS.min(words.len());
     std::iter::from_fn(move || {
         let n = (*words.get(i)? >> 16) as usize;
@@ -50,7 +50,7 @@ fn rebuild(words: &[u32], mut f: impl FnMut(&[u32]) -> Option<Vec<u32>>) -> Vec<
     out
 }
 
-fn op(inst: &[u32]) -> u32 {
+pub(crate) fn op(inst: &[u32]) -> u32 {
     inst[0] & 0xffff
 }
 
@@ -60,7 +60,7 @@ fn with_op(inst: &[u32], opcode: u32) -> Vec<u32> {
     v
 }
 
-fn string(words: &[u32]) -> String {
+pub(crate) fn string(words: &[u32]) -> String {
     let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).take_while(|&b| b != 0).collect();
     String::from_utf8_lossy(&bytes).into_owned()
 }

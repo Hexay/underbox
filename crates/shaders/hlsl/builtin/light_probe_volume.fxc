@@ -1,0 +1,38 @@
+// underbox replacement for Valve's light_probe_volume.fxc. Also compiled into compute and vertex
+// programs, so no implicit-derivative sampling here.
+// TODO: sample baked probe volumes once the renderer binds them (layout to be defined with it);
+// until then there is no baked indirect light and no baked direct-light indices.
+#ifndef LIGHT_PROBE_VOLUME_FXC
+#define LIGHT_PROBE_VOLUME_FXC
+
+#include "ambient_cube.fxc"
+
+void SampleLightProbeVolume( out float3 vAmbientCube[6], float3 vPositionWs )
+{
+	[unroll]
+	for ( int i = 0; i < 6; i++ )
+		vAmbientCube[i] = float3( 0, 0, 0 );
+}
+
+float3 SampleLightProbeVolume( float3 vPositionWs, float3 vNormalWs )
+{
+	float3 vCube[6];
+	SampleLightProbeVolume( vCube, vPositionWs );
+	return SampleIrradiance( vCube, vNormalWs );
+}
+
+// Up to four baked lights affecting the position (index per channel, -1 = none) and their strengths.
+void SampleLightProbeVolumeIndexedDirectLighting( out int4 vIndices, out float4 vStrengths, float3 vPositionWs )
+{
+	vIndices = int4( -1, -1, -1, -1 );
+	vStrengths = float4( 0, 0, 0, 0 );
+}
+
+// Debug view: alternating voxel shading.
+float GetLightProbeUVWCheckerboard( float3 vPositionWs )
+{
+	int3 v = int3( floor( vPositionWs / 64.0 ) );
+	return ( ( v.x + v.y + v.z ) & 1 ) ? 1.0 : 0.75;
+}
+
+#endif // LIGHT_PROBE_VOLUME_FXC
