@@ -21,6 +21,11 @@ pub mod shader;
 pub mod spirv;
 pub mod translate;
 
+// hassle-rs's `com` dependency calls the registry API without linking it.
+#[cfg(windows)]
+#[link(name = "advapi32")]
+unsafe extern "C" {}
+
 pub use cache::Cache;
 pub use combo::{Combo, ComboSet, INVALID_INDEX};
 pub use compiler::{CompiledStage, Compiler, Variant};
