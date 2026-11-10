@@ -485,6 +485,7 @@ dependencies = [
  "physics",
  "platform",
  "render",
+ "serde",
  "serde_json",
  "shaders",
  "window",

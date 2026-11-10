@@ -22,6 +22,7 @@ objects = { path = "../objects" }
 physics = { path = "../physics" }
 platform = { path = "../platform" }
 render = { path = "../render" }
+serde.workspace = true
 serde_json.workspace = true
 shaders = { path = "../shaders" }
 window = { path = "../window" }

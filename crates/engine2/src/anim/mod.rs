@@ -10,6 +10,7 @@ mod controller_debug;
 mod conv;
 pub mod data;
 mod graph;
+mod graph_builder;
 mod model_slots;
 pub mod object;
 mod playback_slots;
@@ -22,6 +23,7 @@ mod tests;
 pub fn register(r: &mut abi::Registry) {
     model_slots::register(r);
     graph::register(r);
+    graph_builder::register(r);
     controller::register(r);
     controller_debug::register(r);
     bone_slots::register(r);
