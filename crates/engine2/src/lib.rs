@@ -32,6 +32,7 @@ pub mod convar;
 pub mod resource_compiler;
 pub mod shader;
 mod engine_glue;
+pub mod input;
 mod video;
 mod world;
 mod xr;
