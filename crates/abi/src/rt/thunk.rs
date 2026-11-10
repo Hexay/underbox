@@ -31,7 +31,7 @@ pub(crate) unsafe fn by_val<T: Copy + Default>(p: *const T) -> T {
 /// # Safety
 /// `p` is null or points at a `T` that's valid, aligned and unaliased for the call.
 #[inline]
-pub(crate) unsafe fn out_ref<'a, T>(p: *mut T, scratch: &'a mut T) -> &'a mut T {
+pub(crate) unsafe fn out_ref<T>(p: *mut T, scratch: &mut T) -> &mut T {
     if p.is_null() { scratch } else { unsafe { &mut *p } }
 }
 
