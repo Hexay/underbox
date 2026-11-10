@@ -17,7 +17,7 @@ pub fn texture_inputs(src: &str) -> Vec<(String, String)> {
         if !statement.contains("Texture") {
             continue;
         }
-        let Some(attr) = identifiers(statement).filter(|w| w.starts_with("g_t")).last() else { continue };
+        let Some(attr) = identifiers(statement).rfind(|w| w.starts_with("g_t")) else { continue };
         for input in identifiers(&code[open + 1..end]).filter(|i| inputs.contains(i)) {
             let pair = (input.to_owned(), attr.to_owned());
             if !pairs.contains(&pair) {

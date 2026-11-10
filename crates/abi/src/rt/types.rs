@@ -203,13 +203,12 @@ impl StringToken {
         const M: u32 = 0x5bd1_e995;
         let bytes = s.to_ascii_lowercase().into_bytes();
         let mut h = 0x3141_5926 ^ bytes.len() as u32;
-        let mut chunks = bytes.chunks_exact(4);
-        for c in &mut chunks {
-            let mut k = u32::from_le_bytes(c.try_into().unwrap()).wrapping_mul(M);
+        let (chunks, tail) = bytes.as_chunks::<4>();
+        for &c in chunks {
+            let mut k = u32::from_le_bytes(c).wrapping_mul(M);
             k ^= k >> 24;
             h = h.wrapping_mul(M) ^ k.wrapping_mul(M);
         }
-        let tail = chunks.remainder();
         if !tail.is_empty() {
             h ^= tail.iter().enumerate().fold(0, |acc, (i, &b)| acc | (b as u32) << (8 * i));
             h = h.wrapping_mul(M);

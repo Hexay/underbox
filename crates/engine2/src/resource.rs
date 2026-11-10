@@ -47,6 +47,12 @@ impl<T> ByName<T> {
     }
 }
 
+impl<T> Default for ByName<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// What every resource type answers about itself through its handles.
 pub trait Resource: Send + Sync + 'static {
     fn is_error(&self) -> bool {

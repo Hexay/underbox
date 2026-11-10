@@ -1,7 +1,7 @@
 //! No platform services: the game server is "logged on" at once as an anonymous server, and every
 //! auth ticket is accepted (dev and LAN; anyone can claim any identity).
 
-use crate::{BeginAuth, Event, Platform, ServerInfo, SteamId};
+use crate::{AuthResponse, BeginAuth, Event, Platform, ServerInfo, SteamId};
 use std::sync::Mutex;
 
 #[derive(Default)]
@@ -28,7 +28,11 @@ impl Platform for Offline {
         "offline"
     }
 
-    fn server_init(&self, _port: u16, _query_port: u16) {}
+    fn server_init(&self, _port: u16, _query_port: u16, _version: &str) {}
+
+    fn server_shutdown(&self) {
+        *self.state() = State::default();
+    }
 
     fn server_log_on(&self, _token: Option<&str>) {
         let mut s = self.state();
@@ -64,7 +68,7 @@ impl Platform for Offline {
             return BeginAuth::DuplicateRequest;
         }
         s.sessions.push(user);
-        s.events.push(Event::AuthResult { user, owner: user, ok: true });
+        s.events.push(Event::AuthResult { user, owner: user, response: AuthResponse::Ok });
         BeginAuth::Ok
     }
 
@@ -90,9 +94,12 @@ mod tests {
         let user = SteamId(76561197960265729);
         assert_eq!(p.begin_auth(user, b"x"), BeginAuth::Ok);
         assert_eq!(p.begin_auth(user, b"x"), BeginAuth::DuplicateRequest);
-        assert_eq!(p.poll(), [Event::ServerConnected, Event::AuthResult { user, owner: user, ok: true }]);
+        assert_eq!(p.poll(), [Event::ServerConnected, Event::AuthResult { user, owner: user, response: AuthResponse::Ok }]);
         assert!(p.poll().is_empty());
         p.end_auth(user);
         assert_eq!(p.begin_auth(user, b"x"), BeginAuth::Ok);
+        p.server_shutdown();
+        assert!(!p.server_logged_on());
+        assert!(p.poll().is_empty(), "shutdown drops pending events");
     }
 }

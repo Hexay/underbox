@@ -16,8 +16,11 @@ pub struct Loaded {
     pub textures: Vec<(String, texture::Ref)>,
 }
 
+/// A shader's texture inputs: (attribute, declared default).
+type Declarations = Vec<(String, String)>;
+
 /// Texture declarations per shader path; `None` for shaders not in source (closed ones).
-static SHADERS: LazyLock<Mutex<HashMap<String, Option<Vec<(String, String)>>>>> = LazyLock::new(Default::default);
+static SHADERS: LazyLock<Mutex<HashMap<String, Option<Declarations>>>> = LazyLock::new(Default::default);
 
 fn source_path(path: &str, ext: &str) -> String {
     let path = path.strip_suffix("_c").unwrap_or(path);
