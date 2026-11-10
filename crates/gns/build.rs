@@ -22,8 +22,18 @@ fn main() {
         cfg.define("USE_CRYPTO", "BCrypt")
             .define("CMAKE_TOOLCHAIN_FILE", vcpkg.join("scripts/buildsystems/vcpkg.cmake"))
             .define("VCPKG_TARGET_TRIPLET", "x64-windows-static-md")
-            .define("MSVC_CRT_STATIC", "OFF");
-        println!("cargo:rustc-link-search=native={}", vcpkg.join("installed/x64-windows-static-md/lib").display());
+            .define("MSVC_CRT_STATIC", "OFF")
+            // Default OFF defines PROTOBUF_USE_DLLS, so every protobuf symbol would be a dllimport.
+            .define("Protobuf_USE_STATIC_LIBS", "ON");
+        let libs = vcpkg.join("installed/x64-windows-static-md/lib");
+        println!("cargo:rustc-link-search=native={}", libs.display());
+        // Modern protobuf depends on Abseil and utf8_range, split across many static libs.
+        for entry in std::fs::read_dir(&libs).expect("vcpkg lib dir") {
+            let name = entry.unwrap().file_name().into_string().unwrap();
+            if let Some(lib) = name.strip_suffix(".lib").filter(|n| n.starts_with("absl_") || n.starts_with("utf8_")) {
+                println!("cargo:rustc-link-lib=static={lib}");
+            }
+        }
     } else {
         cfg.define("USE_CRYPTO", "OpenSSL");
     }
@@ -43,8 +53,11 @@ fn main() {
         .file("src/shim.cpp")
         .compile("gns_shim");
 
+    if windows {
+        println!("cargo:rustc-link-lib=static=libprotobuf");
+    }
     let libs: &[&str] = if windows {
-        &["libprotobuf", "ws2_32", "crypt32", "winmm", "iphlpapi", "bcrypt", "advapi32"]
+        &["ws2_32", "crypt32", "winmm", "iphlpapi", "bcrypt", "advapi32", "dbghelp"]
     } else {
         &["protobuf", "ssl", "crypto", "stdc++", "pthread"]
     };
