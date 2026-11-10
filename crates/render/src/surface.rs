@@ -1,7 +1,7 @@
 //! Presenting to a window. Frames always render offscreen (a swap chain's colour texture); with a
-//! window, `present` copies that texture into the surface's current image. The window lane hands
-//! us anything `wgpu::SurfaceTarget` accepts (a raw-window-handle source); without one, nothing
-//! here is used and frames stay readable for hashing.
+//! window, `present` copies that texture into the surface's current image. Surfaces come from a
+//! `wgpu::SurfaceTarget` or raw window/display handles (SDL windows); without one, nothing here is
+//! used and frames stay readable for hashing.
 
 use crate::{Gpu, Texture};
 
@@ -38,6 +38,28 @@ impl Surface {
     /// A surface on `target` sized `width × height`.
     pub fn new(gpu: &Gpu, target: impl Into<SurfaceTarget<'static>>, width: u32, height: u32, vsync: bool) -> Result<Surface, SurfaceError> {
         let surface = gpu.instance.create_surface(target).map_err(SurfaceError::Create)?;
+        Surface::configure_new(gpu, surface, width, height, vsync)
+    }
+
+    /// A surface on raw window and display handles (an SDL window's, from the window crate).
+    ///
+    /// # Safety
+    /// The handles must stay valid until the returned surface is dropped.
+    pub unsafe fn from_raw(
+        gpu: &Gpu,
+        window: wgpu::rwh::RawWindowHandle,
+        display: wgpu::rwh::RawDisplayHandle,
+        width: u32,
+        height: u32,
+        vsync: bool,
+    ) -> Result<Surface, SurfaceError> {
+        let target = wgpu::SurfaceTargetUnsafe::RawHandle { raw_display_handle: Some(display), raw_window_handle: window };
+        // SAFETY: the caller keeps the handles alive for the surface's lifetime.
+        let surface = unsafe { gpu.instance.create_surface_unsafe(target) }.map_err(SurfaceError::Create)?;
+        Surface::configure_new(gpu, surface, width, height, vsync)
+    }
+
+    fn configure_new(gpu: &Gpu, surface: wgpu::Surface<'static>, width: u32, height: u32, vsync: bool) -> Result<Surface, SurfaceError> {
         let caps = surface.get_capabilities(&gpu.adapter);
         let format = FORMATS.into_iter().find(|f| caps.formats.contains(f)).ok_or(SurfaceError::Unsupported)?;
         // TODO: surfaces without COPY_DST need a blit pass instead of a copy.

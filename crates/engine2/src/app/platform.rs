@@ -53,8 +53,9 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, global::APP_IS_DEDICATED_SERVER, || dict::current_config().dedicated_server);
     bind!(r, global::SOURCE_ENGINE_UNIT_TEST_INIT, || true);
-    // TODO: the startup window belongs to the window subsystem; managed only asks with a game window.
-    bind!(r, global::SOURCE_ENGINE_INIT_STARTUP_WINDOW, |_| false);
+    // Managed asks only with a game window, then creates the window itself through globalSdl; we
+    // only need video up (SDL's offscreen driver when headless, which renders offscreen).
+    bind!(r, global::SOURCE_ENGINE_INIT_STARTUP_WINDOW, |_| window::video::ensure());
     bind!(r, global::SOURCE_ENGINE_PRE_INIT, |cmd, _app| {
         *COMMAND_LINE.write().unwrap() = string(cmd);
         true
