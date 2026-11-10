@@ -10,4 +10,5 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 abi = { path = "../abi" }
+assets = { path = "../assets" }
 objects = { path = "../objects" }

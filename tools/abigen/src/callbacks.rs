@@ -46,6 +46,7 @@ pub fn emit(abi: &Abi, structs: &Structs) -> Result<String, String> {
                     Conv::ByVal => format!("{id} as *const _"),
                     Conv::OutRef => format!("{id} as *mut _"),
                     Conv::StrOut => return Err(ctx("string-return conversion on an argument".into())),
+                    Conv::Slice | Conv::Len => return Err(ctx("buffers fold only on slots".into())),
                 });
             }
             let r = types::map(&cb.ret, true, Dir::Callback, None, structs).map_err(ctx)?;

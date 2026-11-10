@@ -1,6 +1,7 @@
 //! abigen: abi/engine.json + abi/layouts.json → crates/abi/src/generated/.
 //! usage: abigen <abi dir> <out dir>
 
+mod buffers;
 mod callbacks;
 mod names;
 mod slots;

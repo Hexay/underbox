@@ -34,3 +34,15 @@ pub(crate) unsafe fn by_val<T: Copy + Default>(p: *const T) -> T {
 pub(crate) unsafe fn out_ref<'a, T>(p: *mut T, scratch: &'a mut T) -> &'a mut T {
     if p.is_null() { scratch } else { unsafe { &mut *p } }
 }
+
+/// A buffer managed passed as pointer + element count; empty when null or the count is ≤ 0.
+///
+/// # Safety
+/// `p` is null or points at `len` `T`s that are valid, aligned and unaliased for the call.
+#[inline]
+pub(crate) unsafe fn slice_arg<'a, T, P>(p: *mut P, len: impl TryInto<usize>) -> &'a mut [T] {
+    match len.try_into() {
+        Ok(n) if n > 0 && !p.is_null() => unsafe { std::slice::from_raw_parts_mut(p.cast::<T>(), n) },
+        _ => &mut [],
+    }
+}

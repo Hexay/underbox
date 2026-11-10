@@ -70,11 +70,12 @@ fn plan<'a>(abi: &'a Abi, structs: &Structs) -> Result<Vec<Planned<'a>>, String>
         }
         let self_class = slot.class.as_ref().map(|c| c.native.as_str());
         let ctx = |e: String| format!("slot {} ({}): {e}", slot.index, slot.name);
-        let args = slot
+        let mut args = slot
             .args
             .iter()
             .map(|a| types::map(a, false, Dir::Slot, self_class, structs).map_err(ctx))
             .collect::<Result<Vec<_>, _>>()?;
+        crate::buffers::fold(slot, &mut args).map_err(ctx)?;
         let ret = types::map(&slot.ret, true, Dir::Slot, self_class, structs).map_err(ctx)?;
         if matches!(ret.conv, Conv::ByVal | Conv::OutRef | Conv::CStrIn) {
             return Err(ctx(format!("can't return {:?}", ret.conv)));
@@ -93,7 +94,7 @@ fn overload_suffix(mangled: &str, member: &str) -> String {
 }
 
 fn safe_fn(p: &Planned) -> String {
-    let args: Vec<_> = p.args.iter().map(|a| a.safe.as_str()).collect();
+    let args: Vec<_> = p.args.iter().filter(|a| a.conv != Conv::Len).map(|a| a.safe.as_str()).collect();
     let ret = if p.ret.safe == "()" { String::new() } else { format!(" -> {}", p.ret.safe) };
     format!("fn({}){ret}", args.join(", "))
 }
@@ -214,6 +215,8 @@ fn emit_thunks(planned: &[Planned]) -> Result<String, String> {
                     writeln!(out, "            let mut s{n} = Default::default();").unwrap();
                     format!("unsafe {{ out_ref(a{n}, &mut s{n}) }}")
                 }
+                Conv::Slice => format!("unsafe {{ slice_arg(a{n}, a{}) }}", n + 1),
+                Conv::Len => continue,
                 Conv::StrOut => return Err(format!("slot {i}: string-return conversion on an argument")),
             };
             call_args.push(expr);
