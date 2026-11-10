@@ -24,6 +24,7 @@ pub enum Kind {
     PhysicsShape,
     PhysicsAggregate,
     PhysicsJoint,
+    AudioStream,
 }
 
 impl Kind {

@@ -3,12 +3,38 @@
 
 use abi::slots::{c_audio_mix_buffer as buf, c_audio_mix_device_buffers as dev};
 use abi::{NativeRef, RawPtr, Registry, bind, class};
+use audio::{BLOCK as MIX_BUFFER_SIZE, Block};
 use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 
-/// `AudioEngine.MixBufferSize` (Sandbox.Engine/Systems/Audio/AudioEngine.cs).
-pub const MIX_BUFFER_SIZE: usize = 512;
+pub type BufRef = NativeRef<class::CAudioMixBuffer>;
+pub type DevRef = NativeRef<class::CAudioMixDeviceBuffers>;
 
-type BufRef = NativeRef<class::CAudioMixBuffer>;
+/// One buffer's samples (silence if it's dead).
+pub fn read(b: BufRef) -> Block {
+    objects::get::<_, MixBuffer>(b).map_or(audio::SILENT, |m| std::array::from_fn(|i| m.get(i)))
+}
+
+pub fn write(b: BufRef, block: &Block) {
+    on(b, |m| block.iter().enumerate().for_each(|(i, &v)| m.set(i, v)));
+}
+
+/// A device buffer set's channels, as blocks.
+pub fn read_all(d: DevRef) -> Vec<Block> {
+    channels(d).into_iter().map(read).collect()
+}
+
+/// Write `blocks` over the set's first channels.
+pub fn write_all(d: DevRef, blocks: &[Block]) {
+    channels(d).into_iter().zip(blocks).for_each(|(b, block)| write(b, block));
+}
+
+pub fn channel_count(d: DevRef) -> usize {
+    channels(d).len()
+}
+
+fn channels(d: DevRef) -> Vec<BufRef> {
+    objects::get::<_, DeviceBuffers>(d).map(|d| d.0.clone()).unwrap_or_default()
+}
 
 /// Samples as f32 bits. Managed writes them through a raw pointer while we may read them, so
 /// they're atomics (same layout as f32) rather than plain floats behind a lock.
