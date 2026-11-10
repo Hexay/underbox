@@ -12,7 +12,8 @@ PORT=${PORT:-27215}
 mkdir -p "$OUT"
 
 # Boots copy libengine2.so into the shared sbox-public tree; serialise with every other worktree.
-OUT=$OUT flock /srv/agents/cache/underbox-boot.lock sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- \
+# -o: a lingering child (MSBuild node, server) must not inherit and keep holding the lock.
+OUT=$OUT UNTIL='MATCH:END' GRACE=1 flock -o /srv/agents/cache/underbox-boot.lock sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- \
     +game "$ROOT/corpus/orbmatch/.sbproj" +port "$PORT" > "$OUT/boot.txt" 2>&1 || true
 
 fail=0
