@@ -1,0 +1,89 @@
+//! Turning meshes into GPU draws: [`gpu_mesh`] uploads `MeshGlue` buffers (re-uploading when
+//! their version moves), [`model`] expands a model into per-draw-call [`Draw`]s, [`immediate`]
+//! holds the RenderTools / IRenderContext draw slots. Everything shades with the placeholder
+//! program for now (docs/renderer.md, "Shaders").
+
+pub mod gpu_mesh;
+pub mod immediate;
+pub mod model;
+
+use crate::render::{device, texture};
+use abi::structs::{NativeRect, RenderViewport};
+use render::pass::{self, DrawUniforms, Load, MeshDraw, Targets};
+use render::wgpu::{IndexFormat, PrimitiveTopology};
+use render::{Placeholder, RasterState, VertexBufferKey};
+use std::ops::Range;
+use std::sync::{Arc, OnceLock};
+
+/// One draw with owned buffers, ready for [`execute`].
+pub struct Draw {
+    pub vertices: Arc<render::Buffer>,
+    pub vertex_offset: u64,
+    pub vertex: Vec<VertexBufferKey>,
+    pub indices: Option<(Arc<render::Buffer>, IndexFormat)>,
+    pub range: Range<u32>,
+    pub base_vertex: i32,
+    pub instances: u32,
+    pub uniforms: DrawUniforms,
+    pub state: RasterState,
+}
+
+/// Where draws go: textures (null for none), viewport (zero size = whole target), scissor.
+#[derive(Clone, Copy, Default)]
+pub struct Target {
+    pub color: texture::Ref,
+    pub depth: texture::Ref,
+    pub viewport: RenderViewport,
+    pub scissor: Option<NativeRect>,
+}
+
+pub fn placeholder() -> Option<&'static Placeholder> {
+    static PLACEHOLDER: OnceLock<Placeholder> = OnceLock::new();
+    let gpu = device::gpu()?;
+    Some(PLACEHOLDER.get_or_init(|| Placeholder::new(gpu)))
+}
+
+/// `RenderPrimitiveType` to a wgpu topology; patches and adjacency draw as triangle lists.
+pub fn topology(prim: i64) -> PrimitiveTopology {
+    match prim {
+        0 => PrimitiveTopology::PointList,
+        1 | 2 => PrimitiveTopology::LineList,
+        3 | 4 => PrimitiveTopology::LineStrip,
+        7 | 8 => PrimitiveTopology::TriangleStrip,
+        _ => PrimitiveTopology::TriangleList,
+    }
+}
+
+/// Run `draws` (possibly none, to only clear) into `target` as one pass.
+pub fn execute(target: &Target, load: Load, draws: &[Draw]) {
+    let (Some(gpu), Some(placeholder)) = (device::gpu(), placeholder()) else { return };
+    let (color, depth) = (texture::resolve(target.color), texture::resolve(target.depth));
+    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), ..Default::default() };
+    if let (Some(c), Some(d)) = (targets.color, targets.depth)
+        && (c.desc.width, c.desc.height) != (d.desc.width, d.desc.height)
+    {
+        targets.depth = None;
+    }
+    targets.depth = targets.depth.filter(|d| d.desc.format.is_depth_stencil_format());
+    let v = target.viewport;
+    if v.m_n_width > 0 && v.m_n_height > 0 {
+        let far = if v.max_z > v.min_z { v.max_z } else { 1.0 };
+        targets.viewport = Some([v.m_n_top_left_x as f32, v.m_n_top_left_y as f32, v.m_n_width as f32, v.m_n_height as f32, v.min_z.max(0.0), far]);
+    }
+    targets.scissor = target.scissor.filter(|s| s.w > 0 && s.h > 0).map(|s| [s.x.max(0) as u32, s.y.max(0) as u32, s.w as u32, s.h as u32]);
+    let draws: Vec<_> = draws
+        .iter()
+        .map(|d| MeshDraw {
+            vertices: (&d.vertices.buffer, d.vertex_offset),
+            vertex: d.vertex.clone(),
+            indices: d.indices.as_ref().map(|(b, f)| (&b.buffer, *f)),
+            range: d.range.clone(),
+            base_vertex: d.base_vertex,
+            instances: d.instances,
+            uniforms: d.uniforms,
+            state: RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state },
+        })
+        .collect();
+    let load = Load { color: load.color.filter(|_| targets.color.is_some()), depth: load.depth.filter(|_| targets.depth.is_some()) };
+    pass::execute(gpu, placeholder, &targets, load, &draws);
+}
