@@ -74,9 +74,9 @@ impl IndexBuffer {
     pub fn indices(&self) -> Vec<u32> {
         let bytes = self.read();
         if self.meta {
-            bytes.chunks_exact(4).map(|c| u32::from_le_bytes(c.try_into().unwrap())).collect()
+            bytes.as_chunks::<4>().0.iter().map(|c| u32::from_le_bytes(*c)).collect()
         } else {
-            bytes.chunks_exact(2).map(|c| u32::from(u16::from_le_bytes(c.try_into().unwrap()))).collect()
+            bytes.as_chunks::<2>().0.iter().map(|c| u32::from(u16::from_le_bytes(*c))).collect()
         }
     }
 
@@ -158,7 +158,7 @@ fn legacy_layout(stride: i32, names: Option<&CStr>, fields: RawPtr<c_void>, n: i
 }
 
 /// The locked region's address (managed writes straight into it), or null when out of range.
-fn lock<M>(b: Option<Arc<Buffer<M>>>, size: i32, offset: i32) -> RawPtr<c_void> {
+pub(super) fn lock<M>(b: Option<Arc<Buffer<M>>>, size: i32, offset: i32) -> RawPtr<c_void> {
     let (Some(b), Ok(size), Ok(offset)) = (b, usize::try_from(size), usize::try_from(offset)) else { return RawPtr::NULL };
     let mut bytes = b.read();
     if offset + size > bytes.len() {
@@ -168,13 +168,13 @@ fn lock<M>(b: Option<Arc<Buffer<M>>>, size: i32, offset: i32) -> RawPtr<c_void> 
     RawPtr::from_raw(bytes[offset..].as_mut_ptr().cast())
 }
 
-fn set_data<M>(b: Option<Arc<Buffer<M>>>, data: RawPtr<c_void>, size: i32, offset: i32) {
+pub(super) fn set_data<M>(b: Option<Arc<Buffer<M>>>, data: RawPtr<c_void>, size: i32, offset: i32) {
     let (Some(b), Ok(size), Ok(offset)) = (b, usize::try_from(size), usize::try_from(offset)) else { return };
     b.write(offset, &bytes_at(data, size));
 }
 
 /// Grow or shrink to `count` elements keeping the prefix; the handle stays the same.
-fn resize<M>(b: &Buffer<M>, count: i32, size: usize) {
+pub(super) fn resize<M>(b: &Buffer<M>, count: i32, size: usize) {
     b.read().resize(count.max(0) as usize * size, 0);
     b.touch();
 }

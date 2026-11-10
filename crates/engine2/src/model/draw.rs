@@ -28,7 +28,7 @@ pub fn trace(m: &Model, input: &MeshTraceInput, hit: &mut MeshTraceOutput) -> bo
         for d in x.mesh.draw_calls().iter().filter(|d| d.prim == TRIANGLES) {
             let start_index = d.start_index.max(0) as usize;
             let span = indices.get(start_index..start_index + d.index_count.max(0) as usize).unwrap_or_default();
-            for (t, tri) in span.chunks_exact(3).enumerate() {
+            for (t, tri) in span.as_chunks::<3>().0.iter().enumerate() {
                 let corner = |i: u32| vertices.get(i as usize + d.start_vertex.max(0) as usize).copied().unwrap_or_default();
                 let c = [corner(tri[0]), corner(tri[1]), corner(tri[2])];
                 let p = c.map(|c| Vec3::from(c.position));

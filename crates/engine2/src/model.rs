@@ -6,6 +6,8 @@ pub mod content;
 mod draw;
 mod parts;
 pub mod physics;
+#[cfg(test)]
+pub(crate) mod tests;
 
 use crate::resource::{self, ByName, Resource};
 use abi::slots::{c_model as m, glue_resources as glue};

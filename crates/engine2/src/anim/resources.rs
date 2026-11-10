@@ -120,3 +120,45 @@ pub fn register(r: &mut Registry) {
         })
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anim::{ModelAnim, Skeleton, Xform};
+    use glam::{Quat, Vec3};
+
+    /// `root` and `arm` (10 up); `walk`, 2 frames at 10 fps moving `root` 4 along X.
+    fn insert(model: &str) {
+        let mut skeleton = Skeleton::default();
+        skeleton.push_local("root", None, Xform::IDENTITY);
+        skeleton.push_local("arm", Some(0), Xform::new(Vec3::new(0.0, 0.0, 10.0), Quat::IDENTITY));
+        let mut walk = Clip::new("walk", 10.0);
+        walk.frames = vec![vec![Xform::IDENTITY], vec![Xform::new(Vec3::new(4.0, 0.0, 0.0), Quat::IDENTITY)]];
+        data::insert(model, ModelAnim { skeleton, clips: vec![Arc::new(walk)], ..Default::default() });
+    }
+
+    #[test]
+    fn skeleton_resource_reads_the_model_skeleton() {
+        insert("models/test/res_skeleton.vmdl");
+        let s = skeleton("models/test/res_skeleton.vmdl").unwrap();
+        let k = &s.model.anim.skeleton;
+        assert_eq!((k.len(), k.bone(1).unwrap().parent), (2, Some(0)));
+        assert_eq!(bone_at(&k.model_space(&k.bind_pose()), 1).position.vec.z, 10.0);
+        assert_eq!(bone_at(&[], 3).scale.vec.x, 1.0, "out of range reads as identity");
+        assert!(skeleton("models/test/none.vmdl").is_none());
+    }
+
+    #[test]
+    fn clip_resource_resolves_by_model_path_or_bare_name() {
+        insert("models/test/res_clip.vmdl");
+        let c = clip("models/test/res_clip.vmdl/walk").unwrap();
+        assert_eq!((c.clip.frames.len(), c.clip.duration()), (2, 0.1));
+        assert_eq!(c.skeleton.name, "models/test/res_clip.vmdl");
+        assert!(clip("animations/walk.vanmgrph").is_some(), "file stem found among loaded models");
+        assert!(clip("models/test/res_clip.vmdl/run").is_none());
+
+        let half = c.clip.sample(0.05, &Pose::bind(&c.skeleton.model.anim.skeleton));
+        assert!((bone_at(&half.0, 0).position.vec.x - 2.0).abs() < 1e-5);
+        assert!((c.clip.root_motion(0.0, 0.1).pos.x - 4.0).abs() < 1e-5);
+    }
+}
