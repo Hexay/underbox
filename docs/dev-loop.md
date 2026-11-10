@@ -7,6 +7,7 @@
 | Boot the client | `tools/boot-client.sh [max-s] [sbox-public] [-- args]` (headless, logs frame hashes to `target/client/frames.tsv`) |
 | Golden client frame | `tools/client-frame.sh` (showroom; `UNDERBOX_BLESS=1` records; PNG in `target/client-frame/`) |
 | Scripted match | `tools/match.sh` (stops at `MATCH:END`) |
+| Map loading | `tools/map.sh` (corpus/mapworld, stops at `MAP:END`); its frame: `CORPUS=mapworld tools/client-frame.sh` |
 | Net probe | `tools/net-probe.sh` |
 | Shared-build lock | `tools/boot-lock.sh <cmd...>` (only for scripts that write `sbox-public/game`) |
 | Measure a loop | `tools/loop-bench.sh <runs> <file> <cmd...>` (median and spread) |

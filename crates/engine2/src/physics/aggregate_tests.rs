@@ -7,26 +7,8 @@ use super::{body, joint};
 use crate::math::{identity, vec3};
 use crate::model::content::Content;
 use abi::structs::Transform;
-use std::ffi::c_void;
+use crate::handles::fake_managed;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, Ordering};
-
-static NEXT: AtomicI32 = AtomicI32::new(1);
-
-extern "C" fn register_handle(_: *mut c_void, _: u32) -> i32 {
-    NEXT.fetch_add(1, Ordering::Relaxed)
-}
-
-extern "C" fn free_handle(_: i32) {}
-
-/// Stand in for managed's handle index (callbacks 16 and 17).
-fn fake_managed() {
-    let mut table = vec![0usize; abi::CALLBACK_COUNT];
-    table[16] = register_handle as *const () as usize;
-    table[17] = free_handle as *const () as usize;
-    // SAFETY: the table holds CALLBACK_COUNT entries; only the two set are called here.
-    unsafe { abi::rt::callbacks::set_table(table.as_ptr()) };
-}
 
 fn new_world() -> world::Ref {
     objects::create_shared(Arc::new(PhysicsWorld::default()))

@@ -9,3 +9,5 @@ rust-version.workspace = true
 half = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tga", "tiff", "exr", "bmp"] }
 kv = { path = "../kv" }
+lz4_flex = "0.14.0"
+ruzstd = "0.8"

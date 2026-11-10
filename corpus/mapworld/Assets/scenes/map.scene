@@ -1,0 +1,95 @@
+{
+  "__guid": "7d2e4f61-9a3b-4c8d-b1e2-6f5a4b3c2d10",
+  "GameObjects": [
+    {
+      "__guid": "8e3f5a72-0b4c-4d9e-a2f3-7a6b5c4d3e21",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "9f4a6b83-1c5d-4eaf-b304-8b7c6d5e4f32",
+          "FogMode": "Enabled",
+          "FogStrength": 1,
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": false,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "a05b7c94-2d6e-4fb0-8415-9c8d7e6f5a43",
+      "Flags": 0,
+      "Name": "Map",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.MapInstance",
+          "__guid": "b16c8da5-3e7f-40c1-9526-ad9e8f7a6b54",
+          "EnableCollision": true,
+          "MapName": "maps/tiny.vpk",
+          "NoOrigin": false,
+          "UseMapFromLaunch": false
+        }
+      ]
+    },
+    {
+      "__guid": "c27d9eb6-4f80-41d2-a637-be0f9a8b7c65",
+      "Flags": 0,
+      "Name": "Probe",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "MapProbe",
+          "__guid": "d38eafc7-5091-42e3-b748-cf1a0b9c8d76",
+          "Timeout": 20
+        }
+      ]
+    },
+    {
+      "__guid": "e49fb0d8-61a2-43f4-8859-d02b1cad9e87",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,130",
+      "Rotation": "0,0.2215,0,0.9751",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "f5a0c1e9-72b3-4405-996a-e13c2dbe0f98",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

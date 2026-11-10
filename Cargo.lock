@@ -104,6 +104,8 @@ dependencies = [
  "half",
  "image",
  "kv",
+ "lz4_flex",
+ "ruzstd",
 ]
 
 [[package]]
@@ -489,6 +491,7 @@ dependencies = [
  "serde_json",
  "shaders",
  "window",
+ "world",
 ]
 
 [[package]]
@@ -1694,6 +1697,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
+name = "ruzstd"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
+dependencies = [
+ "twox-hash",
+]
+
+[[package]]
 name = "safe_arch"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2706,6 +2718,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "world"
+version = "0.1.0"
+dependencies = [
+ "assets",
+ "kv",
 ]
 
 [[package]]

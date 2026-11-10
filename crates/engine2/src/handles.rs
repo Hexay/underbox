@@ -67,3 +67,19 @@ impl Handle {
         }
     }
 }
+
+/// Stand in for managed's handle index (callbacks 16 and 17) in unit tests: ids count up from 1.
+#[cfg(test)]
+pub fn fake_managed() {
+    use std::ffi::c_void;
+    static NEXT: AtomicI32 = AtomicI32::new(1);
+    extern "C" fn register_handle(_: *mut c_void, _: u32) -> i32 {
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    }
+    extern "C" fn free_handle(_: i32) {}
+    let mut table = vec![0usize; abi::CALLBACK_COUNT];
+    table[16] = register_handle as *const () as usize;
+    table[17] = free_handle as *const () as usize;
+    // SAFETY: the table holds CALLBACK_COUNT entries; only the two set are called here.
+    unsafe { abi::rt::callbacks::set_table(table.as_ptr()) };
+}

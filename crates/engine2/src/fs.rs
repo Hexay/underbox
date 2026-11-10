@@ -20,6 +20,26 @@ struct Mounts {
     /// `EngineGlue.AddSearchPath` roots (path ID, folder): ahead of everything, or behind the cloud.
     front: Vec<(String, PathBuf)>,
     back: Vec<(String, PathBuf)>,
+    /// Mounted map paks, searched after the folders, newest first.
+    paks: Vec<std::sync::Arc<world::vpk::Vpk>>,
+}
+
+/// Make a pak's files readable through [`read`] until [`unmount_pak`].
+pub fn mount_pak(pak: std::sync::Arc<world::vpk::Vpk>) {
+    MOUNTS.write().unwrap().paks.push(pak);
+}
+
+pub fn unmount_pak(pak: &std::sync::Arc<world::vpk::Vpk>) {
+    MOUNTS.write().unwrap().paks.retain(|p| !std::sync::Arc::ptr_eq(p, pak));
+}
+
+/// A file's bytes: from the folders [`resolve`] searches, else from a mounted pak.
+pub fn read(path: &str, path_id: &str) -> Option<Vec<u8>> {
+    if let Some(file) = resolve(path, path_id) {
+        return std::fs::read(file).ok();
+    }
+    let paks = MOUNTS.read().unwrap().paks.clone();
+    paks.iter().rev().find_map(|p| p.read(path)?.inspect_err(|e| abi::rt::log::warn(&e.to_string())).ok())
 }
 
 /// Add a search root for `path_id`, ahead of the others when `front`.
