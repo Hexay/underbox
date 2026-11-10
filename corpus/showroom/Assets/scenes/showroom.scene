@@ -1,0 +1,137 @@
+{
+  "__guid": "9c1d7e52-3f84-4a6b-b2e1-5d0f8a7c3b14",
+  "GameObjects": [
+    {
+      "__guid": "a1f0c3d2-6b5e-4e7a-9c8d-0f1e2d3c4b5a",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "b2e1d4c3-7c6f-4f8b-8d9e-1a2f3e4d5c6b",
+          "FogMode": "Enabled",
+          "FogStrength": 1,
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": false,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "c3d2e5f4-8d7a-4a9c-9e0f-2b3a4f5e6d7c",
+      "Flags": 0,
+      "Name": "Floor",
+      "Scale": "4,4,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "d4e3f6a5-9e8b-4bad-8f10-3c4b5a6f7e8d",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.4,0.5,0.3,1"
+        }
+      ]
+    },
+    {
+      "__guid": "e5f4a7b6-0f9c-4cbe-9a21-4d5c6b7a8f9e",
+      "Flags": 0,
+      "Name": "Red Box",
+      "Position": "0,0,25",
+      "Rotation": "0,0,0.2588,0.9659",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "f6a5b8c7-1a0d-4dcf-8b32-5e6d7c8b9a0f",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.9,0.15,0.1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "0a7b6c9d-2b1e-4ed0-9c43-6f7e8d9c0b1a",
+      "Flags": 0,
+      "Name": "Blue Box",
+      "Position": "40,90,40",
+      "Scale": "1.6,1.6,1.6",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "1b8c7d0e-3c2f-4fe1-8d54-7a8f9e0d1c2b",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.15,0.3,0.9,1"
+        }
+      ]
+    },
+    {
+      "__guid": "2c9d8e1f-4d3a-4af2-9e65-8b9a0f1e2d3c",
+      "Flags": 0,
+      "Name": "White Box",
+      "Position": "60,-100,25",
+      "Rotation": "0,0,-0.3827,0.9239",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "3d0e9f2a-5e4b-4b03-8f76-9c0b1a2f3e4d",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "1,1,1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "4e1f0a3b-6f5c-4c14-9a87-0d1c2b3a4f5e",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,130",
+      "Rotation": "0,0.2215,0,0.9751",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "5f2a1b4c-7a6d-4d25-8b98-1e2d3c4b5a6f",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}
