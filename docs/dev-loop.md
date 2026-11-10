@@ -16,6 +16,8 @@
 - `boot-server.sh` stops `GRACE` seconds after a log line matches `UNTIL`; a plain boot stops at
   `Server is idle`. Give game boots an `UNTIL` that marks "done" instead of idling to the timeout.
   The last line, `== timing:`, splits the boot into prepare, cargo and server.
+- `boot-server.sh` ReadyToRun-compiles `game/bin/managed` (`tools/r2r-managed.sh`, a no-op once
+  done) so boots don't JIT the engine and Roslyn. A dotnet rebuild there is recompiled next boot.
 
 ## Incremental
 
