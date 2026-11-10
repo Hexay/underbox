@@ -103,5 +103,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, m::GET_MODEL_RENDER_BOUNDS, bounds);
     // TODO: physics from PhysicsShapeList nodes (none in the dev primitives).
     bind!(r, m::GET_PHYSICS_BOUNDS, |_| BBox::default());
+    // Every model has its "default" skin; TODO: MaterialGroupList nodes add more.
+    bind!(r, m::GET_NUM_MATERIAL_GROUPS, |_| 1);
+    bind!(r, m::GET_MATERIAL_GROUP_NAME, |_, i| StrRet::from((i == 0).then_some("default")));
+    bind!(r, m::GET_MATERIAL_GROUP_INDEX, |_, name| if name == abi::StringToken::of("default") { 0 } else { -1 });
     bind!(r, m::HAS_SCENE_OBJECTS, |r| on(r, |m| !m.meshes.is_empty()));
 }

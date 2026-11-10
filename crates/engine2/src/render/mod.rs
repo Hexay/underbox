@@ -23,6 +23,10 @@ enum RenderDeviceApi {
 
 pub fn register(r: &mut Registry) {
     bind!(r, device::GET_RENDER_DEVICE_API, || RenderDeviceApi::Empty as i64);
+    bind!(r, device::FLUSH_PIPELINE_CACHE, || {});
+    // Web-streamed textures stream from Facepunch's CDN, which only real devices consume.
+    bind!(r, abi::slots::glue_resources::SET_TEXTURE_WEB_STREAMING_STATE, |_, _| {});
+    bind!(r, abi::slots::glue_resources::CANCEL_TEXTURE_WEB_STREAMING_PREFETCH, || 0);
     attributes::register(r);
     image::register(r);
     material::register(r);

@@ -14,6 +14,7 @@ mod interfaces;
 pub mod physics;
 pub mod render;
 pub mod resource;
+mod resource_system;
 pub mod scene;
 pub mod subsystems;
 
