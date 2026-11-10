@@ -26,7 +26,7 @@ fn hull(position: abi::structs::Vector3, rotation: abi::structs::Rotation, point
 
 /// Triangles from a flat index list; a trailing partial triangle or a negative index is dropped.
 fn mesh(vertices: &[abi::structs::Vector3], indices: &[i32]) -> Geometry {
-    let triangles = indices.chunks_exact(3).filter_map(|t| Some([t[0].try_into().ok()?, t[1].try_into().ok()?, t[2].try_into().ok()?]));
+    let triangles = indices.as_chunks::<3>().0.iter().filter_map(|t| Some([t[0].try_into().ok()?, t[1].try_into().ok()?, t[2].try_into().ok()?]));
     Geometry::Mesh { vertices: vertices.iter().copied().map(to_vec).collect(), triangles: triangles.collect() }
 }
 

@@ -14,10 +14,10 @@ fn main() {
     let inherited: HashSet<usize> = INHERITS.iter().map(|&(d, _)| d).collect();
     let mut classes: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     let mut bound = 0;
-    for i in 0..SLOT_COUNT {
+    for (i, &class) in SLOT_CLASS.iter().enumerate().take(SLOT_COUNT) {
         let is_bound = status(i) != SlotStatus::Stub;
         bound += usize::from(is_bound);
-        let entry = classes.entry(if SLOT_CLASS[i].is_empty() { "(error)" } else { SLOT_CLASS[i] }).or_default();
+        let entry = classes.entry(if class.is_empty() { "(error)" } else { class }).or_default();
         entry.0 += usize::from(is_bound);
         entry.1 += 1;
     }

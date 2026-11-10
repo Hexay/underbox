@@ -68,7 +68,7 @@ impl<'a> Structs<'a> {
         let name = &self.rust_names[l.managed.as_str()];
         let natural = self.align_of(l);
         // Pack=1 unions (AnimVariant is 17 bytes) can't carry their fields' alignment.
-        let align = if l.size % natural == 0 { natural } else { 1 };
+        let align = if l.size.is_multiple_of(natural) { natural } else { 1 };
         writeln!(out, "/// `{}` ({} bytes, overlapping fields)\n#[repr(C, align({align}))]\n#[derive(Clone, Copy, Debug)]\npub struct {name} {{\n    bytes: [u8; {}],\n}}\n", l.managed, l.size, l.size).unwrap();
         writeln!(out, "impl Default for {name} {{\n    fn default() -> Self {{\n        Self {{ bytes: [0; {}] }}\n    }}\n}}\n\nimpl {name} {{", l.size).unwrap();
         for f in &l.fields {
@@ -120,7 +120,7 @@ impl<'a> Structs<'a> {
         if l.size > cursor {
             fields.push((format!("_pad{cursor}"), format!("[u8; {}]", l.size - cursor), cursor));
         }
-        let packed = !aligned || l.size % align != 0;
+        let packed = !aligned || !l.size.is_multiple_of(align);
 
         let repr = if packed { "#[repr(C, packed)]" } else { "#[repr(C)]" };
         let derives = if packed { "#[derive(Clone, Copy)]" } else { "#[derive(Clone, Copy, Debug)]" };
