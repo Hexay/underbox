@@ -12,6 +12,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # No debuginfo: smaller rust-cache, faster links (most of all MSVC's PDBs).
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
   linux:
@@ -30,8 +32,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      - run: cargo test --workspace --no-fail-fast
 
   windows:
     runs-on: windows-2022
@@ -55,8 +59,9 @@ jobs:
           path: C:\vcpkg\installed
           key: vcpkg-protobuf-x64-windows-static-md-v1
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      # Without cache-on-failure a red job saves nothing and the next run is cold again.
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+        with:
+          cache-on-failure: true
+      # No clippy here: Linux lints the same code, and a check pass shares no artifacts with test.
+      - run: cargo test --workspace --no-fail-fast
