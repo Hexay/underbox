@@ -30,6 +30,8 @@ if [ ! -f "$SBOX/game/sbox-server.dll" ] || [ "$SBOX/engine/Sandbox.Compiling/Em
     echo "== building sbox-server (~2 min)"
     # The icon isn't in the public repo; an empty property skips it without patching their csproj.
     dotnet build "$SBOX/engine/Launcher/SboxServer/Sbox-Server.csproj" -c Release -m:4 -nodeReuse:false -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
+    # An up-to-date build leaves the dll's mtime alone, which would rebuild on every boot.
+    touch "$SBOX/game/sbox-server.dll"
 fi
 T_PREP=$(lap prepare)
 
