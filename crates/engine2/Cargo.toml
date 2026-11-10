@@ -16,3 +16,6 @@ lz4_flex = "0.14.0"
 objects = { path = "../objects" }
 physics = { path = "../physics" }
 platform = { path = "../platform" }
+
+[features]
+steam = ["platform/steam"]

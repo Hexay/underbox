@@ -2,9 +2,13 @@
 //! The engine core talks only to [`Platform`]; native's Steam slots are a view over it.
 
 mod offline;
+#[cfg(feature = "steam")]
+mod steam;
 mod steam_id;
 
 pub use offline::Offline;
+#[cfg(feature = "steam")]
+pub use steam::Steam;
 pub use steam_id::SteamId;
 
 use std::sync::{Arc, OnceLock};
@@ -31,6 +35,9 @@ pub enum BeginAuth {
     Ok = 0,
     InvalidTicket = 1,
     DuplicateRequest = 2,
+    InvalidVersion = 3,
+    GameMismatch = 4,
+    ExpiredTicket = 5,
 }
 
 /// Something the platform reports back asynchronously, drained by [`Platform::poll`].
@@ -62,12 +69,37 @@ pub trait Platform: Send + Sync {
 
 static INSTALLED: OnceLock<Arc<dyn Platform>> = OnceLock::new();
 
-/// The process's platform; [`Offline`] unless a backend was installed first.
+/// The process's platform: the one installed first, else [`select`]ed by `UNDERBOX_PLATFORM`.
 pub fn get() -> &'static Arc<dyn Platform> {
-    INSTALLED.get_or_init(|| Arc::new(Offline::default()))
+    INSTALLED.get_or_init(|| select(std::env::var("UNDERBOX_PLATFORM").ok().as_deref()))
 }
 
 /// Choose the backend; false if one is already in use.
 pub fn install(p: Arc<dyn Platform>) -> bool {
     INSTALLED.set(p).is_ok()
+}
+
+/// The backend called `name` (`steam` or `offline`); [`Offline`] for none or one this build lacks.
+pub fn select(name: Option<&str>) -> Arc<dyn Platform> {
+    match name {
+        #[cfg(feature = "steam")]
+        Some("steam") => Arc::new(Steam::default()),
+        None | Some("" | "offline") => Arc::new(Offline::default()),
+        Some(other) => {
+            eprintln!("platform: no '{other}' backend in this build; using offline");
+            Arc::new(Offline::default())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selects_by_name_with_offline_fallback() {
+        assert_eq!(select(None).name(), "offline");
+        assert_eq!(select(Some("custom")).name(), "offline");
+        assert_eq!(select(Some("steam")).name(), if cfg!(feature = "steam") { "steam" } else { "offline" });
+    }
 }
