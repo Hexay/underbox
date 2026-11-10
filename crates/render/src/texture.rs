@@ -99,6 +99,22 @@ impl Texture {
         gpu.queue.submit([encoder.finish()]);
     }
 
+    /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`. False (nothing copied) when the
+    /// formats differ or the rect falls outside either texture.
+    pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
+        let fits = |t: &Texture, x: u32, y: u32| x + w <= t.desc.width && y + h <= t.desc.height;
+        if self.desc.format != dst.desc.format || w == 0 || h == 0 || !fits(self, x, y) || !fits(dst, dx, dy) {
+            return false;
+        }
+        fn at(texture: &wgpu::Texture, x: u32, y: u32) -> wgpu::TexelCopyTextureInfo<'_> {
+            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All }
+        }
+        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), extent(w, h));
+        gpu.queue.submit([encoder.finish()]);
+        true
+    }
+
     /// Copy mip 0 back to the CPU, tightly packed. Blocks until the GPU is done.
     pub fn read_back(&self, gpu: &Gpu) -> Frame {
         self.read_region(gpu, 0, [0, 0, self.desc.width, self.desc.height]).expect("read-back needs an uncompressed colour format")

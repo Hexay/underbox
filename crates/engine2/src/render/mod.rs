@@ -6,11 +6,16 @@ pub mod attributes;
 mod buffers;
 pub mod context;
 pub mod device;
+pub mod draw;
 mod formats;
+mod frames;
 pub mod image;
 pub mod material;
 mod material_source;
+pub mod readback;
+pub mod scene;
 pub mod stats;
+pub mod swap_chain;
 pub mod texture;
 pub mod vfx;
 
@@ -24,9 +29,13 @@ pub fn register(r: &mut Registry) {
     attributes::register(r);
     buffers::register(r);
     context::register(r);
+    draw::immediate::register(r);
     image::register(r);
     material::register(r);
+    readback::register(r);
+    scene::register(r);
     stats::register(r);
+    swap_chain::register(r);
     texture::register(r);
     vfx::register(r);
 }

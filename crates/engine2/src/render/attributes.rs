@@ -79,6 +79,21 @@ fn on<R: Default>(r: Ref, f: impl FnOnce(&RenderAttributes) -> R) -> R {
     objects::get::<_, RenderAttributes>(r).map(|a| f(&a)).unwrap_or_default()
 }
 
+/// A vector4 value (with parents), for native readers such as the camera's clear colour.
+pub fn vector4(r: Ref, name: StringToken) -> Option<Vector4> {
+    on(r, |a| match a.get(Kind::Vector4, name) {
+        Some(Value::Vector4(v)) => Some(v),
+        _ => None,
+    })
+}
+
+pub fn int(r: Ref, name: StringToken) -> Option<i32> {
+    on(r, |a| match a.get(Kind::Int, name) {
+        Some(Value::Int(v)) => Some(v),
+        _ => None,
+    })
+}
+
 /// Bind a set/get-or-default/delete trio for one value type.
 macro_rules! trio {
     ($r:expr, $set:ident, $get:ident, $del:ident, $kind:ident, $ty:ty) => {
