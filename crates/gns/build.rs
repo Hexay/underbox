@@ -53,6 +53,8 @@ fn main() {
         .file("src/shim.cpp")
         .compile("gns_shim");
 
+    // TODO(release): static protobuf on Linux too; libprotobuf.so's soname ties the binary to the build
+    // distro. Distro libprotobuf.a isn't -fPIC (can't go in a cdylib), so that means building it.
     if windows {
         println!("cargo:rustc-link-lib=static=libprotobuf");
     }
