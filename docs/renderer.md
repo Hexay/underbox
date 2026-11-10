@@ -46,6 +46,13 @@ crates/engine2/src/render   slots only; state lives in the objects/handle tables
                          immediate (SetRenderState/Draw*, context Draw*, DrawModel)
   scene/                 camera (CCameraRenderer), view, layer, setup (+RenderPipelineTools),
                          execute (layers -> draws), system (g_pSceneSystem frame slots)
+  game_window.rs         GameWindowGlue attach; the client frame SourceEngineFrame runs
+                         (managed OnClientOutput, then GameWindow.Present)
+  shading/               material programs: program (translate Vs/Ps, layouts, uniform blocks,
+                         vfx attributes), cache per (shader, combo) in mod.rs, vertex (shader
+                         inputs <- mesh layout, defaults/instance slots), view (PerViewConstant
+                         Buffer_t), layout (uniform block fill from naga), bind (bind groups by
+                         reflected name), defaults (1x1 textures, samplers). Not yet used by draws.
   tools.rs               the remaining RenderTools/IRenderContext/g_pRenderDevice slots
   attributes, material, vfx, image, stats   (pre-M2 stand-ins)
 ```
@@ -213,12 +220,15 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. Managed client boot: build `engine/Launcher/Sbox` on Linux and run it with SDL's offscreen
-   driver and `UNDERBOX_FRAMES=log` (a `tools/boot-client.sh` beside boot-server.sh, same lock),
-   loading a corpus game with `-mcp +game <path>.sbproj`; hash its frames.
-2. Materials: resolve a draw call's material to a translated `Program` (per-stage, bind by name)
-   and fill the builtin headers' buffers; textures/samplers/constant buffers (`BindTexture`,
-   `SetConstantBufferData`, now no-ops) bind through it.
+1. Client boot (`tools/boot-client.sh`) reaches presented frames on orbmatch; its scene has no
+   camera or renderers, so every frame is black. Add a corpus scene with a camera and dev models
+   (`models/dev/box.vmdl`) and record its frame hashes as a golden test.
+2. Materials: `shading/` builds and binds scene_renderer_mesh on a real device
+   (`shading/tests.rs`). Wire it into draws: `MeshDraw.shaded` (`render::pass::Shaded`) from the
+   draw call's material (shader path, params snapshot), the view's matrices and instance
+   transforms, placeholder on failure. Combos are always 0/0 (TODO). Core material shaders
+   (complex, generic, unlit, ...) ship without source, so most vmats need a stand-in mapping to a
+   shader we can compile. Then `BindTexture` and `SetConstantBufferData` (still no-ops).
 3. `Sandbox.SceneRenderer` (managed's own renderer: `SceneMirror`, `RenderContext.cs`) reads native
    per-object draws (`GetSceneObjectDraw`, bound) and draws with `DrawModelDrawCall` (answers
    false): implement once materials bind.

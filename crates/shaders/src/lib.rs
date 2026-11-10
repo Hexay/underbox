@@ -30,6 +30,8 @@ pub use cache::Cache;
 pub use combo::{Combo, ComboSet, INVALID_INDEX};
 pub use compiler::{CompiledStage, Compiler, Variant};
 pub use include::IncludePaths;
+/// The naga the WGSL comes from, for consumers reading it back (uniform member layouts).
+pub use naga;
 pub use reflect::{Reflection, bind_group_layouts};
 pub use shader::{Program, Stage, VfxShader};
 pub use translate::{Error, Phase};

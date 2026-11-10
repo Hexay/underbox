@@ -3,6 +3,9 @@
 //! managed checks for (e.g. no Steam client on the offline platform).
 
 mod dispatch;
+#[cfg(not(feature = "steam"))]
+mod flat_api;
+mod friends;
 mod game_server;
 
 use abi::slots::{global_steam as global, i_steam_networking_sockets as sockets, steam_ugc_c_ugc_subscriptions as ugc};
@@ -20,6 +23,7 @@ fn interface<C: NativeClass>(cell: &'static OnceLock<usize>) -> NativeRef<C> {
 
 pub fn register(r: &mut Registry) {
     game_server::register(r);
+    friends::register(r);
     dispatch::register(r);
     static SOCKETS: OnceLock<usize> = OnceLock::new();
     bind!(r, global::STEAM_NETWORKING_SOCKETS, || interface::<class::ISteamNetworkingSockets>(&SOCKETS));
