@@ -24,7 +24,10 @@ fn create_preset(name: Option<&CStr>) -> NativeRef<class::DspPreset> {
     objects::create(DspPreset { name, ..Default::default() })
 }
 
+pub mod mix;
+
 pub fn register(r: &mut Registry) {
+    mix::register(r);
     bind!(r, device::IS_VALID, || false);
     bind!(r, device::IS_ACTIVE, || false);
     bind!(r, device::NAME, || StrRet::from(c"none"));

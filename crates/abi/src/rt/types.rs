@@ -87,6 +87,10 @@ impl<T> RawPtr<T> {
         self.ptr
     }
 
+    pub fn cast<U>(self) -> RawPtr<U> {
+        RawPtr { ptr: self.ptr.cast() }
+    }
+
     pub fn is_null(self) -> bool {
         self.ptr.is_null()
     }

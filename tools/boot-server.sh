@@ -22,6 +22,13 @@ TARGET_DIR=$(cargo metadata -q --format-version 1 --manifest-path "$ROOT/Cargo.t
 NATIVE="$SBOX/game/bin/linuxsteamrt64"
 mkdir -p "$NATIVE"
 cp "$TARGET_DIR/debug/libengine2.so" "$NATIVE/libengine2.so"
+# Managed loads these modules by name for their CreateInterface; they're all engine2, and the
+# loader dedupes symlinks by inode so they share its state. TODO(windows): needs forwarder DLLs.
+for m in vfx_vulkan filesystem_stdio; do ln -sf libengine2.so "$NATIVE/lib$m.so"; done
+# Facepunch ships only SkiaSharp's Windows/macOS natives; match Sandbox.Engine.csproj's version.
+# s&box's DLLImportResolver loads natives from its native dir, not runtimes/.
+sh "$ROOT/tools/nuget-file.sh" SkiaSharp.NativeAssets.Linux 3.116.0 runtimes/linux-x64/native/libSkiaSharp.so \
+    "$NATIVE/libSkiaSharp.so"
 
 cd "$SBOX/game"
 timeout -s INT "$SECS" dotnet sbox-server.dll "$@" > "$OUT/server.log" 2>&1 || echo "exit: $?"
