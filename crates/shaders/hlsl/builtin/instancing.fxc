@@ -1,0 +1,38 @@
+// underbox replacement for Valve's instancing.fxc: per-instance transforms and tint from the
+// transform buffer, indexed by the TEXCOORD13 instance-transform stream.
+#ifndef INSTANCING_FXC
+#define INSTANCING_FXC
+
+#include "transform_buffer.fxc"
+
+// Set by the engine for meshes whose vertices were animated into the vertex cache by skinning_cs.
+DynamicCombo( D_CS_VERTEX_ANIMATION, 0..1, Sys( ALL ) );
+
+struct ExtraShaderData_t
+{
+	float4 vTint;
+	uint nVertexCacheOffset;
+};
+
+float3x4 GetTransformMatrix( uint nSlot )
+{
+	TransformBufferData_t d = g_TransformBuffer[ nSlot ];
+	return float3x4( d.Row0, d.Row1, d.Row2 );
+}
+
+float3x4 GetTransformMatrix( uint nSlot, uint nBone )
+{
+	return GetTransformMatrix( g_TransformBuffer[ nSlot ].BlendWeightCount != 0 ? nSlot + 2 + nBone : nSlot );
+}
+
+ExtraShaderData_t GetExtraPerInstanceShaderData( uint nSlot )
+{
+	TransformBufferData_t d = g_TransformBuffer[ nSlot ];
+	ExtraShaderData_t o;
+	uint c = d.TintRgb888;
+	o.vTint = float4( ( ( c >> 16 ) & 0xff ) / 255.0, ( ( c >> 8 ) & 0xff ) / 255.0, ( c & 0xff ) / 255.0, d.Alpha );
+	o.nVertexCacheOffset = d.VertexCacheOffset;
+	return o;
+}
+
+#endif // INSTANCING_FXC

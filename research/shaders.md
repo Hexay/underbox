@@ -45,3 +45,53 @@ Answer: **yes, every compiled combo holds raw SPIR-V.** The DXIL path doesn't ex
 Open items:
 - Byte-level layout of `WriteProgramToBuffer` and `VFX_PROGRAM_FEATURE`, including compression. This needs a real `.shader_c` from a local build.
 - Format of the reflection section, needed for bind group layouts.
+
+## Source path as built (`crates/shaders`)
+vfx parse → include expansion → HLSL → DXC (`tools/fetch-dxc.sh`, pinned) → SPIR-V passes → naga →
+WGSL, plus reflection and a disk cache. Decisions, each with its reason:
+- DXC args (`src/dxc.rs`): `-HV 2018` because the corpus uses per-component vector ternaries;
+  `-fvk-use-gl-layout` because WGSL rejects DXC's relaxed and DX layouts.
+- Slang-isms in the sources: `{}` init and `point` as an identifier are rewritten (`src/compat.rs`);
+  `dynamic_uniform`/`asDynamicUniform` are defined away (`hlsl/prelude.hlsl`).
+- Valve's closed headers are replaced by our own (`hlsl/builtin/`, see `hlsl/README.md`). The data
+  headers fix a layout the renderer must follow.
+- `SpecializedConstant()` globals become `static const T x = UB_SPEC_<n>;` and every variant
+  compiles with its values defined. Real spec constants produce `OpSpecConstantOp`, which naga rejects.
+- SPIR-V passes before naga, one module each:
+  - `comparison`: a texture or sampler used both with and without depth comparison gets a `<name>_cmp`
+    clone binding for the comparison uses;
+  - `row_major`: non-square row-major struct members get the transposed type, because naga sizes them
+    wrong;
+  - `bindings`: aliased bindings (the bindless arrays share set 1 binding 16) move past the set's
+    highest binding.
+
+  Reflection reports the final (group, binding) of each name, and the renderer binds by name.
+- `isnan(x)` becomes `x != x` because WGSL has no `isnan` (`src/translate.rs`).
+- Vertex and pixel stages are separate WGSL modules. `render::Program` takes one module, so the
+  renderer lane needs a per-stage adapter. Nothing in `crates/render` was changed.
+
+## Corpus status
+`cargo test -p shaders --test corpus` runs each of the 85 core shaders' default combo (static 0,
+dynamic 0) and writes `corpus.tsv`/`corpus-errors.txt` to CARGO_TARGET_TMPDIR. All 85 shaders
+parse. Of 141 program stages, 139 compile through DXC and 127 come out as validated WGSL. The test's
+`MIN_OK_STAGES` is the regression floor.
+
+Remaining failures, by class:
+- **Missing consumer-supplied types (DXC):** `terrain` Ps needs `PS_INPUT` from material.hlsl's
+  includer; `ObjectHighlight` has a GS block without `MainGs`.
+- **naga can't express it (spv-in):**
+  - geometry shaders: `gizmo_line`, `gizmo_sprite`. Their VS then also fails validation, because it
+    outputs no position and feeds the GS.
+  - storage-image arrays such as `RWTexture2DArray<float>`: naga panics in `parse_type_image`
+    (`ddgi_depth_copy_cs`, `envmap_filtering_cs`).
+  - `SPV_KHR_compute_shader_derivatives` (`downsample_spd`).
+  - `OpDecorateId` (`clutter_cull_cs`).
+  - "invalid image" (`particle_lighting_cs`).
+- **naga validation:**
+  - `atmosphere_sky` Ps: a local of a non-storable type;
+  - `occlusion_cull_cs`: an atomic on a struct field, where the store type mismatches;
+  - `screen_space_reflections_cs`: `||` on `vec3<bool>`, from HLSL 2018's per-component logic.
+
+Next: GS needs emulation (compute or instancing) or the wgpu SPIR-V passthrough on Vulkan. Most of
+the naga cases are small upstream fixes or more SPIR-V passes. The `||` case could be rewritten to
+`or()` in compat for HLSL 2021-style code.

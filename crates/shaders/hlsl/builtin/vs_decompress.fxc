@@ -1,0 +1,73 @@
+// underbox replacement for Valve's vs_decompress.fxc: compressed tangent frames and the skinned
+// vertex cache skinning_cs writes.
+#ifndef VS_DECOMPRESS_FXC
+#define VS_DECOMPRESS_FXC
+
+#include "octohedral_encoding.fxc"
+
+bool g_bUncompressedTangentFrame < Attribute( "UncompressedTangentFrame" ); Default( 0 ); >;
+
+// TODO: Valve's compressed layout is unknown; ours is the contract with crates/assets' vertex
+// writer. Input is the 10:10:10:2 word as integers: xy octahedral normal, z tangent angle about
+// the normal (one turn over 0..1023), w bit 0 set for a negative bitangent sign.
+void _DecompressNormalTangent( float4 vPacked, out float3 vNormal, out float4 vTangentU_flSign )
+{
+	vNormal = OctohedralDecode( vPacked.xy / 1023.0 * 2.0 - 1.0 );
+	float3 vRef = abs( vNormal.z ) < 0.999 ? float3( 0, 0, 1 ) : float3( 1, 0, 0 );
+	float3 t0 = normalize( cross( vRef, vNormal ) );
+	float3 t1 = cross( vNormal, t0 );
+	float s, c;
+	sincos( vPacked.z / 1023.0 * 6.28318530718, s, c );
+	vTangentU_flSign = float4( t0 * c + t1 * s, ( uint( vPacked.w ) & 1 ) ? -1.0 : 1.0 );
+}
+
+void DecompressNormalTangent( float4 vNormalIn, float4 vTangentIn, out float3 vNormal, out float4 vTangentU_flSign )
+{
+	if ( g_bUncompressedTangentFrame )
+	{
+		vNormal = vNormalIn.xyz;
+		vTangentU_flSign = vTangentIn;
+	}
+	else
+	{
+		_DecompressNormalTangent( vNormalIn, vNormal, vTangentU_flSign );
+	}
+}
+
+void DecompressNormal( float4 vNormalIn, out float3 vNormal )
+{
+	float4 vTangent;
+	DecompressNormalTangent( vNormalIn, float4( 0, 0, 1, 1 ), vNormal, vTangent );
+}
+
+// skinning_cs output: 24 bytes per vertex (position, 16:16 octahedral normal, 1:15:15 sign and
+// octahedral tangent, morph wrinkle).
+struct CachedAnimatedVertex_t
+{
+	float3 vPosWs;
+	uint2 vPackedNormalTangentWs;
+	float flMorphWrinkle;
+};
+
+ByteAddressBuffer g_AnimatedVertexCache < Attribute( "AnimatedVertexCache" ); >;
+
+CachedAnimatedVertex_t FetchCachedVertex( uint nVertex )
+{
+	uint a = nVertex * 24;
+	CachedAnimatedVertex_t v;
+	v.vPosWs = asfloat( g_AnimatedVertexCache.Load3( a ) );
+	v.vPackedNormalTangentWs = g_AnimatedVertexCache.Load2( a + 12 );
+	v.flMorphWrinkle = asfloat( g_AnimatedVertexCache.Load( a + 20 ) );
+	return v;
+}
+
+void DecodeCachedVertexTangentSpace( CachedAnimatedVertex_t v, out float3 vNormal, out float3 vTangent, out float flSign )
+{
+	uint n = v.vPackedNormalTangentWs.x;
+	uint t = v.vPackedNormalTangentWs.y;
+	vNormal = OctohedralDecode( float2( n & 0xffff, n >> 16 ) / 65535.0 * 2.0 - 1.0 );
+	vTangent = OctohedralDecode( float2( ( t >> 1 ) & 0x7fff, ( t >> 16 ) & 0x7fff ) / 32767.0 * 2.0 - 1.0 );
+	flSign = ( t & 1 ) ? 1.0 : -1.0;
+}
+
+#endif // VS_DECOMPRESS_FXC
