@@ -132,6 +132,7 @@ dependencies = [
  "objects",
  "physics",
  "platform",
+ "serde_json",
 ]
 
 [[package]]

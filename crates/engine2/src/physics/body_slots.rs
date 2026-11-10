@@ -1,11 +1,21 @@
-//! `IPhysicsBody`'s slots (shapes are in `shape.rs`).
+//! `IPhysicsBody`'s slots: type, pose, velocity, forces, sleep and switches. Mass is in
+//! `body_mass.rs`, shapes in `shape_slots.rs`, queries in `body_query.rs`.
 
-use super::body::{apply_gravity, get, with_rb, with_sim, with_state};
+use super::body::{apply_state, get, set_motion_locks, with_rb, with_sim, with_state};
+use super::shape;
 use crate::math::{from_rot, from_vec, to_rot, to_vec, vec3};
 use abi::slots::i_physics_body as b;
 use abi::structs::{BBox, Transform};
 use abi::{HandleId, Registry, bind};
-use physics::{BodyType, Pose};
+use physics::{BodyType, Pose, function};
+
+/// Set or clear the touch-event switch on every shape of the body.
+fn set_touch(r: super::body::Ref, on: bool) {
+    let shapes = get(r).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
+    for s in shapes {
+        shape::update_meta(s, |m| if on { m.functions |= function::TOUCH } else { m.functions &= !function::TOUCH });
+    }
+}
 
 pub fn register(r: &mut Registry) {
     bind!(r, b::GET_WORLD, |r| get(r).and_then(|b| super::world::get(b.world)).map_or(HandleId::new(-1), |w| w.handle.id()));
@@ -19,29 +29,14 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, b::SET_GRAVITY_SCALE, |r, v| {
         with_state(r, |s| s.gravity_scale = v);
-        apply_gravity(r);
+        apply_state(r);
     });
     bind!(r, b::GET_GRAVITY_SCALE, |r| with_state(r, |s| s.gravity_scale));
     bind!(r, b::ENABLE_GRAVITY, |r, v| {
         with_state(r, |s| s.gravity_enabled = v);
-        apply_gravity(r);
+        apply_state(r);
     });
     bind!(r, b::IS_GRAVITY_ENABLED, |r| with_state(r, |s| s.gravity_enabled));
-
-    bind!(r, b::SET_MASS, |r, m| with_sim(r, |sim, id| sim.set_mass(id, m)));
-    bind!(r, b::GET_MASS, |r| with_rb(r, |rb| rb.mass()));
-    bind!(r, b::GET_MASS_CENTER, |r| with_rb(r, |rb| from_vec(rb.center_of_mass())));
-    bind!(r, b::GET_LOCAL_MASS_CENTER, |r| with_rb(r, |rb| from_vec(rb.local_center_of_mass())));
-    // TODO: apply the override through Rapier's additional mass properties.
-    bind!(r, b::SET_LOCAL_MASS_CENTER, |r, c| with_state(r, |s| s.local_mass_center = to_vec(c)));
-    bind!(r, b::SET_OVERRIDE_MASS_CENTER, |r, v| with_state(r, |s| s.override_mass_center = v));
-    bind!(r, b::GET_OVERRIDE_MASS_CENTER, |r| with_state(r, |s| s.override_mass_center));
-    bind!(r, b::BUILD_MASS, |_| {});
-    bind!(r, b::SET_MASS_UPDATES_DEFERRED, |r, v| with_state(r, |s| std::mem::replace(&mut s.mass_updates_deferred, v)));
-    bind!(r, b::GET_DENSITY, |r| with_sim(r, |sim, id| {
-        let first = sim.body(id).and_then(|rb| rb.colliders().first().copied());
-        first.and_then(|c| sim.shape(c)).map_or(0.0, |c| c.density())
-    }));
 
     bind!(r, b::SET_POSITION, |r, p| with_rb(r, |rb| rb.set_translation(to_vec(p), true)));
     bind!(r, b::GET_POSITION, |r| with_rb(r, |rb| from_vec(rb.translation())));
@@ -77,23 +72,31 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::WAKE, |r| with_rb(r, |rb| rb.wake_up(true)));
     bind!(r, b::SLEEP, |r| with_rb(r, |rb| rb.sleep()));
     bind!(r, b::IS_SLEEPING, |r| with_rb(r, |rb| rb.is_sleeping()));
-    // TODO: per-body auto-sleep and threshold through Rapier's activation settings.
-    bind!(r, b::ENABLE_AUTO_SLEEPING, |r| with_state(r, |s| s.auto_sleep = true));
-    bind!(r, b::DISABLE_AUTO_SLEEPING, |r| with_state(r, |s| s.auto_sleep = false));
-    bind!(r, b::SET_SLEEP_THRESHOLD, |r, v| with_state(r, |s| s.sleep_threshold = v));
+    bind!(r, b::ENABLE_AUTO_SLEEPING, |r| {
+        with_state(r, |s| s.auto_sleep = true);
+        apply_state(r);
+    });
+    bind!(r, b::DISABLE_AUTO_SLEEPING, |r| {
+        with_state(r, |s| s.auto_sleep = false);
+        apply_state(r);
+    });
+    bind!(r, b::SET_SLEEP_THRESHOLD, |r, v| {
+        with_state(r, |s| s.sleep_threshold = v);
+        apply_state(r);
+    });
     bind!(r, b::GET_SLEEP_THRESHOLD, |r| with_state(r, |s| s.sleep_threshold));
-    bind!(r, b::ENABLE_TOUCH_EVENTS, |r| with_state(r, |s| s.touch_events = true));
-    bind!(r, b::DISABLE_TOUCH_EVENTS, |r| with_state(r, |s| s.touch_events = false));
-    bind!(r, b::IS_TOUCH_EVENT_ENABLED, |r| with_state(r, |s| s.touch_events));
+    bind!(r, b::ENABLE_TOUCH_EVENTS, |r| set_touch(r, true));
+    bind!(r, b::DISABLE_TOUCH_EVENTS, |r| set_touch(r, false));
+    bind!(r, b::IS_TOUCH_EVENT_ENABLED, |r| {
+        let shapes = get(r).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
+        shapes.into_iter().any(|s| shape::with_meta(s, |m| m.functions & function::TOUCH != 0))
+    });
 
     bind!(r, b::ENABLE, |r| with_rb(r, |rb| rb.set_enabled(true)));
     bind!(r, b::DISABLE, |r| with_rb(r, |rb| rb.set_enabled(false)));
     bind!(r, b::IS_ENABLED, |r| with_rb(r, |rb| rb.is_enabled()));
     bind!(r, b::SET_BULLET, |r, v| with_rb(r, |rb| rb.enable_ccd(v)));
-    bind!(r, b::SET_MOTION_LOCKS, |r, x, y, z, ax, ay, az| with_rb(r, |rb| {
-        rb.set_enabled_translations(!x, !y, !z, true);
-        rb.set_enabled_rotations(!ax, !ay, !az, true);
-    }));
+    bind!(r, b::SET_MOTION_LOCKS, |r, x, y, z, pitch, yaw, roll| with_rb(r, |rb| set_motion_locks(rb, [x, y, z, pitch, yaw, roll])));
     bind!(r, b::BUILD_BOUNDS, |r| with_sim(r, |sim, id| {
         sim.body_bounds(id).map(|(lo, hi)| BBox { mins: from_vec(lo), maxs: from_vec(hi) })
     }).unwrap_or_default());

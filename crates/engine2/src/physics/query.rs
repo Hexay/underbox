@@ -4,7 +4,7 @@ use super::{shape, world};
 use crate::math::to_vec;
 use abi::slots::{c_query_result as q, i_physics_world as w};
 use abi::{HandleId, NativeRef, Registry, bind, class};
-use physics::Shape;
+use physics::{BodyType, Pose, Shape};
 use std::sync::{Arc, Mutex};
 
 type Ref = NativeRef<class::CQueryResult>;
@@ -16,11 +16,21 @@ fn get(r: Ref) -> Option<Arc<QueryResult>> {
     objects::get::<_, QueryResult>(r)
 }
 
-/// TODO: honour the mask (managed passes 0x07: static | keyframed | dynamic, i.e. everything).
-fn query(world: world::Ref, result: Ref, probe: Shape, _mask: u16) {
+/// `PhysicsQueryObjectSet_t`: which body types a query includes.
+fn included(mask: u16, kind: BodyType) -> bool {
+    let bit = match kind {
+        BodyType::Static => 1 << 0,
+        BodyType::Keyframed => 1 << 1,
+        BodyType::Dynamic => 1 << 2,
+    };
+    mask & bit != 0
+}
+
+fn query(world: world::Ref, result: Ref, probe: Shape, mask: u16) {
     let found = world::with_sim(world, |sim| {
-        let ids = sim.overlapping(&probe);
-        ids.into_iter().filter_map(|id| sim.shape(id)).map(|c| shape::from_user_data(c.user_data)).collect::<Vec<_>>()
+        let ids = sim.overlapping(&probe).into_iter().filter_map(|id| sim.shape(id));
+        let wanted = ids.filter(|c| c.parent().and_then(|b| sim.body(b)).is_some_and(|b| included(mask, BodyType::of(b))));
+        wanted.map(|c| shape::from_user_data(c.user_data)).collect::<Vec<_>>()
     });
     if let Some(result) = get(result) {
         result.0.lock().unwrap().extend(found);
@@ -45,5 +55,15 @@ pub fn register(r: &mut Registry) {
         let half = (hi - lo) * 0.5;
         let probe = Shape::Box { center: lo + half, rotation: Default::default(), half_extents: half.max(physics::Vector::ZERO) };
         query(w, result, probe, mask)
+    });
+    // The convex hull of the points (managed passes a frustum's eight corners).
+    bind!(r, w::QUERY_2, |w, result, points, count, mask| {
+        let points: &[abi::structs::Vector3] = if points.is_null() || count <= 0 {
+            &[]
+        } else {
+            // SAFETY: managed passes `count` Vector3s at `points` for the call (PhysicsWorld3d.Trace.cs).
+            unsafe { points.cast().as_slice(count as usize) }
+        };
+        query(w, result, Shape::Hull { pose: Pose::IDENTITY, points: points.iter().copied().map(to_vec).collect() }, mask)
     });
 }
