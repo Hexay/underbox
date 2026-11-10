@@ -2,8 +2,9 @@
 //! handle as its own pointer; copies share one resource, and destroying a handle drops only it.
 
 use abi::{Guid, NativeClass, NativeRef, RawPtr};
+use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex};
 
 struct Handle<T> {
     resource: Arc<T>,
@@ -30,6 +31,20 @@ pub fn destroy_handle<C>(handle: NativeRef<C>) {
 /// Identifies the resource, shared by all its handles (native's binding pointer).
 pub fn binding_ptr<C, T: Send + Sync + 'static>(handle: NativeRef<C>) -> RawPtr<c_void> {
     resolve::<C, T>(handle).map_or(RawPtr::NULL, |r| RawPtr::from_raw(Arc::as_ptr(&r) as *mut c_void))
+}
+
+/// Resources by path, so loading one path twice gives one resource (managed caches wrappers by
+/// binding pointer). Entries stay resident; TODO: unload unreferenced ones.
+pub struct ByName<T>(LazyLock<Mutex<HashMap<String, Arc<T>>>>);
+
+impl<T> ByName<T> {
+    pub const fn new() -> Self {
+        Self(LazyLock::new(Mutex::default))
+    }
+
+    pub fn find_or_insert(&self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
+        self.0.lock().unwrap().entry(name.to_ascii_lowercase()).or_insert_with(|| Arc::new(make())).clone()
+    }
 }
 
 /// What every resource type answers about itself through its handles.
@@ -59,5 +74,6 @@ macro_rules! bind_resource_handle {
         abi::bind!($r, m::IS_STRONG_HANDLE_LOADED, |h| resource::resolve::<_, $ty>(h).is_some_and(|r| r.is_loaded()));
         abi::bind!($r, m::COPY_STRONG_HANDLE, resource::copy_handle::<_, $ty>);
         abi::bind!($r, m::GET_BINDING_PTR, resource::binding_ptr::<_, $ty>);
+        abi::bind!($r, m::GET_GUID, |h| resource::resolve::<_, $ty>(h).map(|r| r.guid()).unwrap_or_default());
     }};
 }

@@ -3,10 +3,10 @@
 //! still builds, reads back and edits materials.
 
 use crate::render::attributes;
-use crate::resource::{self, Resource};
-use abi::slots::{g_p_material_system2 as system, i_material2 as m};
+use crate::resource::{self, ByName, Resource};
+use abi::slots::{g_p_material_system2 as system, glue_resources as glue, i_material2 as m};
 use abi::structs::Vector4;
-use abi::{NativeRef, Registry, StrRet, bind, class};
+use abi::{Guid, NativeRef, Registry, StrRet, bind, class};
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::sync::{Arc, Mutex};
@@ -28,9 +28,31 @@ pub struct Material {
     shader: String,
     attributes: attributes::Ref,
     params: Mutex<Params>,
+    error: bool,
+    guid: Guid,
 }
 
-impl Resource for Material {}
+impl Resource for Material {
+    fn is_error(&self) -> bool {
+        self.error
+    }
+    fn guid(&self) -> Guid {
+        self.guid
+    }
+}
+
+static LOADED: ByName<Material> = ByName::new();
+
+/// The material at a resource path; see texture::load for why every one is the error material.
+fn load(path: Option<&CStr>, guid: Guid) -> Ref {
+    let name = string(path);
+    let material = LOADED.find_or_insert(&name, || new(name.clone(), String::new(), true, guid));
+    resource::new_handle(material)
+}
+
+fn new(name: String, shader: String, error: bool, guid: Guid) -> Material {
+    Material { name, shader, attributes: attributes::create(), params: Mutex::default(), error, guid }
+}
 
 impl Drop for Material {
     fn drop(&mut self) {
@@ -43,13 +65,7 @@ fn string(s: Option<&CStr>) -> String {
 }
 
 fn create_raw(name: Option<&CStr>, shader: Option<&CStr>, _anonymous: bool) -> Ref {
-    let material = Material {
-        name: string(name),
-        shader: string(shader),
-        attributes: attributes::create(),
-        params: Mutex::default(),
-    };
-    resource::new_handle(Arc::new(material))
+    resource::new_handle(Arc::new(new(string(name), string(shader), false, Guid::default())))
 }
 
 fn on<R: Default>(h: Ref, f: impl FnOnce(&Material) -> R) -> R {
@@ -63,6 +79,8 @@ fn params<R: Default>(h: Ref, f: impl FnOnce(&mut Params) -> R) -> R {
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::i_material2, Material);
     bind!(r, system::CREATE_RAW_MATERIAL, create_raw);
+    bind!(r, glue::GET_MATERIAL, load);
+    bind!(r, system::FIND_OR_CREATE_MATERIAL_FROM_RESOURCE, |path| load(path, Guid::default()));
     bind!(r, system::CREATE_PROCEDURAL_MATERIAL_COPY, |src, _kind, _recreate| resource::copy_handle::<_, Material>(src));
     bind!(r, system::FRAME_UPDATE, || {});
 
