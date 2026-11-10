@@ -2,7 +2,7 @@
 //! render attributes it binds. With the empty device nothing compiles or draws, but managed
 //! still builds, reads back and edits materials.
 
-use crate::render::attributes;
+use crate::render::{attributes, texture};
 use crate::resource::{self, ByName, Resource};
 use abi::slots::{g_p_material_system2 as system, glue_resources as glue, i_material2 as m};
 use abi::structs::Vector4;
@@ -43,10 +43,20 @@ impl Resource for Material {
 
 static LOADED: ByName<Material> = ByName::new();
 
-/// The material at a resource path; see texture::load for why every one is the error material.
+/// The material at a resource path, from its `.vmat` source; native's error material without one.
 fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = string(path);
-    let material = LOADED.find_or_insert(&name, || new(name.clone(), String::new(), true, guid));
+    let material = LOADED.find_or_insert(&name, || match super::material_source::load(&name) {
+        Some(src) => {
+            let material = new(name.clone(), src.shader, false, guid);
+            let mut p = material.params.lock().unwrap();
+            p.vectors.extend(src.vectors);
+            p.textures.extend(src.textures);
+            drop(p);
+            material
+        }
+        None => new(name.clone(), String::new(), true, guid),
+    });
     resource::new_handle(material)
 }
 
@@ -54,9 +64,18 @@ fn new(name: String, shader: String, error: bool, guid: Guid) -> Material {
     Material { name, shader, attributes: attributes::create(), params: Mutex::default(), error, guid }
 }
 
+/// Texture params hold handles the material owns: managed takes ownership of whatever a
+/// getter returns (Texture.FromNative), so getters hand out copies and setters keep copies.
+fn copy(t: Texture) -> Texture {
+    resource::copy_handle::<_, texture::Texture>(t)
+}
+
 impl Drop for Material {
     fn drop(&mut self) {
         objects::destroy(self.attributes);
+        for t in self.params.get_mut().unwrap().textures.drain().map(|(_, t)| t) {
+            resource::destroy_handle(t);
+        }
     }
 }
 
@@ -106,11 +125,12 @@ pub fn register(r: &mut Registry) {
         p.vectors.insert(string(n), v);
     }));
     bind!(r, m::GET_VECTOR4, |h, n| params(h, |p| p.vectors.get(&string(n)).copied().unwrap_or_default()));
-    bind!(r, m::SET_2, |h, n, t| params(h, |p| {
-        p.textures.insert(string(n), t);
-    }));
-    bind!(r, m::GET_TEXTURE, |h, n| params(h, |p| p.textures.get(&string(n)).copied().unwrap_or_default()));
-    bind!(r, m::GET_FIRST_TEXTURE_ATTRIBUTE, |h| params(h, |p| p.textures.values().next().copied().unwrap_or_default()));
+    bind!(r, m::SET_2, |h, n, t| {
+        let replaced = params(h, |p| p.textures.insert(string(n), copy(t)));
+        replaced.into_iter().for_each(resource::destroy_handle);
+    });
+    bind!(r, m::GET_TEXTURE, |h, n| params(h, |p| p.textures.get(&string(n)).copied()).map_or(Texture::NULL, copy));
+    bind!(r, m::GET_FIRST_TEXTURE_ATTRIBUTE, |h| params(h, |p| p.textures.values().next().copied()).map_or(Texture::NULL, copy));
     bind!(r, m::SET_EDITED, |h, e| params(h, |p| p.edited = e));
     bind!(r, m::IS_EDITED, |h| params(h, |p| p.edited));
 }

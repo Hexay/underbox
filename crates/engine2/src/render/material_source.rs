@@ -1,0 +1,52 @@
+//! A material's parameters from its `.vmat` source, textures bound to their shader attributes
+//! (see `assets::material::bind_textures`).
+
+use super::texture;
+use crate::math::vec4;
+use abi::Guid;
+use abi::rt::log::{Level, log};
+use std::collections::HashMap;
+use std::ffi::CString;
+use std::sync::{LazyLock, Mutex};
+
+pub struct Loaded {
+    pub shader: String,
+    pub vectors: Vec<(String, abi::structs::Vector4)>,
+    /// (attribute, owned texture handle).
+    pub textures: Vec<(String, texture::Ref)>,
+}
+
+/// Texture declarations per shader path; `None` for shaders not in source (closed ones).
+static SHADERS: LazyLock<Mutex<HashMap<String, Option<Vec<(String, String)>>>>> = LazyLock::new(Default::default);
+
+fn source_path(path: &str, ext: &str) -> String {
+    let path = path.strip_suffix("_c").unwrap_or(path);
+    if path.ends_with(ext) { path.to_owned() } else { format!("{path}{ext}") }
+}
+
+fn shader_declarations(shader: &str) -> Option<Vec<(String, String)>> {
+    let key = if shader.contains('/') { shader.to_owned() } else { format!("shaders/{shader}") };
+    let mut cache = SHADERS.lock().unwrap();
+    cache
+        .entry(key.clone())
+        .or_insert_with(|| {
+            let file = crate::fs::resolve(&key, "GAME")?;
+            Some(assets::material::texture_inputs(&std::fs::read_to_string(file).ok()?))
+        })
+        .clone()
+}
+
+/// `None` when the source is missing or unreadable (the caller makes the error material).
+pub fn load(path: &str) -> Option<Loaded> {
+    let file = crate::fs::resolve(&source_path(path, ".vmat"), "GAME")?;
+    let material = assets::material::from_vmat(&std::fs::read_to_string(file).ok()?)
+        .inspect_err(|e| log(Level::Warn, &format!("{path}: {e:?}")))
+        .ok()?;
+    let declared = shader_declarations(&material.shader);
+    let textures = assets::material::bind_textures(&material, declared.as_deref())
+        .into_iter()
+        .map(|(attr, tex)| (attr, texture::load(CString::new(tex).ok().as_deref(), Guid::default())))
+        .collect();
+    let vectors = material.values.iter().map(|(k, [x, y, z, w])| (k.clone(), vec4(*x, *y, *z, *w))).collect();
+    Some(Loaded { shader: material.shader, vectors, textures })
+}

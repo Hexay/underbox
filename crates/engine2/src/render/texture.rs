@@ -35,7 +35,7 @@ static LOADED: ByName<Texture> = ByName::new();
 
 /// The texture at a resource path. Nothing loads compiled textures yet (TODO: assets subsystem),
 /// so every path is native's error texture: a valid handle that reports `IsError`.
-fn load(path: Option<&CStr>, guid: Guid) -> Ref {
+pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = LOADED.find_or_insert(&name, || {
         let mut config = TextureCreationConfig_t::default();
