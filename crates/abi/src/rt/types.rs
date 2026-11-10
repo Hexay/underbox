@@ -11,6 +11,10 @@ pub struct NativeRef<C> {
     _class: PhantomData<fn() -> C>,
 }
 
+// Sound: never dereferenced (see above), so it's an address, like a usize.
+unsafe impl<C> Send for NativeRef<C> {}
+unsafe impl<C> Sync for NativeRef<C> {}
+
 impl<C> NativeRef<C> {
     pub const NULL: Self = Self::from_raw(std::ptr::null_mut());
 
