@@ -62,7 +62,14 @@ pub fn register(r: &mut Registry) {
     bind!(r, global::SOURCE_ENGINE_INIT, |_| true);
     // False asks managed's EngineLoop to quit. TODO: a client draws here (EngineLoop.OnClientOutput).
     bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| true);
-    bind!(r, global::SOURCE_ENGINE_SHUTDOWN, |_, _| {});
+    bind!(r, global::SOURCE_ENGINE_SHUTDOWN, |_, _| SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::Relaxed));
+}
+
+static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether managed has begun shutting the engine down (SourceEngineShutdown).
+pub fn shutting_down() -> bool {
+    SHUTTING_DOWN.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Source's launch parameters are the process arguments (`-dev`, `+game x`), matched case-blind.
