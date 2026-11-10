@@ -15,7 +15,7 @@ awk '/^test result:/ { p += $4; f += $6; i += $8 } END { printf "== %d passed, %
 if [ $status -eq 0 ]; then
     echo "RESULT: PASS"
 else
-    keep="$ROOT/target/test-fail-$1-$(date +%Y%m%d-%H%M%S).log"
+    keep="$ROOT/target/test-fail-$CRATE-$(date +%Y%m%d-%H%M%S).log"
     mkdir -p "$ROOT/target" && cp "$LOG" "$keep"
     tail -n 15 "$LOG"
     echo "RESULT: FAIL (exit $status, log kept in $keep)"
