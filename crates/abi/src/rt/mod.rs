@@ -1,6 +1,7 @@
 //! Hand-written support for the generated code in `crate::generated`.
 
 pub mod callbacks;
+pub mod casts;
 pub mod log;
 pub mod registry;
 pub mod strings;

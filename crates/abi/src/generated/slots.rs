@@ -18,305 +18,1203 @@ pub const CALLBACK_COUNT: usize = 71;
 
 /// Marker types naming native classes in `NativeRef<C>` / `HandleId<C>`.
 pub mod class {
+    use crate::rt::casts::NativeClass;
     pub enum AggregateGlue {}
+    impl NativeClass for AggregateGlue {
+        const NAME: &'static str = "AggregateGlue";
+    }
     pub enum CAimIKNode_Definition {}
+    impl NativeClass for CAimIKNode_Definition {
+        const NAME: &'static str = "CAimIKNode_Definition";
+    }
     pub enum CAndNode_Definition {}
+    impl NativeClass for CAndNode_Definition {
+        const NAME: &'static str = "CAndNode_Definition";
+    }
     pub enum CAnimClipResource {}
+    impl NativeClass for CAnimClipResource {
+        const NAME: &'static str = "CAnimClipResource";
+    }
     pub enum CAnimGraph2Controller {}
+    impl NativeClass for CAnimGraph2Controller {
+        const NAME: &'static str = "CAnimGraph2Controller";
+    }
     pub enum CAnimGraph2Resource {}
+    impl NativeClass for CAnimGraph2Resource {
+        const NAME: &'static str = "CAnimGraph2Resource";
+    }
     pub enum CAnimSkeletonResource {}
+    impl NativeClass for CAnimSkeletonResource {
+        const NAME: &'static str = "CAnimSkeletonResource";
+    }
     pub enum CAnimationGroupBuilder {}
+    impl NativeClass for CAnimationGroupBuilder {
+        const NAME: &'static str = "CAnimationGroupBuilder";
+    }
     pub enum CAnimationPoseNode_Definition {}
+    impl NativeClass for CAnimationPoseNode_Definition {
+        const NAME: &'static str = "CAnimationPoseNode_Definition";
+    }
     pub enum CAttachment {}
+    impl NativeClass for CAttachment {
+        const NAME: &'static str = "CAttachment";
+    }
     pub enum CAudioMixBuffer {}
+    impl NativeClass for CAudioMixBuffer {
+        const NAME: &'static str = "CAudioMixBuffer";
+    }
     pub enum CAudioMixDeviceBuffers {}
+    impl NativeClass for CAudioMixDeviceBuffers {
+        const NAME: &'static str = "CAudioMixDeviceBuffers";
+    }
     pub enum CAudioMixer {}
+    impl NativeClass for CAudioMixer {
+        const NAME: &'static str = "CAudioMixer";
+    }
     pub enum CAudioProcessor {}
+    impl NativeClass for CAudioProcessor {
+        const NAME: &'static str = "CAudioProcessor";
+    }
     pub enum CAudioStreamManaged {}
+    impl NativeClass for CAudioStreamManaged {
+        const NAME: &'static str = "CAudioStreamManaged";
+    }
     pub enum CBinauralEffect {}
+    impl NativeClass for CBinauralEffect {
+        const NAME: &'static str = "CBinauralEffect";
+    }
     pub enum CBlend1DNode_Definition {}
+    impl NativeClass for CBlend1DNode_Definition {
+        const NAME: &'static str = "CBlend1DNode_Definition";
+    }
     pub enum CBlend2DNode_Definition {}
+    impl NativeClass for CBlend2DNode_Definition {
+        const NAME: &'static str = "CBlend2DNode_Definition";
+    }
     pub enum CBoneMaskBlendNode_Definition {}
+    impl NativeClass for CBoneMaskBlendNode_Definition {
+        const NAME: &'static str = "CBoneMaskBlendNode_Definition";
+    }
     pub enum CBoneMaskNode_Definition {}
+    impl NativeClass for CBoneMaskNode_Definition {
+        const NAME: &'static str = "CBoneMaskNode_Definition";
+    }
     pub enum CBoneMaskSelectorNode_Definition {}
+    impl NativeClass for CBoneMaskSelectorNode_Definition {
+        const NAME: &'static str = "CBoneMaskSelectorNode_Definition";
+    }
     pub enum CBoneMaskSwitchNode_Definition {}
+    impl NativeClass for CBoneMaskSwitchNode_Definition {
+        const NAME: &'static str = "CBoneMaskSwitchNode_Definition";
+    }
     pub enum CBuilderHitBox {}
+    impl NativeClass for CBuilderHitBox {
+        const NAME: &'static str = "CBuilderHitBox";
+    }
     pub enum CBuilderMaterialGroup {}
+    impl NativeClass for CBuilderMaterialGroup {
+        const NAME: &'static str = "CBuilderMaterialGroup";
+    }
     pub enum CCachedBoolNode_Definition {}
+    impl NativeClass for CCachedBoolNode_Definition {
+        const NAME: &'static str = "CCachedBoolNode_Definition";
+    }
     pub enum CCachedFloatNode_Definition {}
+    impl NativeClass for CCachedFloatNode_Definition {
+        const NAME: &'static str = "CCachedFloatNode_Definition";
+    }
     pub enum CCachedIDNode_Definition {}
+    impl NativeClass for CCachedIDNode_Definition {
+        const NAME: &'static str = "CCachedIDNode_Definition";
+    }
     pub enum CCachedTargetNode_Definition {}
+    impl NativeClass for CCachedTargetNode_Definition {
+        const NAME: &'static str = "CCachedTargetNode_Definition";
+    }
     pub enum CCachedVectorNode_Definition {}
+    impl NativeClass for CCachedVectorNode_Definition {
+        const NAME: &'static str = "CCachedVectorNode_Definition";
+    }
     pub enum CCameraRenderer {}
+    impl NativeClass for CCameraRenderer {
+        const NAME: &'static str = "CCameraRenderer";
+    }
     pub enum CClipNode_Definition {}
+    impl NativeClass for CClipNode_Definition {
+        const NAME: &'static str = "CClipNode_Definition";
+    }
     pub enum CClipSelectorNode_Definition {}
+    impl NativeClass for CClipSelectorNode_Definition {
+        const NAME: &'static str = "CClipSelectorNode_Definition";
+    }
     pub enum CConstBoolNode_Definition {}
+    impl NativeClass for CConstBoolNode_Definition {
+        const NAME: &'static str = "CConstBoolNode_Definition";
+    }
     pub enum CConstFloatNode_Definition {}
+    impl NativeClass for CConstFloatNode_Definition {
+        const NAME: &'static str = "CConstFloatNode_Definition";
+    }
     pub enum CConstIDNode_Definition {}
+    impl NativeClass for CConstIDNode_Definition {
+        const NAME: &'static str = "CConstIDNode_Definition";
+    }
     pub enum CConstTargetNode_Definition {}
+    impl NativeClass for CConstTargetNode_Definition {
+        const NAME: &'static str = "CConstTargetNode_Definition";
+    }
     pub enum CConstVectorNode_Definition {}
+    impl NativeClass for CConstVectorNode_Definition {
+        const NAME: &'static str = "CConstVectorNode_Definition";
+    }
     pub enum CControlParameterBoolNode_Definition {}
+    impl NativeClass for CControlParameterBoolNode_Definition {
+        const NAME: &'static str = "CControlParameterBoolNode_Definition";
+    }
     pub enum CControlParameterFloatNode_Definition {}
+    impl NativeClass for CControlParameterFloatNode_Definition {
+        const NAME: &'static str = "CControlParameterFloatNode_Definition";
+    }
     pub enum CControlParameterIDNode_Definition {}
+    impl NativeClass for CControlParameterIDNode_Definition {
+        const NAME: &'static str = "CControlParameterIDNode_Definition";
+    }
     pub enum CControlParameterTargetNode_Definition {}
+    impl NativeClass for CControlParameterTargetNode_Definition {
+        const NAME: &'static str = "CControlParameterTargetNode_Definition";
+    }
     pub enum CControlParameterVectorNode_Definition {}
+    impl NativeClass for CControlParameterVectorNode_Definition {
+        const NAME: &'static str = "CControlParameterVectorNode_Definition";
+    }
     pub enum CCurrentSyncEventIDNode_Definition {}
+    impl NativeClass for CCurrentSyncEventIDNode_Definition {
+        const NAME: &'static str = "CCurrentSyncEventIDNode_Definition";
+    }
     pub enum CCurrentSyncEventNode_Definition {}
+    impl NativeClass for CCurrentSyncEventNode_Definition {
+        const NAME: &'static str = "CCurrentSyncEventNode_Definition";
+    }
     pub enum CDecalSceneObject {}
+    impl NativeClass for CDecalSceneObject {
+        const NAME: &'static str = "CDecalSceneObject";
+    }
     pub enum CDirectEffect {}
+    impl NativeClass for CDirectEffect {
+        const NAME: &'static str = "CDirectEffect";
+    }
     pub enum CDurationScaleNode_Definition {}
+    impl NativeClass for CDurationScaleNode_Definition {
+        const NAME: &'static str = "CDurationScaleNode_Definition";
+    }
     pub enum CDynamicSceneObject {}
+    impl NativeClass for CDynamicSceneObject {
+        const NAME: &'static str = "CDynamicSceneObject";
+    }
     pub enum CEntityKeyValues {}
+    impl NativeClass for CEntityKeyValues {
+        const NAME: &'static str = "CEntityKeyValues";
+    }
     pub enum CEnvMapSceneObject {}
+    impl NativeClass for CEnvMapSceneObject {
+        const NAME: &'static str = "CEnvMapSceneObject";
+    }
     pub enum CExternalPoseNode_Definition {}
+    impl NativeClass for CExternalPoseNode_Definition {
+        const NAME: &'static str = "CExternalPoseNode_Definition";
+    }
     pub enum CFixedWeightBoneMaskNode_Definition {}
+    impl NativeClass for CFixedWeightBoneMaskNode_Definition {
+        const NAME: &'static str = "CFixedWeightBoneMaskNode_Definition";
+    }
     pub enum CFloatAngleMathNode_Definition {}
+    impl NativeClass for CFloatAngleMathNode_Definition {
+        const NAME: &'static str = "CFloatAngleMathNode_Definition";
+    }
     pub enum CFloatClampNode_Definition {}
+    impl NativeClass for CFloatClampNode_Definition {
+        const NAME: &'static str = "CFloatClampNode_Definition";
+    }
     pub enum CFloatComparisonNode_Definition {}
+    impl NativeClass for CFloatComparisonNode_Definition {
+        const NAME: &'static str = "CFloatComparisonNode_Definition";
+    }
     pub enum CFloatCurveEventNode_Definition {}
+    impl NativeClass for CFloatCurveEventNode_Definition {
+        const NAME: &'static str = "CFloatCurveEventNode_Definition";
+    }
     pub enum CFloatCurveNode_Definition {}
+    impl NativeClass for CFloatCurveNode_Definition {
+        const NAME: &'static str = "CFloatCurveNode_Definition";
+    }
     pub enum CFloatEaseNode_Definition {}
+    impl NativeClass for CFloatEaseNode_Definition {
+        const NAME: &'static str = "CFloatEaseNode_Definition";
+    }
     pub enum CFloatMathNode_Definition {}
+    impl NativeClass for CFloatMathNode_Definition {
+        const NAME: &'static str = "CFloatMathNode_Definition";
+    }
     pub enum CFloatRandomNode_Definition {}
+    impl NativeClass for CFloatRandomNode_Definition {
+        const NAME: &'static str = "CFloatRandomNode_Definition";
+    }
     pub enum CFloatRangeComparisonNode_Definition {}
+    impl NativeClass for CFloatRangeComparisonNode_Definition {
+        const NAME: &'static str = "CFloatRangeComparisonNode_Definition";
+    }
     pub enum CFloatRemapNode_Definition {}
+    impl NativeClass for CFloatRemapNode_Definition {
+        const NAME: &'static str = "CFloatRemapNode_Definition";
+    }
     pub enum CFloatSelectorNode_Definition {}
+    impl NativeClass for CFloatSelectorNode_Definition {
+        const NAME: &'static str = "CFloatSelectorNode_Definition";
+    }
     pub enum CFloatSpringNode_Definition {}
+    impl NativeClass for CFloatSpringNode_Definition {
+        const NAME: &'static str = "CFloatSpringNode_Definition";
+    }
     pub enum CFloatSwitchNode_Definition {}
+    impl NativeClass for CFloatSwitchNode_Definition {
+        const NAME: &'static str = "CFloatSwitchNode_Definition";
+    }
     pub enum CFootEventConditionNode_Definition {}
+    impl NativeClass for CFootEventConditionNode_Definition {
+        const NAME: &'static str = "CFootEventConditionNode_Definition";
+    }
     pub enum CFootIKNode_Definition {}
+    impl NativeClass for CFootIKNode_Definition {
+        const NAME: &'static str = "CFootIKNode_Definition";
+    }
     pub enum CFootstepEventIDNode_Definition {}
+    impl NativeClass for CFootstepEventIDNode_Definition {
+        const NAME: &'static str = "CFootstepEventIDNode_Definition";
+    }
     pub enum CFootstepEventPercentageThroughNode_Definition {}
+    impl NativeClass for CFootstepEventPercentageThroughNode_Definition {
+        const NAME: &'static str = "CFootstepEventPercentageThroughNode_Definition";
+    }
     pub enum CFrustum {}
+    impl NativeClass for CFrustum {
+        const NAME: &'static str = "CFrustum";
+    }
     pub enum CGraphBuilder {}
+    impl NativeClass for CGraphBuilder {
+        const NAME: &'static str = "CGraphBuilder";
+    }
     pub enum CGraphEventConditionNode_Condition {}
+    impl NativeClass for CGraphEventConditionNode_Condition {
+        const NAME: &'static str = "CGraphEventConditionNode_Condition";
+    }
     pub enum CGraphEventConditionNode_Definition {}
+    impl NativeClass for CGraphEventConditionNode_Definition {
+        const NAME: &'static str = "CGraphEventConditionNode_Definition";
+    }
     pub enum CGraphNode_Definition {}
+    impl NativeClass for CGraphNode_Definition {
+        const NAME: &'static str = "CGraphNode_Definition";
+    }
     pub enum CHitBox {}
+    impl NativeClass for CHitBox {
+        const NAME: &'static str = "CHitBox";
+    }
     pub enum CHitBoxSet {}
+    impl NativeClass for CHitBoxSet {
+        const NAME: &'static str = "CHitBoxSet";
+    }
     pub enum CIDBasedClipSelectorNode_Definition {}
+    impl NativeClass for CIDBasedClipSelectorNode_Definition {
+        const NAME: &'static str = "CIDBasedClipSelectorNode_Definition";
+    }
     pub enum CIDBasedSelectorNode_Definition {}
+    impl NativeClass for CIDBasedSelectorNode_Definition {
+        const NAME: &'static str = "CIDBasedSelectorNode_Definition";
+    }
     pub enum CIDComparisonNode_Definition {}
+    impl NativeClass for CIDComparisonNode_Definition {
+        const NAME: &'static str = "CIDComparisonNode_Definition";
+    }
     pub enum CIDEventConditionNode_Definition {}
+    impl NativeClass for CIDEventConditionNode_Definition {
+        const NAME: &'static str = "CIDEventConditionNode_Definition";
+    }
     pub enum CIDEventNode_Definition {}
+    impl NativeClass for CIDEventNode_Definition {
+        const NAME: &'static str = "CIDEventNode_Definition";
+    }
     pub enum CIDEventPercentageThroughNode_Definition {}
+    impl NativeClass for CIDEventPercentageThroughNode_Definition {
+        const NAME: &'static str = "CIDEventPercentageThroughNode_Definition";
+    }
     pub enum CIDSelectorNode_Definition {}
+    impl NativeClass for CIDSelectorNode_Definition {
+        const NAME: &'static str = "CIDSelectorNode_Definition";
+    }
     pub enum CIDSwitchNode_Definition {}
+    impl NativeClass for CIDSwitchNode_Definition {
+        const NAME: &'static str = "CIDSwitchNode_Definition";
+    }
     pub enum CIDToFloatNode_Definition {}
+    impl NativeClass for CIDToFloatNode_Definition {
+        const NAME: &'static str = "CIDToFloatNode_Definition";
+    }
     pub enum CIsExternalGraphSlotFilledNode_Definition {}
+    impl NativeClass for CIsExternalGraphSlotFilledNode_Definition {
+        const NAME: &'static str = "CIsExternalGraphSlotFilledNode_Definition";
+    }
     pub enum CIsTargetSetNode_Definition {}
+    impl NativeClass for CIsTargetSetNode_Definition {
+        const NAME: &'static str = "CIsTargetSetNode_Definition";
+    }
     pub enum CLayerBlendNode_Definition {}
+    impl NativeClass for CLayerBlendNode_Definition {
+        const NAME: &'static str = "CLayerBlendNode_Definition";
+    }
     pub enum CLayerBlendNode_LayerDefinition {}
+    impl NativeClass for CLayerBlendNode_LayerDefinition {
+        const NAME: &'static str = "CLayerBlendNode_LayerDefinition";
+    }
     pub enum CLookAtChainNode_Definition {}
+    impl NativeClass for CLookAtChainNode_Definition {
+        const NAME: &'static str = "CLookAtChainNode_Definition";
+    }
     pub enum CManagedSceneObject {}
+    impl NativeClass for CManagedSceneObject {
+        const NAME: &'static str = "CManagedSceneObject";
+    }
     pub enum CMaterialSystem2AppSystemDict {}
+    impl NativeClass for CMaterialSystem2AppSystemDict {
+        const NAME: &'static str = "CMaterialSystem2AppSystemDict";
+    }
     pub enum CModel {}
+    impl NativeClass for CModel {
+        const NAME: &'static str = "CModel";
+    }
     pub enum CModelBuilder {}
+    impl NativeClass for CModelBuilder {
+        const NAME: &'static str = "CModelBuilder";
+    }
     pub enum CNotNode_Definition {}
+    impl NativeClass for CNotNode_Definition {
+        const NAME: &'static str = "CNotNode_Definition";
+    }
     pub enum COrNode_Definition {}
+    impl NativeClass for COrNode_Definition {
+        const NAME: &'static str = "COrNode_Definition";
+    }
     pub enum COrientationWarpNode_Definition {}
+    impl NativeClass for COrientationWarpNode_Definition {
+        const NAME: &'static str = "COrientationWarpNode_Definition";
+    }
     pub enum CParameterizedBlendNode_BlendRange {}
+    impl NativeClass for CParameterizedBlendNode_BlendRange {
+        const NAME: &'static str = "CParameterizedBlendNode_BlendRange";
+    }
     pub enum CParameterizedClipSelectorNode_Definition {}
+    impl NativeClass for CParameterizedClipSelectorNode_Definition {
+        const NAME: &'static str = "CParameterizedClipSelectorNode_Definition";
+    }
     pub enum CParameterizedSelectorNode_Definition {}
+    impl NativeClass for CParameterizedSelectorNode_Definition {
+        const NAME: &'static str = "CParameterizedSelectorNode_Definition";
+    }
     pub enum CPassthroughNode_Definition {}
+    impl NativeClass for CPassthroughNode_Definition {
+        const NAME: &'static str = "CPassthroughNode_Definition";
+    }
     pub enum CPathEffect {}
+    impl NativeClass for CPathEffect {
+        const NAME: &'static str = "CPathEffect";
+    }
     pub enum CPhysBodyDesc {}
+    impl NativeClass for CPhysBodyDesc {
+        const NAME: &'static str = "CPhysBodyDesc";
+    }
     pub enum CPhysBodyDescArray {}
+    impl NativeClass for CPhysBodyDescArray {
+        const NAME: &'static str = "CPhysBodyDescArray";
+    }
     pub enum CPhysSurfaceProperties {}
+    impl NativeClass for CPhysSurfaceProperties {
+        const NAME: &'static str = "CPhysSurfaceProperties";
+    }
     pub enum CPhysicsData {}
+    impl NativeClass for CPhysicsData {
+        const NAME: &'static str = "CPhysicsData";
+    }
     pub enum CQueryResult {}
+    impl NativeClass for CQueryResult {
+        const NAME: &'static str = "CQueryResult";
+    }
     pub enum CReadBufferManagedCallback {}
+    impl NativeClass for CReadBufferManagedCallback {
+        const NAME: &'static str = "CReadBufferManagedCallback";
+    }
     pub enum CReadTexturePixelsManagedCallback {}
+    impl NativeClass for CReadTexturePixelsManagedCallback {
+        const NAME: &'static str = "CReadTexturePixelsManagedCallback";
+    }
     pub enum CReferencePoseNode_Definition {}
+    impl NativeClass for CReferencePoseNode_Definition {
+        const NAME: &'static str = "CReferencePoseNode_Definition";
+    }
     pub enum CReferencedGraphNode_Definition {}
+    impl NativeClass for CReferencedGraphNode_Definition {
+        const NAME: &'static str = "CReferencedGraphNode_Definition";
+    }
     pub enum CRenderAttributes {}
+    impl NativeClass for CRenderAttributes {
+        const NAME: &'static str = "CRenderAttributes";
+    }
     pub enum CRenderMesh {}
+    impl NativeClass for CRenderMesh {
+        const NAME: &'static str = "CRenderMesh";
+    }
     pub enum CRenderPipelineSetup {}
+    impl NativeClass for CRenderPipelineSetup {
+        const NAME: &'static str = "CRenderPipelineSetup";
+    }
     pub enum CReverbEffect {}
+    impl NativeClass for CReverbEffect {
+        const NAME: &'static str = "CReverbEffect";
+    }
     pub enum CRootMotionOverrideNode_Definition {}
+    impl NativeClass for CRootMotionOverrideNode_Definition {
+        const NAME: &'static str = "CRootMotionOverrideNode_Definition";
+    }
     pub enum CScaleNode_Definition {}
+    impl NativeClass for CScaleNode_Definition {
+        const NAME: &'static str = "CScaleNode_Definition";
+    }
     pub enum CSceneAnimatableObject {}
+    impl NativeClass for CSceneAnimatableObject {
+        const NAME: &'static str = "CSceneAnimatableObject";
+    }
     pub enum CSceneLightObject {}
+    impl NativeClass for CSceneLightObject {
+        const NAME: &'static str = "CSceneLightObject";
+    }
     pub enum CSceneLightProbeVolumeObject {}
+    impl NativeClass for CSceneLightProbeVolumeObject {
+        const NAME: &'static str = "CSceneLightProbeVolumeObject";
+    }
     pub enum CSceneObject {}
+    impl NativeClass for CSceneObject {
+        const NAME: &'static str = "CSceneObject";
+    }
     pub enum CSceneSkyBoxObject {}
+    impl NativeClass for CSceneSkyBoxObject {
+        const NAME: &'static str = "CSceneSkyBoxObject";
+    }
     pub enum CSelectorNode_Definition {}
+    impl NativeClass for CSelectorNode_Definition {
+        const NAME: &'static str = "CSelectorNode_Definition";
+    }
     pub enum CServerList {}
+    impl NativeClass for CServerList {
+        const NAME: &'static str = "CServerList";
+    }
     pub enum CSfxTable {}
+    impl NativeClass for CSfxTable {
+        const NAME: &'static str = "CSfxTable";
+    }
     pub enum CSimplePCMWaveData {}
+    impl NativeClass for CSimplePCMWaveData {
+        const NAME: &'static str = "CSimplePCMWaveData";
+    }
     pub enum CSpeedScaleNode_Definition {}
+    impl NativeClass for CSpeedScaleNode_Definition {
+        const NAME: &'static str = "CSpeedScaleNode_Definition";
+    }
     pub enum CStateCompletedConditionNode_Definition {}
+    impl NativeClass for CStateCompletedConditionNode_Definition {
+        const NAME: &'static str = "CStateCompletedConditionNode_Definition";
+    }
     pub enum CStateMachineNode_Definition {}
+    impl NativeClass for CStateMachineNode_Definition {
+        const NAME: &'static str = "CStateMachineNode_Definition";
+    }
     pub enum CStateMachineNode_StateDefinition {}
+    impl NativeClass for CStateMachineNode_StateDefinition {
+        const NAME: &'static str = "CStateMachineNode_StateDefinition";
+    }
     pub enum CStateMachineNode_TransitionDefinition {}
+    impl NativeClass for CStateMachineNode_TransitionDefinition {
+        const NAME: &'static str = "CStateMachineNode_TransitionDefinition";
+    }
     pub enum CStateNode_Definition {}
+    impl NativeClass for CStateNode_Definition {
+        const NAME: &'static str = "CStateNode_Definition";
+    }
     pub enum CStateNode_TimedEvent {}
+    impl NativeClass for CStateNode_TimedEvent {
+        const NAME: &'static str = "CStateNode_TimedEvent";
+    }
     pub enum CSteamInventoryResult {}
+    impl NativeClass for CSteamInventoryResult {
+        const NAME: &'static str = "CSteamInventoryResult";
+    }
     pub enum CSteamItemInstance {}
+    impl NativeClass for CSteamItemInstance {
+        const NAME: &'static str = "CSteamItemInstance";
+    }
     pub enum CSyncEventIndexConditionNode_Definition {}
+    impl NativeClass for CSyncEventIndexConditionNode_Definition {
+        const NAME: &'static str = "CSyncEventIndexConditionNode_Definition";
+    }
     pub enum CTargetInfoNode_Definition {}
+    impl NativeClass for CTargetInfoNode_Definition {
+        const NAME: &'static str = "CTargetInfoNode_Definition";
+    }
     pub enum CTargetOffsetNode_Definition {}
+    impl NativeClass for CTargetOffsetNode_Definition {
+        const NAME: &'static str = "CTargetOffsetNode_Definition";
+    }
     pub enum CTargetPointNode_Definition {}
+    impl NativeClass for CTargetPointNode_Definition {
+        const NAME: &'static str = "CTargetPointNode_Definition";
+    }
     pub enum CTargetSelectorNode_Definition {}
+    impl NativeClass for CTargetSelectorNode_Definition {
+        const NAME: &'static str = "CTargetSelectorNode_Definition";
+    }
     pub enum CTargetWarpNode_Definition {}
+    impl NativeClass for CTargetWarpNode_Definition {
+        const NAME: &'static str = "CTargetWarpNode_Definition";
+    }
     pub enum CTextureBase {}
+    impl NativeClass for CTextureBase {
+        const NAME: &'static str = "CTextureBase";
+    }
     pub enum CTimeConditionNode_Definition {}
+    impl NativeClass for CTimeConditionNode_Definition {
+        const NAME: &'static str = "CTimeConditionNode_Definition";
+    }
     pub enum CTimeControlledClipNode_Definition {}
+    impl NativeClass for CTimeControlledClipNode_Definition {
+        const NAME: &'static str = "CTimeControlledClipNode_Definition";
+    }
     pub enum CTransitionEventConditionNode_Definition {}
+    impl NativeClass for CTransitionEventConditionNode_Definition {
+        const NAME: &'static str = "CTransitionEventConditionNode_Definition";
+    }
     pub enum CTransitionNode_Definition {}
+    impl NativeClass for CTransitionNode_Definition {
+        const NAME: &'static str = "CTransitionNode_Definition";
+    }
     pub enum CTwoBoneIKNode_Definition {}
+    impl NativeClass for CTwoBoneIKNode_Definition {
+        const NAME: &'static str = "CTwoBoneIKNode_Definition";
+    }
     pub enum CUtlBuffer {}
+    impl NativeClass for CUtlBuffer {
+        const NAME: &'static str = "CUtlBuffer";
+    }
     pub enum CUtlSymbolTable {}
+    impl NativeClass for CUtlSymbolTable {
+        const NAME: &'static str = "CUtlSymbolTable";
+    }
     pub enum CUtlVector_CGraphEventConditionNode_Condition_ {}
+    impl NativeClass for CUtlVector_CGraphEventConditionNode_Condition_ {
+        const NAME: &'static str = "CUtlVector_CGraphEventConditionNode_Condition_";
+    }
     pub enum CUtlVector_CLayerBlendNode_LayerDefinition_ {}
+    impl NativeClass for CUtlVector_CLayerBlendNode_LayerDefinition_ {
+        const NAME: &'static str = "CUtlVector_CLayerBlendNode_LayerDefinition_";
+    }
     pub enum CUtlVector_CParameterizedBlendNode_BlendRange_ {}
+    impl NativeClass for CUtlVector_CParameterizedBlendNode_BlendRange_ {
+        const NAME: &'static str = "CUtlVector_CParameterizedBlendNode_BlendRange_";
+    }
     pub enum CUtlVector_CStateMachineNode_StateDefinition_ {}
+    impl NativeClass for CUtlVector_CStateMachineNode_StateDefinition_ {
+        const NAME: &'static str = "CUtlVector_CStateMachineNode_StateDefinition_";
+    }
     pub enum CUtlVector_CStateMachineNode_TransitionDefinition_ {}
+    impl NativeClass for CUtlVector_CStateMachineNode_TransitionDefinition_ {
+        const NAME: &'static str = "CUtlVector_CStateMachineNode_TransitionDefinition_";
+    }
     pub enum CUtlVector_CStateNode_TimedEvent_ {}
+    impl NativeClass for CUtlVector_CStateNode_TimedEvent_ {
+        const NAME: &'static str = "CUtlVector_CStateNode_TimedEvent_";
+    }
     pub enum CUtlVector_CUtlString_ {}
+    impl NativeClass for CUtlVector_CUtlString_ {
+        const NAME: &'static str = "CUtlVector_CUtlString_";
+    }
     pub enum CUtlVector_FloatCurve_t_Point_ {}
+    impl NativeClass for CUtlVector_FloatCurve_t_Point_ {
+        const NAME: &'static str = "CUtlVector_FloatCurve_t_Point_";
+    }
     pub enum CUtlVector_HRenderTexture_ {}
+    impl NativeClass for CUtlVector_HRenderTexture_ {
+        const NAME: &'static str = "CUtlVector_HRenderTexture_";
+    }
     pub enum CUtlVector_MeshTraceOutput_ {}
+    impl NativeClass for CUtlVector_MeshTraceOutput_ {
+        const NAME: &'static str = "CUtlVector_MeshTraceOutput_";
+    }
     pub enum CUtlVector_PhysicsTrace_Result_ {}
+    impl NativeClass for CUtlVector_PhysicsTrace_Result_ {
+        const NAME: &'static str = "CUtlVector_PhysicsTrace_Result_";
+    }
     pub enum CUtlVector_StringID_ {}
+    impl NativeClass for CUtlVector_StringID_ {
+        const NAME: &'static str = "CUtlVector_StringID_";
+    }
     pub enum CUtlVector_Vector2D_ {}
+    impl NativeClass for CUtlVector_Vector2D_ {
+        const NAME: &'static str = "CUtlVector_Vector2D_";
+    }
     pub enum CUtlVector_Vector_ {}
+    impl NativeClass for CUtlVector_Vector_ {
+        const NAME: &'static str = "CUtlVector_Vector_";
+    }
     pub enum CUtlVector_float_ {}
+    impl NativeClass for CUtlVector_float_ {
+        const NAME: &'static str = "CUtlVector_float_";
+    }
     pub enum CUtlVector_int16_ {}
+    impl NativeClass for CUtlVector_int16_ {
+        const NAME: &'static str = "CUtlVector_int16_";
+    }
     pub enum CUtlVector_uint32_ {}
+    impl NativeClass for CUtlVector_uint32_ {
+        const NAME: &'static str = "CUtlVector_uint32_";
+    }
     pub enum CUtlVector_uint8_ {}
+    impl NativeClass for CUtlVector_uint8_ {
+        const NAME: &'static str = "CUtlVector_uint8_";
+    }
     pub enum CVectorCreateNode_Definition {}
+    impl NativeClass for CVectorCreateNode_Definition {
+        const NAME: &'static str = "CVectorCreateNode_Definition";
+    }
     pub enum CVectorInfoNode_Definition {}
+    impl NativeClass for CVectorInfoNode_Definition {
+        const NAME: &'static str = "CVectorInfoNode_Definition";
+    }
     pub enum CVectorNegateNode_Definition {}
+    impl NativeClass for CVectorNegateNode_Definition {
+        const NAME: &'static str = "CVectorNegateNode_Definition";
+    }
     pub enum CVelocityBasedSpeedScaleNode_Definition {}
+    impl NativeClass for CVelocityBasedSpeedScaleNode_Definition {
+        const NAME: &'static str = "CVelocityBasedSpeedScaleNode_Definition";
+    }
     pub enum CVelocityBlendNode_Definition {}
+    impl NativeClass for CVelocityBlendNode_Definition {
+        const NAME: &'static str = "CVelocityBlendNode_Definition";
+    }
     pub enum CVfx {}
+    impl NativeClass for CVfx {
+        const NAME: &'static str = "CVfx";
+    }
     pub enum CVfxByteCodeManager {}
+    impl NativeClass for CVfxByteCodeManager {
+        const NAME: &'static str = "CVfxByteCodeManager";
+    }
     pub enum CVfxCombo {}
+    impl NativeClass for CVfxCombo {
+        const NAME: &'static str = "CVfxCombo";
+    }
     pub enum CVfxComboIterator {}
+    impl NativeClass for CVfxComboIterator {
+        const NAME: &'static str = "CVfxComboIterator";
+    }
     pub enum CVfxProgramData {}
+    impl NativeClass for CVfxProgramData {
+        const NAME: &'static str = "CVfxProgramData";
+    }
     pub enum CVideoPlayer {}
+    impl NativeClass for CVideoPlayer {
+        const NAME: &'static str = "CVideoPlayer";
+    }
     pub enum CVideoRecorder {}
+    impl NativeClass for CVideoRecorder {
+        const NAME: &'static str = "CVideoRecorder";
+    }
     pub enum CVirtualParameterBoneMaskNode_Definition {}
+    impl NativeClass for CVirtualParameterBoneMaskNode_Definition {
+        const NAME: &'static str = "CVirtualParameterBoneMaskNode_Definition";
+    }
     pub enum CVirtualParameterBoolNode_Definition {}
+    impl NativeClass for CVirtualParameterBoolNode_Definition {
+        const NAME: &'static str = "CVirtualParameterBoolNode_Definition";
+    }
     pub enum CVirtualParameterFloatNode_Definition {}
+    impl NativeClass for CVirtualParameterFloatNode_Definition {
+        const NAME: &'static str = "CVirtualParameterFloatNode_Definition";
+    }
     pub enum CVirtualParameterIDNode_Definition {}
+    impl NativeClass for CVirtualParameterIDNode_Definition {
+        const NAME: &'static str = "CVirtualParameterIDNode_Definition";
+    }
     pub enum CVirtualParameterTargetNode_Definition {}
+    impl NativeClass for CVirtualParameterTargetNode_Definition {
+        const NAME: &'static str = "CVirtualParameterTargetNode_Definition";
+    }
     pub enum CVirtualParameterVectorNode_Definition {}
+    impl NativeClass for CVirtualParameterVectorNode_Definition {
+        const NAME: &'static str = "CVirtualParameterVectorNode_Definition";
+    }
     pub enum CZeroPoseNode_Definition {}
+    impl NativeClass for CZeroPoseNode_Definition {
+        const NAME: &'static str = "CZeroPoseNode_Definition";
+    }
     pub enum ConCommand {}
+    impl NativeClass for ConCommand {
+        const NAME: &'static str = "ConCommand";
+    }
     pub enum ConVar {}
+    impl NativeClass for ConVar {
+        const NAME: &'static str = "ConVar";
+    }
     pub enum DspInstance {}
+    impl NativeClass for DspInstance {
+        const NAME: &'static str = "DspInstance";
+    }
     pub enum DspPreset {}
+    impl NativeClass for DspPreset {
+        const NAME: &'static str = "DspPreset";
+    }
     pub enum EngineGlue {}
+    impl NativeClass for EngineGlue {
+        const NAME: &'static str = "EngineGlue";
+    }
     pub enum ErrorReports {}
+    impl NativeClass for ErrorReports {
+        const NAME: &'static str = "ErrorReports";
+    }
     pub enum FloatBitMap_t {}
+    impl NativeClass for FloatBitMap_t {
+        const NAME: &'static str = "FloatBitMap_t";
+    }
     pub enum FloatCurve_t {}
+    impl NativeClass for FloatCurve_t {
+        const NAME: &'static str = "FloatCurve_t";
+    }
     pub enum FloatCurve_t_Point {}
+    impl NativeClass for FloatCurve_t_Point {
+        const NAME: &'static str = "FloatCurve_t_Point";
+    }
     pub enum FloatRange_t {}
+    impl NativeClass for FloatRange_t {
+        const NAME: &'static str = "FloatRange_t";
+    }
     pub enum GameWindowGlue {}
+    impl NativeClass for GameWindowGlue {
+        const NAME: &'static str = "GameWindowGlue";
+    }
     pub enum Glue_Networking {}
+    impl NativeClass for Glue_Networking {
+        const NAME: &'static str = "Glue_Networking";
+    }
     pub enum Glue_RenderDeviceManager {}
+    impl NativeClass for Glue_RenderDeviceManager {
+        const NAME: &'static str = "Glue_RenderDeviceManager";
+    }
     pub enum Glue_Resources {}
+    impl NativeClass for Glue_Resources {
+        const NAME: &'static str = "Glue_Resources";
+    }
     pub enum HResourceManifest__ {}
+    impl NativeClass for HResourceManifest__ {
+        const NAME: &'static str = "HResourceManifest__";
+    }
     pub enum IAnimParameter {}
+    impl NativeClass for IAnimParameter {
+        const NAME: &'static str = "IAnimParameter";
+    }
     pub enum IAnimParameterInstance {}
+    impl NativeClass for IAnimParameterInstance {
+        const NAME: &'static str = "IAnimParameterInstance";
+    }
     pub enum IAnimParameterList {}
+    impl NativeClass for IAnimParameterList {
+        const NAME: &'static str = "IAnimParameterList";
+    }
     pub enum IAnimationGraph {}
+    impl NativeClass for IAnimationGraph {
+        const NAME: &'static str = "IAnimationGraph";
+    }
     pub enum IAsyncResourceDataRequest {}
+    impl NativeClass for IAsyncResourceDataRequest {
+        const NAME: &'static str = "IAsyncResourceDataRequest";
+    }
     pub enum IMaterial2 {}
+    impl NativeClass for IMaterial2 {
+        const NAME: &'static str = "IMaterial2";
+    }
     pub enum IMaterialMode {}
+    impl NativeClass for IMaterialMode {
+        const NAME: &'static str = "IMaterialMode";
+    }
     pub enum IPVS {}
+    impl NativeClass for IPVS {
+        const NAME: &'static str = "IPVS";
+    }
     pub enum IPhysAggregateInstance {}
+    impl NativeClass for IPhysAggregateInstance {
+        const NAME: &'static str = "IPhysAggregateInstance";
+    }
     pub enum IPhysSurfacePropertyController {}
+    impl NativeClass for IPhysSurfacePropertyController {
+        const NAME: &'static str = "IPhysSurfacePropertyController";
+    }
     pub enum IPhysicsBody {}
+    impl NativeClass for IPhysicsBody {
+        const NAME: &'static str = "IPhysicsBody";
+    }
     pub enum IPhysicsJoint {}
+    impl NativeClass for IPhysicsJoint {
+        const NAME: &'static str = "IPhysicsJoint";
+    }
     pub enum IPhysicsShape {}
+    impl NativeClass for IPhysicsShape {
+        const NAME: &'static str = "IPhysicsShape";
+    }
     pub enum IPhysicsWorld {}
+    impl NativeClass for IPhysicsWorld {
+        const NAME: &'static str = "IPhysicsWorld";
+    }
     pub enum IRD_RegisterResourceDataUtils {}
+    impl NativeClass for IRD_RegisterResourceDataUtils {
+        const NAME: &'static str = "IRD_RegisterResourceDataUtils";
+    }
     pub enum IRayTraceSceneWorld {}
+    impl NativeClass for IRayTraceSceneWorld {
+        const NAME: &'static str = "IRayTraceSceneWorld";
+    }
     pub enum IReadBufferCallback {}
+    impl NativeClass for IReadBufferCallback {
+        const NAME: &'static str = "IReadBufferCallback";
+    }
     pub enum IReadTexturePixelsCallback {}
+    impl NativeClass for IReadTexturePixelsCallback {
+        const NAME: &'static str = "IReadTexturePixelsCallback";
+    }
     pub enum IRenderContext {}
+    impl NativeClass for IRenderContext {
+        const NAME: &'static str = "IRenderContext";
+    }
     pub enum ISceneLayer {}
+    impl NativeClass for ISceneLayer {
+        const NAME: &'static str = "ISceneLayer";
+    }
     pub enum ISceneView {}
+    impl NativeClass for ISceneView {
+        const NAME: &'static str = "ISceneView";
+    }
     pub enum ISceneWorld {}
+    impl NativeClass for ISceneWorld {
+        const NAME: &'static str = "ISceneWorld";
+    }
     pub enum IShaderCompileContext {}
+    impl NativeClass for IShaderCompileContext {
+        const NAME: &'static str = "IShaderCompileContext";
+    }
     pub enum ISteamApps {}
+    impl NativeClass for ISteamApps {
+        const NAME: &'static str = "ISteamApps";
+    }
     pub enum ISteamFriends {}
+    impl NativeClass for ISteamFriends {
+        const NAME: &'static str = "ISteamFriends";
+    }
     pub enum ISteamGameServer {}
+    impl NativeClass for ISteamGameServer {
+        const NAME: &'static str = "ISteamGameServer";
+    }
     pub enum ISteamHTMLSurface {}
+    impl NativeClass for ISteamHTMLSurface {
+        const NAME: &'static str = "ISteamHTMLSurface";
+    }
     pub enum ISteamMatchmaking {}
+    impl NativeClass for ISteamMatchmaking {
+        const NAME: &'static str = "ISteamMatchmaking";
+    }
     pub enum ISteamNetworkingMessages {}
+    impl NativeClass for ISteamNetworkingMessages {
+        const NAME: &'static str = "ISteamNetworkingMessages";
+    }
     pub enum ISteamNetworkingSockets {}
+    impl NativeClass for ISteamNetworkingSockets {
+        const NAME: &'static str = "ISteamNetworkingSockets";
+    }
     pub enum ISteamNetworkingUtils {}
+    impl NativeClass for ISteamNetworkingUtils {
+        const NAME: &'static str = "ISteamNetworkingUtils";
+    }
     pub enum ISteamRemoteStorage {}
+    impl NativeClass for ISteamRemoteStorage {
+        const NAME: &'static str = "ISteamRemoteStorage";
+    }
     pub enum ISteamUser {}
+    impl NativeClass for ISteamUser {
+        const NAME: &'static str = "ISteamUser";
+    }
     pub enum ISteamUtils {}
+    impl NativeClass for ISteamUtils {
+        const NAME: &'static str = "ISteamUtils";
+    }
     pub enum ITonemapSystem {}
+    impl NativeClass for ITonemapSystem {
+        const NAME: &'static str = "ITonemapSystem";
+    }
     pub enum IVfx {}
+    impl NativeClass for IVfx {
+        const NAME: &'static str = "IVfx";
+    }
     pub enum IVolumetricFog {}
+    impl NativeClass for IVolumetricFog {
+        const NAME: &'static str = "IVolumetricFog";
+    }
     pub enum IWorldReference {}
+    impl NativeClass for IWorldReference {
+        const NAME: &'static str = "IWorldReference";
+    }
     pub enum ImageLoader {}
+    impl NativeClass for ImageLoader {
+        const NAME: &'static str = "ImageLoader";
+    }
     pub enum KeyValues3 {}
+    impl NativeClass for KeyValues3 {
+        const NAME: &'static str = "KeyValues3";
+    }
     pub enum LZ4Glue {}
+    impl NativeClass for LZ4Glue {
+        const NAME: &'static str = "LZ4Glue";
+    }
     pub enum MeshGlue {}
+    impl NativeClass for MeshGlue {
+        const NAME: &'static str = "MeshGlue";
+    }
     pub enum NativeLowLevel {}
+    impl NativeClass for NativeLowLevel {
+        const NAME: &'static str = "NativeLowLevel";
+    }
     pub enum PerformanceTrace {}
+    impl NativeClass for PerformanceTrace {
+        const NAME: &'static str = "PerformanceTrace";
+    }
     pub enum PhysicsTrace {}
+    impl NativeClass for PhysicsTrace {
+        const NAME: &'static str = "PhysicsTrace";
+    }
     pub enum RenderPipelineTools {}
+    impl NativeClass for RenderPipelineTools {
+        const NAME: &'static str = "RenderPipelineTools";
+    }
     pub enum RenderTools {}
+    impl NativeClass for RenderTools {
+        const NAME: &'static str = "RenderTools";
+    }
     pub enum RnCapsuleDesc_t {}
+    impl NativeClass for RnCapsuleDesc_t {
+        const NAME: &'static str = "RnCapsuleDesc_t";
+    }
     pub enum RnHullDesc_t {}
+    impl NativeClass for RnHullDesc_t {
+        const NAME: &'static str = "RnHullDesc_t";
+    }
     pub enum RnHull_t {}
+    impl NativeClass for RnHull_t {
+        const NAME: &'static str = "RnHull_t";
+    }
     pub enum RnMeshDesc_t {}
+    impl NativeClass for RnMeshDesc_t {
+        const NAME: &'static str = "RnMeshDesc_t";
+    }
     pub enum RnMesh_t {}
+    impl NativeClass for RnMesh_t {
+        const NAME: &'static str = "RnMesh_t";
+    }
     pub enum RnSphereDesc_t {}
+    impl NativeClass for RnSphereDesc_t {
+        const NAME: &'static str = "RnSphereDesc_t";
+    }
     pub enum SceneSystemPerFrameStats_t {}
+    impl NativeClass for SceneSystemPerFrameStats_t {
+        const NAME: &'static str = "SceneSystemPerFrameStats_t";
+    }
     pub enum ShaderTools {}
+    impl NativeClass for ShaderTools {
+        const NAME: &'static str = "ShaderTools";
+    }
     pub enum SheetSequenceFrame_t {}
+    impl NativeClass for SheetSequenceFrame_t {
+        const NAME: &'static str = "SheetSequenceFrame_t";
+    }
     pub enum SheetSequence_t {}
+    impl NativeClass for SheetSequence_t {
+        const NAME: &'static str = "SheetSequence_t";
+    }
     pub enum Steam_Inventory {}
+    impl NativeClass for Steam_Inventory {
+        const NAME: &'static str = "Steam_Inventory";
+    }
     pub enum Steam_Screenshots {}
+    impl NativeClass for Steam_Screenshots {
+        const NAME: &'static str = "Steam_Screenshots";
+    }
     pub enum Steam_Ugc_CUgcQuery {}
+    impl NativeClass for Steam_Ugc_CUgcQuery {
+        const NAME: &'static str = "Steam_Ugc_CUgcQuery";
+    }
     pub enum Steam_Ugc_CUgcSubscriptions {}
+    impl NativeClass for Steam_Ugc_CUgcSubscriptions {
+        const NAME: &'static str = "Steam_Ugc_CUgcSubscriptions";
+    }
     pub enum Steam_Ugc_CUgcUpdate {}
+    impl NativeClass for Steam_Ugc_CUgcUpdate {
+        const NAME: &'static str = "Steam_Ugc_CUgcUpdate";
+    }
     pub enum Steam_Ugc_CUgcVote {}
+    impl NativeClass for Steam_Ugc_CUgcVote {
+        const NAME: &'static str = "Steam_Ugc_CUgcVote";
+    }
     pub enum ThreadJob {}
+    impl NativeClass for ThreadJob {
+        const NAME: &'static str = "ThreadJob";
+    }
     pub enum VPhysXBodyPart_t {}
+    impl NativeClass for VPhysXBodyPart_t {
+        const NAME: &'static str = "VPhysXBodyPart_t";
+    }
     pub enum VPhysXJoint_t {}
+    impl NativeClass for VPhysXJoint_t {
+        const NAME: &'static str = "VPhysXJoint_t";
+    }
     pub enum VSound_t {}
+    impl NativeClass for VSound_t {
+        const NAME: &'static str = "VSound_t";
+    }
     pub enum VertexLayout {}
+    impl NativeClass for VertexLayout {
+        const NAME: &'static str = "VertexLayout";
+    }
     pub enum VfxCompiledShaderInfo_t {}
+    impl NativeClass for VfxCompiledShaderInfo_t {
+        const NAME: &'static str = "VfxCompiledShaderInfo_t";
+    }
     pub enum VoiceGlue {}
+    impl NativeClass for VoiceGlue {
+        const NAME: &'static str = "VoiceGlue";
+    }
     pub enum WindowsGlue {}
+    impl NativeClass for WindowsGlue {
+        const NAME: &'static str = "WindowsGlue";
+    }
     pub enum fpxr_ApplicationConfig {}
+    impl NativeClass for fpxr_ApplicationConfig {
+        const NAME: &'static str = "fpxr_ApplicationConfig";
+    }
     pub enum fpxr_Compositor {}
+    impl NativeClass for fpxr_Compositor {
+        const NAME: &'static str = "fpxr_Compositor";
+    }
     pub enum fpxr_EventManager {}
+    impl NativeClass for fpxr_EventManager {
+        const NAME: &'static str = "fpxr_EventManager";
+    }
     pub enum fpxr_Input {}
+    impl NativeClass for fpxr_Input {
+        const NAME: &'static str = "fpxr_Input";
+    }
     pub enum fpxr_Instance {}
+    impl NativeClass for fpxr_Instance {
+        const NAME: &'static str = "fpxr_Instance";
+    }
     pub enum g_pAnimationSystemUtils {}
+    impl NativeClass for g_pAnimationSystemUtils {
+        const NAME: &'static str = "g_pAnimationSystemUtils";
+    }
     pub enum g_pAudioDevice {}
+    impl NativeClass for g_pAudioDevice {
+        const NAME: &'static str = "g_pAudioDevice";
+    }
     pub enum g_pEnginePVSManager {}
+    impl NativeClass for g_pEnginePVSManager {
+        const NAME: &'static str = "g_pEnginePVSManager";
+    }
     pub enum g_pEngineServiceMgr {}
+    impl NativeClass for g_pEngineServiceMgr {
+        const NAME: &'static str = "g_pEngineServiceMgr";
+    }
     pub enum g_pFullFileSystem {}
+    impl NativeClass for g_pFullFileSystem {
+        const NAME: &'static str = "g_pFullFileSystem";
+    }
     pub enum g_pInputSystem {}
+    impl NativeClass for g_pInputSystem {
+        const NAME: &'static str = "g_pInputSystem";
+    }
     pub enum g_pMaterialSystem2 {}
+    impl NativeClass for g_pMaterialSystem2 {
+        const NAME: &'static str = "g_pMaterialSystem2";
+    }
     pub enum g_pMaterialSystem2Utils {}
+    impl NativeClass for g_pMaterialSystem2Utils {
+        const NAME: &'static str = "g_pMaterialSystem2Utils";
+    }
     pub enum g_pMeshSystem {}
+    impl NativeClass for g_pMeshSystem {
+        const NAME: &'static str = "g_pMeshSystem";
+    }
     pub enum g_pPhysicsSystem {}
+    impl NativeClass for g_pPhysicsSystem {
+        const NAME: &'static str = "g_pPhysicsSystem";
+    }
     pub enum g_pRenderDevice {}
+    impl NativeClass for g_pRenderDevice {
+        const NAME: &'static str = "g_pRenderDevice";
+    }
     pub enum g_pResourceCompilerSystem {}
+    impl NativeClass for g_pResourceCompilerSystem {
+        const NAME: &'static str = "g_pResourceCompilerSystem";
+    }
     pub enum g_pResourceSystem {}
+    impl NativeClass for g_pResourceSystem {
+        const NAME: &'static str = "g_pResourceSystem";
+    }
     pub enum g_pSceneSystem {}
+    impl NativeClass for g_pSceneSystem {
+        const NAME: &'static str = "g_pSceneSystem";
+    }
     pub enum g_pSceneUtils {}
+    impl NativeClass for g_pSceneUtils {
+        const NAME: &'static str = "g_pSceneUtils";
+    }
     pub enum g_pSoundSystemInternal {}
+    impl NativeClass for g_pSoundSystemInternal {
+        const NAME: &'static str = "g_pSoundSystemInternal";
+    }
     pub enum g_pWorldRendererMgr {}
+    impl NativeClass for g_pWorldRendererMgr {
+        const NAME: &'static str = "g_pWorldRendererMgr";
+    }
     pub enum global {}
+    impl NativeClass for global {
+        const NAME: &'static str = "global";
+    }
     pub enum globalBox2d {}
+    impl NativeClass for globalBox2d {
+        const NAME: &'static str = "globalBox2d";
+    }
     pub enum globalOVRLipSync {}
+    impl NativeClass for globalOVRLipSync {
+        const NAME: &'static str = "globalOVRLipSync";
+    }
     pub enum globalSdl {}
+    impl NativeClass for globalSdl {
+        const NAME: &'static str = "globalSdl";
+    }
     pub enum globalSteam {}
+    impl NativeClass for globalSteam {
+        const NAME: &'static str = "globalSteam";
+    }
 }
 
 /// Marker types naming pointer handles in `PtrHandle<H>`.
@@ -16115,6 +17013,1323 @@ pub mod windows_glue {
     use super::*;
     /// `WindowsGlue_FindFile`
     pub const FIND_FILE: Slot<fn() -> StrRet> = Slot::new(3919);
+}
+
+/// (class, direct base class), by marker name.
+pub static CLASS_BASES: &[(&str, &str)] = &[
+    ("CAimIKNode_Definition", "CGraphNode_Definition"),
+    ("CAndNode_Definition", "CGraphNode_Definition"),
+    ("CAnimationPoseNode_Definition", "CGraphNode_Definition"),
+    ("CBlend1DNode_Definition", "CGraphNode_Definition"),
+    ("CBlend2DNode_Definition", "CGraphNode_Definition"),
+    ("CBoneMaskBlendNode_Definition", "CGraphNode_Definition"),
+    ("CBoneMaskNode_Definition", "CGraphNode_Definition"),
+    ("CBoneMaskSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CBoneMaskSwitchNode_Definition", "CGraphNode_Definition"),
+    ("CCachedBoolNode_Definition", "CGraphNode_Definition"),
+    ("CCachedFloatNode_Definition", "CGraphNode_Definition"),
+    ("CCachedIDNode_Definition", "CGraphNode_Definition"),
+    ("CCachedTargetNode_Definition", "CGraphNode_Definition"),
+    ("CCachedVectorNode_Definition", "CGraphNode_Definition"),
+    ("CClipNode_Definition", "CGraphNode_Definition"),
+    ("CClipSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CConstBoolNode_Definition", "CGraphNode_Definition"),
+    ("CConstFloatNode_Definition", "CGraphNode_Definition"),
+    ("CConstIDNode_Definition", "CGraphNode_Definition"),
+    ("CConstTargetNode_Definition", "CGraphNode_Definition"),
+    ("CConstVectorNode_Definition", "CGraphNode_Definition"),
+    (
+        "CControlParameterBoolNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CControlParameterFloatNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CControlParameterIDNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CControlParameterTargetNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CControlParameterVectorNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CCurrentSyncEventIDNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CCurrentSyncEventNode_Definition", "CGraphNode_Definition"),
+    ("CDecalSceneObject", "CSceneObject"),
+    ("CDurationScaleNode_Definition", "CGraphNode_Definition"),
+    ("CDynamicSceneObject", "CSceneObject"),
+    ("CEnvMapSceneObject", "CSceneLightObject"),
+    ("CEnvMapSceneObject", "CSceneObject"),
+    ("CExternalPoseNode_Definition", "CGraphNode_Definition"),
+    (
+        "CFixedWeightBoneMaskNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CFloatAngleMathNode_Definition", "CGraphNode_Definition"),
+    ("CFloatClampNode_Definition", "CGraphNode_Definition"),
+    ("CFloatComparisonNode_Definition", "CGraphNode_Definition"),
+    ("CFloatCurveEventNode_Definition", "CGraphNode_Definition"),
+    ("CFloatCurveNode_Definition", "CGraphNode_Definition"),
+    ("CFloatEaseNode_Definition", "CGraphNode_Definition"),
+    ("CFloatMathNode_Definition", "CGraphNode_Definition"),
+    ("CFloatRandomNode_Definition", "CGraphNode_Definition"),
+    (
+        "CFloatRangeComparisonNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CFloatRemapNode_Definition", "CGraphNode_Definition"),
+    ("CFloatSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CFloatSpringNode_Definition", "CGraphNode_Definition"),
+    ("CFloatSwitchNode_Definition", "CGraphNode_Definition"),
+    (
+        "CFootEventConditionNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CFootIKNode_Definition", "CGraphNode_Definition"),
+    ("CFootstepEventIDNode_Definition", "CGraphNode_Definition"),
+    (
+        "CFootstepEventPercentageThroughNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CGraphEventConditionNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CIDBasedClipSelectorNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CIDBasedSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CIDComparisonNode_Definition", "CGraphNode_Definition"),
+    ("CIDEventConditionNode_Definition", "CGraphNode_Definition"),
+    ("CIDEventNode_Definition", "CGraphNode_Definition"),
+    (
+        "CIDEventPercentageThroughNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CIDSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CIDSwitchNode_Definition", "CGraphNode_Definition"),
+    ("CIDToFloatNode_Definition", "CGraphNode_Definition"),
+    (
+        "CIsExternalGraphSlotFilledNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CIsTargetSetNode_Definition", "CGraphNode_Definition"),
+    ("CLayerBlendNode_Definition", "CGraphNode_Definition"),
+    ("CLookAtChainNode_Definition", "CGraphNode_Definition"),
+    ("CManagedSceneObject", "CSceneObject"),
+    ("CNotNode_Definition", "CGraphNode_Definition"),
+    ("COrNode_Definition", "CGraphNode_Definition"),
+    ("COrientationWarpNode_Definition", "CGraphNode_Definition"),
+    (
+        "CParameterizedClipSelectorNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CParameterizedSelectorNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CPassthroughNode_Definition", "CGraphNode_Definition"),
+    ("CReadBufferManagedCallback", "IReadBufferCallback"),
+    (
+        "CReadTexturePixelsManagedCallback",
+        "IReadTexturePixelsCallback",
+    ),
+    ("CReferencePoseNode_Definition", "CGraphNode_Definition"),
+    ("CReferencedGraphNode_Definition", "CGraphNode_Definition"),
+    (
+        "CRootMotionOverrideNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CScaleNode_Definition", "CGraphNode_Definition"),
+    ("CSceneAnimatableObject", "CSceneObject"),
+    ("CSceneLightObject", "CSceneObject"),
+    ("CSceneLightProbeVolumeObject", "CSceneObject"),
+    ("CSceneSkyBoxObject", "CSceneObject"),
+    ("CSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CSpeedScaleNode_Definition", "CGraphNode_Definition"),
+    (
+        "CStateCompletedConditionNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CStateMachineNode_Definition", "CGraphNode_Definition"),
+    ("CStateNode_Definition", "CGraphNode_Definition"),
+    (
+        "CSyncEventIndexConditionNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CTargetInfoNode_Definition", "CGraphNode_Definition"),
+    ("CTargetOffsetNode_Definition", "CGraphNode_Definition"),
+    ("CTargetPointNode_Definition", "CGraphNode_Definition"),
+    ("CTargetSelectorNode_Definition", "CGraphNode_Definition"),
+    ("CTargetWarpNode_Definition", "CGraphNode_Definition"),
+    ("CTimeConditionNode_Definition", "CGraphNode_Definition"),
+    (
+        "CTimeControlledClipNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CTransitionEventConditionNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CTransitionNode_Definition", "CGraphNode_Definition"),
+    ("CTwoBoneIKNode_Definition", "CGraphNode_Definition"),
+    ("CVectorCreateNode_Definition", "CGraphNode_Definition"),
+    ("CVectorInfoNode_Definition", "CGraphNode_Definition"),
+    ("CVectorNegateNode_Definition", "CGraphNode_Definition"),
+    (
+        "CVelocityBasedSpeedScaleNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CVelocityBlendNode_Definition", "CGraphNode_Definition"),
+    (
+        "CVirtualParameterBoneMaskNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CVirtualParameterBoolNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CVirtualParameterFloatNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CVirtualParameterIDNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CVirtualParameterTargetNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    (
+        "CVirtualParameterVectorNode_Definition",
+        "CGraphNode_Definition",
+    ),
+    ("CZeroPoseNode_Definition", "CGraphNode_Definition"),
+];
+
+/// Bind every cast slot: up-casts keep the pointer, down-casts check the object's class (`dynamic_cast`).
+pub fn bind_casts(r: &mut crate::Registry) {
+    use crate::rt::casts::{down, up};
+    r.bind(
+        c_aim_ik_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CAimIKNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_aim_ik_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CAimIKNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_and_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CAndNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_and_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CAndNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_animation_pose_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CAnimationPoseNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_animation_pose_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CAnimationPoseNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_blend1_d_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CBlend1DNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_blend1_d_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CBlend1DNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_blend2_d_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CBlend2DNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_blend2_d_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CBlend2DNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_blend_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CBoneMaskBlendNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_blend_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CBoneMaskBlendNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CBoneMaskNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CBoneMaskNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CBoneMaskSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CBoneMaskSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_switch_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CBoneMaskSwitchNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_bone_mask_switch_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CBoneMaskSwitchNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_bool_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCachedBoolNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_bool_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCachedBoolNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_float_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCachedFloatNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_float_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCachedFloatNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_id_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCachedIDNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_id_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCachedIDNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_target_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCachedTargetNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_target_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCachedTargetNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_vector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCachedVectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_cached_vector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCachedVectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_clip_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CClipNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_clip_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CClipNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_clip_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CClipSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_clip_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CClipSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_bool_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CConstBoolNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_bool_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CConstBoolNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_float_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CConstFloatNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_float_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CConstFloatNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_id_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CConstIDNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_id_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CConstIDNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_target_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CConstTargetNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_target_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CConstTargetNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_vector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CConstVectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_const_vector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CConstVectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_bool_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CControlParameterBoolNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_bool_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CControlParameterBoolNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_float_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CControlParameterFloatNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_float_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CControlParameterFloatNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_id_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CControlParameterIDNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_id_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CControlParameterIDNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_target_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CControlParameterTargetNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_target_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CControlParameterTargetNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_vector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CControlParameterVectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_control_parameter_vector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CControlParameterVectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_current_sync_event_id_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCurrentSyncEventIDNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_current_sync_event_id_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCurrentSyncEventIDNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_current_sync_event_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CCurrentSyncEventNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_current_sync_event_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CCurrentSyncEventNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_decal_scene_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CDecalSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_decal_scene_object::TO_C_SCENE_OBJECT,
+        up::<class::CDecalSceneObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_duration_scale_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CDurationScaleNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_duration_scale_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CDurationScaleNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_dynamic_scene_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CDynamicSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_dynamic_scene_object::TO_C_SCENE_OBJECT,
+        up::<class::CDynamicSceneObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_env_map_scene_object::FROM_C_SCENE_LIGHT_OBJECT,
+        down::<class::CSceneLightObject, class::CEnvMapSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_env_map_scene_object::TO_C_SCENE_LIGHT_OBJECT,
+        up::<class::CEnvMapSceneObject, class::CSceneLightObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_env_map_scene_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CEnvMapSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_env_map_scene_object::TO_C_SCENE_OBJECT,
+        up::<class::CEnvMapSceneObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_external_pose_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CExternalPoseNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_external_pose_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CExternalPoseNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_fixed_weight_bone_mask_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFixedWeightBoneMaskNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_fixed_weight_bone_mask_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFixedWeightBoneMaskNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_angle_math_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatAngleMathNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_angle_math_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatAngleMathNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_clamp_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatClampNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_clamp_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatClampNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_comparison_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatComparisonNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_comparison_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatComparisonNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_curve_event_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatCurveEventNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_curve_event_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatCurveEventNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_curve_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatCurveNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_curve_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatCurveNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_ease_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatEaseNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_ease_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatEaseNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_math_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatMathNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_math_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatMathNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_random_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatRandomNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_random_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatRandomNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_range_comparison_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatRangeComparisonNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_range_comparison_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatRangeComparisonNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_remap_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatRemapNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_remap_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatRemapNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_spring_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatSpringNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_spring_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatSpringNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_switch_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFloatSwitchNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_float_switch_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFloatSwitchNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_foot_event_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFootEventConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_foot_event_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFootEventConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_foot_ik_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFootIKNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_foot_ik_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFootIKNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_footstep_event_id_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFootstepEventIDNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_footstep_event_id_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFootstepEventIDNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_footstep_event_percentage_through_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CFootstepEventPercentageThroughNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_footstep_event_percentage_through_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CFootstepEventPercentageThroughNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_graph_event_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CGraphEventConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_graph_event_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CGraphEventConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_based_clip_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDBasedClipSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_based_clip_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDBasedClipSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_based_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDBasedSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_based_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDBasedSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_comparison_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDComparisonNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_comparison_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDComparisonNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_event_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDEventConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_event_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDEventConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_event_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDEventNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_event_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDEventNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_event_percentage_through_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDEventPercentageThroughNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_event_percentage_through_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDEventPercentageThroughNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_switch_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDSwitchNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_switch_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDSwitchNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_to_float_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIDToFloatNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        cid_to_float_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIDToFloatNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_is_external_graph_slot_filled_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIsExternalGraphSlotFilledNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_is_external_graph_slot_filled_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIsExternalGraphSlotFilledNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_is_target_set_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CIsTargetSetNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_is_target_set_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CIsTargetSetNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_layer_blend_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CLayerBlendNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_layer_blend_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CLayerBlendNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_look_at_chain_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CLookAtChainNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_look_at_chain_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CLookAtChainNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_managed_scene_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CManagedSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_managed_scene_object::TO_C_SCENE_OBJECT,
+        up::<class::CManagedSceneObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_not_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CNotNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_not_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CNotNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_or_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::COrNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_or_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::COrNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_orientation_warp_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::COrientationWarpNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_orientation_warp_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::COrientationWarpNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_parameterized_clip_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CParameterizedClipSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_parameterized_clip_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CParameterizedClipSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_parameterized_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CParameterizedSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_parameterized_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CParameterizedSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_passthrough_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CPassthroughNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_passthrough_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CPassthroughNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_read_buffer_managed_callback::FROM_I_READ_BUFFER_CALLBACK,
+        down::<class::IReadBufferCallback, class::CReadBufferManagedCallback>,
+        "abi::casts",
+    );
+    r.bind(
+        c_read_buffer_managed_callback::TO_I_READ_BUFFER_CALLBACK,
+        up::<class::CReadBufferManagedCallback, class::IReadBufferCallback>,
+        "abi::casts",
+    );
+    r.bind(
+        c_read_texture_pixels_managed_callback::FROM_I_READ_TEXTURE_PIXELS_CALLBACK,
+        down::<class::IReadTexturePixelsCallback, class::CReadTexturePixelsManagedCallback>,
+        "abi::casts",
+    );
+    r.bind(
+        c_read_texture_pixels_managed_callback::TO_I_READ_TEXTURE_PIXELS_CALLBACK,
+        up::<class::CReadTexturePixelsManagedCallback, class::IReadTexturePixelsCallback>,
+        "abi::casts",
+    );
+    r.bind(
+        c_reference_pose_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CReferencePoseNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_reference_pose_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CReferencePoseNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_referenced_graph_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CReferencedGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_referenced_graph_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CReferencedGraphNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_root_motion_override_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CRootMotionOverrideNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_root_motion_override_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CRootMotionOverrideNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scale_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CScaleNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scale_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CScaleNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_animatable_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CSceneAnimatableObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_animatable_object::TO_C_SCENE_OBJECT,
+        up::<class::CSceneAnimatableObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_light_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CSceneLightObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_light_object::TO_C_SCENE_OBJECT,
+        up::<class::CSceneLightObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_light_probe_volume_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CSceneLightProbeVolumeObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_light_probe_volume_object::TO_C_SCENE_OBJECT,
+        up::<class::CSceneLightProbeVolumeObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_sky_box_object::FROM_C_SCENE_OBJECT,
+        down::<class::CSceneObject, class::CSceneSkyBoxObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_scene_sky_box_object::TO_C_SCENE_OBJECT,
+        up::<class::CSceneSkyBoxObject, class::CSceneObject>,
+        "abi::casts",
+    );
+    r.bind(
+        c_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_speed_scale_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CSpeedScaleNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_speed_scale_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CSpeedScaleNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_state_completed_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CStateCompletedConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_state_completed_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CStateCompletedConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_state_machine_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CStateMachineNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_state_machine_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CStateMachineNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_state_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CStateNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_state_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CStateNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_sync_event_index_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CSyncEventIndexConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_sync_event_index_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CSyncEventIndexConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_info_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTargetInfoNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_info_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTargetInfoNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_offset_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTargetOffsetNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_offset_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTargetOffsetNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_point_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTargetPointNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_point_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTargetPointNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_selector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTargetSelectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_selector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTargetSelectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_warp_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTargetWarpNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_target_warp_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTargetWarpNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_time_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTimeConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_time_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTimeConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_time_controlled_clip_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTimeControlledClipNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_time_controlled_clip_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTimeControlledClipNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_transition_event_condition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTransitionEventConditionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_transition_event_condition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTransitionEventConditionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_transition_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTransitionNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_transition_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTransitionNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_two_bone_ik_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CTwoBoneIKNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_two_bone_ik_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CTwoBoneIKNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_vector_create_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVectorCreateNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_vector_create_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVectorCreateNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_vector_info_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVectorInfoNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_vector_info_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVectorInfoNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_vector_negate_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVectorNegateNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_vector_negate_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVectorNegateNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_velocity_based_speed_scale_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVelocityBasedSpeedScaleNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_velocity_based_speed_scale_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVelocityBasedSpeedScaleNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_velocity_blend_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVelocityBlendNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_velocity_blend_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVelocityBlendNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_bone_mask_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVirtualParameterBoneMaskNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_bone_mask_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVirtualParameterBoneMaskNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_bool_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVirtualParameterBoolNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_bool_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVirtualParameterBoolNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_float_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVirtualParameterFloatNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_float_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVirtualParameterFloatNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_id_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVirtualParameterIDNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_id_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVirtualParameterIDNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_target_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVirtualParameterTargetNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_target_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVirtualParameterTargetNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_vector_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CVirtualParameterVectorNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_virtual_parameter_vector_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CVirtualParameterVectorNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_zero_pose_node_definition::FROM_C_GRAPH_NODE_DEFINITION,
+        down::<class::CGraphNode_Definition, class::CZeroPoseNode_Definition>,
+        "abi::casts",
+    );
+    r.bind(
+        c_zero_pose_node_definition::TO_C_GRAPH_NODE_DEFINITION,
+        up::<class::CZeroPoseNode_Definition, class::CGraphNode_Definition>,
+        "abi::casts",
+    );
 }
 
 pub static NAMES: [&str; SLOT_COUNT] = [
