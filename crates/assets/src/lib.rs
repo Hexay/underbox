@@ -3,6 +3,7 @@
 pub mod bitmap;
 pub mod container;
 pub mod game_resource;
+pub mod kv3bin;
 pub mod material;
 pub mod model;
 pub mod project;
