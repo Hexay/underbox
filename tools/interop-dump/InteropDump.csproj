@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Underbox.InteropDump</RootNamespace>
+    <SboxPublic Condition="'$(SboxPublic)' == ''">$(MSBuildThisFileDirectory)../../../sbox-public</SboxPublic>
+    <NoWarn>$(NoWarn);CS1591;CS8632</NoWarn>
+  </PropertyGroup>
+
+  <!-- Compiled from source so the internal pipeline (NativeExportTable, SkipPolicy) is reachable. -->
+  <ItemGroup>
+    <Compile Include="$(SboxPublic)/engine/Tools/InteropGen/**/*.cs" Exclude="$(SboxPublic)/engine/Tools/InteropGen/obj/**;$(SboxPublic)/engine/Tools/InteropGen/bin/**" LinkBase="InteropGen" />
+  </ItemGroup>
+
+</Project>
