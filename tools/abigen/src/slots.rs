@@ -103,9 +103,9 @@ fn emit_slots(abi: &Abi, structs: &Structs, planned: &[Planned], markers: &BTree
     writeln!(out, "use crate::rt::registry::Slot;\nuse crate::rt::strings::StrRet;\nuse crate::rt::types::*;\nuse crate::generated::structs::*;\nuse std::ffi::{{CStr, c_void}};\n").unwrap();
     writeln!(out, "pub const HASH: i32 = {};\npub const SLOT_COUNT: usize = {};\npub const CALLBACK_COUNT: usize = {};\n", abi.hash, abi.slots.len(), abi.callbacks.len()).unwrap();
 
-    writeln!(out, "/// Marker types naming native classes in `NativeRef<C>` / `HandleId<C>`.\npub mod class {{").unwrap();
+    writeln!(out, "/// Marker types naming native classes in `NativeRef<C>` / `HandleId<C>`.\npub mod class {{\n    use crate::rt::casts::NativeClass;").unwrap();
     for m in markers {
-        writeln!(out, "    pub enum {m} {{}}").unwrap();
+        writeln!(out, "    pub enum {m} {{}}\n    impl NativeClass for {m} {{ const NAME: &'static str = {m:?}; }}").unwrap();
     }
     writeln!(out, "}}\n\n/// Marker types naming pointer handles in `PtrHandle<H>`.\npub mod handle {{").unwrap();
     for h in handles {
@@ -130,6 +130,25 @@ fn emit_slots(abi: &Abi, structs: &Structs, planned: &[Planned], markers: &BTree
             writeln!(out, "}}\n").unwrap();
         }
     }
+
+    let casts: Vec<_> = planned.iter().filter(|p| matches!(p.slot.kind, SlotKind::CastFromTo | SlotKind::CastToFrom)).collect();
+    writeln!(out, "/// (class, direct base class), by marker name.\npub static CLASS_BASES: &[(&str, &str)] = &[").unwrap();
+    for p in casts.iter().filter(|p| p.slot.kind == SlotKind::CastFromTo) {
+        let class = names::type_name(&p.slot.class.as_ref().unwrap().native);
+        writeln!(out, "    ({class:?}, {:?}),", names::type_name(p.slot.base_class.as_deref().unwrap())).unwrap();
+    }
+    writeln!(out, "];\n\n/// Bind every cast slot: up-casts keep the pointer, down-casts check the object's class (`dynamic_cast`).\npub fn bind_casts(r: &mut crate::Registry) {{\n    use crate::rt::casts::{{down, up}};").unwrap();
+    for p in casts {
+        let class = names::type_name(&p.slot.class.as_ref().unwrap().native);
+        let base = names::type_name(p.slot.base_class.as_deref().unwrap());
+        let module = p.module.as_deref().unwrap();
+        let f = match p.slot.kind {
+            SlotKind::CastFromTo => format!("down::<class::{base}, class::{class}>"),
+            _ => format!("up::<class::{class}, class::{base}>"),
+        };
+        writeln!(out, "    r.bind({module}::{}, {f}, \"abi::casts\");", p.constant).unwrap();
+    }
+    writeln!(out, "}}\n").unwrap();
 
     writeln!(out, "pub static NAMES: [&str; SLOT_COUNT] = [").unwrap();
     for p in planned {
