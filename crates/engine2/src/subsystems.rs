@@ -12,6 +12,7 @@ pub fn register(r: &mut Registry) {
     crate::app::register(r);
     crate::render::register(r);
     crate::containers::register(r);
+    crate::fs::register(r);
     crate::audio::register(r);
 }
 

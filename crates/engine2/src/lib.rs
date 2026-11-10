@@ -4,6 +4,7 @@
 pub mod app;
 pub mod audio;
 pub mod containers;
+pub mod fs;
 mod igen;
 mod interfaces;
 pub mod render;

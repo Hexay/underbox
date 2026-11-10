@@ -10,8 +10,7 @@ mkdir -p "$ROOT/abi"
 echo "== managed bindings (InteropGen, managed side only)"
 $DUMP generate "$SBOX/engine" | grep -E 'Error|engine.def' || true
 
-# Facepunch's bootstrap downloads this into ThirdParty; NuGet's copy (MIT) compiles the same.
-sh "$ROOT/tools/nuget-file.sh" System.Speech 10.0.14 lib/net10.0/System.Speech.dll "$SBOX/engine/ThirdParty/System.Speech.dll"
+sh "$ROOT/tools/prepare-sbox.sh" "$SBOX"
 
 echo "== Sandbox.Engine.dll (background-worthy: ~2 min cold)"
 dotnet build "$SBOX/engine/Sandbox.Engine/Sandbox.Engine.csproj" -c Release -m:4 -v q -nologo -clp:ErrorsOnly
