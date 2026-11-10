@@ -1,12 +1,34 @@
 //! `b2World_*`: lifetime, stepping, events, queries and tuning.
 
+use super::cast;
 use abi::Registry;
+use abi::slots::global_box2d as b2;
+use std::sync::Mutex;
+
+/// Box2D claims world slots in a global array without a lock; concurrent create/destroy corrupt it.
+static WORLD_SLOTS: Mutex<()> = Mutex::new(());
 
 pub fn register(r: &mut Registry) {
+    r.bind(
+        b2::B2_CREATE_WORLD,
+        |def| {
+            let _slots = WORLD_SLOTS.lock().unwrap();
+            // SAFETY: managed passes a valid world def, as for real engine2.
+            cast(unsafe { box2d_sys::b2CreateWorld(&cast(def)) })
+        },
+        module_path!(),
+    );
+    r.bind(
+        b2::B2_DESTROY_WORLD,
+        |world| {
+            let _slots = WORLD_SLOTS.lock().unwrap();
+            // SAFETY: Box2D validates the id.
+            unsafe { box2d_sys::b2DestroyWorld(cast(world)) }
+        },
+        module_path!(),
+    );
     fwd! { r:
-        B2_CREATE_WORLD => b2CreateWorld(; a);
         B2_WORLD_EXPLODE => b2World_Explode(a; b);
-        B2_DESTROY_WORLD => b2DestroyWorld(a);
         B2_WORLD_IS_VALID => b2World_IsValid(a);
         B2_WORLD_STEP => b2World_Step(a, b, c);
         B2_WORLD_DRAW => b2World_Draw(a, b);
