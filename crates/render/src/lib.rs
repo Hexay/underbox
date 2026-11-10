@@ -22,7 +22,7 @@ mod state;
 mod surface;
 mod texture;
 
-pub use blit::Blitter;
+pub use blit::{Blitter, Transfer};
 pub use buffer::{Buffer, BufferKind};
 pub use forward::{Camera, DrawItem, ForwardPass};
 pub use frame::{Comparison, Frame};

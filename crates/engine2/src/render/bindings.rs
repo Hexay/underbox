@@ -66,6 +66,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::BIND_TEXTURE, bind_texture);
     // TODO: slot-addressed blocks and raw shader handles pair with BindVertexShader/BindPixelShader,
     // whose RenderShaderHandle_t nothing in igen_engine produces; accepted and dropped.
+    // TODO: binds by register slot, not name; nothing in sbox-public calls it.
     bind!(r, ctx::SET_DYNAMIC_CONSTANT_BUFFER_DATA, |_, _, _, _, _| {});
     bind!(r, ctx::BIND_VERTEX_SHADER, |_, _, _| {});
     bind!(r, ctx::BIND_PIXEL_SHADER, |_, _| {});

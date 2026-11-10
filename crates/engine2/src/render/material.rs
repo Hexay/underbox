@@ -105,7 +105,7 @@ fn string(s: Option<&CStr>) -> String {
     s.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-fn create_raw(name: Option<&CStr>, shader: Option<&CStr>, _anonymous: bool) -> Ref {
+pub(crate) fn create_raw(name: Option<&CStr>, shader: Option<&CStr>, _anonymous: bool) -> Ref {
     resource::new_handle(Arc::new(new(string(name), string(shader), false, Guid::default())))
 }
 

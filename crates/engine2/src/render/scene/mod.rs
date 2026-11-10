@@ -8,7 +8,7 @@ pub mod execute;
 pub mod layer;
 pub mod setup;
 pub mod system;
-mod trace;
+pub(crate) mod trace;
 pub mod view;
 
 #[cfg(test)]

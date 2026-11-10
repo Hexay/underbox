@@ -128,6 +128,15 @@ pub fn shader_value(r: Ref, name: &str) -> Option<glam::Vec4> {
     })
 }
 
+pub fn set_buffer(r: Ref, name: StringToken, handle: usize) {
+    on(r, |a| a.set(Kind::Buffer, name, Value::Buffer(handle)));
+}
+
+pub fn set_parent(r: Ref, parent: Ref) {
+    let parent = objects::get::<_, RenderAttributes>(parent);
+    on(r, |s| *s.parent.lock().unwrap() = parent);
+}
+
 /// The GPU buffer handle named `name` (with parents), as `SetBufferValue` stored it.
 pub fn buffer(r: Ref, name: &str) -> Option<usize> {
     on(r, |a| match a.get(Kind::Buffer, StringToken::of(name)) {
@@ -183,7 +192,7 @@ pub fn register(r: &mut Registry) {
     }));
     bind!(r, ra::DELETE_TEXTURE_VALUE, |a, n| on(a, |s| s.delete(Kind::Texture, n)));
     bind!(r, ra::SET_SAMPLER_VALUE, |a, n, v| on(a, |s| s.set(Kind::Sampler, n, Value::Sampler(v))));
-    bind!(r, ra::SET_BUFFER_VALUE, |a, n, b| on(a, |s| s.set(Kind::Buffer, n, Value::Buffer(b.value))));
+    bind!(r, ra::SET_BUFFER_VALUE, |a, n, b| set_buffer(a, n, b.value));
     bind!(r, ra::SET_PTR_VALUE, |a, n, p| on(a, |s| s.set(Kind::Ptr, n, Value::Ptr(p.as_ptr() as usize))));
     bind!(r, ra::DELETE_PTR_VALUE, |a, n| on(a, |s| s.delete(Kind::Ptr, n)));
     bind!(r, ra::SET_INT_VECTOR4_D_VALUE, |a, n, x, y, z, w| {
@@ -194,10 +203,7 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, ra::IS_EMPTY, |a| on(a, |s| s.values.lock().unwrap().is_empty()));
     bind!(r, ra::CLEAR, |a, _free_memory, _clear_parent| on(a, |s| s.values.lock().unwrap().clear()));
-    bind!(r, ra::SET_PARENT, |a, parent| {
-        let parent = objects::get::<_, RenderAttributes>(parent);
-        on(a, |s| *s.parent.lock().unwrap() = parent)
-    });
+    bind!(r, ra::SET_PARENT, set_parent);
     bind!(r, ra::MERGE_TO_PTR, |a, into| {
         let from = on(a, |s| s.values.lock().unwrap().clone());
         on(into, |s| s.values.lock().unwrap().extend(from))

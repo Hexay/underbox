@@ -5,6 +5,7 @@
 pub mod attributes;
 mod bindings;
 mod buffers;
+mod compute;
 pub mod context;
 pub mod device;
 pub mod draw;
@@ -36,6 +37,7 @@ pub fn register(r: &mut Registry) {
     attributes::register(r);
     bindings::register(r);
     buffers::register(r);
+    compute::register(r);
     context::register(r);
     draw::immediate::register(r);
     draw::draw_call::register(r);

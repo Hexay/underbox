@@ -95,6 +95,7 @@ impl Lighting {
             "g_DirectionalLightCascadeCount" => s(shadow.map_or(0.0, |_| 1.0)),
             "g_DirectionalLightWorldToShadowViewMatrices" => shadow.map(|sh| Value::Array(vec![Value::Mat(sh.world_to_shadow)])),
             "g_DirectionalLightInverseShadowMapSize" => s(1.0 / shadow::SIZE as f32),
+            "g_DirectionalLightShadowMapTextureIndex" => shadow.and(v(shadow::INDEX as f32, 0.0, 0.0, 0.0)),
             _ => None,
         }
     }

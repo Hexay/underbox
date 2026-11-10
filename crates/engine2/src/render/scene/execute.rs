@@ -107,7 +107,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             let (Some(src), Some(dst)) = (texture::resolve(src), texture::resolve(t.color)) else { return };
             let (Some(a), Some(b)) = (src.gpu.as_ref(), dst.gpu.as_ref()) else { return };
             let rect = if s.m_n_width > 0 { [s.m_n_top_left_x as u32, s.m_n_top_left_y as u32, s.m_n_width as u32, s.m_n_height as u32] } else { [0, 0, a.desc.width, a.desc.height] };
-            draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport));
+            draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport), render::Transfer::None);
         }
         Kind::Procedural(_) | Kind::Label => {}
     }

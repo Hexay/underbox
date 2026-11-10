@@ -38,10 +38,21 @@ fn copy_texture(src: texture::Ref, dst: texture::Ref, r: NativeRect, dx: i32, dy
 
 /// `BlitTexture`: all of `src` into `viewport` of the bound colour target, scaled and converted
 /// (managed's HDR-to-swap-chain copy).
-fn blit_texture(c: context::Ref, src: texture::Ref, viewport: RenderViewport) -> bool {
+/// `nSrgbTransfer` 1 encodes and 2 decodes; on top, a target bound with sRGB write that stores
+/// 8-bit values (no sRGB view of its own) gets the encode its view would apply.
+fn blit_texture(c: context::Ref, src: texture::Ref, viewport: RenderViewport, srgb_transfer: i32) -> bool {
+    use render::Transfer;
     let (Some(s), Some(d)) = (texture::resolve(src), texture::resolve(context::target(c).color)) else { return false };
     let (Some(a), Some(b)) = (s.gpu.as_ref(), d.gpu.as_ref()) else { return false };
-    draw::blit(a, [0, 0, a.desc.width, a.desc.height], b, draw::viewport_rect(b, &viewport))
+    let f = b.desc.format;
+    let view_encodes = context::srgb_write(c) && !f.is_srgb() && f.target_component_alignment() == Some(1);
+    let transfer = match (srgb_transfer, view_encodes) {
+        (2, true) => Transfer::None,
+        (2, false) => Transfer::Decode,
+        (1, _) | (_, true) => Transfer::Encode,
+        _ => Transfer::None,
+    };
+    draw::blit(a, [0, 0, a.desc.width, a.desc.height], b, draw::viewport_rect(b, &viewport), transfer)
 }
 
 /// `GetSceneObjectDraw`: the `index`th draw call over the object's model meshes (LOD 0, enabled
@@ -142,7 +153,7 @@ pub fn register(r: &mut Registry) {
         copy_from_target(c, t, Some([x.max(0) as u32, y.max(0) as u32, w.max(0) as u32, h.max(0) as u32]), false);
     });
     // TODO: the sRGB transfer flag; the blit draw writes linear values as they are.
-    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, _srgb| blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }));
+    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, srgb| blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb));
     bind!(r, tools::COPY_TEXTURE, |_, src, dst, r, dx, dy, _, _, _, _| copy_texture(src, dst, r, dx, dy));
     bind!(r, tools::DRAW_SKY_BOX, |c, _attrs, _mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
@@ -179,7 +190,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::QUEUE_MODEL_MESH_MORPH, |_, _, _| -1);
     bind!(r, tools::GENERATE_MORPHS, |_| {});
     bind!(r, tools::GET_MORPH_SUBRECT, |_, _| {});
-    bind!(r, tools::COMPUTE, |_, _, _, _, _, _| {});
     bind!(r, tools::COMPUTE_INDIRECT, |_, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS, |_, _, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS_INDIRECT, |_, _, _, _, _| {});

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-pub(super) fn core_dir() -> Option<PathBuf> {
+pub(crate) fn core_dir() -> Option<PathBuf> {
     let env = std::env::var_os("SBOX_PUBLIC").map(PathBuf::from);
     let beside = Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().map(|a| a.join("sbox-public")).find(|p| p.join("game/core/shaders").is_dir());
     env.or(beside).map(|p| p.join("game/core")).filter(|p| p.is_dir())

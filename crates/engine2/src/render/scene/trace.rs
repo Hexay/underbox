@@ -23,6 +23,30 @@ fn describe(t: texture::Ref) -> String {
     }
 }
 
+/// One line per `DrawModelDrawCall` (the first 8 per pair of targets): targets, viewport, depth
+/// mode, instance ids and the transform each reads.
+pub fn draw_call(t: &Target, reverse_z: bool, ids: &[u32], transforms: Option<&[u8]>) {
+    static SEEN: LazyLock<std::sync::Mutex<std::collections::HashMap<String, u32>>> = LazyLock::new(Default::default);
+    let targets = format!("{} / {}", describe(t.color), describe(t.depth));
+    let n = {
+        let mut seen = SEEN.lock().unwrap();
+        let n = seen.entry(targets.clone()).or_default();
+        *n += 1;
+        *n
+    };
+    if !enabled() || n > 8 {
+        return;
+    }
+    let f = |b: &[u8], i: usize| b.get(i * 4..i * 4 + 4).map_or(f32::NAN, |x| f32::from_le_bytes(x.try_into().unwrap()));
+    let at: Vec<String> = ids.iter().map(|&id| transforms.map_or("-".into(), |b| { let o = id as usize * 16; format!("{id}@({:.0},{:.0},{:.0})", f(b, o + 3), f(b, o + 7), f(b, o + 11)) })).collect();
+    let v = t.viewport;
+    let msg = format!(
+        "draw call: -> {targets} viewport {}x{}+{}+{} z {}..{} reverse_z {reverse_z} instances [{}] transforms {}",
+        v.m_n_width, v.m_n_height, v.m_n_top_left_x, v.m_n_top_left_y, v.min_z, v.max_z, at.join(" "), transforms.map_or(0, <[u8]>::len)
+    );
+    abi::rt::log::log(abi::rt::log::Level::Info, &msg);
+}
+
 pub fn layer(view: usize, layer: &SceneLayer, t: &Target, draws: &[Draw]) {
     if !enabled() {
         return;

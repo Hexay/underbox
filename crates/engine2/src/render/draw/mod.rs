@@ -66,11 +66,11 @@ pub fn viewport_rect(t: &render::Texture, v: &abi::structs::RenderViewport) -> [
 }
 
 /// `src_rect` of `src` into `dst_rect` of `dst` (`[x, y, w, h]`): a copy when sizes and formats
-/// match, else a draw that scales and converts.
-pub fn blit(src: &render::Texture, src_rect: [u32; 4], dst: &render::Texture, dst_rect: [u32; 4]) -> bool {
+/// match and no transfer applies, else a draw that scales and converts.
+pub fn blit(src: &render::Texture, src_rect: [u32; 4], dst: &render::Texture, dst_rect: [u32; 4], transfer: render::Transfer) -> bool {
     let Some(gpu) = device::gpu() else { return false };
-    let same_size = src_rect[2..] == dst_rect[2..];
-    (same_size && src.copy_to(gpu, dst, src_rect, (dst_rect[0], dst_rect[1]))) || blitter().is_some_and(|b| b.blit(gpu, src, src_rect, dst, dst_rect))
+    let copy = src_rect[2..] == dst_rect[2..] && transfer == render::Transfer::None;
+    (copy && src.copy_to(gpu, dst, src_rect, (dst_rect[0], dst_rect[1]))) || blitter().is_some_and(|b| b.blit(gpu, src, src_rect, dst, dst_rect, transfer))
 }
 
 /// `RenderPrimitiveType` to a wgpu topology; patches and adjacency draw as triangle lists.

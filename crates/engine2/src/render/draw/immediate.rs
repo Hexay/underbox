@@ -213,7 +213,7 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, ctx::BIND_RENDER_TARGETS_2, |c, chain, color, depth| {
         let (sc, sd) = swap_chain::targets(chain).unwrap_or_default();
-        context::bind_targets(c, if color { sc } else { Default::default() }, if depth { sd } else { Default::default() });
+        context::bind_targets_srgb(c, if color { sc } else { Default::default() }, if depth { sd } else { Default::default() }, true);
     });
     bind!(r, tools::DRAW_MODEL, |c, _layer, _mode, m, xf, n, _attrs| draw_model(c, m, transforms(xf, n)));
     bind!(r, tools::DRAW_MODEL_2, |c, _layer, _mode, m, xf, n, _attrs, _lod| draw_model(c, m, transforms(xf, n)));

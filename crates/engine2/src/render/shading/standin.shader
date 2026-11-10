@@ -148,9 +148,13 @@ PS
 	Texture2D g_tUnderboxSunShadow < Attribute( "g_tUnderboxSunShadow" ); >;
 	SamplerComparisonState g_sUnderboxSunShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( LESS_EQUAL ); >;
 
+	// Our cascade's index (lighting/shadow.rs); managed's renderer names its own bindless maps.
+	#define UNDERBOX_SUN_SHADOW_INDEX 0x7FFFFF00u
+
 	float SunVisibility( float3 vPositionWs, float3 vNormalWs )
 	{
-		if ( g_DirectionalLightCascadeCount == 0 )
+		// TODO: managed's cascades (bindless shadow maps) draw unshadowed.
+		if ( g_DirectionalLightCascadeCount == 0 || g_DirectionalLightShadowMapTextureIndex.x != UNDERBOX_SUN_SHADOW_INDEX )
 			return 1.0;
 		float4x4 m = g_DirectionalLightWorldToShadowViewMatrices[0];
 		float flTexelWs = g_DirectionalLightInverseShadowMapSize / length( m[0].xyz );

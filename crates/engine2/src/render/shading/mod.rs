@@ -15,7 +15,7 @@ pub mod view;
 #[cfg(test)]
 mod coverage;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 pub use program::Shading;
 

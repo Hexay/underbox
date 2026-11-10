@@ -19,6 +19,9 @@ pub const SIZE: u32 = 2048;
 const DISTANCE: f32 = 2000.0;
 /// The texture the stand-in samples.
 pub const TEXTURE: &str = "g_tUnderboxSunShadow";
+/// `g_DirectionalLightShadowMapTextureIndex.x` naming [`TEXTURE`] (the stand-in's
+/// `UNDERBOX_SUN_SHADOW_INDEX`); managed's renderer fills in bindless indices instead.
+pub const INDEX: u32 = 0x7FFF_FF00;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SunShadow {

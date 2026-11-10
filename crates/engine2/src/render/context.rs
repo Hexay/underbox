@@ -19,6 +19,7 @@ struct Bindings {
     depth: Option<texture::Ref>,
     viewport: RenderViewport,
     scissor: Option<NativeRect>,
+    srgb_write: bool,
 }
 
 pub struct RenderContext {
@@ -68,13 +69,23 @@ fn some(t: texture::Ref) -> Option<texture::Ref> {
 
 /// Bind colour and depth targets; the viewport resets to cover the colour (or depth) target.
 pub fn bind_targets(r: Ref, color: texture::Ref, depth: texture::Ref) {
+    bind_targets_srgb(r, color, depth, false);
+}
+
+/// [`bind_targets`] with native's sRGB write: an 8-bit colour target stores sRGB-encoded values
+/// (swap chains always, `BindColorAndDepthTarget` when asked).
+pub fn bind_targets_srgb(r: Ref, color: texture::Ref, depth: texture::Ref, srgb_write: bool) {
     let size = some(color).or(some(depth)).and_then(texture::resolve).and_then(|t| t.gpu.as_ref().map(|g| (g.desc.width, g.desc.height)));
     with(r, |b| {
-        (b.color, b.depth, b.scissor) = (some(color), some(depth), None);
+        (b.color, b.depth, b.scissor, b.srgb_write) = (some(color), some(depth), None, srgb_write);
         if let Some((w, h)) = size {
             b.viewport = RenderViewport { m_n_width: w as i32, m_n_height: h as i32, max_z: 1.0, ..Default::default() };
         }
     });
+}
+
+pub fn srgb_write(r: Ref) -> bool {
+    with(r, |b| b.srgb_write)
 }
 
 /// Whether draws on `r` are reverse-Z (near = 1, depth cleared to 0). Managed's scene renderer
@@ -85,7 +96,7 @@ pub fn reverse_z(r: Ref) -> bool {
 }
 
 /// TODO: clears cover the whole target; a viewport or scissor smaller than it needs a quad draw.
-fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
+pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
     let Some(gpu) = device::gpu() else { return };
     let (target, depth) = with(r, |b| (b.color, b.depth));
     let v = color.vec;
@@ -127,7 +138,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::BEGIN_PIX_EVENT, |_, _| {});
     bind!(r, ctx::END_PIX_EVENT, |_| {});
     bind!(r, ctx::PIX_SET_MARKER, |_, _| {});
-    bind!(r, tools::BIND_COLOR_AND_DEPTH_TARGET, |r, color, depth, _srgb| bind_targets(r, color, depth));
+    bind!(r, tools::BIND_COLOR_AND_DEPTH_TARGET, bind_targets_srgb);
     bind!(r, tools::BIND_DEPTH_TARGET, |r, depth, _slice| bind_targets(r, NativeRef::default(), depth));
     bind!(r, tools::SUPPORTS_DRAW_INDIRECT_COUNT, || false);
 }
