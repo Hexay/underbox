@@ -5,7 +5,7 @@ use super::{body, shape, world};
 use crate::math::{from_vec, to_rot, to_vec};
 use abi::rt::delegates::TraceFilter;
 use abi::slots::physics_trace as t;
-use abi::structs::{PhysicsTrace_Result, Request};
+use abi::structs::{BBox, Capsule, PhysicsTrace_Result, Request, Sphere, Transform, Vector3};
 use abi::{NativeRef, Registry, bind};
 use physics::{BodyType, Collider, Hit, Shape, ShapeId, Sweep};
 
@@ -127,7 +127,33 @@ fn trace(req: Request) -> PhysicsTrace_Result {
     result(&req, first.as_ref())
 }
 
+/// `TraceAgainst*`: the request's sweep against one shape, scaled and placed by `at`; no world.
+fn trace_against(req: Request, target: Shape, at: Transform) -> PhysicsTrace_Result {
+    let pose = physics::Pose::from_parts(to_vec(at.position), to_rot(at.rotation));
+    let hit = sweep(&req).against(&target, pose);
+    result(&req, hit.map(|h| (h, NativeRef::NULL, Vec::new())).as_ref())
+}
+
+fn scaled(at: &Transform) -> (impl Fn(Vector3) -> physics::Vector, f32) {
+    let s = to_vec(at.scale);
+    (move |v| to_vec(v) * s, s.abs().max_element())
+}
+
 pub fn register(r: &mut Registry) {
+    bind!(r, t::TRACE_AGAINST_SPHERE, |req, s: Sphere, at| {
+        let (p, k) = scaled(&at);
+        trace_against(req, Shape::Sphere { center: p(s.center), radius: s.radius * k }, at)
+    });
+    bind!(r, t::TRACE_AGAINST_CAPSULE, |req, c: Capsule, at| {
+        let (p, k) = scaled(&at);
+        trace_against(req, Shape::Capsule { a: p(c.center_a), b: p(c.center_b), radius: c.radius * k }, at)
+    });
+    bind!(r, t::TRACE_AGAINST_B_BOX, |req, b: BBox, at| {
+        let (p, _) = scaled(&at);
+        let (mins, maxs) = (p(b.mins), p(b.maxs));
+        let half_extents = ((maxs - mins) * 0.5).abs();
+        trace_against(req, Shape::Box { center: (mins + maxs) * 0.5, rotation: physics::Rotation::IDENTITY, half_extents }, at)
+    });
     bind!(r, t::TRACE, trace);
     bind!(r, t::TRACE_ALL, |req, out| {
         let hits: Vec<_> = allowed(&req, candidates(&req, true)).map(|f| result(&req, Some(&f))).collect();

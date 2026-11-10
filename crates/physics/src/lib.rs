@@ -9,6 +9,7 @@ mod mass;
 mod rules;
 mod shape;
 mod trace;
+mod trace_against;
 mod world;
 
 #[cfg(test)]
