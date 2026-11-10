@@ -142,7 +142,7 @@ pub fn encode_index_buffer(indices: &[u32]) -> Vec<u8> {
     let mut codes = Vec::with_capacity(indices.len() / 3);
     let mut data = Vec::new();
     let (mut f, mut next, mut last) = (Fifos::new(), 0u32, 0u32);
-    let mut free = |data: &mut Vec<u8>, v: u32, last: &mut u32| {
+    let free = |data: &mut Vec<u8>, v: u32, last: &mut u32| {
         encode_vbyte(data, zigzag_delta(v.wrapping_sub(*last)));
         *last = v;
     };

@@ -104,7 +104,15 @@ fn decode_deltas(buffer: &[u8], target: &mut [u8], k: usize, count: usize, verte
     Ok(())
 }
 
-fn decode_block(data: &[u8], mut at: usize, out: &mut [u8], count: usize, vertex_size: usize, last: &mut [u8], channels: &[u8], version: u8) -> Result<usize, Error> {
+/// What every block of a stream shares.
+struct Stream<'a> {
+    vertex_size: usize,
+    channels: &'a [u8],
+    version: u8,
+}
+
+fn decode_block(data: &[u8], mut at: usize, out: &mut [u8], count: usize, last: &mut [u8], s: &Stream) -> Result<usize, Error> {
+    let Stream { vertex_size, channels, version } = *s;
     let aligned = count.next_multiple_of(GROUP);
     let mut buffer = [0u8; BLOCK_MAX * 4 + GROUP];
     let control_size = if version == 0 { 0 } else { vertex_size / 4 };
@@ -152,7 +160,7 @@ pub fn decode_vertex_buffer(data: &[u8], count: usize, vertex_size: usize) -> Re
     let (mut at, mut offset) = (1, 0);
     while offset < count {
         let n = block.min(count - offset);
-        at = decode_block(data, at, &mut out[offset * vertex_size..(offset + n) * vertex_size], n, vertex_size, &mut last, channels, version)?;
+        at = decode_block(data, at, &mut out[offset * vertex_size..(offset + n) * vertex_size], n, &mut last, &Stream { vertex_size, channels, version })?;
         offset += n;
     }
     if data.len() - at != tail_pad {

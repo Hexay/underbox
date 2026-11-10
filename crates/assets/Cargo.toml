@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bcdec_rs = "0.2"
 half = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tga", "tiff", "exr", "bmp"] }
 kv = { path = "../kv" }

@@ -1,7 +1,7 @@
 //! Float RGBA images (Source 2's `FloatBitMap_t`): load from image files and raw texel buffers,
 //! transform, resample, and encode into `ImageFormat` texels (bitmap lib's job in engine2).
 
-mod bc;
+pub(crate) mod bc;
 pub mod file;
 pub mod format;
 mod psd;
