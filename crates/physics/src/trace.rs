@@ -103,6 +103,19 @@ mod tests {
     }
 
     #[test]
+    fn compound_sweep_stops_on_its_leading_part() {
+        let mut world = World::default();
+        wall_at_x(&mut world, 40.0);
+        world.step(1.0 / 60.0, 1);
+        let dumbbell = Shape::Compound(vec![
+            Shape::Sphere { center: Vector::ZERO, radius: 2.0 },
+            Shape::Sphere { center: Vector::new(10.0, 0.0, 0.0), radius: 2.0 },
+        ]);
+        let hit = world.trace(&sweep(Some(dumbbell)), &|_, _| true).unwrap();
+        assert!((hit.position.x - 27.0).abs() < 0.05, "front ball (origin+10, r 2) meets the face at 39: {:?}", hit.position);
+    }
+
+    #[test]
     fn starting_inside_reports_solid() {
         let mut world = World::default();
         wall_at_x(&mut world, 0.0);
