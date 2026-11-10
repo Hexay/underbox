@@ -1,0 +1,15 @@
+[package]
+name = "audio"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "soundsystem: sound decoding, voice sampling, effects, DSP presets, voice codec and the output device"
+
+[features]
+# Real output and capture through cpal. Without it only the null device exists (and no libasound link on Linux).
+device = ["dep:cpal"]
+
+[dependencies]
+cpal = { version = "0.17", optional = true }
+opus = "0.4"
+symphonia = { version = "0.5", default-features = false, features = ["wav", "pcm", "adpcm", "mp3", "ogg", "vorbis", "flac"] }
