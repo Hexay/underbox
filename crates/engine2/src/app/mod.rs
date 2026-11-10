@@ -2,8 +2,10 @@
 
 pub mod dict;
 pub mod platform;
+mod sdl;
 
 pub fn register(r: &mut abi::Registry) {
     dict::register(r);
     platform::register(r);
+    sdl::register(r);
 }

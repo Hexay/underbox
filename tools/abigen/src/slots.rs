@@ -13,12 +13,12 @@ pub struct Emitted {
     pub thunks: String,
 }
 
-struct Planned<'a> {
-    slot: &'a Slot,
-    module: Option<String>,
-    constant: String,
-    args: Vec<Mapped>,
-    ret: Mapped,
+pub(crate) struct Planned<'a> {
+    pub slot: &'a Slot,
+    pub module: Option<String>,
+    pub constant: String,
+    pub args: Vec<Mapped>,
+    pub ret: Mapped,
 }
 
 pub fn emit(abi: &Abi, structs: &Structs) -> Result<Emitted, String> {
@@ -150,6 +150,7 @@ fn emit_slots(abi: &Abi, structs: &Structs, planned: &[Planned], markers: &BTree
         writeln!(out, "    r.bind({module}::{}, {f}, \"abi::casts\");", p.constant).unwrap();
     }
     writeln!(out, "}}\n").unwrap();
+    crate::fields::emit(planned, &mut out);
 
     writeln!(out, "pub static NAMES: [&str; SLOT_COUNT] = [").unwrap();
     for p in planned {

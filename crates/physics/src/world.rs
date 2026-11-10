@@ -50,6 +50,10 @@ impl Default for World {
 }
 
 impl World {
+    pub(crate) fn raw(&self) -> &PhysicsWorld {
+        &self.inner
+    }
+
     pub fn gravity(&self) -> Vector {
         self.inner.gravity
     }

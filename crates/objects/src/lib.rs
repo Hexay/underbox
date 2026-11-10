@@ -44,6 +44,7 @@ pub fn get<C, T: Any + Send + Sync>(r: NativeRef<C>) -> Option<Arc<T>> {
 pub fn destroy<C>(r: NativeRef<C>) -> bool {
     let removed = OBJECTS.write().unwrap().remove(&r.addr());
     if removed.is_some() {
+        abi::rt::fields::forget(r.addr());
         // SAFETY: the address came from Box::into_raw in create_shared and was in the map, so it's freed once.
         drop(unsafe { Box::from_raw(r.addr() as *mut Token) });
     }

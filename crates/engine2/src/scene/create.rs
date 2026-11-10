@@ -1,5 +1,5 @@
-//! Where scene objects come from: the scene system's light/sky/decal/probe factories, the mesh
-//! system's model objects, and managed's own scene object classes.
+//! Where scene objects come from: the scene system's sky/decal/probe factories, the mesh
+//! system's model objects, and managed's own scene object classes (lights are in light.rs).
 
 use super::object::{self, State};
 use crate::handles::Kind;
@@ -7,12 +7,7 @@ use abi::slots::{c_dynamic_scene_object as dynamic, c_managed_scene_object as ma
 use abi::{Registry, bind, class};
 
 pub fn register(r: &mut Registry) {
-    use class::{CDecalSceneObject as Decal, CEnvMapSceneObject as EnvMap, CSceneLightObject as Light};
-    bind!(r, system::CREATE_POINT_LIGHT, |w| object::create::<Light, _>(w, Kind::SceneLightObject, State::default()));
-    bind!(r, system::CREATE_SPOT_LIGHT, |w| object::create::<Light, _>(w, Kind::SceneLightObject, State::default()));
-    bind!(r, system::CREATE_ORTHO_LIGHT, |w| object::create::<Light, _>(w, Kind::SceneLightObject, State::default()));
-    // TODO: keep the light's direction once lights are modelled (M2 renderer).
-    bind!(r, system::CREATE_DIRECTIONAL_LIGHT, |w, _direction| object::create::<Light, _>(w, Kind::SceneLightObject, State::default()));
+    use class::{CDecalSceneObject as Decal, CEnvMapSceneObject as EnvMap};
     bind!(r, system::CREATE_ENV_MAP, |w, _projection| object::create::<EnvMap, _>(w, Kind::EnvMapSceneObject, State::default()));
     bind!(r, system::CREATE_LIGHT_PROBE_VOLUME, |w| {
         object::create::<class::CSceneLightProbeVolumeObject, _>(w, Kind::SceneLightProbeVolumeObject, State::default())

@@ -9,7 +9,7 @@ mod generated;
 pub mod rt;
 
 pub use generated::callbacks;
-pub use generated::slots::{self, CALLBACK_COUNT, HASH, INHERITS, NAMES, SLOT_CLASS, SLOT_COUNT, STRUCT_SIZES, bind_casts, class, handle};
+pub use generated::slots::{self, CALLBACK_COUNT, HASH, INHERITS, NAMES, SLOT_CLASS, SLOT_COUNT, STRUCT_SIZES, bind_casts, bind_fields, class, handle};
 pub use rt::casts::NativeClass;
 pub use generated::structs;
 pub use generated::thunks::native_table;

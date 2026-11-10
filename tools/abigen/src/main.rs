@@ -3,6 +3,7 @@
 
 mod buffers;
 mod callbacks;
+mod fields;
 mod names;
 mod slots;
 mod structs;
