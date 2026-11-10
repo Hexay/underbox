@@ -38,6 +38,19 @@ pub unsafe extern "C" fn igen_engine(hash: i32, managed: *const usize, native: *
     eprintln!("engine2: igen_engine hash {HASH}: {SLOT_COUNT} slots ({bound} bound), {CALLBACK_COUNT} callbacks");
 }
 
+/// The slot table as managed receives it, every subsystem bound: tests call slots through the
+/// thunks, exercising the ABI. Installed once per test process (`Registry::install` is one-shot).
+#[cfg(test)]
+pub(crate) fn test_table() -> &'static [usize; SLOT_COUNT] {
+    static TABLE: std::sync::OnceLock<Box<[usize; SLOT_COUNT]>> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut registry = Registry::default();
+        crate::subsystems::register(&mut registry);
+        registry.install();
+        Box::new(abi::native_table())
+    })
+}
+
 fn fatal(message: &str) -> ! {
     eprintln!("engine2: fatal: {message}");
     std::process::abort()

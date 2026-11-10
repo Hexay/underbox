@@ -12,6 +12,7 @@ pub mod model;
 mod igen;
 mod interfaces;
 pub mod physics;
+mod physics2d;
 pub mod render;
 pub mod resource;
 mod compress;
