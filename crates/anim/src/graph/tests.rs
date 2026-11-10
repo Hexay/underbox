@@ -118,6 +118,12 @@ fn time_in_state_and_value_math() {
     let mut g = Instance::new(shared.clone(), clips);
     let values = value::Values { def: &shared, params: &g.params, ctx: Default::default() };
     assert_eq!((values.float(sum), values.float(remap), values.bool(is_swim)), (2.0, 15.0, true));
+    let unary = |op| value::math(-2.75, 0.0, op);
+    assert_eq!(
+        [MathOp::Floor, MathOp::Ceil, MathOp::Trunc, MathOp::Fract, MathOp::InvFract].map(unary),
+        [-3.0, -2.0, -2.0, -0.75, 1.75]
+    );
+    assert_eq!((value::math(-7.0, 3.0, MathOp::Mod), value::math(7.0, 0.0, MathOp::Mod)), (-1.0, 0.0));
     let bind = Pose::zero(1);
     g.update(0.2, &bind);
     assert_eq!(g.current_state(sm), Some("A"));

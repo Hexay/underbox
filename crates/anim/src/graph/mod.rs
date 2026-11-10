@@ -34,6 +34,17 @@ pub enum MathOp {
     Div,
     Min,
     Max,
+    /// Remainder with the sign of `a` (C `fmod`); 0 when `b` is 0.
+    Mod,
+    // The rest are unary: `b` is ignored.
+    Floor,
+    Ceil,
+    /// The integer part (toward zero).
+    Trunc,
+    /// `a - trunc(a)`.
+    Fract,
+    /// `1 - fract(a)`.
+    InvFract,
 }
 
 /// A node input that is either another value node or a constant.
