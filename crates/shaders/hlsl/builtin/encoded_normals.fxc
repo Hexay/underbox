@@ -1,0 +1,11 @@
+// underbox replacement for Valve's encoded_normals.fxc. Used for RGBA16F G-buffer normals, so
+// octahedral in [-1,1] is enough.
+#ifndef ENCODED_NORMALS_FXC
+#define ENCODED_NORMALS_FXC
+
+#include "octohedral_encoding.fxc"
+
+float2 EncodeNormal2D( float3 n ) { return OctohedralEncode( n ); }
+float3 DecodeNormal2D( float2 e ) { return OctohedralDecode( e ); }
+
+#endif // ENCODED_NORMALS_FXC

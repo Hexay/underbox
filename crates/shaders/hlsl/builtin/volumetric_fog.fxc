@@ -1,0 +1,32 @@
+// underbox replacement for Valve's volumetric_fog.fxc. The froxel volume is the "FogVolume" 3D
+// texture managed's VolumetricFog.cs binds (rgb in-scattering, a transmittance); constants are in
+// vr_common.fxc's per-view buffer (g_mVolFogFromWorld, g_vVolFogPostWorldToFrustumScale/Bias).
+#ifndef VOLUMETRIC_FOG_FXC
+#define VOLUMETRIC_FOG_FXC
+
+DynamicCombo( D_ENABLE_VOLUMETRIC_FOG, 0..1, Sys( ALL ) );
+
+Texture3D g_tFogVolume < Attribute( "FogVolume" ); >;
+
+// rgb in-scattered light, a transmittance.
+float4 CalculateVolumetricFog( float3 vPositionWs, float2 vScreenPos )
+{
+#if D_ENABLE_VOLUMETRIC_FOG
+	float4 p = mul( g_mVolFogFromWorld[0], float4( vPositionWs, 1.0 ) );
+	// TODO: confirm the froxel UV convention (D3D clip y is up, texture v is down) against VolumetricFog.cs.
+	float3 uvw = float3( p.xy / p.w, p.w ) * g_vVolFogPostWorldToFrustumScale.xyz + g_vVolFogPostWorldToFrustumBias.xyz;
+	uvw.y = 1.0 - uvw.y;
+	return g_tFogVolume.SampleLevel( g_sTrilinearClamp, saturate( uvw ), 0 );
+#else
+	return float4( 0, 0, 0, 1 );
+#endif
+}
+
+// Affine in vColor (water/lighting.hlsl passes 0 to get the scattering alone).
+float3 ApplyVolumetricFog( float3 vColor, float3 vPositionWs, float2 vScreenPos )
+{
+	float4 fog = CalculateVolumetricFog( vPositionWs, vScreenPos );
+	return vColor * fog.a + fog.rgb;
+}
+
+#endif // VOLUMETRIC_FOG_FXC
