@@ -17,6 +17,7 @@ mod query;
 mod rules;
 pub mod shape;
 mod shape_slots;
+pub mod surfaces;
 mod trace;
 pub mod world;
 
@@ -28,6 +29,7 @@ pub fn register(r: &mut abi::Registry) {
     body_mass::register(r);
     body_query::register(r);
     shape_slots::register(r);
+    surfaces::register(r);
     joint_slots::register(r);
     joint_drive_slots::register(r);
     aggregate_slots::register(r);

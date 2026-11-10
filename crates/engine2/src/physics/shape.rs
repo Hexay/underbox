@@ -78,9 +78,9 @@ pub fn update_meta<R: Default>(r: Ref, f: impl FnOnce(&mut ShapeMeta) -> R) -> R
     })
 }
 
-/// Settings values below zero mean "the surface's", which is `default.surface` until surfaces exist.
+/// Settings values below zero mean "the surface's" (`surface_index`, else `default`).
 fn surface(settings: &PhysicsShapeSettings) -> Surface {
-    let fallback = Surface::default();
+    let fallback = super::surfaces::physical(settings.surface_index).or_else(|| super::surfaces::physical(0)).unwrap_or_default();
     let pick = |v: f32, d: f32| if v >= 0.0 { v } else { d };
     Surface { friction: pick(settings.friction, fallback.friction), elasticity: pick(settings.elasticity, fallback.elasticity), trigger: settings.flags & SENSOR != 0 }
 }
