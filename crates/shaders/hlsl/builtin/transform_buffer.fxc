@@ -1,0 +1,20 @@
+// underbox replacement for Valve's transform_buffer.fxc. The layout is managed's
+// GpuInstanceTransform (engine/.../GpuInstanceTransform.cs, 64 bytes), bound as "g_TransformBuffer".
+#ifndef TRANSFORM_BUFFER_FXC
+#define TRANSFORM_BUFFER_FXC
+
+struct TransformBufferData_t
+{
+	float4 Row0;
+	float4 Row1;
+	float4 Row2;
+	float Alpha;
+	uint TintRgb888;
+	uint VertexCacheOffset;
+	// Nonzero: skinned, bone matrices start two entries after the instance's.
+	uint BlendWeightCount;
+};
+
+StructuredBuffer<TransformBufferData_t> g_TransformBuffer < Attribute( "g_TransformBuffer" ); >;
+
+#endif // TRANSFORM_BUFFER_FXC

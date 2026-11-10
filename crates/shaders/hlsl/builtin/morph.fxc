@@ -1,0 +1,29 @@
+// underbox replacement for Valve's morph.fxc. Only skinning_cs calls it (with D_MORPH declared and
+// g_nMorphTextureAtlasWidth defined first); other includers get the declarations only.
+#ifndef MORPH_FXC
+#define MORPH_FXC
+
+#include "transform_buffer.fxc"
+
+// Atlas rectangle of this instance's morph targets: U offset, V offset, U range, V range.
+struct MorphSubrectData_t
+{
+	float4 vAtlasRect;
+};
+
+#ifdef D_MORPH
+MorphSubrectData_t CalculateMorphSubrectData( uint nBaseSlot )
+{
+	TransformBufferData_t d = g_TransformBuffer[ nBaseSlot + 1 ];
+	MorphSubrectData_t o;
+	o.vAtlasRect = float4( d.Row0.z, d.Row0.w, d.Row1.w, d.Row2.w );
+	return o;
+}
+
+// TODO: apply morph deltas once the renderer produces the morph atlas (layout to be defined with it).
+void Morph( inout float3 vPosition, inout float3 vNormal, inout float flWrinkle, uint nVertex, MorphSubrectData_t data )
+{
+}
+#endif
+
+#endif // MORPH_FXC

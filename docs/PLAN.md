@@ -64,7 +64,7 @@ subsystems (each depends on core, never on each other except through traits):
   anim       ── animation graphs, skeletons, clips, IK
   net        ── Glue.Networking sockets and poll groups over a pluggable transport
   platform   ── Platform trait + backends (steam, offline, …)
-  window     ── SDL3-shaped windows and events on winit
+  window     ── windows, events and input: SDL3 itself, built from source (docs/renderer.md)
 tools/gen    ── generator (see below)
 tools/corpus ── game corpus runner + scenario watchers
 ```

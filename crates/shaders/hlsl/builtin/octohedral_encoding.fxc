@@ -1,0 +1,21 @@
+// underbox replacement for Valve's octohedral_encoding.fxc: L1 octahedral unit-vector mapping,
+// both directions in [-1,1].
+#ifndef OCTOHEDRAL_ENCODING_FXC
+#define OCTOHEDRAL_ENCODING_FXC
+
+float2 OctohedralEncode( float3 n )
+{
+	n /= abs( n.x ) + abs( n.y ) + abs( n.z );
+	float2 wrapped = ( 1.0 - abs( n.yx ) ) * float2( n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0 );
+	return n.z >= 0.0 ? n.xy : wrapped;
+}
+
+float3 OctohedralDecode( float2 e )
+{
+	float3 n = float3( e, 1.0 - abs( e.x ) - abs( e.y ) );
+	float t = saturate( -n.z );
+	n.xy += float2( n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t );
+	return normalize( n );
+}
+
+#endif // OCTOHEDRAL_ENCODING_FXC
