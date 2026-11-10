@@ -27,21 +27,8 @@ sh "$ROOT/tools/submodules.sh"
 GAME=$(sh "$ROOT/tools/game-dir.sh" "$SBOX")
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
-# see docs/dev-loop.md (incremental)
-env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
+sh "$ROOT/tools/install-engine2.sh" "$GAME"
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
-NATIVE="$GAME/bin/linuxsteamrt64"
-mkdir -p "$NATIVE"
-# Rename, not overwrite: a server still mapping the old file would crash on an in-place rewrite.
-cp --reflink=auto "${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so" "$NATIVE/.libengine2.so.$$"
-mv -f "$NATIVE/.libengine2.so.$$" "$NATIVE/libengine2.so"
-# Managed loads these modules by name for their CreateInterface; they're all engine2, and the
-# loader dedupes symlinks by inode so they share its state. TODO(windows): needs forwarder DLLs.
-for m in vfx_vulkan filesystem_stdio; do ln -sf libengine2.so "$NATIVE/lib$m.so"; done
-# Facepunch ships only SkiaSharp's Windows/macOS natives; match Sandbox.Engine.csproj's version.
-# s&box's DLLImportResolver loads natives from its native dir, not runtimes/.
-sh "$ROOT/tools/nuget-file.sh" SkiaSharp.NativeAssets.Linux 3.116.0 runtimes/linux-x64/native/libSkiaSharp.so \
-    "$NATIVE/libSkiaSharp.so"
 
 cd "$GAME"
 # TERM, not INT: a `&` background sh job inherits SIGINT ignored, and .NET then never hooks it.
