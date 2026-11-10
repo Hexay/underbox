@@ -6,4 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Platform services (Steam, offline, custom) behind one trait; the engine core never names a backend."
 
+[features]
+# Links Valve's libsteam_api (vendored by steamworks-sys); it must be on the loader path at run time.
+steam = ["dep:steamworks"]
+
 [dependencies]
+steamworks = { version = "0.13.1", features = ["raw-bindings"], optional = true }
