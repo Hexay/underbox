@@ -18,6 +18,7 @@ pub fn register(r: &mut Registry) {
     crate::model::register(r);
     crate::scene::register(r);
     crate::physics::register(r);
+    crate::physics2d::register(r);
     crate::audio::register(r);
     crate::steam::register(r);
     crate::net::register(r);
