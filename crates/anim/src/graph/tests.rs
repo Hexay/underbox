@@ -124,3 +124,35 @@ fn time_in_state_and_value_math() {
     g.update(0.1, &bind);
     assert_eq!(g.current_state(sm), Some("B"));
 }
+
+#[test]
+fn recording_replays_updates_with_their_parameters() {
+    use recording::{Seek, UpdateKind};
+    let mut def = Definition::default();
+    def.root = Some(locomotion(&mut def));
+    let mut g = Instance::new(def.into_shared(), clips);
+    let bind = Pose::zero(1);
+    let mut rec = Recording::default();
+    assert!(!rec.start_playback(), "nothing recorded yet");
+    rec.start();
+    let mut live = vec![];
+    for speed in [0.0, 50.0, 200.0] {
+        g.params.set_by_name("speed", Value::Float(speed));
+        live.push(x(&g.update(0.1, &bind)));
+        rec.record(0.1, &g.params, Xform::IDENTITY);
+    }
+    rec.stop();
+    assert_eq!((rec.len(), rec.get(0).map(|u| u.kind), rec.get(1).map(|u| u.kind)), (3, Some(UpdateKind::FullState), Some(UpdateKind::TimeStep)));
+    assert_eq!(rec.seek(1, &mut g, &bind).err(), Some(Seek::Failure), "seeking needs playback");
+    assert!(rec.start_playback());
+    for (i, want) in live.iter().enumerate() {
+        assert!((x(&rec.seek(i, &mut g, &bind).unwrap()) - want).abs() < 1e-4);
+        assert_eq!(rec.current_index(), Some(i));
+    }
+    assert_eq!(rec.seek(3, &mut g, &bind).err(), Some(Seek::Failure));
+    rec.clear();
+    assert!(rec.has_data(), "can't clear during playback");
+    rec.stop_playback();
+    rec.clear();
+    assert!(!rec.has_data());
+}

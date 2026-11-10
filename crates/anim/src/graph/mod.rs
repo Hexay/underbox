@@ -3,9 +3,11 @@
 //! Value nodes compute bools/floats/IDs from parameters; pose nodes sample clips and combine them.
 
 mod eval;
+pub mod recording;
 mod value;
 
 pub use eval::Instance;
+pub use recording::Recording;
 
 use crate::params::{ParamDef, Value};
 use std::sync::Arc;

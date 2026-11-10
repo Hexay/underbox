@@ -4,7 +4,7 @@
 
 use super::data::{self, ModelData};
 use super::graph;
-use anim::graph::Instance;
+use anim::graph::{Instance, Recording};
 use anim::params::Params;
 use anim::sequence::Player;
 use anim::{Pose, Skeleton, Xform};
@@ -19,6 +19,8 @@ pub struct Graph2 {
     pub resource: graph::Ref2,
     pub instance: Instance,
     pub controller: NativeRef<class::CAnimGraph2Controller>,
+    /// Belongs to the controller: replaced with it.
+    pub recording: Recording,
 }
 
 pub struct Graph1 {
@@ -139,7 +141,7 @@ impl AnimState {
         let data = self.data.clone();
         let instance = Instance::new(def, |slot| data.anim.clip(slot).cloned());
         let controller = objects::create(super::controller::Handle(me));
-        self.graph2 = Some(Graph2 { resource, instance, controller });
+        self.graph2 = Some(Graph2 { resource, instance, controller, recording: Recording::default() });
         true
     }
 
@@ -159,14 +161,20 @@ impl AnimState {
         Pose::bind(self.skeleton())
     }
 
-    /// Advance the pose by `dt` seconds (times the playback rate).
-    pub fn update(&mut self, dt: f32) {
+    /// Advance the pose by `dt` seconds (times the playback rate); `character` is the object's
+    /// transform, kept with a graph recording. During recording playback the graph holds still.
+    pub fn update(&mut self, dt: f32, character: Xform) {
         let dt = dt * self.rate;
         self.dt = dt;
         self.root_motion = Xform::IDENTITY;
         let bind = self.bind_pose();
         let pose = match (&mut self.graph2, self.data.anim.clip(&self.sequence.name)) {
-            (Some(g), _) if self.use_graph => g.instance.update(dt, &bind),
+            (Some(g), _) if self.use_graph && g.recording.is_playing() => return,
+            (Some(g), _) if self.use_graph => {
+                let pose = g.instance.update(dt, &bind);
+                g.recording.record(dt, &g.instance.params, character);
+                pose
+            }
             (_, Some(clip)) => {
                 let t0 = self.sequence.sample_time(clip);
                 self.sequence.advance(dt);

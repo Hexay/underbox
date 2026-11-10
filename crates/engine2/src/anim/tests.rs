@@ -78,13 +78,13 @@ fn sequence_playback_moves_world_bones() {
     let object = Xform::new(Vec3::new(100.0, 0.0, 0.0), Quat::IDENTITY);
     s.calculate_world(&object);
     assert!(s.world[1].pos.abs_diff_eq(Vec3::new(105.0, 0.0, 10.0), 1e-4), "bind pose before any update");
-    s.update(0.5);
+    s.update(0.5, Xform::IDENTITY);
     s.calculate_world(&object);
     let h = 5.0 * std::f32::consts::FRAC_1_SQRT_2;
     assert!(s.world[1].pos.abs_diff_eq(Vec3::new(100.0 + h, h, 10.0), 1e-3), "45° through the turn: {:?}", s.world[1].pos);
     assert!(s.prev_world[1].pos.abs_diff_eq(Vec3::new(105.0, 0.0, 10.0), 1e-4), "previous frame kept for velocity");
     s.rate = 2.0;
-    s.update(0.125);
+    s.update(0.125, Xform::IDENTITY);
     s.calculate_world(&object);
     let a = 0.75 * FRAC_PI_2;
     assert!(s.world[1].pos.abs_diff_eq(Vec3::new(100.0 + 5.0 * a.cos(), 5.0 * a.sin(), 10.0), 1e-3), "playback rate doubles dt");
@@ -118,8 +118,8 @@ fn graph_parameters_drive_state_transitions() {
     assert_eq!(controller::get(ctl, StringToken::of("B_WAVE")), Some(Value::Bool(true)));
 
     let mut s = shared.lock().unwrap();
-    s.update(0.5);
+    s.update(0.5, Xform::IDENTITY);
     assert!(s.local[0].rot.abs_diff_eq(Quat::IDENTITY, 1e-5), "Wave enters at its first frame");
-    s.update(0.5);
+    s.update(0.5, Xform::IDENTITY);
     assert!(s.local[0].rot.abs_diff_eq(Quat::from_rotation_z(FRAC_PI_2 / 2.0), 1e-4), "then plays the clip");
 }
