@@ -2720,6 +2720,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "world"
+version = "0.1.0"
+dependencies = [
+ "assets",
+ "kv",
+]
+
+[[package]]
 name = "xml-rs"
 version = "0.8.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
