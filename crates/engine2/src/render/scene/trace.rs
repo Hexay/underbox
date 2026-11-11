@@ -47,6 +47,16 @@ pub fn draw_call(t: &Target, reverse_z: bool, ids: &[u32], transforms: Option<&[
     abi::rt::log::log(abi::rt::log::Level::Info, &msg);
 }
 
+/// The view's eye and forward axis, before its layers.
+pub fn view(view: usize, view_proj: glam::Mat4) {
+    if !enabled() {
+        return;
+    }
+    let v = crate::render::shading::view::View { view_proj, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
+    let (eye, forward) = (v.camera_position(), v.camera_axes().0);
+    abi::rt::log::log(abi::rt::log::Level::Info, &format!("view: {view:#x} eye ({:.0},{:.0},{:.0}) forward ({:.2},{:.2},{:.2})", eye.x, eye.y, eye.z, forward.x, forward.y, forward.z));
+}
+
 pub fn layer(view: usize, layer: &SceneLayer, t: &Target, draws: &[Draw]) {
     if !enabled() {
         return;

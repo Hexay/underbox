@@ -84,6 +84,7 @@ pub fn run(v: view::Ref) {
         let s = view.state.lock().unwrap();
         (s.layers.clone(), s.worlds.clone(), !s.parent.is_null())
     };
+    super::trace::view(v.addr(), view.view_proj);
     let mut lighting = Lighting::collect(&worlds, view.ambient);
     (lighting.tone_map, lighting.fog, lighting.view_fog) = (view.environment.tone_map, view.environment.fog.clone(), view.environment.view_fog.clone());
     // Child views (the 3D skybox) are lit without shadow maps or froxels, as native's.
