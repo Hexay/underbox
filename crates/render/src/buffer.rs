@@ -101,20 +101,35 @@ pub(crate) fn map_read(gpu: &Gpu, staging: &wgpu::Buffer) -> Vec<u8> {
     staging.map_async(wgpu::MapMode::Read, .., move |r| {
         let _ = tx.send(r);
     });
-    gpu.wait_idle();
-    // Not mapped yet means a hung GPU (Gpu::wait_idle logged it): zeros rather than a wait forever.
-    match rx.try_recv() {
-        Ok(Ok(())) => {
+    // A hung GPU (Gpu::wait_idle logged it) reads zeros rather than waiting forever.
+    let mapped = if gpu.wait_idle() { recv_polling(gpu, &rx) } else { rx.try_recv().ok() };
+    match mapped {
+        Some(Ok(())) => {
             let bytes = staging.get_mapped_range(..).expect("mapped range").to_vec();
             staging.unmap();
             bytes
         }
-        Ok(Err(e)) => {
+        Some(Err(e)) => {
             eprintln!("wgpu error: read-back failed: {e}");
             vec![0; staging.size() as usize]
         }
-        Err(_) => vec![0; staging.size() as usize],
+        None => vec![0; staging.size() as usize],
     }
+}
+
+/// The map callback after an idle wait. Gotcha: with threads sharing the device, another
+/// thread's poll can fire it after our wait returned, so keep polling until it lands.
+fn recv_polling<T>(gpu: &Gpu, rx: &std::sync::mpsc::Receiver<T>) -> Option<T> {
+    for _ in 0..1000 {
+        match rx.recv_timeout(std::time::Duration::from_millis(5)) {
+            Ok(r) => return Some(r),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                let _ = gpu.device.poll(wgpu::PollType::Poll);
+            }
+            Err(_) => return None,
+        }
+    }
+    None
 }
 
 fn align4(n: u64) -> u64 {
