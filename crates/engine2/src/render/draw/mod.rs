@@ -132,7 +132,10 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
         targets.viewport = Some([v.m_n_top_left_x as f32, v.m_n_top_left_y as f32, v.m_n_width as f32, v.m_n_height as f32, v.min_z.max(0.0), far]);
     }
     targets.scissor = target.scissor.filter(|s| s.w > 0 && s.h > 0).map(|s| [s.x.max(0) as u32, s.y.max(0) as u32, s.w as u32, s.h as u32]);
-    let state = |d: &Draw| RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state };
+    let state = |d: &Draw| {
+        let s = d.shaded.as_ref().map_or(d.state, |s| s.shading.render_state.apply(d.state));
+        RasterState { depth_write: s.depth_write && targets.depth.is_some(), ..s }
+    };
     let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
     let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
     let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &[target.color, target.depth]))).collect();

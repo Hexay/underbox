@@ -52,6 +52,10 @@ pub fn frame_update(t: Ref, update: bool) -> f32 {
         if let (true, Some(p), Some(l)) = (update, s.params, s.luminance) {
             s.scalar = target(&p, l);
         }
+        if crate::render::scene::trace::enabled() {
+            let msg = format!("exposure: update {update} params {} luminance {:?} scalar {}", s.params.is_some(), s.luminance, s.scalar);
+            abi::rt::log::log(abi::rt::log::Level::Info, &msg);
+        }
         s.scalar
     })
 }

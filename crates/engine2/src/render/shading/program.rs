@@ -47,6 +47,7 @@ pub struct Shading<P = render::Program> {
     pub storage: Blocks,
     /// By HLSL variable name.
     pub attributes: HashMap<String, Attr>,
+    pub render_state: super::render_state::Overrides,
 }
 
 fn stage(compiler: &Compiler, shader: &VfxShader, stage: Stage, v: &Variant) -> Result<CompiledStage, String> {
@@ -124,7 +125,7 @@ pub fn build_compute(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader,
         render::ComputeProgram::new(gpu, label, &stage, layouts(gpu, label, &[&cs]), cs.reflection.workgroup_size)
     })?;
     let (blocks, storage) = (layout::uniform_blocks(&cs.wgsl), layout::storage_elements(&cs.wgsl));
-    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: Vec::new(), blocks, storage, attributes: attributes(shader) })
+    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: Vec::new(), blocks, storage, attributes: attributes(shader), render_state: Default::default() })
 }
 
 fn parse_default(args: &str) -> Option<Vec4> {
@@ -159,5 +160,5 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     blocks.extend(layout::uniform_blocks(&ps.wgsl));
     let mut storage = layout::storage_elements(&vs.wgsl);
     storage.extend(layout::storage_elements(&ps.wgsl));
-    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader) })
+    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader) })
 }

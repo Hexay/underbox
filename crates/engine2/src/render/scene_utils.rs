@@ -1,7 +1,7 @@
 //! `g_pSceneUtils`' per-view systems and the ray tracing world. The tonemap system and the
 //! volumetric fog are real objects keeping what managed sets (fog isn't null-guarded: managed
-//! calls `SetParams` straight on what `CreateVolumetricFog` returns); the renderer doesn't apply
-//! either yet (docs/renderer.md). Ray tracing isn't supported (`IsRayTracingSupported` is false),
+//! calls `SetParams` straight on what `CreateVolumetricFog` returns). Exposure is render/exposure.rs;
+//! volumetric fog isn't drawn yet (docs/renderer.md). Ray tracing isn't supported (`IsRayTracingSupported` is false),
 //! so building its acceleration structures fails and managed skips ray traced effects.
 
 use abi::slots::{g_p_material_system2_utils as utils, g_p_scene_utils as su, i_ray_trace_scene_world as rt, i_tonemap_system as tonemap, i_volumetric_fog as fog};

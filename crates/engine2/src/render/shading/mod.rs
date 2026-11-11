@@ -9,6 +9,7 @@ mod defaults;
 mod shadow_slots;
 pub mod layout;
 pub mod program;
+pub mod render_state;
 mod stages;
 pub mod standin;
 pub mod vertex;
@@ -19,6 +20,8 @@ mod coverage;
 mod gizmo_tests;
 #[cfg(test)]
 mod sky_tests;
+#[cfg(test)]
+mod tonemap_tests;
 #[cfg(test)]
 pub(crate) mod tests;
 

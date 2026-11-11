@@ -60,12 +60,14 @@ pixels). Lines in GPU buffers (none in sbox-public's gizmo or DebugOverlay code)
 | Slot(s) | Answer | Managed's path |
 | --- | --- | --- |
 | `IRayTraceSceneWorld` build, `IsRayTracingSupported` | no-op, `false` | skips ray-traced effects |
-| `g_pSceneUtils` tonemap / volumetric fog | real objects that store their parameters; not applied | `SetParams` is called unguarded, so null isn't an option |
+| `g_pSceneUtils` tonemap | auto exposure measured and applied as `g_flToneMapScalarLinear` (render/exposure.rs) | managed's tonemapping.shader applies the curve |
+| `g_pSceneUtils` volumetric fog | stores its parameters; not drawn | `SetParams` is called unguarded, so null isn't an option; analytic `Sandbox.Fog` is applied by the stand-in (shading/standin_fog.hlsl) |
 | `GetBestMultisampleType`, `IsUpscalerSupported`, `SupportsAsyncCompute` | 0 (none), `false`, `false` | single-sample targets, no upscaler, no async queue |
 | Texture web streaming | inactive, no requests, prefetch done | loads stay local |
 | Sprite sheets (`SheetSequence*`) | no frames | static textures |
 | `CalculateRadianceSH`, probe constants | no-op | probes stay empty (docs/lighting.md) |
-| 3D skybox, PVS, mesh traces | the world lane's (`crates/engine2/src/world`) | |
+| 3D skybox, PVS | stored by the world lane; drawn as a child view (render/scene/skybox.rs) and culled per object (render/scene/pvs.rs) | |
+| Mesh traces | the world lane's (`crates/engine2/src/world`) | |
 
 ## Sampler states
 
