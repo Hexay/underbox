@@ -40,7 +40,7 @@ fn scene_renderer_mesh_builds_and_binds() {
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
     let lighting = Lighting::fallback();
-    let draw = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values], attributes: &[], slots: &[] };
+    let draw = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values], attributes: &[], slots: &[], targets: &[] };
     let groups = gpu.checked(|| bind::bind_groups(&gpu, &s, &draw)).unwrap().unwrap();
     assert_eq!(groups.len(), s.program.bind_group_layouts.len());
 }

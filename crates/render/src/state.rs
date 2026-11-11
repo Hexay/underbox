@@ -24,6 +24,14 @@ pub struct RasterState {
     pub depth_compare: wgpu::CompareFunction,
     pub blend: Option<wgpu::BlendState>,
     pub color_writes: bool,
+    /// Rasterizer depth bias: constant, and the slope scale as `f32` bits (keys must hash).
+    pub depth_bias: (i32, u32),
+}
+
+impl RasterState {
+    pub fn bias_state(&self) -> wgpu::DepthBiasState {
+        wgpu::DepthBiasState { constant: self.depth_bias.0, slope_scale: f32::from_bits(self.depth_bias.1), clamp: 0.0 }
+    }
 }
 
 impl Default for RasterState {
@@ -35,6 +43,7 @@ impl Default for RasterState {
             depth_compare: wgpu::CompareFunction::LessEqual,
             blend: None,
             color_writes: true,
+            depth_bias: (0, 0),
         }
     }
 }

@@ -43,8 +43,12 @@ fn read_args(b: gpu_buffers::Handle, offset: i32, count: u32) -> Vec<[u32; 5]> {
     read_words(b, offset, u64::from(count) * ARGS).as_chunks::<5>().0.to_vec()
 }
 
+/// Native's `RsDepthBiasStateOverride_t` from managed's shadow passes: constant and slope scale
+/// (negative for reverse-Z maps).
+type Bias = (i32, f32);
+
 #[allow(clippy::too_many_arguments)]
-fn draw_model(c: context::Ref, attrs: attributes::Ref, mat: material::Ref, m: crate::model::Ref, mesh: i32, call: i32, ids: gpu_buffers::Handle, subs: &[Sub]) -> bool {
+fn draw_model(c: context::Ref, attrs: attributes::Ref, mat: material::Ref, m: crate::model::Ref, (mesh, call): (i32, i32), bias: Bias, ids: gpu_buffers::Handle, subs: &[Sub]) -> bool {
     let (Some(model), Some(material)) = (crate::model::get(m), material::resolve(mat)) else { return false };
     let Some(entry) = usize::try_from(mesh).ok().and_then(|i| model.content.meshes.get(i)) else { return false };
     let Some(mut dc) = usize::try_from(call).ok().and_then(|i| entry.mesh.draw_calls().into_iter().nth(i)) else { return false };
@@ -53,7 +57,7 @@ fn draw_model(c: context::Ref, attrs: attributes::Ref, mat: material::Ref, m: cr
     let view_proj = immediate::view_proj(c);
     let uniforms = DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
     let depth_compare = if context::reverse_z(c) { CompareFunction::GreaterEqual } else { CompareFunction::LessEqual };
-    let raster = RasterState { depth_compare, ..Default::default() };
+    let raster = RasterState { depth_compare, depth_bias: (bias.0, bias.1.to_bits()), ..Default::default() };
     let ids = gpu_buffers::get(ids);
     let mut draws = Vec::new();
     for sub in subs.iter().filter(|s| s.count > 0) {
@@ -95,26 +99,27 @@ fn slot(first: i32) -> u32 {
 }
 
 /// `DrawModelDrawCallIndirect`: the instance count from the args at byte `offset` of `args`.
-fn draw_indirect(c: context::Ref, attrs: attributes::Ref, mat: material::Ref, m: crate::model::Ref, (mesh, call): (i32, i32), (ids, first): (gpu_buffers::Handle, i32), (args, offset): (gpu_buffers::Handle, i32)) -> bool {
+#[allow(clippy::too_many_arguments)]
+fn draw_indirect(c: context::Ref, attrs: attributes::Ref, mat: material::Ref, m: crate::model::Ref, call: (i32, i32), bias: Bias, (ids, first): (gpu_buffers::Handle, i32), (args, offset): (gpu_buffers::Handle, i32)) -> bool {
     let count = read_args(args, offset, 1).first().map_or(0, |a| a[1]);
-    draw_model(c, attrs, mat, m, mesh, call, ids, &[Sub { first: slot(first), count, range: None }])
+    draw_model(c, attrs, mat, m, call, bias, ids, &[Sub { first: slot(first), count, range: None }])
 }
 
 pub fn register(r: &mut Registry) {
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL, |c, attrs, mat, _mode, m, mesh, call, _bias, _slope, _strip, _stencil, _skinned, ids, first, n, _bind| {
-        draw_model(c, attrs, mat, m, mesh, call, ids, &[Sub { first: slot(first), count: n.max(1).unsigned_abs(), range: None }])
+    bind!(r, tools::DRAW_MODEL_DRAW_CALL, |c, attrs, mat, _mode, m, mesh, call, bias, slope, _strip, _stencil, _skinned, ids, first, n, _bind| {
+        draw_model(c, attrs, mat, m, (mesh, call), (bias, slope), ids, &[Sub { first: slot(first), count: n.max(1).unsigned_abs(), range: None }])
     });
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL_INDIRECT, |c, attrs, mat, _mode, m, mesh, call, _bias, _slope, _strip, _stencil, _skinned, ids, first, args, offset, _bind| {
-        draw_indirect(c, attrs, mat, m, (mesh, call), (ids, first), (args, offset))
+    bind!(r, tools::DRAW_MODEL_DRAW_CALL_INDIRECT, |c, attrs, mat, _mode, m, mesh, call, bias, slope, _strip, _stencil, _skinned, ids, first, args, offset, _bind| {
+        draw_indirect(c, attrs, mat, m, (mesh, call), (bias, slope), (ids, first), (args, offset))
     });
-    bind!(r, tools::DRAW_MODEL_DRAW_CALL_MULTI_INDIRECT, |c, attrs, mat, _mode, m, mesh, call, _bias, _slope, _strip, _stencil, ids, first, args, offset, count, counts, count_offset, _bind| {
+    bind!(r, tools::DRAW_MODEL_DRAW_CALL_MULTI_INDIRECT, |c, attrs, mat, _mode, m, mesh, call, bias, slope, _strip, _stencil, ids, first, args, offset, count, counts, count_offset, _bind| {
         // A count buffer's first word caps the draws (drawIndirectCount).
         let count = if counts.value == 0 { slot(count) } else { read_words(counts, count_offset, 4).first().map_or(0, |n| (*n).min(slot(count))) };
         let subs: Vec<Sub> = read_args(args, offset, count)
             .iter()
             .map(|a| Sub { first: slot(first) + a[4], count: a[1], range: Some((a[2]..a[2] + a[0], a[3] as i32)) })
             .collect();
-        draw_model(c, attrs, mat, m, mesh, call, ids, &subs)
+        draw_model(c, attrs, mat, m, (mesh, call), (bias, slope), ids, &subs)
     });
 }
 

@@ -14,6 +14,8 @@ pub fn to_wgpu(format: i32) -> Option<F> {
         27 => F::R32Float,
         29 => F::Rgba32Float,
         53 => F::Rg16Float,
+        // RG3232F: the depth chain (SharedPasses.DepthChainTarget).
+        54 => F::Rg32Float,
         57 => F::Rgb10a2Unorm,
         59 => F::R16Float,
         60 => F::Depth16Unorm,

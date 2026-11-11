@@ -90,31 +90,47 @@ PS
 		float g_DirectionalLightInverseShadowMapSize;
 		uint g_DirectionalLightScreenSpaceShadowIndex;
 		bool g_DirectionalLightEnabled;
+		float4 g_DirectionalLightCascadeHardness;
+		float4 g_DirectionalLightCascadeSpheres[4];
+		float4 g_DirectionalLightShadowBias;
 	};
+
+	// Native's GPULight is scalar layout, which WGSL can't declare: read it by word (lighting/blocks.rs).
+	StructuredBuffer<uint> BinnedLightBufferV2 < Attribute( "BinnedLightBufferV2" ); >;
+	#define GPU_LIGHT_WORDS 39u
 
 	struct BinnedLight
 	{
 		uint Type;
-		uint Shape;
-		uint Flags;
-		float4x4 LightToWorld;
+		float3 Position;
+		float3 Forward;
 		float3 Color;
 		float LinearFalloff;
 		float QuadraticFalloff;
 		float FalloffBias;
-		float Radius;
 		float RadiusSquared;
-		float2 ShapeSize;
 		float4 SpotLightInnerOuterConeCosines;
-		float FogIntensity;
 		uint ShadowMapIndex;
-		uint LightCookieTextureIndex;
-		uint ShadowMaskTextureIndex;
-		uint LightModulatorOffset;
-		uint LightModulatorCount;
 	};
 
-	StructuredBuffer<BinnedLight> BinnedLightBufferV2 < Attribute( "BinnedLightBufferV2" ); >;
+	float LightWord( uint nBase, uint i ) { return asfloat( BinnedLightBufferV2[nBase + i] ); }
+
+	BinnedLight LoadLight( uint n )
+	{
+		uint b = n * GPU_LIGHT_WORDS;
+		BinnedLight l;
+		l.Type = BinnedLightBufferV2[b];
+		l.Forward = float3( LightWord( b, 3 ), LightWord( b, 7 ), LightWord( b, 11 ) );
+		l.Position = float3( LightWord( b, 6 ), LightWord( b, 10 ), LightWord( b, 14 ) );
+		l.Color = float3( LightWord( b, 19 ), LightWord( b, 20 ), LightWord( b, 21 ) );
+		l.LinearFalloff = LightWord( b, 22 );
+		l.QuadraticFalloff = LightWord( b, 23 );
+		l.FalloffBias = LightWord( b, 24 );
+		l.RadiusSquared = LightWord( b, 26 );
+		l.SpotLightInnerOuterConeCosines = float4( LightWord( b, 29 ), LightWord( b, 30 ), LightWord( b, 31 ), LightWord( b, 32 ) );
+		l.ShadowMapIndex = BinnedLightBufferV2[b + 34];
+		return l;
+	}
 
 	Texture2D g_tColor < Attribute( "g_tColor" ); >;
 	SamplerState g_sStandin < Filter( ANISO ); AddressU( WRAP ); AddressV( WRAP ); >;
@@ -132,30 +148,32 @@ PS
 	// Diffuse only; falloff and cone as vr_lighting.fxc computes them.
 	float3 BinnedLightDiffuse( BinnedLight l, float3 vPositionWs, float3 vNormalWs )
 	{
-		float3 vRay = l.LightToWorld[3].xyz - vPositionWs;
+		float3 vRay = l.Position - vPositionWs;
 		float flDistSq = dot( vRay, vRay );
 		if ( flDistSq > l.RadiusSquared )
 			return 0.0;
 		float3 vDir = vRay * rsqrt( max( flDistSq, 1e-6 ) );
 		float4 vCone = l.SpotLightInnerOuterConeCosines;
-		float flCone = saturate( ( dot( vDir, -l.LightToWorld[0].xyz ) - vCone.y ) * vCone.z );
+		float flCone = saturate( ( dot( vDir, -l.Forward ) - vCone.y ) * vCone.z );
 		float flDot = dot( float2( sqrt( flDistSq ), flDistSq ), float2( l.LinearFalloff, l.QuadraticFalloff ) );
 		float flFalloff = saturate( 1.0 / max( flDot, 1e-6 ) - l.FalloffBias );
 		return l.Color * saturate( dot( vNormalWs, vDir ) ) * flCone * flFalloff;
 	}
 
-	// The sun's one cascade (render/lighting/shadow.rs): matrix 0 maps world to uv and depth.
+	// Cascade 0's map: ours (render/lighting/shadow.rs, forward Z) or, for managed's scene renderer,
+	// the map its bindless index names (shadow::managed_cascade, reverse Z). Matrix 0 maps world to uv and depth.
 	Texture2D g_tUnderboxSunShadow < Attribute( "g_tUnderboxSunShadow" ); >;
 	SamplerComparisonState g_sUnderboxSunShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( LESS_EQUAL ); >;
+	SamplerComparisonState g_sUnderboxReverseShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( GREATER_EQUAL ); >;
 
-	// Our cascade's index (lighting/shadow.rs); managed's renderer names its own bindless maps.
 	#define UNDERBOX_SUN_SHADOW_INDEX 0x7FFFFF00u
 
+	// TODO: managed's further cascades (only cascade 0's map is bound).
 	float SunVisibility( float3 vPositionWs, float3 vNormalWs )
 	{
-		// TODO: managed's cascades (bindless shadow maps) draw unshadowed.
-		if ( g_DirectionalLightCascadeCount == 0 || g_DirectionalLightShadowMapTextureIndex.x != UNDERBOX_SUN_SHADOW_INDEX )
+		if ( g_DirectionalLightCascadeCount == 0 )
 			return 1.0;
+		bool bOurs = g_DirectionalLightShadowMapTextureIndex.x == UNDERBOX_SUN_SHADOW_INDEX;
 		float4x4 m = g_DirectionalLightWorldToShadowViewMatrices[0];
 		float flTexelWs = g_DirectionalLightInverseShadowMapSize / length( m[0].xyz );
 		float3 vShadow = mul( m, float4( vPositionWs + vNormalWs * flTexelWs * 1.5, 1.0 ) ).xyz;
@@ -164,7 +182,12 @@ PS
 		float flSum = 0.0;
 		for ( int y = -1; y <= 1; y++ )
 			for ( int x = -1; x <= 1; x++ )
-				flSum += g_tUnderboxSunShadow.SampleCmpLevelZero( g_sUnderboxSunShadow, vShadow.xy + float2( x, y ) * g_DirectionalLightInverseShadowMapSize, vShadow.z - 0.0005 );
+			{
+				float2 uv = vShadow.xy + float2( x, y ) * g_DirectionalLightInverseShadowMapSize;
+				flSum += bOurs
+					? g_tUnderboxSunShadow.SampleCmpLevelZero( g_sUnderboxSunShadow, uv, vShadow.z - 0.0005 )
+					: g_tUnderboxSunShadow.SampleCmpLevelZero( g_sUnderboxReverseShadow, uv, saturate( vShadow.z + g_DirectionalLightShadowBias.x ) );
+			}
 		return flSum / 9.0;
 	}
 
@@ -182,7 +205,7 @@ PS
 		uint nTile = l.ShadowMapIndex - UNDERBOX_LOCAL_SHADOW_INDEX;
 		if ( l.ShadowMapIndex < UNDERBOX_LOCAL_SHADOW_INDEX || nTile >= UNDERBOX_LOCAL_SHADOW_TILES )
 			return 1.0;
-		float3 vRay = vPositionWs - l.LightToWorld[3].xyz;
+		float3 vRay = vPositionWs - l.Position;
 		if ( l.Type == 1 )
 		{
 			// Cube face +X, -X, +Y, -Y, +Z, -Z by the ray's dominant axis.
@@ -216,7 +239,7 @@ PS
 			vLight += g_DirectionalLightColor.rgb * saturate( dot( vNormalWs, -g_DirectionalLightDirection.xyz ) ) * SunVisibility( vPositionWs, vNormalWs );
 		for ( int n = 0; n < NumLights.x; n++ )
 		{
-			BinnedLight l = BinnedLightBufferV2[n];
+			BinnedLight l = LoadLight( n );
 			float3 vDiffuse = BinnedLightDiffuse( l, vPositionWs, vNormalWs );
 			if ( any( vDiffuse > 0.0 ) )
 				vDiffuse *= LocalVisibility( l, vPositionWs, vNormalWs );

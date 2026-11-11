@@ -66,3 +66,23 @@ pub fn program(gpu: &render::Gpu, shader_path: &str) -> Option<Arc<Shading>> {
     PROGRAMS.lock().unwrap().insert(key, built.clone());
     built
 }
+
+pub type Compute = Shading<render::ComputeProgram>;
+
+/// A shader's compute program, compiled on first use; `Err` (cached too) when it doesn't translate.
+// TODO: combos from the dispatch's attributes (D_MSAA, ...); always 0, 0 for now.
+pub fn compute(gpu: &render::Gpu, shader_path: &str) -> Result<Arc<Compute>, String> {
+    type Built = Result<Arc<Compute>, String>;
+    static COMPUTE: LazyLock<Mutex<HashMap<String, Built>>> = LazyLock::new(Default::default);
+    if let Some(cached) = COMPUTE.lock().unwrap().get(shader_path) {
+        return cached.clone();
+    }
+    let built = (|| {
+        let compiler = COMPILER.as_ref().ok_or("no shader compiler")?;
+        let shader = source(shader_path)?;
+        program::build_compute(gpu, compiler, &shader, shader_path, &shaders::Variant::new(0, 0))
+    })()
+    .map(Arc::new);
+    COMPUTE.lock().unwrap().insert(shader_path.to_owned(), built.clone());
+    built
+}

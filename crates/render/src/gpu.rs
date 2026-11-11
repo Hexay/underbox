@@ -7,7 +7,10 @@ use std::fmt;
 const OPTIONAL: wgpu::Features = wgpu::Features::TEXTURE_BINDING_ARRAY
     .union(wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING)
     .union(wgpu::Features::PARTIALLY_BOUND_BINDING_ARRAY)
-    .union(wgpu::Features::SUBGROUP);
+    .union(wgpu::Features::SUBGROUP)
+    // DXC's storage images reflect read-write even when only written (no NonReadable), which
+    // core WebGPU allows for few formats; the adapter's own format table allows more.
+    .union(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
 
 /// One device and its queue. Everything else in this crate borrows it.
 pub struct Gpu {

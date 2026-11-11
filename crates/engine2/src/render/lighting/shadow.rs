@@ -88,6 +88,17 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref], view_proj: Mat4) {
     lighting.shadow = Some(SunShadow { world_to_shadow: to_texture() * light, map: target.depth });
 }
 
+/// The shadow map of managed's first sun cascade: what `g_DirectionalLightShadowMapTextureIndex.x`
+/// names in its `DirectionalLightCB` bytes, or `None` without cascades. Managed's maps are reverse-Z.
+// TODO: in a client boot managed's cascade casts no shadow though map, matrix and binding check
+// out (see docs/lighting.md "Managed sun shadows").
+pub fn managed_cascade(cb: &[u8]) -> Option<texture::Ref> {
+    let word = |i: usize| cb.get(i * 4..i * 4 + 4).map(|w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]));
+    // Word 72: g_DirectionalLightShadowMapTextureIndex.x; 76: g_DirectionalLightCascadeCount.
+    (word(76)? > 0).then_some(())?;
+    crate::render::tools::texture_at_view_index(word(72)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

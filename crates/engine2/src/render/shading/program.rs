@@ -14,11 +14,29 @@ use std::collections::HashMap;
 pub struct Attr {
     pub attribute: Option<String>,
     pub default: Option<Vec4>,
+    /// A comparison sampler's `ComparisonFunc( ... )`.
+    pub compare: Option<wgpu::CompareFunction>,
 }
 
-pub struct Shading {
+fn compare_func(s: &str) -> Option<wgpu::CompareFunction> {
+    use wgpu::CompareFunction as C;
+    Some(match s.trim() {
+        "NEVER" => C::Never,
+        "LESS" => C::Less,
+        "EQUAL" => C::Equal,
+        "LESS_EQUAL" => C::LessEqual,
+        "GREATER" => C::Greater,
+        "NOT_EQUAL" => C::NotEqual,
+        "GREATER_EQUAL" => C::GreaterEqual,
+        "ALWAYS" => C::Always,
+        _ => return None,
+    })
+}
+
+/// A material program (`render::Program`) or a compute program (`render::ComputeProgram`).
+pub struct Shading<P = render::Program> {
     pub label: String,
-    pub program: render::Program,
+    pub program: P,
     /// Every resource either stage uses, once per (group, binding).
     pub bindings: Vec<Binding>,
     pub vertex_inputs: Vec<VertexInput>,
@@ -52,9 +70,59 @@ fn supported(gpu: &render::Gpu, b: &Binding) -> bool {
         wgpu::BindingType::Texture { .. } | wgpu::BindingType::Sampler(_) => {
             b.count.is_none() || gpu.device.features().contains(wgpu::Features::TEXTURE_BINDING_ARRAY)
         }
-        wgpu::BindingType::Buffer { .. } => b.count.is_none(),
+        wgpu::BindingType::Buffer { .. } | wgpu::BindingType::StorageTexture { .. } => b.count.is_none(),
         _ => false,
     }
+}
+
+/// What the binder needs of either program kind.
+pub trait Layouts {
+    fn bind_group_layouts(&self) -> &[wgpu::BindGroupLayout];
+}
+
+impl Layouts for render::Program {
+    fn bind_group_layouts(&self) -> &[wgpu::BindGroupLayout] {
+        &self.bind_group_layouts
+    }
+}
+
+impl Layouts for render::ComputeProgram {
+    fn bind_group_layouts(&self) -> &[wgpu::BindGroupLayout] {
+        &self.bind_group_layouts
+    }
+}
+
+fn merged(gpu: &render::Gpu, stages: &[&CompiledStage]) -> Result<Vec<Binding>, String> {
+    let mut bindings: Vec<Binding> = Vec::new();
+    for b in stages.iter().flat_map(|s| &s.reflection.bindings) {
+        if !supported(gpu, b) {
+            return Err(format!("unsupported binding {} ({:?})", b.name, b.ty));
+        }
+        if !bindings.iter().any(|x| (x.group, x.binding) == (b.group, b.binding)) {
+            bindings.push(b.clone());
+        }
+    }
+    Ok(bindings)
+}
+
+fn layouts(gpu: &render::Gpu, label: &str, stages: &[&CompiledStage]) -> Vec<wgpu::BindGroupLayout> {
+    let reflections: Vec<_> = stages.iter().map(|s| &s.reflection).collect();
+    shaders::bind_group_layouts(&reflections, RUNTIME_ARRAY_LEN)
+        .iter()
+        .map(|entries| gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries }))
+        .collect()
+}
+
+/// A vfx shader's `CS` program for one combo.
+pub fn build_compute(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, v: &Variant) -> Result<Shading<render::ComputeProgram>, String> {
+    let cs = stage(compiler, shader, Stage::Cs, v)?;
+    let bindings = merged(gpu, &[&cs])?;
+    let program = gpu.checked(|| {
+        let stage = render::Stage::new(gpu, label, &cs.wgsl, &cs.reflection.entry);
+        render::ComputeProgram::new(gpu, label, &stage, layouts(gpu, label, &[&cs]), cs.reflection.workgroup_size)
+    })?;
+    let (blocks, storage) = (layout::uniform_blocks(&cs.wgsl), layout::storage_elements(&cs.wgsl));
+    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: Vec::new(), blocks, storage, attributes: attributes(shader) })
 }
 
 fn parse_default(args: &str) -> Option<Vec4> {
@@ -68,7 +136,8 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
     for a in shader.programs.iter().flat_map(|p| &p.annotations) {
         let attribute = a.get("Attribute").map(|s| s.trim().trim_matches('"').to_owned());
         let default = ["Default", "Default1", "Default2", "Default3", "Default4"].iter().find_map(|k| a.get(k).and_then(parse_default));
-        out.entry(a.name.clone()).or_insert(Attr { attribute, default });
+        let compare = a.get("ComparisonFunc").and_then(compare_func);
+        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare });
     }
     out
 }
@@ -77,23 +146,11 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     let vs = stage(compiler, shader, Stage::Vs, v)?;
     let mut ps = stage(compiler, shader, Stage::Ps, v)?;
     super::stages::separate(&vs, &mut ps)?;
-    let mut bindings: Vec<Binding> = Vec::new();
-    for b in vs.reflection.bindings.iter().chain(&ps.reflection.bindings) {
-        if !supported(gpu, b) {
-            return Err(format!("unsupported binding {} ({:?})", b.name, b.ty));
-        }
-        if !bindings.iter().any(|x| (x.group, x.binding) == (b.group, b.binding)) {
-            bindings.push(b.clone());
-        }
-    }
+    let bindings = merged(gpu, &[&vs, &ps])?;
     let program = gpu.checked(|| {
-        let layouts = shaders::bind_group_layouts(&[&vs.reflection, &ps.reflection], RUNTIME_ARRAY_LEN)
-            .iter()
-            .map(|entries| gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries }))
-            .collect();
         let vertex = render::Stage::new(gpu, label, &vs.wgsl, &vs.reflection.entry);
         let fragment = render::Stage::new(gpu, label, &ps.wgsl, &ps.reflection.entry);
-        render::Program::from_stages(gpu, label, vertex, Some(fragment), layouts)
+        render::Program::from_stages(gpu, label, vertex, Some(fragment), layouts(gpu, label, &[&vs, &ps]))
     })?;
     let mut blocks = layout::uniform_blocks(&vs.wgsl);
     blocks.extend(layout::uniform_blocks(&ps.wgsl));

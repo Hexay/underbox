@@ -105,7 +105,7 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
     let state = |d: &Draw| RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state };
     let view = view_of(&targets);
     let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
-    let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex)))).collect();
+    let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &[target.color, target.depth]))).collect();
     let (defaults, ids) = shaded::streams(gpu);
     let draws: Vec<_> = draws
         .iter()

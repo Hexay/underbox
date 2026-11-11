@@ -36,9 +36,19 @@ fn bytes<'a>(data: RawPtr<c_void>, size: i32) -> Option<&'a [u8]> {
     (!data.is_null() && size > 0).then(|| unsafe { data.cast::<u8>().as_slice(size as usize) })
 }
 
+/// `UNDERBOX_DUMP_CB=<block>` logs every upload of that block as words (float/hex), to compare
+/// managed's bytes with what `lighting/blocks.rs` fills for the native path.
+fn dump(name: StringToken, src: &[u8]) {
+    static WANT: LazyLock<Option<(String, StringToken)>> = LazyLock::new(|| std::env::var("UNDERBOX_DUMP_CB").ok().map(|n| (n.clone(), StringToken::of(&n))));
+    let Some((want, _)) = WANT.as_ref().filter(|(_, t)| *t == name) else { return };
+    let words: Vec<String> = src.as_chunks::<4>().0.iter().map(|w| format!("{:?}/{:#x}", f32::from_le_bytes(*w), u32::from_le_bytes(*w))).collect();
+    abi::rt::log::log(abi::rt::log::Level::Info, &format!("cb {want} {} bytes: {}", src.len(), words.join(" ")));
+}
+
 /// Block `name`'s data for later draws with `attrs`, and into `buffer` when it is one of ours.
 fn set_constant_buffer(attrs: attributes::Ref, name: StringToken, buffer: RawPtr<c_void>, data: RawPtr<c_void>, size: i32) {
     let Some(src) = bytes(data, size) else { return };
+    dump(name, src);
     attributes::set_constant_buffer(attrs, name, src);
     if let Some(layout) = CONSTANT_BUFFERS.lock().unwrap().get(&(buffer.as_ptr() as usize)) {
         let n = src.len().min(layout.size());

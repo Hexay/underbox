@@ -11,7 +11,7 @@
 use super::{Light, Lighting, local_shadow, shadow};
 use crate::render::shading::layout::{Block, Value};
 use crate::render::texture;
-use glam::{Mat4, Vec4};
+use glam::{Vec3, Vec4};
 
 /// Uniform blocks this module fills.
 pub const BLOCKS: [&str; 4] = ["ViewLightingConfigV2", "DirectionalLightCB", "ClusteredLightingConstants", local_shadow::BLOCK];
@@ -24,11 +24,16 @@ fn s(x: f32) -> Option<Value> {
     v(x, 0.0, 0.0, 0.0)
 }
 
+/// Words in native's `GPULight` (lightbinner_standard.h): 156 bytes in scalar layout, which
+/// managed's `LightBinnerFeature.GpuLight` uploads too. std430 would put `LightToWorld` at 16, not 12.
+pub const GPU_LIGHT_WORDS: usize = 39;
+
 impl Light {
-    /// `LightToWorld` as the shader indexes it: rows forward, left, up, position.
-    fn light_to_world(&self) -> Mat4 {
-        let r = Mat4::from_quat(self.rotation);
-        Mat4::from_cols(r.x_axis, r.y_axis, r.z_axis, self.position.extend(1.0)).transpose()
+    /// `LightToWorld`'s rows in memory: columns forward, left, up, position. Read column-major,
+    /// the shader's rows 0 and 3 are forward and position.
+    fn light_to_world_rows(&self) -> [Vec4; 4] {
+        let (f, l, u, p) = (self.rotation * Vec3::X, self.rotation * Vec3::Y, self.rotation * Vec3::Z, self.position);
+        [Vec4::new(f.x, l.x, u.x, p.x), Vec4::new(f.y, l.y, u.y, p.y), Vec4::new(f.z, l.z, u.z, p.z), Vec4::W]
     }
 
     /// (linear, quadratic, bias) for `CalculateDistanceFalloff`; see the module docs.
@@ -46,26 +51,22 @@ impl Light {
         Vec4::new(ci, co, 1.0 / (ci - co).max(1e-4), outer.tan())
     }
 
-    /// A `BinnedLightBufferV2` member; `shadow` is the light's first local shadow tile.
-    fn binned(&self, name: &str, shadow: Option<u32>) -> Option<Value> {
+    /// The light as one `GPULight`; `shadow` is its first local shadow tile.
+    fn gpu_light(&self, shadow: Option<u32>) -> [u32; GPU_LIGHT_WORDS] {
         let (linear, quadratic, bias) = self.falloff();
-        match name {
-            "Type" => s(self.kind as f32),
-            // Visible, diffuse and specular.
-            "Flags" => s(0x7 as f32),
-            "LightToWorld" => Some(Value::Mat(self.light_to_world())),
-            "Color" => v(self.color.x, self.color.y, self.color.z, 0.0),
-            "LinearFalloff" => s(linear),
-            "QuadraticFalloff" => s(quadratic),
-            "FalloffBias" => s(bias),
-            "Radius" => s(self.radius),
-            "RadiusSquared" => s(self.radius * self.radius),
-            "SpotLightInnerOuterConeCosines" => Some(Value::Vec(self.cone_cosines())),
-            "FogIntensity" => s(self.fog),
-            "ShadowMapIndex" => s(shadow.map_or(u32::MAX, |t| local_shadow::INDEX + t) as f32),
-            "LightCookieTextureIndex" | "ShadowMaskTextureIndex" => s(u32::MAX as f32),
-            _ => None,
+        let mut w = [0u32; GPU_LIGHT_WORDS];
+        // Type, shape (sphere), flags (visible, diffuse, specular).
+        w[..3].copy_from_slice(&[self.kind, 0, 0x7]);
+        for (i, row) in self.light_to_world_rows().iter().enumerate() {
+            w[3 + i * 4..7 + i * 4].copy_from_slice(&row.to_array().map(f32::to_bits));
         }
+        let floats = [self.color.x, self.color.y, self.color.z, linear, quadratic, bias, self.radius, self.radius * self.radius, 0.0, 0.0];
+        w[19..29].copy_from_slice(&floats.map(f32::to_bits));
+        w[29..33].copy_from_slice(&self.cone_cosines().to_array().map(f32::to_bits));
+        w[33] = self.fog.to_bits();
+        // Shadow map, cookie and shadow mask indices; modulator offset and count stay 0.
+        w[34..37].copy_from_slice(&[shadow.map_or(u32::MAX, |t| local_shadow::INDEX + t), u32::MAX, u32::MAX]);
+        w
     }
 }
 
@@ -119,7 +120,7 @@ impl Lighting {
         Some(match name {
             "BinnedLightBufferV2" => {
                 let first = |i: usize| self.local.as_ref().and_then(|l| l.first.get(i).copied().flatten());
-                element.fill_elements(n, |i, f| self.lights[i].binned(f, first(i)))
+                self.lights.iter().enumerate().flat_map(|(i, l)| l.gpu_light(first(i))).flat_map(u32::to_le_bytes).collect()
             }
             "ClusterLightCounts" => element.fill_elements(1, |_, _| s(n as f32)),
             "ClusterLightIndices" => element.fill_elements(n, |i, _| s(i as f32)),
@@ -165,11 +166,18 @@ mod tests {
         assert!(lit(400.0) < 0.1 && lit(512.0) == 0.0);
     }
 
+    /// Word offsets managed's `GpuLight` has (scalar layout): forward and position down the
+    /// matrix columns from word 3, colour at 19, radius² at 26, shadow map index at 34.
     #[test]
-    fn light_to_world_rows_are_direction_then_position() {
-        let mut l = point(1.0);
+    fn gpu_light_matches_managed_scalar_layout() {
+        let mut l = point(5.0);
         l.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
-        let m = l.light_to_world();
-        assert!(m.row(0).truncate().distance(Vec3::Y) < 1e-6 && m.row(3).truncate() == l.position);
+        let w = l.gpu_light(Some(2)).map(f32::from_bits);
+        let forward = Vec3::new(w[3], w[7], w[11]);
+        assert!(forward.distance(Vec3::Y) < 1e-6, "{forward}");
+        assert_eq!([w[6], w[10], w[14], w[18]], [1.0, 2.0, 3.0, 1.0]);
+        assert_eq!([w[19], w[26]], [1.0, 25.0]);
+        assert_eq!(l.gpu_light(Some(2))[34], local_shadow::INDEX + 2);
+        assert_eq!(l.gpu_light(None)[34], u32::MAX);
     }
 }

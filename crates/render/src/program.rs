@@ -100,7 +100,7 @@ impl Program {
                 depth_write_enabled: Some(s.depth_write),
                 depth_compare: Some(s.depth_compare),
                 stencil: Default::default(),
-                bias: Default::default(),
+                bias: s.bias_state(),
             }),
             multisample: Default::default(),
             fragment: self.fragment.as_ref().filter(|_| key.color.is_some()).map(|f| wgpu::FragmentState {

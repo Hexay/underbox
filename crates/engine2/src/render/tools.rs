@@ -121,15 +121,26 @@ fn sampler(desc: abi::structs::CSamplerStateDesc) -> PtrHandle<abi::handle::Samp
     PtrHandle::new(i + 1)
 }
 
+/// Bindless indices handed out, by texture address, and the textures in index order.
+type Indices = (HashMap<usize, i32>, Vec<texture::Ref>);
+static INDICES: LazyLock<Mutex<Indices>> = LazyLock::new(Default::default);
+
 /// Bindless texture index: stable per texture for its lifetime.
-fn texture_view_index(t: texture::Ref) -> i32 {
-    static INDICES: LazyLock<Mutex<HashMap<usize, i32>>> = LazyLock::new(Default::default);
+pub(crate) fn texture_view_index(t: texture::Ref) -> i32 {
     if t.is_null() {
         return -1;
     }
-    let mut m = INDICES.lock().unwrap();
-    let n = m.len() as i32;
-    *m.entry(t.addr()).or_insert(n)
+    let mut guard = INDICES.lock().unwrap();
+    let (by_addr, refs) = &mut *guard;
+    *by_addr.entry(t.addr()).or_insert_with(|| {
+        refs.push(t);
+        refs.len() as i32 - 1
+    })
+}
+
+/// The texture a bindless index managed put in a constant block names (the handle may be dead).
+pub fn texture_at_view_index(index: u32) -> Option<texture::Ref> {
+    INDICES.lock().unwrap().1.get(index as usize).copied()
 }
 
 fn light_probe_volume(mins: RawPtr<c_void>, maxs: RawPtr<c_void>, priority: RawPtr<c_void>) -> i32 {

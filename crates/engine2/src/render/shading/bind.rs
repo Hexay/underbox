@@ -5,9 +5,9 @@
 
 use super::defaults;
 use super::layout::Value;
-use super::program::{self, Shading};
+use super::program::{self, Layouts, Shading};
 use super::view::{self, View};
-use crate::render::lighting::{self, Lighting};
+use crate::render::lighting::{self, Lighting, shadow};
 use crate::render::{attributes, buffers as gpu_buffers, texture};
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
@@ -38,6 +38,8 @@ pub struct Inputs<'a> {
     pub attributes: &'a [attributes::Ref],
     /// `BindTexture` textures by slot, for texture bindings at that binding number nothing names.
     pub slots: &'a [(u32, texture::Ref)],
+    /// The pass's own targets: never sampled (managed's shadow passes would read the map they write).
+    pub targets: &'a [texture::Ref],
 }
 
 impl Inputs<'_> {
@@ -53,7 +55,7 @@ impl Inputs<'_> {
 }
 
 /// The names a reflected resource answers to: its HLSL name and its vfx `Attribute( "..." )`.
-fn names<'a>(s: &'a Shading, name: &'a str) -> impl Iterator<Item = &'a str> {
+fn names<'a, P>(s: &'a Shading<P>, name: &'a str) -> impl Iterator<Item = &'a str> {
     std::iter::once(name).chain(s.attributes.get(name).and_then(|a| a.attribute.as_deref()))
 }
 
@@ -72,7 +74,7 @@ fn transforms(instances: &[Instance]) -> Vec<u8> {
     out
 }
 
-fn uniform_value(s: &Shading, inputs: &Inputs, name: &str) -> Option<Value> {
+fn uniform_value<P>(s: &Shading<P>,inputs: &Inputs, name: &str) -> Option<Value> {
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let default = || s.attributes.get(name).and_then(|a| a.default);
@@ -101,16 +103,20 @@ enum Resource {
     Samplers(Vec<wgpu::Sampler>),
 }
 
-/// The draw's texture for `b`: a render attribute's or the material's by name, the lighting's
-/// (shadow maps), else a `BindTexture` slot at its binding.
-fn texture_view(s: &Shading, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
+/// The draw's texture for `b`: a render attribute's or the material's by name, managed's sun
+/// cascade or the lighting's (shadow maps), else a `BindTexture` slot at its binding.
+fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
     let B::Texture { sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false } = b.ty else { return None };
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n)));
     let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
     let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
-    let t = from_attributes().or_else(from_material).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
+    let from_managed = || (b.name == shadow::TEXTURE).then(|| inputs.constant_buffer("DirectionalLightCB")).flatten().and_then(|cb| shadow::managed_cascade(&cb));
+    let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
+    if inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {
+        return None;
+    }
     let gpu = t.gpu.as_ref()?;
     let ok = match (gpu.desc.format.sample_type(None, None)?, sample_type) {
         (wgpu::TextureSampleType::Float { filterable }, wgpu::TextureSampleType::Float { filterable: want }) => filterable || !want,
@@ -119,7 +125,18 @@ fn texture_view(s: &Shading, inputs: &Inputs, b: &Binding) -> Option<wgpu::Textu
     ok.then(|| gpu.view.clone())
 }
 
-fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Result<Resource, String> {
+/// A `RWTexture2D`'s texture by name: mip 0 of a texture in exactly that format that allows
+/// storage writes (formats.rs gives that usage where wgpu guarantees it).
+fn storage_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding, format: wgpu::TextureFormat) -> Result<wgpu::TextureView, String> {
+    let t = inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n))).and_then(texture::resolve);
+    let gpu = t.as_ref().and_then(|t| t.gpu.as_ref()).ok_or_else(|| format!("{}: no texture to write", b.name))?;
+    if gpu.desc.format != format || !gpu.texture.usage().contains(wgpu::TextureUsages::STORAGE_BINDING) {
+        return Err(format!("{}: {:?} isn't writable as {format:?}", b.name, gpu.desc.format));
+    }
+    Ok(gpu.texture.create_view(&wgpu::TextureViewDescriptor { mip_level_count: Some(1), ..Default::default() }))
+}
+
+fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -> Result<Resource, String> {
     Ok(match b.ty {
         B::Buffer { ty: wgpu::BufferBindingType::Uniform, .. } => {
             let block = s.blocks.get(&(b.group, b.binding)).ok_or_else(|| format!("no layout for block {}", b.name))?;
@@ -147,19 +164,20 @@ fn resource(gpu: &render::Gpu, s: &Shading, inputs: &Inputs, b: &Binding) -> Res
         B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => {
             Resource::Views(vec![defaults::texture(gpu, view_dimension, sample_type); program::array_len(b) as usize])
         }
-        B::Sampler(kind) if b.count.is_some() => Resource::Samplers(vec![defaults::sampler(gpu, kind); program::array_len(b) as usize]),
+        B::Sampler(kind) if b.count.is_some() => Resource::Samplers(vec![defaults::sampler(gpu, kind, None); program::array_len(b) as usize]),
         B::Texture { sample_type, view_dimension, .. } => {
             Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }
-        B::Sampler(kind) => Resource::Sampler(defaults::sampler(gpu, kind)),
+        B::StorageTexture { format, view_dimension: wgpu::TextureViewDimension::D2, .. } => Resource::View(storage_view(s, inputs, b, format)?),
+        B::Sampler(kind) => Resource::Sampler(defaults::sampler(gpu, kind, s.attributes.get(&b.name).and_then(|a| a.compare))),
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),
     })
 }
 
 /// One bind group per layout of the program, in group order.
-pub fn bind_groups(gpu: &render::Gpu, s: &Shading, inputs: &Inputs) -> Result<Vec<wgpu::BindGroup>, String> {
+pub fn bind_groups<P: Layouts>(gpu: &render::Gpu, s: &Shading<P>, inputs: &Inputs) -> Result<Vec<wgpu::BindGroup>, String> {
     let mut groups = Vec::new();
-    for (g, layout) in s.program.bind_group_layouts.iter().enumerate() {
+    for (g, layout) in s.program.bind_group_layouts().iter().enumerate() {
         let mine: Vec<&Binding> = s.bindings.iter().filter(|b| b.group == g as u32).collect();
         let resources = mine.iter().map(|b| resource(gpu, s, inputs, b)).collect::<Result<Vec<_>, _>>()?;
         // wgpu's array resources borrow slices of references, which must outlive the entries.

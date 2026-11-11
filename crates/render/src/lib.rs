@@ -4,13 +4,14 @@
 //!   window when the window lane hands one over.
 //! - [`Texture`], [`Buffer`]: GPU resources; render targets are textures with `RENDER_ATTACHMENT`.
 //! - [`Program`]: a shader program (one module, or one per stage) and its bind-group layouts,
-//!   with pipelines cached per [`PipelineKey`].
+//!   with pipelines cached per [`PipelineKey`]; [`ComputeProgram`] for compute stages.
 //! - [`Placeholder`] + [`pass::execute`]: the placeholder-shaded draw path every draw takes until
 //!   translated combos exist; [`ForwardPass`] is the same for [`Mesh`]es.
 //! - [`Frame`]: a read-back image with hashing and tolerant comparison, for frame-hash tests.
 
 mod blit;
 mod buffer;
+mod compute;
 mod forward;
 mod frame;
 mod gpu;
@@ -24,6 +25,7 @@ mod texture;
 
 pub use blit::{Blitter, Transfer};
 pub use buffer::{Buffer, BufferKind};
+pub use compute::ComputeProgram;
 pub use forward::{Camera, DrawItem, ForwardPass};
 pub use frame::{Comparison, Frame};
 pub use gpu::{Gpu, GpuError};

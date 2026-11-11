@@ -145,30 +145,26 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
   vertex binding are moved apart after translation (`shading/stages.rs`).
 - Binder precedence per uniform block (`shading/bind.rs`): managed's `SetConstantBufferData` bytes
   by block name, the view block, the lighting blocks, then member-wise attributes → material →
-  annotation defaults. Textures: attributes → material → lighting (sun shadow map) → the
-  context's `BindTexture` slot with that binding number.
+  annotation defaults. Textures: attributes → material → managed's sun cascade (the bindless
+  index in its `DirectionalLightCB`, `shadow::managed_cascade`) → lighting (our shadow maps) → the
+  context's `BindTexture` slot with that binding number. A texture that is the pass's own target
+  is never bound (managed's shadow pass would sample the map it writes). `ComparisonFunc` and
+  `RWTexture2D` (storage, mip 0, exact format) bind as declared.
+- `UNDERBOX_DUMP_CB=<block>` logs every `SetConstantBufferData` of that block as words
+  (`render/bindings.rs`): compare managed's bytes with ours before changing a layout.
 - Bindless arrays (`g_bindless_*`) bind when the adapter has `TEXTURE_BINDING_ARRAY`: every
   element is a default texture or sampler, runtime-sized ones get `program::RUNTIME_ARRAY_LEN`.
   `render::Gpu` also takes `SUBGROUP` (wave ops in the lit shaders) and the adapter's per-stage
   binding limits (they bind 14+ storage buffers). TODO: managed's global bindless descriptor set.
-- Textures load as native's error texture (no compiled-texture loader yet) except the ones
-  `texture_generated.rs` draws, e.g. the dev test grid behind `testgrid.vmat`.
+- Textures load from compiled `vtex_c` first (`crate::compiled::texture`), then the ones
+  `texture_generated.rs` draws (e.g. the dev test grid behind `testgrid.vmat`), else native's
+  error texture. Materials without a `.vmat` source load from `vmat_c` (`crate::compiled::material`).
 - Coverage over sbox-public's vmats: `sh tools/test.sh engine2 material_coverage -- --ignored`
   writes `target/material-coverage.tsv` (full wgpu error text per row). Main gaps: compute-only
   shaders, tools shaders without source (selection, visualisers), atmosphere_sky, terrain and
   gizmo_line/gizmo_sprite translation failures.
 
-### Lighting and shadows
-
-`render/lighting/`: `Lighting::collect` reads the view's worlds (first directional light is the
-sun, the rest are binned) plus the camera's `ambientColor`; worlds without lights fall back to a
-fixed sun so unlit test scenes keep their goldens. It fills `ViewLightingConfigV2`,
-`DirectionalLightCB`, `ClusteredLightingConstants` (one cluster holding every light) and
-`BinnedLightBufferV2` in s&box's layouts, read back from the WGSL (`shading/layout.rs`).
-Falloff is packed as native does (see `blocks.rs` module docs). Sun shadows: one 2048² depth map
-fitted to the view frustum and texel-snapped (`lighting/shadow.rs`), sampled by the stand-in with
-3×3 PCF as `g_tUnderboxSunShadow`. Point and spot shadows: a 4×4 atlas of 512² tiles, six per
-point light and one per spot (`lighting/local_shadow.rs`), named by sentinel `ShadowMapIndex`.
+Compute, lighting and shadows (ours and managed's): docs/lighting.md.
 
 ## Headless path and frame-hash tests
 
@@ -272,15 +268,14 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. `r_managed_scene` lighting: geometry matches the native frame, but local lights are missing
-   (`clustered_light_culling_cs` is skipped, so cluster counts stay 0) and the sun reads weaker
-   than native. Dump managed's `DirectionalLightCB` bytes against `blocks.rs` before guessing.
-   Other skipped compute: `depthresolve_cs`, `cmaa2_cs`, `downsample_spd` (`render/compute/`).
-2. Managed's shadows: `AddShadowView` returns null and `PackSceneLight` answers -1; the stand-in
-   samples only our own maps (sentinel indices), so managed's draw unshadowed. Combos are always
-   0/0 (TODO).
+1. Managed sun shadows cast nothing in a boot (docs/lighting.md, "Managed sun shadows (open)"); then further
+   cascades (the stand-in reads cascade 0 only) and managed's local-light shadows
+   (`ProjectedShadows` buffers).
+2. Compute: `downsample_spd` (strip the derivatives extension, per-mip storage views),
+   `occlusion_cull_cs` on the GPU (naga type mismatch), compute combos beyond 0/0.
 3. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
    CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
-4. Real bindless descriptor sets, a cube-sampling sky stand-in, compiled-texture loading.
+4. Real bindless descriptor sets, a cube-sampling sky stand-in, the testgrid tone, and the
+   shaders that don't translate (atmosphere_sky, terrain, gizmo_line, gizmo_sprite).
 5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.

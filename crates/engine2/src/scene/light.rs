@@ -98,9 +98,10 @@ fn create(w: world::Ref, light: Light) -> HandleId<class::CSceneLightObject> {
     object::create_with::<class::CSceneLightObject, _>(w, Kind::SceneLightObject, State::default(), Some(light))
 }
 
-/// The light's forward axis (+X of its rotation), as `GetWorldDirection` reports it.
-fn forward(direction: Rotation) -> Vector3 {
-    from_vec(to_rot(direction) * physics::Vector::X)
+/// `GetWorldDirection`: native's points at the light, so it is minus the light's forward axis (+X
+/// of its rotation); managed negates it back (`SceneMirror`, `ShadowMapper.FromNative`).
+fn toward_light(direction: Rotation) -> Vector3 {
+    from_vec(-(to_rot(direction) * physics::Vector::X))
 }
 
 /// A directional light shining along `direction` (+X when zero).
@@ -126,7 +127,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, l::GET_LIGHT_TYPE, |r| with(r, |x| x.kind as i32));
     bind!(r, l::SET_WORLD_POSITION, |r, p| object::with(r.cast(), |st| st.transform.position = p));
     bind!(r, l::SET_WORLD_DIRECTION, |r, q| with(r, |x| x.direction = q));
-    bind!(r, l::GET_WORLD_DIRECTION, |r| with(r, |x| Some(forward(x.direction))).unwrap_or_default());
+    bind!(r, l::GET_WORLD_DIRECTION, |r| with(r, |x| Some(toward_light(x.direction))).unwrap_or_default());
     field!(r, GET_COLOR, SET_COLOR, color);
     bind!(r, l::SET_BOUNCE_COLOR, |r, c| with(r, |x| x.bounce_color = c));
     field!(r, GET_RADIUS, SET_RADIUS, radius);

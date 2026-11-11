@@ -25,7 +25,11 @@ impl TextureDesc {
     }
 
     fn usage(&self) -> wgpu::TextureUsages {
-        let base = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
+        let mut base = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
+        // Compute writes (RWTexture2D) wherever the format allows them on every device.
+        if self.format.guaranteed_format_features(wgpu::Features::empty()).allowed_usages.contains(wgpu::TextureUsages::STORAGE_BINDING) {
+            base |= wgpu::TextureUsages::STORAGE_BINDING;
+        }
         if self.render_target { base | wgpu::TextureUsages::RENDER_ATTACHMENT } else { base }
     }
 }
@@ -34,6 +38,8 @@ pub struct Texture {
     pub desc: TextureDesc,
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
+    /// Mip 0 alone: attachments may not span mips.
+    pub target_view: wgpu::TextureView,
 }
 
 impl Texture {
@@ -49,7 +55,8 @@ impl Texture {
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        Texture { desc, texture, view }
+        let target_view = texture.create_view(&wgpu::TextureViewDescriptor { mip_level_count: Some(1), ..Default::default() });
+        Texture { desc, texture, view, target_view }
     }
 
     /// Bytes per texel of mip 0; `None` for block-compressed or depth-stencil formats.
@@ -78,14 +85,14 @@ impl Texture {
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let format = self.desc.format;
         let color_attachment = [Some(wgpu::RenderPassColorAttachment {
-            view: &self.view,
+            view: &self.target_view,
             depth_slice: None,
             resolve_target: None,
             ops: wgpu::Operations { load: wgpu::LoadOp::Clear(color), store: wgpu::StoreOp::Store },
         })];
         let store = wgpu::StoreOp::Store;
         let depth_attachment = wgpu::RenderPassDepthStencilAttachment {
-            view: &self.view,
+            view: &self.target_view,
             depth_ops: format.has_depth_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(depth), store }),
             stencil_ops: format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store }),
         };

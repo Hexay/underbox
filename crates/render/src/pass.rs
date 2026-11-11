@@ -96,13 +96,13 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
     });
     let store = wgpu::StoreOp::Store;
     let color = targets.color.map(|t| wgpu::RenderPassColorAttachment {
-        view: &t.view,
+        view: &t.target_view,
         depth_slice: None,
         resolve_target: None,
         ops: wgpu::Operations { load: load.color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store },
     });
     let depth = targets.depth.map(|t| wgpu::RenderPassDepthStencilAttachment {
-        view: &t.view,
+        view: &t.target_view,
         depth_ops: Some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store }),
         stencil_ops: t.desc.format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Load, store }),
     });
