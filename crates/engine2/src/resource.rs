@@ -45,6 +45,11 @@ impl<T> ByName<T> {
     pub fn find_or_insert(&self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
         self.0.lock().unwrap().entry(name.to_ascii_lowercase()).or_insert_with(|| Arc::new(make())).clone()
     }
+
+    /// Make `resource` the one `name` finds from now on.
+    pub fn insert(&self, name: &str, resource: Arc<T>) {
+        self.0.lock().unwrap().insert(name.to_ascii_lowercase(), resource);
+    }
 }
 
 impl<T> Default for ByName<T> {

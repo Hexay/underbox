@@ -40,6 +40,11 @@ pub fn get<C, T: Any + Send + Sync>(r: NativeRef<C>) -> Option<Arc<T>> {
     value.downcast().ok()
 }
 
+/// Swap the value of the live object at `r`, keeping its address and fields. False if there was none.
+pub fn replace<C, T: Any + Send + Sync>(r: NativeRef<C>, value: T) -> bool {
+    OBJECTS.write().unwrap().get_mut(&r.addr()).map(|e| e.value = Arc::new(value)).is_some()
+}
+
 /// Free the object at `r` (its `Destroy`/`[delete]` slot). False if there was none.
 pub fn destroy<C>(r: NativeRef<C>) -> bool {
     let removed = OBJECTS.write().unwrap().remove(&r.addr());

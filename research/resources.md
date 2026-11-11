@@ -20,6 +20,23 @@ Fixtures are synthetic: `assets::compiled::fixture` writes every file (the crate
 atlas, animation group and `.vanim`, a sound); `world::fixture::tiny_map` packs the crate into corpus/mapworld's
 `maps/tiny.vpk`.
 
+## Resource compiling and tooling slots
+
+- `g_pResourceCompilerSystem` compiles GameResources only (resource_compiler.rs); shaders go
+  through ShaderCompile (research/shaders.md). `RunBuildJob` and `ModelGameData` serve only the
+  editor's ContentCompilerHost worker (editor tables are out of scope): a job fails, game data is null.
+- `IAsyncResourceDataRequest` and `IRD_RegisterResourceDataUtils` (resource_data.rs) are plain
+  state objects; no managed code calls them and no callback of ours hands one out yet.
+- Sprite sheets (render/texture.rs) answer none. For whoever reads them, the vtex SHEET extra
+  data per VRF `Texture.GetSpriteSheetData`: i32 sequences offset, u32 count; a 32-byte sequence record
+  (u32 id, 4 bools, i32 frames offset relative to its field, u32 frame count, f32 total time,
+  name offset, i32 float-params offset, u32 count); 12-byte frames (f32 display time, i32 images
+  offset, u32 count); 32-byte images (cropped min/max, uncropped min/max as Vector2). The SHEET
+  type number and name-offset base are unconfirmed.
+- `Plat_ScreenToWindowCoords`/`WindowToScreenCoords` shift by SDL's window position;
+  `SourceEnginePanelAppInit` reports the render device, `SourceEnginePanelAppFrame` has nothing
+  native to do (editor.rs).
+
 ## Models (`.vmdl_c`)
 
 | Block | Holds |

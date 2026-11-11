@@ -20,6 +20,23 @@ fn is_block_name(name: &str) -> bool {
 /// Splits a `.shader` source into blocks and loose code, in file order. Comments are blanked
 /// first, so offsets (and lines) match the original.
 pub fn split(src: &str) -> Result<Vec<Item>, String> {
+    scan(src, &mut |_, _| {})
+}
+
+/// `src` with every block `keep` rejects blanked from its name to its closing brace, newlines
+/// kept so lines still match (native's `VfxMaskUnusedParts`). `comments` blanks comments too.
+pub fn mask(src: &str, keep: impl Fn(&str) -> bool, comments: bool) -> Result<String, String> {
+    let mut out = if comments { blank_comments(src) } else { src.to_string() }.into_bytes();
+    scan(src, &mut |name, span| {
+        if !keep(name) {
+            crate::scan::blank_bytes(&mut out[span]);
+        }
+    })?;
+    Ok(String::from_utf8(out).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
+}
+
+/// [`split`], also calling `block` with each block's name and its span (name to closing brace).
+fn scan(src: &str, block: &mut dyn FnMut(&str, std::ops::Range<usize>)) -> Result<Vec<Item>, String> {
     let s = blank_comments(src);
     let b = s.as_bytes();
     let mut items = Vec::new();
@@ -32,6 +49,7 @@ pub fn split(src: &str) -> Result<Vec<Item>, String> {
                 flush(&s, &mut code_start, i, &mut items);
                 let close = match_close(&s, brace, false)
                     .ok_or_else(|| format!("line {}: block {name} is never closed", line_of(&s, i)))?;
+                block(name, i..close + 1);
                 items.push(Item::Block {
                     name: name.into(),
                     body: s[brace + 1..close].into(),
@@ -111,5 +129,15 @@ mod tests {
             other => panic!("{other:?}"),
         }
         assert!(matches!(&items[2], Item::Block { name, body, .. } if name == "PS" && body.contains("MainPs")));
+    }
+
+    #[test]
+    fn mask_blanks_rejected_blocks_keeping_lines() {
+        let src = "COMMON { int a; }\nVS {\n  int v; // vs\n}\nPS { int p; } // tail\n";
+        let out = mask(src, |n| n != "VS", false).unwrap();
+        assert_eq!(out.len(), src.len());
+        assert_eq!(out.lines().count(), src.lines().count());
+        assert!(out.contains("COMMON { int a; }") && out.contains("PS { int p; } // tail") && !out.contains("int v"));
+        assert!(!mask(src, |_| true, true).unwrap().contains("// tail"));
     }
 }

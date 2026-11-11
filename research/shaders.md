@@ -75,6 +75,38 @@ WGSL, plus reflection and a disk cache. Decisions, each with its reason:
 - Vertex and pixel stages are separate WGSL modules. `render::Program` takes one module, so the
   renderer lane needs a per-stage adapter. Nothing in `crates/render` was changed.
 
+## Compiling through managed's ShaderCompile (`crates/engine2/src/shader/`)
+`Shader.CompileAsync` / `CompileFileAsync` (GameShaders.cs) and ShaderUpgrade drive the same slots as
+native's vfx_vulkan. Decisions:
+- `IVfx.CompileShader` compiles one combo HLSL → SPIR-V with DXC (`Compiler::spirv`), from the
+  context's masked source (`SetMaskedCode`, parsed once per context), else the CVfx's own parse.
+  The blob is `CVfxShaderFileVulkan` v4 (version, size, SPIR-V, no reflection), what SpirvDump
+  reads. DXC errors become `compilerOutput` with `compileFailed`; PS_RENDER_STATE compiles empty.
+  WGSL translation is left to the renderer at draw time, so a combo naga rejects still compiles.
+- `ShaderTools.MaskShaderSource` blanks other stage blocks (lines kept, `shaders::blocks::mask`).
+- Versions (resource 4, VCS 65..68, ABI 2) come from ShaderUpgradeTest's `Current`, unchecked
+  against a shipped engine2. Same ABI as native on purpose: native-compiled package shaders count
+  as current and load from their HLSL block instead of being recompiled at install.
+- `.shader_c` bodies: managed frames the container and SPRV index itself (`WriteResourceFile`
+  outside the editor); each body starts with the VCS header ShaderUpgrade checks, then `UBX1`
+  and ours: FEATURE = the parsed `VfxShader` as JSON plus the source hash, a stage = its combos
+  `(static, dynamic, blob)`. Native's body layout is closed and unread.
+- Loading (`CreateFromResourceFile`, `CreateAnonymous`, `GetShader` of a missing source): our
+  FEATURE body, else the HLSL block's masked sources parsed per stage, else fail. A core shader
+  without source or HLSL still has no shader (renderer stand-in, as before).
+- `VFX_CHECK_MD5_AGAINST_SOURCE`: blake3 of the source text, its includes and our crate version;
+  a mismatch (or a native file with a source beside it) is out of date, so managed recompiles.
+- `compiled/...` (GameShaders' prefix) paths keep their folder (others get `shaders/`). Anonymous
+  shaders register under their generated name, because the renderer finds shaders by path.
+  `GetShader` reloads a shader whose `.shader_c` mtime changed, standing in for
+  `mat_reloadshaders` (no native commands are announced yet). The renderer's program cache
+  (render/shading/mod.rs) still keeps the old program until restart.
+- Not native's: `IsUiVariableActive` checks the feature value and that the variable is declared,
+  not feature-dependent visibility (TODO in schema.rs); `GetPropertiesJson` lists features and
+  annotated/`CreateInput*` variables only.
+- `IVfx.Init`/`ClearShaderCache`/`CreateSharedContext` stay in render/vfx.rs (render lane); its
+  "compiles nothing" TODO is stale.
+
 ## Corpus status
 `cargo test -p shaders --test corpus` runs each of the 85 core shaders' default combo (static 0,
 dynamic 0) and writes `corpus.tsv`/`corpus-errors.txt` to CARGO_TARGET_TMPDIR. All 85 shaders

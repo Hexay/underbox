@@ -1,7 +1,11 @@
 //! `g_pResourceCompilerSystem`: compiling sources to `<file>_c`. Only GameResources (JSON) have a
 //! compiler here (`assets::game_resource`), as for mounted projects in `fs::add_project_path`.
-//! Engine-native types (models, materials, textures, shaders...) report failure.
-//! TODO: `RunBuildJob` (content-compiler workers) and `ModelGameData` stay unbound until those exist.
+//! Engine-native types (models, materials, textures, shaders...) report failure; shaders compile
+//! through ShaderCompile instead (shader/), which outside the editor frames the `.shader_c` itself.
+//!
+//! `RunBuildJob` and `ModelGameData` serve only Sandbox.Tools' ContentCompilerHost, a content
+//! compiler worker the editor spawns. The editor tables are out of scope (docs/PLAN.md), so a job
+//! fails (the host reports it "failed") and there is no `CGameData` (null).
 
 use crate::utl_buffer;
 use abi::slots::g_p_resource_compiler_system as rc;
@@ -94,6 +98,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, rc::UNLOAD_BUILD_JOBS, || {});
     bind!(r, rc::RUN_MAIN_THREAD_WORK, || {});
     bind!(r, rc::HAS_LOADED_COMPILED_FILE, |_| false);
+    bind!(r, rc::RUN_BUILD_JOB, |_mode, _source, _staging, _report, _args| false);
+    bind!(r, rc::MODEL_GAME_DATA, || RawPtr::NULL);
     // -1: "can't be calculated here" (ContentCompilerHost.Fingerprint).
     bind!(r, rc::SPECIAL_DEPENDENCY_FINGERPRINT, |_, _, _| -1);
 }

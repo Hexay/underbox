@@ -31,6 +31,8 @@ pub mod concommand;
 pub mod convar;
 pub mod resource_compiler;
 pub mod shader;
+mod editor;
+pub mod resource_data;
 mod engine_glue;
 pub mod input;
 mod video;

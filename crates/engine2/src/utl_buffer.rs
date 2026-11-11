@@ -12,6 +12,12 @@ pub fn create(bytes: Vec<u8>) -> Ref {
     objects::create(UtlBuffer(bytes.into_boxed_slice()))
 }
 
+/// Native writing into a buffer managed made (`CUtlBuffer.Create`): it then holds `bytes`, and a
+/// `Base` taken before is stale, as after a real CUtlBuffer grows. False for a dead buffer.
+pub fn put(r: Ref, bytes: Vec<u8>) -> bool {
+    objects::replace(r, UtlBuffer(bytes.into_boxed_slice()))
+}
+
 pub fn bytes(r: Ref) -> Option<std::sync::Arc<UtlBuffer>> {
     objects::get(r)
 }
@@ -40,7 +46,10 @@ mod tests {
         let r = create(b"abc".to_vec());
         let b = bytes(r).unwrap();
         assert_eq!(b.as_slice(), b"abc");
+        assert!(put(r, b"wxyz".to_vec()));
+        assert_eq!(bytes(r).unwrap().as_slice(), b"wxyz", "same handle, new contents");
         assert!(objects::destroy(r));
         assert!(bytes(r).is_none());
+        assert!(!put(r, Vec::new()), "a disposed buffer takes nothing");
     }
 }
