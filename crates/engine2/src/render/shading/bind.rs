@@ -147,7 +147,7 @@ pub fn sample_type_fits(format: wgpu::TextureFormat, want: wgpu::TextureSampleTy
 /// A bindless sampler array: element `i` is the sampler state managed registered at index `i`
 /// (render/samplers.rs), else the default; comparison arrays keep the default.
 fn bindless_samplers(gpu: &render::Gpu, b: &Binding, kind: wgpu::SamplerBindingType) -> Vec<wgpu::Sampler> {
-    let fallback = defaults::sampler(gpu, kind, None);
+    let fallback = defaults::sampler(gpu, kind, None, false);
     let real = |i| samplers::desc(i).filter(|_| kind != wgpu::SamplerBindingType::Comparison).map(|d| samplers::sampler(gpu, &d, kind));
     (0..program::array_len(b) as usize).map(|i| real(i).unwrap_or_else(|| fallback.clone())).collect()
 }
@@ -238,7 +238,9 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         B::StorageTexture { format, view_dimension: wgpu::TextureViewDimension::D2, .. } => Resource::View(storage_view(s, inputs, b, format)?),
         B::Sampler(kind) => {
             let set = (kind != wgpu::SamplerBindingType::Comparison).then(|| inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::sampler(*a, n)))).flatten();
-            Resource::Sampler(set.map_or_else(|| defaults::sampler(gpu, kind, s.attributes.get(&b.name).and_then(|a| a.compare)), |d| samplers::sampler(gpu, &d, kind)))
+            let attr = s.attributes.get(&b.name);
+            let fallback = || defaults::sampler(gpu, kind, attr.and_then(|a| a.compare), attr.is_some_and(|a| a.anisotropic));
+            Resource::Sampler(set.map_or_else(fallback, |d| samplers::sampler(gpu, &d, kind)))
         }
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),
     })

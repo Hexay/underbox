@@ -16,6 +16,8 @@ pub struct Attr {
     pub default: Option<Vec4>,
     /// A comparison sampler's `ComparisonFunc( ... )`.
     pub compare: Option<wgpu::CompareFunction>,
+    /// A sampler's `Filter( ANISO )`.
+    pub anisotropic: bool,
     /// A texture's `SrgbRead( true )`: sampled through its sRGB view.
     pub srgb: bool,
     /// An engine-supplied value's `Source( ... )`: `Viewport` (shading/view.rs).
@@ -156,9 +158,10 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
         let attribute = a.get("Attribute").map(|s| s.trim().trim_matches('"').to_owned());
         let default = ["Default", "Default1", "Default2", "Default3", "Default4"].iter().find_map(|k| a.get(k).and_then(parse_default));
         let compare = a.get("ComparisonFunc").and_then(compare_func);
+        let anisotropic = a.get("Filter").is_some_and(|v| v.trim().starts_with("ANISO"));
         let srgb = a.get("SrgbRead").is_some_and(|v| matches!(v.trim(), "true" | "1"));
         let source = a.get("Source").map(|s| s.trim().to_owned());
-        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, srgb, source });
+        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, anisotropic, srgb, source });
     }
     out
 }
