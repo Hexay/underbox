@@ -224,17 +224,17 @@ own switches: `-nosteam` (else it waits forever for a Steam client) and `-vulkan
 "No usable Vulkan physical devices were found": it skips CPU device types). Its window sits at
 the origin of a screen-sized Xvfb; four identical grabs one second apart count as settled. Ours is
 seeded with real's compiled core textures and materials (`.vtex_c`, `.vmat_c`; shaders stay each
-engine's own), since sbox-public ships none of core's images. Both pin shadow quality High; the
-rest of the auto-detected Low preset applies to both. Never commit real's frames.
+engine's own), since sbox-public ships none of core's images. Both pin shadow quality High and
+volumetric fog Off (`FOG_QUALITY`, the auto-detected Low preset's level; the goldens pin High); the
+rest of the Low preset applies to both. Never commit real's frames.
 
-Metrics (mean abs error R/G/B, SSIM) before → after the fixes (showroom before both, outdoor and
-fog before 2):
+Metrics (mean abs error R/G/B, SSIM) before the fixes, after 1–2, after 3 and 6:
 
-| Scene | Before | After |
-| --- | --- | --- |
-| showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 |
-| outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 |
-| fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 |
+| Scene | Before | After 1–2 | After 3, 6 |
+| --- | --- | --- | --- |
+| showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 | |
+| outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 | 0.15 / 0.12 / 0.11, 0.999 |
+| fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 | 1.4 / 1.3 / 1.0, 0.977 |
 | skinned, glass, hud | content confounds, below | |
 
 Ranked divergences:
@@ -247,20 +247,24 @@ Ranked divergences:
    `UNDERBOX_REAL_CORE`).
 2. **Fixed. The dev plane's texture was rotated 90°.** Real maps `RenderPrimitivePlane` U along +Y
    and V along +X (`model/primitive.rs`). Ours' stand-in testgrid hid both 1 and 2.
-3. **Volumetric fog drawn though the settings turn it off.** The auto-detected preset stores
-   `volumetricfog.quality -1`, so `quality_profiles.json` sets `r_enable_volume_fog 0`; real draws
-   no volume, ours fogs the box behind it lavender. Ours announces no native convars yet
-   (`convar.rs` TODO), so the write is dropped. Fix: define the profile convars, announce them
-   before `ApplyAll`, and gate `render/fog_volume.rs` on them.
+3. **Fixed. Volumetric fog drawn though the settings turn it off.** The Low preset stores
+   `volumetricfog.quality -1`, so `quality_profiles.json` sets `r_enable_volume_fog 0`; managed
+   dropped the write because ours announced no native convars. `render/convars.rs` now defines
+   real libengine2's (`r_3d_skybox`, `r_enable_volume_fog`, `volume_fog_width/height/depth`, with
+   its defaults 1, 1, 240, 160, 64), `SourceEngineInit` announces them before `ApplyAll`, and
+   `fog_volume::render` draws nothing while `r_enable_volume_fog` is 0. Left in fog: the roof's
+   shadow edge across the box (real's is a soft band) and the foreground shadow (ours 0, real 12).
 4. **Real draws no HUD** (hud scene). Both build the panel tree (both log the same missing
    `hud.cs.scss`); real's frame shows only the box. Unexplained; probe the UI pass next (is
    real's ScreenPanel drawn when the window never gets focus?).
 5. **Point light hotspot dimmer on ours.** Showroom lamp peak (209,112,94) against real's
    (246,147,110); sun-lit and shadowed floor agree within 2. Guess: point light falloff or
    specular in `render/lighting/`.
-6. **3D skybox through distance fog brighter on ours** (outdoor: +8 to +13 per channel) with a
-   vertical seam at x ≈ 375 that real lacks. Guess: skybox fog constants (`render/fog.rs`,
-   `render/scene/skybox.rs`).
+6. **Fixed. 3D skybox through distance fog brighter on ours** (outdoor: +8 to +13 per channel)
+   with a seam at x ≈ 375 between two faces of a skybox box. Not the fog constants: the skybox's
+   child view took the camera's ambient colour (and, with none, the stand-in's fallback sun).
+   Real lights it with the skybox world's own lights only, so a skybox without one is black under
+   its fog (`render/scene/skybox.rs`, `Lighting::of_worlds`).
 7. **Minification.** Grid lines are black on ours (0) and grey on real (18): ours uploads mip 0
    only (`compiled/texture.rs`), real samples its mip chain.
 8. **Low. Banding.** Concentric rings in the diff around light pools: 8-bit quantisation differs
@@ -283,7 +287,8 @@ scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
 - **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
-- **Rendering (3–7):** native convars for the quality profiles; the HUD probe; point light falloff;
-  skybox fog; mips. Content: compile project `.vmat` for real (glass), make the fixture `.vmdl_c`
+- **Rendering (4, 5, 7):** the HUD probe; point light falloff; mips. The texture quality group's
+  convars (`r_texture_stream_*`, `r_max_anisotropy`) live in real's rendersystem and aren't defined
+  yet; managed warns once and skips them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say. Content: compile project `.vmat` for real (glass), make the fixture `.vmdl_c`
   pass real's schema (skinned), read real's compiled `.vmdl_c` on ours.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

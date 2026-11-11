@@ -66,7 +66,10 @@ pub fn register(r: &mut Registry) {
         }
         true
     });
+    // Before managed's Bootstrap.Init applies the quality profiles, which drop unknown names.
     bind!(r, global::SOURCE_ENGINE_INIT, |_| {
+        crate::render::convars::define();
+        crate::convar::announce_all();
         crate::render::device::report_to_managed();
         true
     });
