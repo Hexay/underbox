@@ -6,10 +6,12 @@ license.workspace = true
 description = "soundsystem: sound decoding, voice sampling, effects, DSP presets, voice codec and the output device"
 
 [features]
-# Real output and capture through cpal. Without it only the null device exists (and no libasound link on Linux).
-device = ["dep:cpal"]
+# Real output and capture through cpal. Without it only the null device exists. On x86_64 Linux,
+# libasound is dlopened, not linked (src/alsa_dl), so this is safe for a server without ALSA.
+device = ["dep:cpal", "dep:libc"]
 
 [dependencies]
 cpal = { version = "0.17", optional = true }
+libc = { version = "0.2", optional = true }
 opus = "0.4"
 symphonia = { version = "0.5", default-features = false, features = ["wav", "pcm", "adpcm", "mp3", "ogg", "vorbis", "flac"] }

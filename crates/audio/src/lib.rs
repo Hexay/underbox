@@ -2,6 +2,9 @@
 //! sounds, samples voices into fixed-size blocks, runs the native effects and DSP presets, codes
 //! voice chat, and queues the mixed output for a device. See docs/audio.md.
 
+// Must match the alsa-sys override's triple in .cargo/config.toml.
+#[cfg(all(feature = "device", target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+mod alsa_dl;
 pub mod convert;
 pub mod decode;
 #[cfg(feature = "device")]
