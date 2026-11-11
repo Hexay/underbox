@@ -171,14 +171,27 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
   vertex binding are moved apart after translation (`shading/stages.rs`).
 - Binder precedence per uniform block (`shading/bind.rs`): managed's `SetConstantBufferData` bytes
   by block name, the view block, the lighting blocks, then member-wise attributes → material →
-  annotation defaults. Textures: attributes → material → managed's sun cascade (the bindless
+  `Source( Viewport )` (the raster viewport, `View::source`) → matrix attributes (managed's
+  row-major bytes, as native uploads them) → annotation defaults. Draws see the context's
+  attributes, then the running layer's (`HookLayers`' `UIGammaOutput`). Textures: attributes → material → managed's sun cascade (the bindless
   index in its `DirectionalLightCB`, `shadow::managed_cascade`) → managed's local shadow slots
   (`shading/shadow_slots.rs`) → lighting (our shadow maps) → the
   context's `BindTexture` slot with that binding number. A texture that is the pass's own target
   is never bound (managed's shadow pass would sample the map it writes). `ComparisonFunc` and
-  `RWTexture2D` (storage, mip 0, exact format) bind as declared.
+  `RWTexture2D` binds the attribute's mip; a bound texture of another format than DXC inferred
+  rebuilds the program with that storage format (`shaders::retarget_storage`). Storage buffers
+  managed creates also bind as vertex, index and indirect-args buffers.
 - `UNDERBOX_DUMP_CB=<block>` logs every `SetConstantBufferData` of that block as words
   (`render/bindings.rs`): compare managed's bytes with ours before changing a layout.
+  `UNDERBOX_BIND_LOG=<shader substring>` logs, once per line, where each binding's value comes
+  from and which uniform members nothing sets (`shading/bind_log.rs`): run it first when a draw
+  submits but nothing shows.
+- A shader whose source fails to build draws with its shipped `.shader_c` HLSL
+  (`shader::shipped`); grubs' `new_water.shader` is newer than its `.shader_c`.
+- Built-in header functions that the shader defines itself with the same signature become
+  prototypes (`shaders/src/overrides.rs`), as native's headers allow.
+- Border-addressed samplers need `ADDRESS_MODE_CLAMP_TO_BORDER`; without it they clamp to edge
+  (`render/samplers.rs`).
 - Bindless (`render/bindless.rs`): `GetTextureViewIndex` hands out linear/sRGB index pairs from
   1 (`GetTexture2DSrgb` adds 1); `g_bindless_*` arrays (with `TEXTURE_BINDING_ARRAY`) hold the
   real textures of each array's shape, the default elsewhere, partially bound up to the highest
@@ -305,7 +318,11 @@ windows, framebuffers, properties and window events on the offscreen driver.
 2. Fog's shadowed in-scattering, baked indirect, and the managed path's local lights and
    temporal blend (docs/fog.md); `GetSheetInfo` and the shader sheet path (`sheet_sampling.fxc`
    is a stub).
-4. `downsample_spd` skips: its Rg32Float mip isn't writable through the Rgba32Float storage view
-   it declares. Indirect compute (`COMPUTE_INDIRECT` is a no-op), so CMAA2 never blends.
-3. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
+3. CMAA2 still skips: its `InterlockedExchange` on `RWTexture2D<uint>` becomes
+   `OpImageTexelPointer`, which naga's SPIR-V front end rejects ("unsupported storage class").
+   Needs a SPIR-V pass to plain image load/store (racy but CMAA2 tolerates it) or a buffer.
+   Indirect dispatch itself works (`compute/indirect_tests.rs`).
+4. hud's first UI frame (~#15) stalls lavapipe for up to ~30 s, cause untriaged (pipeline
+   creation is the suspect); verify waits for frame 40.
+5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.

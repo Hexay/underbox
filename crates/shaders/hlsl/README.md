@@ -7,6 +7,9 @@
   others. They are written from the corpus call sites and standard definitions; nothing is copied from
   Valve or Facepunch builds. An include falls back to a built-in only when it resolves nowhere on disk,
   so a real header always wins (`src/include.rs`, `src/builtin.rs`).
+- A shader may define a function a built-in also defines (grubs' `SrgbGammaToLinear`). When the
+  signatures match, the built-in's body is dropped and its definition kept as a prototype
+  (`src/overrides.rs`), so a built-in never needs `#ifndef` guards for that.
 
 Engine-data headers (instancing, light probes, lightmaps, volumetric fog) define resource layouts. The
 renderer fills those resources, so the layout chosen here is the contract between the two, and the

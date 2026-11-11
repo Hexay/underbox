@@ -150,16 +150,29 @@ Fixed, in the order they showed up after spawn:
   error cubes centred on the eye, and the placeholder drew their inside faces over the whole
   view. The placeholder now culls back faces as native's default material does.
 
+- **No HUD.** Six causes, all reproduced on `corpus/hud` (panels, borders, radii, a gradient,
+  text; goldens on both paths): `RestoreRenderTargets` unbound the targets; PainterBatcher's
+  vertex-less `DrawIndexedInstanced` was dropped; managed GpuBuffers lacked `INDEX` usage;
+  `g_vViewport < Source( Viewport ) >` and the `LayerMat`/`TransformMat` matrix attributes were
+  never bound, so every quad collapsed; draws didn't see the layer's `UIGammaOutput`, so colours
+  were decoded twice; and `PainterTextInstances`' struct is renamed by `#define`, so the
+  packed-buffer pass missed it and only the first glyph drew.
+- **Grubs terrain:** `gr_foreground*` use a border-addressed sampler, invalid without
+  `ADDRESS_MODE_CLAMP_TO_BORDER`; the device now asks for it and falls back to clamp-to-edge.
+- **Grubs water:** `new_water.shader` redefines `SrgbGammaToLinear`, which our built-in
+  `math_general.fxc` also defines (built-ins now yield to a same-signature definition), and its
+  source is newer than its `.shader_c` (reads `i.vPositionPs` in PS, which current core doesn't
+  declare). It draws with the `.shader_c`'s HLSL, as native does.
+- **`downsample_spd`** writes managed's Rg32Float pyramid: the program is rebuilt with the bound
+  texture's storage format.
+
 What's left, and why:
 
 - No textures, no sky texture: the zoo's materials are `reflectivity_30.vmat` and
   `skybox_day_01.vmat`, whose `.tga`/`.exr` aren't in the repo and no `.vtex_c` ships. The sky is
-  our flat placeholder.
+  our flat placeholder. Grubs' `rocks_a_*` textures are absent from its checkout too.
 - The one spotlight is the `studio_light_projector` prop's; the scene itself has only the sun.
-- No HUD visible yet; not triaged.
-- `downsample_spd` skips (Rg32Float mip through an Rgba32Float view), and CMAA2's indirect
-  passes are no-ops, so it never blends (docs/renderer.md, Next).
-- Grubs' untextured terrain and `new_water.shader` ([Grubs](#grubs)): not triaged.
+- CMAA2 dispatches indirectly now but its image atomics don't translate (docs/renderer.md, Next).
 
 ## Shaders
 
