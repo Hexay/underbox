@@ -140,8 +140,9 @@ fn pack(b: &Buffer, vertex: bool, packing: Packing) -> (u32, Vec<u8>) {
         Packing::Meshopt => (0, encoded()),
         Packing::MeshoptZstd => (ZSTD, ruzstd::encoding::compress_to_vec(&encoded()[..], ruzstd::encoding::CompressionLevel::Fastest)),
     };
-    // Readers take anything at least the raw size as raw, so a stream that didn't shrink can't be stored.
-    if packed.1.len() >= b.data.len() { (NOT_MESHOPT, b.data.clone()) } else { packed }
+    // Readers take anything at least the raw size as raw, so a stream that didn't shrink can't be
+    // stored. No flag either: real engine2 reads none, so a flag would corrupt its element size.
+    if packed.1.len() >= b.data.len() { (0, b.data.clone()) } else { packed }
 }
 
 /// An index buffer's indices, widened.

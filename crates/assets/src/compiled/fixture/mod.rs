@@ -65,7 +65,7 @@ pub fn material(name: &str, tint: [f32; 4]) -> Material {
         ints: vec![("F_SPECULAR".into(), 0)],
         floats: vec![("g_flModelTintAmount".into(), 1.0)],
         vectors: vec![("g_vColorTint".into(), tint)],
-        textures: vec![("g_tColor".into(), TEXTURE.into())],
+        textures: super::material::with_default_textures(vec![("g_tColor".into(), TEXTURE.into())]),
         ..Material::default()
     }
 }
@@ -154,7 +154,7 @@ pub fn sound() -> super::sound::Sound {
 /// (compiled path, bytes) of the crate model, its materials and texture.
 pub fn crate_files() -> Vec<(String, Vec<u8>)> {
     vec![
-        (format!("{MODEL}_c"), super::model::write(&model(), Packing::MeshoptZstd)),
+        (format!("{MODEL}_c"), super::model::write(&model(), Packing::Meshopt)),
         (format!("{MATERIAL}_c"), super::material::write(&material(MATERIAL, [1.0, 1.0, 1.0, 0.0]))),
         (format!("{SKIN_MATERIAL}_c"), super::material::write(&material(SKIN_MATERIAL, [0.4, 0.4, 0.4, 0.0]))),
         (format!("{TEXTURE}_c"), super::texture::write(&texture(), true)),

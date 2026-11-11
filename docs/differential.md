@@ -235,7 +235,9 @@ fog before 2):
 | showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 |
 | outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 |
 | fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 |
-| skinned, glass, hud | content confounds, below | |
+| skinned | 12.2 / 11.5 / 14.7, 0.877 (real: error signs) | 2.7 / 1.8 / 0.9, 0.976 |
+| glass | no settled frame (real: error checker) | 4.8 / 5.8 / 5.1, 0.977 |
+| hud | 37.7 / 29.4 / 36.4, 0.851 | open, divergence 4 |
 
 Ranked divergences:
 
@@ -252,9 +254,12 @@ Ranked divergences:
    no volume, ours fogs the box behind it lavender. Ours announces no native convars yet
    (`convar.rs` TODO), so the write is dropped. Fix: define the profile convars, announce them
    before `ApplyAll`, and gate `render/fog_volume.rs` on them.
-4. **Real draws no HUD** (hud scene). Both build the panel tree (both log the same missing
-   `hud.cs.scss`); real's frame shows only the box. Unexplained; probe the UI pass next (is
-   real's ScreenPanel drawn when the window never gets focus?).
+4. **Open, harness: real draws no HUD.** Under `-nosteam` `SteamFriends()` is null, so
+   `SteamRichPresenceSystem.Poll` throws every frame (from `EngineLoop.FrameStart` via
+   `GameInstanceDll.Tick`); `RunFrame` catches it and skips the rest of `FrameStart`,
+   `SimulateUI()` included. Managed loads its own `libsteam_api.so` (`NativeDllPath`), so
+   `LD_PRELOAD` can't stub Steam; hot-patched Friends/Utils got past the throw, but the client
+   then called the sbox API (401) and never loaded the game.
 5. **Point light hotspot dimmer on ours.** Showroom lamp peak (209,112,94) against real's
    (246,147,110); sun-lit and shadowed floor agree within 2. Guess: point light falloff or
    specular in `render/lighting/`.
@@ -265,16 +270,21 @@ Ranked divergences:
    only (`compiled/texture.rs`), real samples its mip chain.
 8. **Low. Banding.** Concentric rings in the diff around light pools: 8-bit quantisation differs
    (real likely dithers).
+9. **Puppet pose** (skinned). Ours plays `bow` (top face lifted and twisted by bone and morph);
+   real holds the bind pose. Guess: ours autoplays the first sequence on a renderer without an
+   anim graph, and real doesn't.
+10. **Translucent glass lighter on ours** (glass): the whole pane and the box behind it are
+    lighter and more cyan on ours, and ours draws a specular edge real lacks. Guess:
+    translucent opacity (`g_flOpacityScale`, tint alpha) or translucent lighting.
+11. **Low. Crate tops lighter on ours** (skinned).
+
+Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
+and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
+bisecting them: research/resources.md "What real engine2 accepts". `real-game.sh` now runs
+`assetc --materials` because real only compiles `.vmat` sources in the editor.
 
 Agreeing: sky clear colour (exact), ACES auto-exposure on outdoor's floor (exact), sun shadows'
 placement and softness, box shading within 1–6.
-
-Confounds, not render: **skinned** — real rejects our synthetic `.vmdl_c` ("Failed to convert
-introspected block for file: models/compiled/puppet.vmdl") and draws both models as error signs
-(fixture writer, `crates/assets/src/compiled/model.rs`). **glass** — real has no
-`materials/glass.vmat_c` (`assetc` compiles only GameResources) and draws its animated error
-checker, so the scene never settles. Ours given real's compiled core models draws the dev box as
-scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
 
 ## Follow-up lanes
 
@@ -283,7 +293,8 @@ scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
 - **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
-- **Rendering (3–7):** native convars for the quality profiles; the HUD probe; point light falloff;
-  skybox fog; mips. Content: compile project `.vmat` for real (glass), make the fixture `.vmdl_c`
-  pass real's schema (skinned), read real's compiled `.vmdl_c` on ours.
+- **Rendering (3–11):** native convars for the quality profiles; point light falloff; skybox
+  fog; mips; sequence autoplay; translucent opacity. Content: seed real's compiled `.vmdl_c` into
+  ours (`frame.sh`) now that primitive types read.
+- **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.
