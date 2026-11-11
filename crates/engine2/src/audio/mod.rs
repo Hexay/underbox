@@ -12,6 +12,7 @@ pub mod mix;
 mod mixer;
 mod pcm_wave;
 pub mod sound;
+mod stats;
 mod stream;
 mod voice;
 

@@ -46,6 +46,9 @@ pub fn ensure() -> bool {
         return set_error("video is unavailable in this app (dedicated server)");
     }
     *state = if init_video() { State::Up } else { State::Failed };
+    if *state == State::Up {
+        eprintln!("window: SDL video driver {}", current_driver().unwrap_or_default());
+    }
     *state == State::Up
 }
 

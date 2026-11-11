@@ -8,8 +8,16 @@ use std::ffi::c_void;
 
 /// SDL_PollEvent. False without touching SDL when nothing is initialised (a server's loop).
 pub fn poll(out: &mut Event) -> bool {
+    if !video::any_up() {
+        return false;
+    }
     // SAFETY: out is a valid, writable SDL_Event.
-    video::any_up() && unsafe { SDL_PollEvent(out) }
+    while unsafe { SDL_PollEvent(out) } {
+        if crate::relative::filter(out) {
+            return true;
+        }
+    }
+    false
 }
 
 /// SDL_PushEvent (synthetic input for tests and tools). SDL stamps the timestamp.

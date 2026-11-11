@@ -21,6 +21,9 @@ def project_file(root):
     candidates = sorted(root.glob("*.sbproj")) + sorted(root.glob(".sbproj"))
     if not candidates:
         sys.exit(f"prepare: no .sbproj under {root}")
+    # A project template's `$ident.sbproj` isn't found by its ident; a plain `.sbproj` is.
+    if "$" in candidates[0].name:
+        return candidates[0].rename(root / ".sbproj")
     return candidates[0]
 
 
@@ -33,6 +36,8 @@ def set_startup_scene(sbproj, scene):
     # A listed map is a package the launcher asks for; the run must never request one.
     meta["MapList"] = []
     project["PackageReferences"] = []
+    # Templates carry their folder name (game.minimal): a dot in the ident splits `org.ident` wrong.
+    project["Ident"] = project.get("Ident", "").replace(".", "_")
     sbproj.write_text(json.dumps(project, indent=2), encoding="utf-8")
 
 
@@ -58,16 +63,17 @@ def add_watcher(scene_path, idle_seconds, command):
 def main():
     args = argparse.ArgumentParser()
     args.add_argument("root", type=pathlib.Path)
-    args.add_argument("scene", help="relative to Assets, e.g. scenes/zoo.scene")
+    args.add_argument("scene", help="relative to Assets, e.g. scenes/zoo.scene; empty for the project's StartupScene")
     args.add_argument("watch", type=pathlib.Path)
     args.add_argument("--idle", type=int, default=15, help="seconds the watcher idles past the settle")
     args.add_argument("--command", default="", help="console command the host runs once things settle")
     a = args.parse_args()
-    scene_path = a.root / "Assets" / a.scene
-    if not scene_path.is_file():
-        sys.exit(f"prepare: no such scene {scene_path}")
     sbproj = project_file(a.root)
-    set_startup_scene(sbproj, a.scene)
+    scene = a.scene or load(sbproj).get("Metadata", {}).get("StartupScene") or ""
+    scene_path = a.root / "Assets" / scene
+    if not scene or not scene_path.is_file():
+        sys.exit(f"prepare: no such scene {scene_path}")
+    set_startup_scene(sbproj, scene)
     add_watcher(scene_path, a.idle, a.command)
     code = a.root / "Code"
     code.mkdir(exist_ok=True)

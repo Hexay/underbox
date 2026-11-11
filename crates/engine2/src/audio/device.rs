@@ -102,7 +102,9 @@ fn start_mixing(d: &Device) {
 }
 
 fn send_output(buffers: DevRef) {
-    with(|d| d.queue.push(&mix::read_all(buffers)));
+    let blocks = mix::read_all(buffers);
+    super::stats::output_sent(&blocks);
+    with(|d| d.queue.push(&blocks));
 }
 
 fn set_active(id: Option<&CStr>) {
