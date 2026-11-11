@@ -186,7 +186,7 @@ fn managed_sun_shadow_darkens_the_floor() {
 
     // The main pass, lit by the sun through that map.
     let to_uv = Mat4::from_cols(Vec4::new(0.5, 0.0, 0.0, 0.0), Vec4::new(0.0, -0.5, 0.0, 0.0), Vec4::Z, Vec4::new(0.5, 0.5, 0.0, 1.0));
-    let index = crate::render::tools::texture_view_index(map);
+    let index = crate::render::bindless::index(map, false);
     attributes::set_constant_buffer(main_view, StringToken::of("DirectionalLightCB"), &sun_constants(sun, to_uv * light_to_projection, index));
     let x_scale = 1.0;
     let persp = Mat4::from_cols(Vec4::new(x_scale, 0.0, 0.0, 0.0), Vec4::new(0.0, x_scale, 0.0, 0.0), Vec4::new(0.0, 0.0, 1.0 / 999.0, -1.0), Vec4::new(0.0, 0.0, 1000.0 / 999.0, 0.0));

@@ -96,7 +96,7 @@ pub fn managed_cascade(cb: &[u8]) -> Option<texture::Ref> {
     let word = |i: usize| cb.get(i * 4..i * 4 + 4).map(|w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]));
     // Word 72: g_DirectionalLightShadowMapTextureIndex.x; 76: g_DirectionalLightCascadeCount.
     (word(76)? > 0).then_some(())?;
-    crate::render::tools::texture_at_view_index(word(72)?)
+    crate::render::bindless::at(word(72)?).map(|(t, _)| t)
 }
 
 #[cfg(test)]

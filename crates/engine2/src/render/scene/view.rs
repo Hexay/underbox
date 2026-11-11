@@ -139,8 +139,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, v::ADD_MANAGED_PROCEDURAL_LAYER, |r, name, vp, callback, before, _delete| {
         new_layer(r, name, vp, layer::Kind::Procedural(callback.as_ptr() as usize), before)
     });
-    bind!(r, v::ADD_BLIT_TEXTURE_TO_TARGET_LAYER, |r, name, src, src_vp, dst_vp, dst, _color_space| {
-        let l = new_layer(r, name, dst_vp, layer::Kind::Blit { src: rt_texture(src), src_viewport: src_vp }, layer::Ref::default());
+    bind!(r, v::ADD_BLIT_TEXTURE_TO_TARGET_LAYER, |r, name, src, src_vp, dst_vp, dst, color_space| {
+        let kind = layer::Kind::Blit { src: rt_texture(src), src_viewport: src_vp, srgb: color_space == 1 };
+        let l = new_layer(r, name, dst_vp, kind, layer::Ref::default());
         layer::set_output(l, rt_texture(dst), texture::Ref::default());
         l
     });

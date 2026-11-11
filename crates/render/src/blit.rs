@@ -33,7 +33,7 @@ impl Blitter {
     pub fn blit(&self, gpu: &Gpu, src: &Texture, src_rect: [u32; 4], dst: &Texture, dst_rect: [u32; 4], transfer: Transfer) -> bool {
         let float = |t: &Texture| matches!(t.desc.format.sample_type(None, None), Some(wgpu::TextureSampleType::Float { .. })) && !t.desc.format.is_depth_stencil_format();
         let [x, y, w, h] = dst_rect;
-        if !float(src) || !float(dst) || w == 0 || h == 0 || x + w > dst.desc.width || y + h > dst.desc.height || src_rect[2] == 0 || src_rect[3] == 0 {
+        if !float(src) || !float(dst) || src.dimension() != wgpu::TextureViewDimension::D2 || w == 0 || h == 0 || x + w > dst.desc.width || y + h > dst.desc.height || src_rect[2] == 0 || src_rect[3] == 0 {
             return false;
         }
         let [sx, sy, sw, sh] = src_rect.map(|v| v as f32);

@@ -9,13 +9,15 @@ def read_ppm(path):
     data = open(path, "rb").read()
     fields, pos = [], 0
     while len(fields) < 4:
+        if pos >= len(data):
+            sys.exit(f"{path}: truncated PPM header")
         while data[pos:pos + 1].isspace():
             pos += 1
         if data[pos:pos + 1] == b"#":
             pos = data.index(b"\n", pos) + 1
             continue
         end = pos
-        while not data[end:end + 1].isspace():
+        while end < len(data) and not data[end:end + 1].isspace():
             end += 1
         fields.append(data[pos:end])
         pos = end

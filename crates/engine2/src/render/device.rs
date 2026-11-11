@@ -47,9 +47,28 @@ pub fn create() -> Option<&'static render::Gpu> {
 }
 
 /// Managed's `Graphics.Initialize` asks this first; the answer gates all of its GPU work.
+/// Also reports the adapter to managed (`SystemInfo.SetGpu`), whose quality preset detection
+/// reads its memory.
 fn render_device_api() -> i64 {
-    let api = if wants_gpu() && create().is_some() { RenderDeviceApi::Vulkan } else { RenderDeviceApi::Empty };
+    let gpu = if wants_gpu() { create() } else { None };
+    if let Some(gpu) = gpu {
+        report_gpu(gpu);
+    }
+    let api = if gpu.is_some() { RenderDeviceApi::Vulkan } else { RenderDeviceApi::Empty };
     api as i64
+}
+
+/// `SystemInfo.SetGpu`: adapter name, driver, device-local memory, and whether that memory is
+/// system memory (an integrated or software device).
+fn report_gpu(gpu: &render::Gpu) {
+    const SET_GPU: usize = 13;
+    if !abi::rt::callbacks::is_set(SET_GPU) {
+        return;
+    }
+    let cstr = |s: &str| std::ffi::CString::new(s).unwrap_or_default();
+    let (name, driver) = (cstr(&gpu.info.name), cstr(&format!("{} {}", gpu.info.driver, gpu.info.driver_info)));
+    let integrated = matches!(gpu.info.device_type, render::wgpu::DeviceType::IntegratedGpu | render::wgpu::DeviceType::Cpu);
+    abi::callbacks::sandbox_engine_system_info::set_gpu(Some(&name), Some(&driver), gpu.device_local_bytes().unwrap_or(0), integrated);
 }
 
 fn wait_idle() {
@@ -71,7 +90,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, device::IS_RAY_TRACING_SUPPORTED, || false);
     bind!(r, device::ARE_DEBUG_MARKERS_ENABLED, || false);
     bind!(r, device::SET_FORCE_PRELOAD_STREAMING_DATA, |_| {});
+    // Budget only: wgpu reports no usage.
     bind!(r, device::GET_VIDEO_MEMORY_INFO, |a, b, c| {
-        (*a, *b, *c) = (0, 0, 0);
+        (*a, *b, *c) = (gpu().and_then(render::Gpu::device_local_bytes).unwrap_or(0), 0, 0);
     });
 }

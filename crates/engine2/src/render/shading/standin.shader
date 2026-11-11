@@ -132,7 +132,7 @@ PS
 		return l;
 	}
 
-	Texture2D g_tColor < Attribute( "g_tColor" ); >;
+	Texture2D g_tColor < Attribute( "g_tColor" ); SrgbRead( true ); >;
 	SamplerState g_sStandin < Filter( ANISO ); AddressU( WRAP ); AddressV( WRAP ); >;
 
 	float4 g_vColorTint < Attribute( "g_vColorTint" ); Default4( 1.0, 1.0, 1.0, 1.0 ); >;

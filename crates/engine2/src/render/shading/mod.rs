@@ -15,6 +15,8 @@ pub mod view;
 #[cfg(test)]
 mod coverage;
 #[cfg(test)]
+mod sky_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 
 pub use program::Shading;
@@ -36,16 +38,16 @@ pub type Extra = Vec<(&'static str, f32)>;
 /// shader nor a stand-in builds.
 pub fn for_shader(gpu: &render::Gpu, shader_path: &str) -> Option<(Arc<Shading>, Extra)> {
     if crate::shader::find(shader_path).is_none()
-        && let Some(unlit) = standin::mapped(shader_path)
+        && let Some(kind) = standin::mapped(shader_path)
     {
-        return Some((program(gpu, standin::PATH)?, standin::values(unlit).to_vec()));
+        return Some((program(gpu, kind.path())?, kind.values()));
     }
     Some((program(gpu, shader_path)?, Vec::new()))
 }
 
 fn source(shader_path: &str) -> Result<Arc<shaders::VfxShader>, String> {
-    if shader_path == standin::PATH {
-        return standin::shader(&shaders::IncludePaths::new(crate::fs::search_roots())).map(Arc::new);
+    if let Some(standin) = standin::shader(shader_path, &shaders::IncludePaths::new(crate::fs::search_roots())) {
+        return standin.map(Arc::new);
     }
     crate::shader::find(shader_path).ok_or_else(|| "shader not found".into())
 }

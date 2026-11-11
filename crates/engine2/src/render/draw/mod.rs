@@ -65,6 +65,30 @@ pub fn viewport_rect(t: &render::Texture, v: &abi::structs::RenderViewport) -> [
     }
 }
 
+/// Whether writing to `f` through an sRGB view would encode: an 8-bit format without its own
+/// sRGB format (we never create views that write sRGB, so blits apply the encode themselves).
+pub fn srgb_write_encodes(f: render::wgpu::TextureFormat) -> bool {
+    !f.is_srgb() && f.target_component_alignment() == Some(1)
+}
+
+/// The net transfer of a native blit: with `srgb_views` (`RENDER_SRGB`: source and target formats)
+/// an 8-bit source is read decoded and an 8-bit target written encoded, and the shader's
+/// `D_SRGB_TRANSFER` (1 encode, 2 decode) applies in between. Steps that cancel drop out.
+pub fn blit_transfer(srgb_views: Option<(render::wgpu::TextureFormat, render::wgpu::TextureFormat)>, combo: i32) -> render::Transfer {
+    let (read, write) = srgb_views.map_or((0, 0), |(src, dst)| (-i32::from(srgb_write_encodes(src)), i32::from(srgb_write_encodes(dst))));
+    let shader = match combo {
+        1 => 1,
+        2 => -1,
+        _ => 0,
+    };
+    match read + shader + write {
+        1 => render::Transfer::Encode,
+        -1 => render::Transfer::Decode,
+        // TODO: a double encode or decode (no pipeline asks for one).
+        _ => render::Transfer::None,
+    }
+}
+
 /// `src_rect` of `src` into `dst_rect` of `dst` (`[x, y, w, h]`): a copy when sizes and formats
 /// match and no transfer applies, else a draw that scales and converts.
 pub fn blit(src: &render::Texture, src_rect: [u32; 4], dst: &render::Texture, dst_rect: [u32; 4], transfer: render::Transfer) -> bool {

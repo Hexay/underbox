@@ -12,12 +12,27 @@ pub struct TextureDesc {
     pub format: wgpu::TextureFormat,
     pub mips: u32,
     pub render_target: bool,
+    /// Array layers (six per cube); 1 for a plain 2D texture.
+    pub layers: u32,
+    /// Sampled as a cube (or cube array) rather than a 2D array.
+    pub cube: bool,
 }
 
 impl TextureDesc {
     /// A sampleable colour render target that can be read back.
     pub fn render_target(label: &str, width: u32, height: u32, format: wgpu::TextureFormat) -> Self {
-        TextureDesc { label: label.into(), width, height, format, mips: 1, render_target: true }
+        TextureDesc { label: label.into(), width, height, format, mips: 1, render_target: true, layers: 1, cube: false }
+    }
+
+    /// How shaders see it: 2D, 2D array, cube or cube array.
+    pub fn dimension(&self) -> wgpu::TextureViewDimension {
+        use wgpu::TextureViewDimension as D;
+        match (self.cube && self.layers.is_multiple_of(6), self.layers) {
+            (true, 6) => D::Cube,
+            (true, _) => D::CubeArray,
+            (false, 0 | 1) => D::D2,
+            (false, _) => D::D2Array,
+        }
     }
 
     pub fn depth(label: &str, width: u32, height: u32) -> Self {
@@ -40,23 +55,51 @@ pub struct Texture {
     pub view: wgpu::TextureView,
     /// Mip 0 alone: attachments may not span mips.
     pub target_view: wgpu::TextureView,
+    /// The same texels read through the format's sRGB twin (decoded on sample), for formats
+    /// that have one (8-bit RGBA/BGRA and the BC formats).
+    pub srgb_view: Option<wgpu::TextureView>,
+}
+
+/// `format`'s sRGB-decoding twin, when it has one and isn't sRGB already.
+pub fn srgb_twin(format: wgpu::TextureFormat) -> Option<wgpu::TextureFormat> {
+    let twin = format.add_srgb_suffix();
+    (twin != format).then_some(twin)
 }
 
 impl Texture {
     pub fn new(gpu: &Gpu, desc: TextureDesc) -> Texture {
+        let twin = srgb_twin(desc.format);
         let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(&desc.label),
-            size: extent(desc.width, desc.height),
+            size: wgpu::Extent3d { depth_or_array_layers: desc.layers.max(1), ..extent(desc.width, desc.height) },
             mip_level_count: desc.mips.max(1),
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: desc.format,
             usage: desc.usage(),
-            view_formats: &[],
+            view_formats: twin.as_slice(),
         });
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let target_view = texture.create_view(&wgpu::TextureViewDescriptor { mip_level_count: Some(1), ..Default::default() });
-        Texture { desc, texture, view, target_view }
+        let dimension = Some(desc.dimension());
+        let view = texture.create_view(&wgpu::TextureViewDescriptor { dimension, ..Default::default() });
+        // Sampling only: sRGB formats can't be storage images, which the texture itself may allow.
+        let srgb_view = twin.map(|f| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(f), dimension, usage: Some(wgpu::TextureUsages::TEXTURE_BINDING), ..Default::default() }));
+        let target_view = layer_view(&texture, 0);
+        Texture { desc, texture, view, target_view, srgb_view }
+    }
+
+    pub fn dimension(&self) -> wgpu::TextureViewDimension {
+        self.desc.dimension()
+    }
+
+    /// Mip 0 of one array layer (a cube face), as a 2D attachment.
+    pub fn layer_target_view(&self, layer: u32) -> wgpu::TextureView {
+        layer_view(&self.texture, layer)
+    }
+
+    /// The view a shader samples: decoded through [`Texture::srgb_view`] when `srgb` and the format
+    /// has a twin, else the raw view.
+    pub fn sample_view(&self, srgb: bool) -> &wgpu::TextureView {
+        self.srgb_view.as_ref().filter(|_| srgb).unwrap_or(&self.view)
     }
 
     /// Bytes per texel of mip 0; `None` for block-compressed or depth-stencil formats.
@@ -68,14 +111,20 @@ impl Texture {
         f.block_copy_size(None)
     }
 
-    /// Replace mip 0 with tightly packed `data`.
+    /// Bytes of one tightly packed mip-0 layer.
+    pub fn layer_size(&self) -> Option<usize> {
+        Some((self.texel_size()? * self.desc.width * self.desc.height) as usize)
+    }
+
+    /// Replace mip 0 with tightly packed `data`: one layer, or every layer in order.
     pub fn upload(&self, gpu: &Gpu, data: &[u8]) {
-        let Some(texel) = self.texel_size() else { return };
+        let (Some(texel), Some(layer)) = (self.texel_size(), self.layer_size()) else { return };
+        let layers = if data.len() == layer * self.desc.layers.max(1) as usize { self.desc.layers.max(1) } else { 1 };
         gpu.queue.write_texture(
             self.texture.as_image_copy(),
             data,
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(self.desc.width * texel), rows_per_image: None },
-            extent(self.desc.width, self.desc.height),
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(self.desc.width * texel), rows_per_image: Some(self.desc.height) },
+            wgpu::Extent3d { depth_or_array_layers: layers, ..extent(self.desc.width, self.desc.height) },
         );
     }
 
@@ -172,6 +221,16 @@ impl Texture {
         }
         Some(Frame { width: w, height: h, texel_size: texel, pixels })
     }
+}
+
+fn layer_view(texture: &wgpu::Texture, layer: u32) -> wgpu::TextureView {
+    texture.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::D2),
+        mip_level_count: Some(1),
+        base_array_layer: layer,
+        array_layer_count: Some(1),
+        ..Default::default()
+    })
 }
 
 pub(crate) fn extent(width: u32, height: u32) -> wgpu::Extent3d {

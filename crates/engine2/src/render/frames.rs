@@ -31,7 +31,9 @@ pub fn on_present(gpu: &render::Gpu, name: &str, n: u64, color: &render::Texture
     if let Some(dir) = &config.dir {
         let name = name.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
         let file = if config.last_only { dir.join(format!("{name}.ppm")) } else { dir.join(format!("{name}-{n:05}.ppm")) };
-        if let Err(e) = std::fs::create_dir_all(dir).and_then(|_| frame.write_ppm(&file)) {
+        // Written aside and renamed: a boot killed mid-write must not leave a truncated frame.
+        let partial = file.with_extension("ppm.partial");
+        if let Err(e) = std::fs::create_dir_all(dir).and_then(|_| frame.write_ppm(&partial)).and_then(|_| std::fs::rename(&partial, &file)) {
             abi::rt::log::log(abi::rt::log::Level::Warn, &format!("frame dump {}: {e}", file.display()));
         }
     }

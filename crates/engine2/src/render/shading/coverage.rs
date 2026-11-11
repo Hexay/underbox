@@ -34,8 +34,8 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
     let file = core.join("shaders").join(format!("{stem}.shader"));
     let (shader, kind) = if file.is_file() {
         (shaders::VfxShader::parse_file(&file, &includes), "program")
-    } else if standin::mapped(stem).is_some() {
-        (standin::shader(&includes), "stand-in")
+    } else if let Some(kind) = standin::mapped(stem) {
+        (standin::shader(kind.path(), &includes).expect("a stand-in key"), "stand-in")
     } else {
         return "placeholder: no source, not mapped".into();
     };

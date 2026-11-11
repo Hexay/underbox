@@ -9,9 +9,8 @@ use crate::scene::object;
 use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools as tools};
 use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
 use abi::{NativeRef, PtrHandle, RawPtr, Registry, bind, class};
-use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::{LazyLock, Mutex};
+use std::sync::Mutex;
 
 /// Copy `rect` of the context's colour (or depth) target into `dst` at its origin.
 fn copy_from_target(c: context::Ref, dst: texture::Ref, rect: Option<[u32; 4]>, depth: bool) -> bool {
@@ -45,7 +44,7 @@ fn blit_texture(c: context::Ref, src: texture::Ref, viewport: RenderViewport, sr
     let (Some(s), Some(d)) = (texture::resolve(src), texture::resolve(context::target(c).color)) else { return false };
     let (Some(a), Some(b)) = (s.gpu.as_ref(), d.gpu.as_ref()) else { return false };
     let f = b.desc.format;
-    let view_encodes = context::srgb_write(c) && !f.is_srgb() && f.target_component_alignment() == Some(1);
+    let view_encodes = context::srgb_write(c) && draw::srgb_write_encodes(f);
     let transfer = match (srgb_transfer, view_encodes) {
         (2, true) => Transfer::None,
         (2, false) => Transfer::Decode,
@@ -86,9 +85,11 @@ fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: Raw
     NativeRef::NULL
 }
 
-/// `DrawSkyBox`: the placeholder sky, behind everything already drawn.
-fn draw_sky_box(c: context::Ref, tint: Vector4) -> bool {
-    let Some(d) = crate::render::scene::execute::sky(model_draw::tint(tint)) else { return false };
+/// `DrawSkyBox`: the sky material's stand-in (or the placeholder), behind everything already drawn.
+fn draw_sky_box(c: context::Ref, attrs: crate::render::attributes::Ref, mode: crate::render::material_mode::Ref, tint: Vector4) -> bool {
+    let ctx_attrs = context::get(c).map(|x| x.attributes).unwrap_or_default();
+    let context = draw::shaded::ContextBindings { attributes: vec![attrs, ctx_attrs], ..Default::default() };
+    let Some(d) = crate::render::scene::execute::sky(model_draw::tint(tint), crate::render::material_mode::material(mode), immediate::view_proj(c), context) else { return false };
     immediate::submit(c, &[d]);
     true
 }
@@ -121,28 +122,6 @@ fn sampler(desc: abi::structs::CSamplerStateDesc) -> PtrHandle<abi::handle::Samp
     PtrHandle::new(i + 1)
 }
 
-/// Bindless indices handed out, by texture address, and the textures in index order.
-type Indices = (HashMap<usize, i32>, Vec<texture::Ref>);
-static INDICES: LazyLock<Mutex<Indices>> = LazyLock::new(Default::default);
-
-/// Bindless texture index: stable per texture for its lifetime.
-pub(crate) fn texture_view_index(t: texture::Ref) -> i32 {
-    if t.is_null() {
-        return -1;
-    }
-    let mut guard = INDICES.lock().unwrap();
-    let (by_addr, refs) = &mut *guard;
-    *by_addr.entry(t.addr()).or_insert_with(|| {
-        refs.push(t);
-        refs.len() as i32 - 1
-    })
-}
-
-/// The texture a bindless index managed put in a constant block names (the handle may be dead).
-pub fn texture_at_view_index(index: u32) -> Option<texture::Ref> {
-    INDICES.lock().unwrap().1.get(index as usize).copied()
-}
-
 fn light_probe_volume(mins: RawPtr<c_void>, maxs: RawPtr<c_void>, priority: RawPtr<c_void>) -> i32 {
     // SAFETY: managed passes two Vector3s and an int it hasn't initialised (ReadLightProbeVolume).
     unsafe {
@@ -166,7 +145,7 @@ pub fn register(r: &mut Registry) {
     // TODO: the sRGB transfer flag; the blit draw writes linear values as they are.
     bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, srgb| blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb));
     bind!(r, tools::COPY_TEXTURE, |_, src, dst, r, dx, dy, _, _, _, _| copy_texture(src, dst, r, dx, dy));
-    bind!(r, tools::DRAW_SKY_BOX, |c, _attrs, _mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, tint));
+    bind!(r, tools::DRAW_SKY_BOX, |c, attrs, mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, attrs, mode, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
         let t = object::with(o, |s| Some(s.transform)).unwrap_or_else(crate::math::identity);
         immediate::draw_scene_object(c, o, t, crate::math::vec4(1.0, 1.0, 1.0, 1.0));
@@ -218,7 +197,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, _, _| {});
     bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, sampler);
     bind!(r, dev::GET_SAMPLER_INDEX, |h| h.value as i32 - 1);
-    bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, _, _| texture_view_index(t));
+    bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));
     bind!(r, dev::GET_SHEET_META_DATA_TEXTURE, || NativeRef::NULL);
     bind!(r, dev::GET_SHEET_INFO, |_| Vector4::default());
     bind!(r, dev::GET_SEQUENCE, |_, _| NativeRef::NULL);

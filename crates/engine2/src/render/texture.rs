@@ -13,6 +13,9 @@ pub type Ref = NativeRef<class::CTextureBase>;
 
 /// `RuntimeTextureSpecificationFlags.TSPEC_RENDER_TARGET`.
 const TSPEC_RENDER_TARGET: u32 = 0x0001;
+pub const TSPEC_CUBE_TEXTURE: u32 = 0x0020;
+const TSPEC_VOLUME_TEXTURE: u32 = 0x0040;
+pub const TSPEC_TEXTURE_ARRAY: u32 = 0x0080;
 
 pub struct Texture {
     pub name: String,
@@ -101,12 +104,15 @@ fn mem_size(c: &TextureCreationConfig_t) -> i32 {
     image::mem_required(c.m_n_width as i32, c.m_n_height as i32, c.m_n_depth as i32, Some(mips), c.m_n_image_format as i64)
 }
 
-/// The GPU side of a 2D texture, when a device exists and the format maps. Volumes, arrays and
-/// cubes stay CPU-only for now (TODO).
+/// The GPU side of a 2D, 2D array or cube texture, when a device exists and the format maps.
+/// Volumes stay CPU-only for now (TODO).
 fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8]) -> Option<render::Texture> {
     let gpu = device::gpu()?;
     let format = formats::to_wgpu(c.m_n_image_format)?;
-    if c.m_n_depth > 1 || c.m_n_width <= 0 || c.m_n_height <= 0 {
+    let cube = c.m_n_flags & TSPEC_CUBE_TEXTURE != 0;
+    let depth = c.m_n_depth.max(1) as u32;
+    let plain = c.m_n_flags & TSPEC_TEXTURE_ARRAY == 0 && !cube;
+    if c.m_n_flags & TSPEC_VOLUME_TEXTURE != 0 || (plain && depth > 1) || c.m_n_width <= 0 || c.m_n_height <= 0 {
         return None;
     }
     let desc = render::TextureDesc {
@@ -116,9 +122,11 @@ fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8]) -> Option<r
         format,
         mips: c.m_n_num_mip_levels.max(1) as u32,
         render_target: c.m_n_flags & TSPEC_RENDER_TARGET != 0 || format.is_depth_stencil_format(),
+        layers: if cube { depth * 6 } else { depth },
+        cube,
     };
     let texture = render::Texture::new(gpu, desc);
-    if texture.texel_size().is_some_and(|t| data.len() == (t * texture.desc.width * texture.desc.height) as usize) {
+    if texture.layer_size().is_some_and(|l| data.len() == l || data.len() == l * texture.desc.layers as usize) {
         texture.upload(gpu, data);
     }
     Some(texture)

@@ -5,7 +5,11 @@
 use super::layer::{self, Kind, flags, layer_type};
 use super::view::{self, SceneView};
 use crate::handles::Kind as ObjectKind;
+use crate::mesh::layout::{Field, Layout};
+use crate::render::draw::shaded::{self, ContextBindings};
 use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
+use crate::render::material::Material;
+use crate::render::shading::bind::Instance;
 use crate::render::lighting::{Lighting, local_shadow, shadow};
 use crate::render::{context, device, texture};
 use crate::scene::object;
@@ -18,19 +22,49 @@ use render::{BufferKind, Placeholder, RasterState, Semantic};
 use std::sync::{Arc, OnceLock};
 
 use crate::scene::object::IS_OPAQUE;
-/// Placeholder sky colour, times the sky object's tint. TODO: the sky material.
-const SKY: [f32; 4] = [0.45, 0.6, 0.85, 1.0];
+/// Placeholder sky colour (linear; sRGB (0.45, 0.6, 0.85)), times the sky object's tint. TODO: the sky material.
+const SKY: [f32; 4] = [0.170_645, 0.318_547, 0.692_071, 1.0];
 
 /// Clear, sky and one opaque layer: what a view gets when managed adds no layers (no managed
 /// pipeline, as in tests, or a pipeline that declined).
+/// Like native's pipeline, they draw linear into an HDR target and resolve it to the view's
+/// colour with the sRGB encode.
 pub fn default_layers(v: view::Ref, clear_flags: i32, clear_color: abi::structs::Vector4) {
     let Some(view) = view::get(v) else { return };
     let vp = view.viewport;
-    let clear = view::add_layer(v, layer::create(v, "Clear".into(), vp, Kind::Clear(clear_flags), 0, 0), Default::default());
+    let hdr = hdr_target(view.color);
+    let add = |name: &str, kind: Kind, required: i64| {
+        let l = view::add_layer(v, layer::create(v, name.into(), vp, kind, required, 0), Default::default());
+        if !hdr.is_null() {
+            layer::set_output(l, hdr, view.depth);
+        }
+        l
+    };
+    let clear = add("Clear", Kind::Clear(clear_flags), 0);
     layer::with(clear, |s| s.clear_color = clear_color);
-    let sky = view::add_layer(v, layer::create(v, "Sky".into(), vp, Kind::Render(StringToken::of("Forward")), 0, 0), Default::default());
+    let sky = add("Sky", Kind::Render(StringToken::of("Forward")), 0);
     layer::with(sky, |s| s.match_id = StringToken::of("SkyBox").0);
-    view::add_layer(v, layer::create(v, "Opaque".into(), vp, Kind::Render(StringToken::of("Forward")), IS_OPAQUE, 0), Default::default());
+    add("Opaque", Kind::Render(StringToken::of("Forward")), IS_OPAQUE);
+    if !hdr.is_null() {
+        let resolve = Kind::Blit { src: hdr, src_viewport: vp, srgb: true };
+        let l = view::add_layer(v, layer::create(v, "ResolveHDRToFinalSDR".into(), vp, resolve, 0, 0), Default::default());
+        layer::set_output(l, view.color, texture::Ref::default());
+    }
+}
+
+/// An `RGBA16161616F` target the size of `color`, one per size for the process; null without a
+/// GPU colour target.
+fn hdr_target(color: texture::Ref) -> texture::Ref {
+    static TARGETS: std::sync::Mutex<Vec<((u32, u32), texture::Ref)>> = std::sync::Mutex::new(Vec::new());
+    let Some(size) = texture::resolve(color).and_then(|t| t.gpu.as_ref().map(|g| (g.desc.width, g.desc.height))) else { return texture::Ref::default() };
+    let mut targets = TARGETS.lock().unwrap();
+    if let Some((_, t)) = targets.iter().find(|(s, _)| *s == size) {
+        return *t;
+    }
+    const RGBA16161616F: i32 = 24;
+    let t = texture::create_target("underbox_hdr_color", size.0, size.1, RGBA16161616F);
+    targets.push((size, t));
+    t
 }
 
 pub fn run(v: view::Ref) {
@@ -104,11 +138,13 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             let f: extern "C" fn(ManagedRenderSetup_t) = unsafe { std::mem::transmute::<usize, extern "C" fn(ManagedRenderSetup_t)>(callback) };
             f(setup(ctx, v, l, t.color));
         }
-        Kind::Blit { src, src_viewport: s } => {
+        Kind::Blit { src, src_viewport: s, srgb } => {
             let (Some(src), Some(dst)) = (texture::resolve(src), texture::resolve(t.color)) else { return };
             let (Some(a), Some(b)) = (src.gpu.as_ref(), dst.gpu.as_ref()) else { return };
             let rect = if s.m_n_width > 0 { [s.m_n_top_left_x as u32, s.m_n_top_left_y as u32, s.m_n_width as u32, s.m_n_height as u32] } else { [0, 0, a.desc.width, a.desc.height] };
-            draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport), render::Transfer::None);
+            let combo = crate::render::attributes::shader_value(layer.attributes, "D_SRGB_TRANSFER").map_or(0, |v| v.x as i32);
+            let transfer = draw::blit_transfer(srgb.then_some((a.desc.format, b.desc.format)), combo);
+            draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport), transfer);
         }
         Kind::Procedural(_) | Kind::Label => {}
     }
@@ -138,7 +174,8 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
         }
         if obj.kind == ObjectKind::SceneSkyBoxObject {
             if sky_layer {
-                draws.extend(sky(model_draw::tint(s.tint)));
+                let material = s.material_override.as_ref().and_then(|m| m.material());
+                draws.extend(sky(model_draw::tint(s.tint), material, view.view_proj, ContextBindings::default()));
             }
             continue;
         }
@@ -161,14 +198,21 @@ fn tags_pass(view: &SceneView, tags: &[u32]) -> bool {
     wanted && !tags.iter().any(|t| view.exclude_tags.contains(t))
 }
 
-/// A full-screen triangle at the far plane, behind everything drawn with depth.
-pub(crate) fn sky(tint: [f32; 4]) -> Option<Draw> {
+/// A full-screen triangle at the far plane, behind everything drawn with depth: the sky
+/// material's cube (the sky stand-in) when it has a live `SkyTexture`, else the flat placeholder.
+pub(crate) fn sky(tint: [f32; 4], material: Option<Arc<Material>>, view_proj: Mat4, context: ContextBindings) -> Option<Draw> {
     static TRIANGLE: OnceLock<Arc<render::Buffer>> = OnceLock::new();
     let gpu = device::gpu()?;
     let p: [f32; 9] = [-1.0, -1.0, 1.0, 3.0, -1.0, 1.0, -1.0, 3.0, 1.0];
     let bytes: Vec<u8> = p.iter().flat_map(|f| f.to_le_bytes()).collect();
     let vertices = TRIANGLE.get_or_init(|| Arc::new(render::Buffer::with_data(gpu, "sky", BufferKind::Vertex, &bytes))).clone();
-    let tint = std::array::from_fn(|i| SKY[i] * tint[i]);
+    let shaded = material.filter(|m| has_sky_texture(m)).and_then(|m| {
+        let layout = Layout { name: "sky".into(), stride: 12, fields: vec![Field { semantic: "position".into(), index: 0, format: crate::mesh::layout::format::RGB32F, offset: 0 }] };
+        let mut s = shaded::resolve(m, &layout, Instance { world: Mat4::IDENTITY, tint }, view_proj, context)?;
+        s.values.insert("g_vSkyTint".into(), glam::Vec4::from_array(tint));
+        Some(s)
+    });
+    let flat = std::array::from_fn(|i| SKY[i] * tint[i]);
     Some(Draw {
         vertices,
         vertex_offset: 0,
@@ -177,8 +221,13 @@ pub(crate) fn sky(tint: [f32; 4]) -> Option<Draw> {
         range: 0..3,
         base_vertex: 0,
         instances: 1,
-        uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::from_translation(Vec3::ZERO), tint },
+        uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::from_translation(Vec3::ZERO), tint: flat },
         state: RasterState { depth_write: false, ..Default::default() },
-        shaded: None,
+        shaded,
     })
+}
+
+fn has_sky_texture(m: &Material) -> bool {
+    use crate::resource::Resource as _;
+    m.shading_params().0.get("SkyTexture").and_then(|t| texture::resolve(*t)).is_some_and(|t| !t.is_error() && t.gpu.is_some())
 }
