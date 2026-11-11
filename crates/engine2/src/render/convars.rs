@@ -11,6 +11,9 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("volume_fog_width", "240"),
     ("volume_fog_height", "160"),
     ("volume_fog_depth", "64"),
+    ("r_max_anisotropy", "4"),
+    ("r_texture_stream_max_resolution", "-1"),
+    ("r_texture_stream_resolution_bias_min", "1.0"),
 ];
 
 /// Define every render convar (once per process); managed sees them after [`convar::announce_all`].
@@ -32,6 +35,11 @@ pub fn volume_fog_enabled() -> bool {
     int("r_enable_volume_fog").is_none_or(|v| v != 0)
 }
 
+/// `r_max_anisotropy` as a wgpu clamp: 1 turns anisotropic filtering off, wgpu caps it at 16.
+pub fn max_anisotropy() -> u16 {
+    int("r_max_anisotropy").map_or(4, |v| v.clamp(1, 16) as u16)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -41,5 +49,6 @@ mod tests {
         define();
         assert_eq!(int("volume_fog_width"), Some(240));
         assert!(volume_fog_enabled());
+        assert_eq!(max_anisotropy(), 4);
     }
 }

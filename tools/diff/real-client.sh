@@ -1,6 +1,7 @@
 #!/bin/sh
 # Boot Facepunch's real engine2 client on a corpus scene under Xvfb + lavapipe and grab the window.
-# usage: tools/diff/real-client.sh <corpus> <out-dir> [max-s=240] [artifact-root]
+# usage: [MANAGED=1] tools/diff/real-client.sh <corpus> <out-dir> [max-s=240] [artifact-root]
+# MANAGED=1 draws through managed's scene renderer (+r_managed_scene 1), as tools/client-frame.sh.
 # Waits for `game.load success`, then GRACE (default 20) s, then grabs Xvfb's framebuffer every
 # second until SETTLE (default 4) grabs in a row are identical; writes <out-dir>/frame.xwd plus
 # client.out and client.log. See docs/differential.md ("Rendering").
@@ -18,6 +19,7 @@ GRACE=${GRACE:-20}
 SETTLE=${SETTLE:-4}
 SIZE=${SIZE:-1024x768}
 PROJ=$ROOT/corpus/$CORPUS/.sbproj
+if [ "${MANAGED:-}" = 1 ]; then set -- +r_managed_scene 1; else set --; fi
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "")
 rm -rf "$OUT"; mkdir -p "$OUT/fb"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
@@ -37,7 +39,7 @@ LOG=$GAME/logs/dotnet.log
 rm -f "$LOG"
 (cd "$GAME" && DISPLAY=$D SDL_VIDEO_DRIVER=x11 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json \
     ALSA_CONFIG_PATH="$OUT/asound.conf" timeout -s TERM -k 10 "$SECS" \
-    dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" > "$OUT/client.out" 2>&1) &
+    dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1) &
 CLIENT=$!
 
 grab() {

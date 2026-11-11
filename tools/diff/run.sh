@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run one server-side scenario on our engine2 and on Facepunch's, then rank the divergences.
 # usage: tools/diff/run.sh <probe|orbmatch|sweeper|zoo> [both|ours|real] [tol=0.5]
-#        tools/diff/run.sh frame <corpus> [both|ours|real]   (a client frame, tools/diff/frame.sh)
+#        [MANAGED=1] tools/diff/run.sh frame <corpus> [both|ours|real]   (a client frame, tools/diff/frame.sh)
 # Logs: target/diff/<scenario>/{ours,real}.log; report: target/diff/<scenario>/report.txt.
 # Real engine2 comes from UNDERBOX_REAL_ENGINE2, else the newest download in $REAL_ENGINE2_CACHE.
 # zoo needs SANDBOX=<Facepunch/sandbox checkout>.

@@ -222,7 +222,9 @@ same packages and miss the same package models. Differences:
 `run.sh frame` boots both clients on a corpus scene at 1024×768 on lavapipe. Real needs two of its
 own switches: `-nosteam` (else it waits forever for a Steam client) and `-vulkan_allow_cpu` (else
 "No usable Vulkan physical devices were found": it skips CPU device types). Its window sits at
-the origin of a screen-sized Xvfb; four identical grabs one second apart count as settled. Ours is
+the origin of a screen-sized Xvfb; four identical grabs one second apart count as settled. `MANAGED=1` runs both
+through managed's scene renderer (`+r_managed_scene 1`) into `target/diff/frame/<corpus>-managed`,
+for divergences only the managed path shows. Ours is
 seeded with real's compiled core textures and materials (`.vtex_c`, `.vmat_c`; shaders stay each
 engine's own), since sbox-public ships none of core's images. Both pin shadow quality High and
 volumetric fog Off (`FOG_QUALITY`, the auto-detected Low preset's level; the goldens pin High); the
@@ -268,11 +270,15 @@ Ranked divergences:
    with a seam at x ≈ 375 between two faces of a skybox box. Not the fog constants: the skybox's
    child view took the camera's ambient colour (and, with none, the stand-in's fallback sun).
    Real lights it with the skybox world's own lights only, so a skybox without one is black under
-   its fog (`render/scene/skybox.rs`, `Lighting::of_worlds`).
+   its fog (`render/scene/skybox.rs`, `Lighting::of_worlds`). The managed path keeps a seam at
+   x ≈ 365 and that is correct: Sandbox.SceneRenderer binds every lighting block itself and gives
+   its skybox system the main world's ambient (`RenderSystem.Skybox.cs`, `ViewSpace.Lighting`) and
+   no sun, so the two skybox boxes show their tints. Real under `MANAGED=1 run.sh frame outdoor`
+   draws the same seam: 0.11 / 0.13 / 0.16, SSIM 0.9994.
 7. **Fixed. Minification.** Grid lines were black on ours: ours uploaded mip 0 only. Compiled
    textures now upload every stored mip (`compiled/texture.rs`), and a vfx `Filter( ANISO )`
-   sampler without a managed state gets anisotropy 4, the Low profile's `r_max_anisotropy`
-   (`shading/defaults.rs`; mips alone left far lines too bright). Mean luma of showroom's grid
+   sampler without a managed state gets `r_max_anisotropy` (`shading/defaults.rs`; real's
+   default and the Low profile's are both 4; mips alone left far lines too bright). Mean luma of showroom's grid
    line pixels, ours/real: near floor 35.7/43.3 → 43.5/43.3, far floor 75.6/78.6 → 78.9/78.6.
 8. **Low. Banding.** Concentric rings in the diff around light pools are 1-LSB offsets: along a
    gradient both frames step through the same number of levels (no dithering on real), with
@@ -295,10 +301,11 @@ scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
 - **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
-- **Rendering (4, 8):** the HUD probe. The texture quality group's convars
-  (`r_texture_stream_*`, `r_max_anisotropy`) live in real's rendersystem and aren't defined yet;
-  managed warns once and skips them. Define them, then read `r_max_anisotropy` instead of the
-  fixed 4. The froxel grid stays 96×56×64 whatever `volume_fog_*` say. Content: compile project
+- **Rendering (4, 8):** the HUD probe. `render/convars.rs` now defines the texture quality
+  group's convars with real's defaults (`r_max_anisotropy` 4, `r_texture_stream_max_resolution`
+  -1, `r_texture_stream_resolution_bias_min` 1.0). Nothing reads the streaming two yet, and
+  managed sampler states don't clamp to `r_max_anisotropy` yet (`render/samplers.rs`), though
+  real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say. Content: compile project
   `.vmat` for real (glass), make the fixture `.vmdl_c` pass real's schema (skinned), read real's
   compiled `.vmdl_c` on ours.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.
