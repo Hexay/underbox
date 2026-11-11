@@ -42,10 +42,6 @@ fn y_to_z() -> Pose {
     Pose::from_parts(Vector::ZERO, Rotation::from_rotation_x(std::f32::consts::FRAC_PI_2))
 }
 
-/// Sensors also see static and keyframed bodies; solid pairs only matter with a dynamic body.
-fn collision_types(sensor: bool) -> ActiveCollisionTypes {
-    if sensor { ActiveCollisionTypes::all() } else { ActiveCollisionTypes::default() }
-}
 
 impl Shape {
     /// The collider for this shape; `None` for a degenerate hull or mesh.
@@ -86,9 +82,12 @@ impl Shape {
 
 impl World {
     /// Mass comes from the shape's [`ShapeMeta`] density (see `mass.rs`), so colliders are massless.
+    /// Triggers keep rapier's default pair types too: only a pair with a dynamic body reports, as
+    /// native. A keyframed or static collider resting in a static trigger stays silent; sbox-walker's
+    /// map relies on it (`contacts_tests::static_trigger_*`).
     pub fn add_shape(&mut self, body: RigidBodyHandle, shape: &Shape, surface: Surface) -> Option<ColliderHandle> {
         let hooks = ActiveHooks::FILTER_CONTACT_PAIRS | ActiveHooks::FILTER_INTERSECTION_PAIR;
-        let collider = shape.collider(surface)?.density(0.0).active_hooks(hooks).active_collision_types(collision_types(surface.trigger));
+        let collider = shape.collider(surface)?.density(0.0).active_hooks(hooks).active_collision_types(ActiveCollisionTypes::default());
         self.body(body)?;
         let id = self.raw_mut().insert_collider(collider, Some(body));
         self.meta.insert(id, ShapeMeta::default());
@@ -113,7 +112,6 @@ impl World {
     pub fn set_trigger(&mut self, id: ColliderHandle, trigger: bool) {
         if let Some(c) = self.shape_mut(id) {
             c.set_sensor(trigger);
-            c.set_active_collision_types(collision_types(trigger));
         }
     }
 
