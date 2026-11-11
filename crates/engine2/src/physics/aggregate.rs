@@ -5,7 +5,7 @@
 use super::{body, joint, shape, world};
 use crate::handles::{Handle, Kind};
 use crate::math::{quat, v3};
-use crate::model::physics::data::{JointDesc, Part, PhysicsData};
+use crate::model::physics::data::{Indices, JointDesc, Part, PhysicsData};
 use abi::structs::{PhysicsBodySettings, PhysicsShapeSettings, Transform};
 use abi::{HandleId, NativeRef, StringToken, class};
 use glam::Vec3;
@@ -59,28 +59,31 @@ fn body_settings(p: &Part) -> PhysicsBodySettings {
     }
 }
 
-fn shape_settings(data: &PhysicsData, p: &Part) -> PhysicsShapeSettings {
+/// A shape's settings: its part's collision tags, and the surface its `ids` name (unknown: the
+/// default surface).
+fn shape_settings(data: &PhysicsData, p: &Part, ids: Indices) -> PhysicsShapeSettings {
     let mut tags = [0u32; 16];
     let attribute = data.attributes.get(usize::from(p.collision_attribute)).cloned().unwrap_or_default();
     for (slot, tag) in tags.iter_mut().zip(attribute) {
         *slot = StringToken::of(&tag).0;
     }
-    PhysicsShapeSettings { tags, friction: -1.0, elasticity: -1.0, surface_index: -1, collision_function_mask: u32::from(physics::function::DEFAULT), ..Default::default() }
+    let surface_index = usize::try_from(ids.surface).ok().and_then(|i| data.surfaces.get(i)).copied().unwrap_or(-1);
+    PhysicsShapeSettings { tags, friction: -1.0, elasticity: -1.0, surface_index, collision_function_mask: u32::from(physics::function::DEFAULT), ..Default::default() }
 }
 
 fn add_shapes(b: body::Ref, data: &PhysicsData, p: &Part) {
     let s = &p.shapes;
-    let add = |kind, geometry| {
-        shape::add(b, kind, geometry, shape_settings(data, p));
+    let add = |kind, geometry, ids| {
+        shape::add(b, kind, geometry, shape_settings(data, p, ids));
     };
     let pv = |v: Vec3| physics::Vector::new(v.x, v.y, v.z);
-    s.spheres.iter().for_each(|x| add(shape::Type::Sphere, Shape::Sphere { center: pv(x.center), radius: x.radius }));
-    s.capsules.iter().for_each(|x| add(shape::Type::Capsule, Shape::Capsule { a: pv(x.a), b: pv(x.b), radius: x.radius }));
-    s.hulls.iter().for_each(|x| add(shape::Type::Hull, Shape::Hull { pose: Pose::IDENTITY, points: x.hull.vertices.iter().copied().map(pv).collect() }));
+    s.spheres.iter().for_each(|x| add(shape::Type::Sphere, Shape::Sphere { center: pv(x.center), radius: x.radius }, x.ids));
+    s.capsules.iter().for_each(|x| add(shape::Type::Capsule, Shape::Capsule { a: pv(x.a), b: pv(x.b), radius: x.radius }, x.ids));
+    s.hulls.iter().for_each(|x| add(shape::Type::Hull, Shape::Hull { pose: Pose::IDENTITY, points: x.hull.vertices.iter().copied().map(pv).collect() }, x.ids));
     for x in &s.meshes {
         let mesh = Shape::Mesh { vertices: x.vertices.iter().copied().map(pv).collect(), triangles: x.triangles.clone() };
         let slots = if x.materials.is_empty() { Vec::new() } else { data.surfaces.clone() };
-        shape::add_with_slots(b, shape::Type::Mesh, mesh, shape_settings(data, p), x.materials.clone(), slots);
+        shape::add_with_slots(b, shape::Type::Mesh, mesh, shape_settings(data, p, x.ids), x.materials.clone(), slots);
     }
 }
 
@@ -96,6 +99,7 @@ fn joint_settings(j: &JointDesc) -> Option<Joint> {
         3 => JointKind::Revolute,
         6 => JointKind::Weld,
         7 => JointKind::Spring,
+        16 => JointKind::Wheel,
         _ => return None,
     };
     let x_to_z = |t: Transform| {
@@ -113,7 +117,33 @@ fn joint_settings(j: &JointDesc) -> Option<Joint> {
     if j.override_friction {
         s.friction = j.friction;
     }
+    if kind == JointKind::Wheel {
+        s.wheel = wheel(j);
+    }
     Some(s)
+}
+
+/// A wheel's suspension slides and steers about the (twist) axis and spins about frame X: the
+/// linear spring and limit are the suspension's, the twist limit and angular spring steer, and
+/// the angular motor's X spins.
+fn wheel(j: &JointDesc) -> physics::Wheel {
+    physics::Wheel {
+        suspension: j.linear_frequency > 0.0,
+        suspension_hertz: j.linear_frequency,
+        suspension_damping: j.linear_damping_ratio,
+        suspension_limit: j.enable_linear_limit,
+        suspension_limits: j.linear_limit,
+        spin_motor: j.enable_angular_motor,
+        spin_speed: j.angular_target_velocity.vec.x,
+        max_spin_torque: j.max_torque,
+        steering: j.angular_frequency > 0.0 || j.enable_twist_limit,
+        steering_hertz: j.angular_frequency,
+        steering_damping: j.angular_damping_ratio,
+        max_steering_torque: if j.max_torque > 0.0 && !j.enable_angular_motor { j.max_torque } else { f32::MAX },
+        steering_limit: j.enable_twist_limit,
+        steering_limits: j.twist_limit,
+        target_steering: j.angular_target_angle,
+    }
 }
 
 pub fn create(world_ref: world::Ref, data: Arc<PhysicsData>, start: Transform, motion: i64) -> HandleId<class::IPhysAggregateInstance> {

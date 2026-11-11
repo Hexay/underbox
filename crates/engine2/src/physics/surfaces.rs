@@ -118,9 +118,19 @@ pub fn register(r: &mut Registry) {
     bind!(r, props::UPDATE_PHYSICS, |p, friction, elasticity, density, rolling_resistance, bounce_threshold| {
         update(p, Physical { friction, elasticity, density, rolling_resistance, bounce_threshold })
     });
-    // Live shapes keep the values they were made with; new shapes see the update.
-    // TODO: push reloaded surface physics into existing shapes.
-    bind!(r, sys::UPDATE_SURFACE_PROPERTIES, |_| {});
+    // `UpdatePhysics` only records; this pushes the surface into live shapes that inherit from it.
+    bind!(r, sys::UPDATE_SURFACE_PROPERTIES, reapply);
+}
+
+fn reapply(p: Props) {
+    if let Some(i) = objects::get::<_, Index>(p) {
+        super::shape::reapply_surface(i.0 as i32);
+    }
+}
+
+/// Surface `index`'s name.
+pub fn name(index: i32) -> Option<String> {
+    SURFACES.read().unwrap().get(usize::try_from(index).ok()?).map(|e| e.name.clone())
 }
 
 #[cfg(test)]
@@ -144,5 +154,35 @@ mod tests {
         assert_eq!(object(i), rock);
         assert_eq!(physical(-1), None);
         assert_eq!(physical(0), Some(Physical::default()));
+    }
+
+    #[test]
+    fn surface_reloads_reach_shapes_that_inherit_them() {
+        use super::super::{body, shape, world};
+        crate::handles::fake_managed();
+        let w: world::Ref = objects::create_shared(std::sync::Arc::new(world::PhysicsWorld::default()));
+        let b = body::spawn(w, physics::BodyType::Static, physics::Pose::IDENTITY, &Default::default()).unwrap();
+        let ice = add("test_ice", "default", "");
+        update(ice, Physical { friction: 0.5, elasticity: 0.2, ..Physical::default() });
+        let ball = || physics::Shape::Sphere { center: physics::Vector::ZERO, radius: 1.0 };
+        let settings = |friction| abi::structs::PhysicsShapeSettings { friction, elasticity: -1.0, surface_index: -1, ..Default::default() };
+        let add_ref = |friction| {
+            shape::add(b, shape::Type::Sphere, ball(), settings(friction));
+            body::get(b).unwrap().shapes.lock().unwrap().last().copied().unwrap()
+        };
+        let (inherits, fixed) = (add_ref(-1.0), add_ref(0.9));
+        let friction = |s| shape::with_collider(s, |c| c.friction());
+        for s in [inherits, fixed] {
+            shape::set_surface(s, by_hash(StringToken::of("test_ice").0).unwrap());
+        }
+        assert_eq!((friction(inherits), friction(fixed)), (0.5, 0.9));
+        assert_eq!(shape::surface_name(inherits), "test_ice");
+        update(ice, Physical { friction: 0.1, elasticity: 0.2, ..Physical::default() });
+        assert_eq!(friction(inherits), 0.5, "UpdatePhysics alone only records");
+        reapply(ice);
+        assert_eq!((friction(inherits), friction(fixed)), (0.1, 0.9));
+        assert_eq!(shape::with_collider(fixed, |c| c.restitution()), 0.2, "elasticity still inherited");
+        shape::set_physical(fixed, false, -1.0);
+        assert_eq!(friction(fixed), 0.1, "-1 reverts to the surface");
     }
 }

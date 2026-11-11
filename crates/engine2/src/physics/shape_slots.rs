@@ -1,7 +1,8 @@
 //! `IPhysicsShape`'s slots and `IPhysicsBody.Add*Shape`.
 
 use super::body;
-use super::shape::{Type, add, get, remove, toggle_tag, update, update_meta, with_collider, with_meta, with_sim, with_state};
+use super::shape::{Type, add, add_with_slots, get, remove, set_physical, set_surface, slot_surfaces, surface_name, toggle_tag, update, update_meta, with_collider, with_meta, with_sim, with_state};
+use super::surfaces::by_hash;
 use crate::math::{from_vec, to_rot, to_vec};
 use crate::model::physics::part_slots::{hull_of, mesh_of};
 use abi::slots::{i_physics_body as b, i_physics_shape as s};
@@ -29,6 +30,13 @@ fn hull_points(points: Vec<physics::Vector>) -> Geometry {
     Geometry::Hull { pose: physics::Pose::from_parts(physics::Vector::ZERO, physics::Rotation::IDENTITY), points }
 }
 
+fn triangle_count(g: &Geometry) -> Option<usize> {
+    match g {
+        Geometry::Mesh { triangles, .. } => Some(triangles.len()),
+        _ => None,
+    }
+}
+
 fn bbox((mins, maxs): (physics::Vector, physics::Vector)) -> BBox {
     BBox { mins: from_vec(mins), maxs: from_vec(maxs) }
 }
@@ -44,8 +52,13 @@ pub fn register(r: &mut Registry) {
         add(body, Type::Hull, Geometry::Box { center: to_vec(center), rotation: to_rot(rotation), half_extents: to_vec(half) }, settings)
     });
     bind!(r, b::ADD_HULL_SHAPE, |body, position, rotation, points, settings| add(body, Type::Hull, hull(position, rotation, points), settings));
-    // TODO: per-triangle surfaces (material count + surface indices in settings).
-    bind!(r, b::ADD_MESH_SHAPE, |body, vertices, indices, _materials, settings| add(body, Type::Mesh, mesh(vertices, indices), settings));
+    // Raw meshes carry no per-triangle materials: every triangle is slot 0.
+    bind!(r, b::ADD_MESH_SHAPE, |body, vertices, indices, _materials, settings| {
+        let slots = slot_surfaces(&settings);
+        let geometry = mesh(vertices, indices);
+        let triangles = if slots.is_empty() { Vec::new() } else { triangle_count(&geometry).map_or(Vec::new(), |n| vec![0; n]) };
+        add_with_slots(body, Type::Mesh, geometry, settings, triangles, slots)
+    });
     bind!(r, b::ADD_HULL_SHAPE_1, |body, h, xform, settings| {
         let points = hull_of(h.as_raw(), |x| placed(&x.vertices, xform));
         add(body, Type::Hull, hull_points(points), settings)
@@ -54,10 +67,10 @@ pub fn register(r: &mut Registry) {
         let points = mesh_of(m.as_raw(), |x| placed(&x.vertices, xform));
         add(body, Type::Hull, hull_points(points), settings)
     });
-    // TODO: per-triangle surfaces, as ADD_MESH_SHAPE.
+    // Each triangle's material slot picks one of `settings`' slot surfaces (managed `CreationSurfaces`).
     bind!(r, b::ADD_MESH_SHAPE_1, |body, m, xform, _materials, settings| {
-        let (vertices, triangles) = mesh_of(m.as_raw(), |x| (placed(&x.vertices, xform), x.triangles.clone()));
-        add(body, Type::Mesh, Geometry::Mesh { vertices, triangles }, settings)
+        let (vertices, triangles, materials) = mesh_of(m.as_raw(), |x| (placed(&x.vertices, xform), x.triangles.clone(), x.materials.clone()));
+        add_with_slots(body, Type::Mesh, Geometry::Mesh { vertices, triangles }, settings, materials, slot_surfaces(&settings))
     });
     bind!(r, b::REMOVE_SHAPE, remove);
     bind!(r, b::PURGE_SHAPES, |body| {
@@ -83,8 +96,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::SET_IGNORE_TRACES, |r, v| with_state(r, |st| st.ignore_traces = v));
     bind!(r, s::SET_LOCAL_VELOCITY, |r, v| with_state(r, |st| st.local_velocity = v));
     bind!(r, s::GET_LOCAL_VELOCITY, |r| with_state(r, |st| st.local_velocity));
-    // TODO: surface properties (materials) once the surface-property controller exists.
-    bind!(r, s::SET_MATERIAL_INDEX, |_, _| {});
+    bind!(r, s::SET_MATERIAL_INDEX, |r, name: abi::StringToken| set_surface(r, by_hash(name.0).unwrap_or(-1)));
     // Managed sets a mesh's per-slot surfaces (`PhysicsShape.Surfaces`); slot 0 is also the shape's own.
     bind!(r, s::SET_SURFACE_INDEX, |r, index, slot| with_state(r, |st| {
         if slot <= 0 {
@@ -94,13 +106,13 @@ pub fn register(r: &mut Registry) {
             st.set_slot_surface(slot, index);
         }
     }));
-    bind!(r, s::GET_MATERIAL_NAME, |_| StrRet::from("default"));
+    bind!(r, s::GET_MATERIAL_NAME, |r| StrRet::from(surface_name(r)));
 
     bind!(r, s::SET_TRIGGER, |r, v| with_sim(r, |sim, id| sim.set_trigger(id, v)));
     bind!(r, s::IS_TRIGGER, |r| with_collider(r, |c| c.is_sensor()));
-    bind!(r, s::SET_FRICTION, |r, v| with_collider(r, |c| c.set_friction(v)));
+    bind!(r, s::SET_FRICTION, |r, v| set_physical(r, false, v));
     bind!(r, s::GET_FRICTION, |r| with_collider(r, |c| c.friction()));
-    bind!(r, s::SET_ELASTICITY, |r, v| with_collider(r, |c| c.set_restitution(v)));
+    bind!(r, s::SET_ELASTICITY, |r, v| set_physical(r, true, v));
     bind!(r, s::SET_ROLLING_RESISTANCE, |_, _| {});
     bind!(r, s::SET_HAS_NO_MASS, |r, v| update_meta(r, |m| m.massless = v));
     bind!(r, s::IS_TOUCHING, |r, other, triggers| {

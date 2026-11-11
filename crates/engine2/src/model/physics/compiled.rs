@@ -141,4 +141,8 @@ pub fn load(path: &str) -> Option<Arc<PhysicsData>> {
 
 pub fn register(r: &mut Registry) {
     bind!(r, glue::GET_PHYSICS, |path: Option<&CStr>, _: Guid| data_slots::handle(path.and_then(|p| load(&p.to_string_lossy())).as_ref()));
+    // Real engine2 only finds resources already loaded; loading on demand answers the same.
+    bind!(r, abi::slots::g_p_physics_system::GET_AGGREGATE_DATA, |name: Option<&CStr>| {
+        data_slots::handle(name.and_then(|p| load(&p.to_string_lossy())).as_ref())
+    });
 }

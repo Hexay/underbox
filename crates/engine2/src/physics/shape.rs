@@ -6,7 +6,8 @@ use crate::handles::{Handle, Kind};
 use abi::structs::PhysicsShapeSettings;
 use abi::{HandleId, NativeRef, StringToken, class};
 use physics::{Shape as Geometry, ShapeId, ShapeMeta, Surface};
-use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
+use std::sync::{Arc, LazyLock, Mutex};
 
 pub type Ref = NativeRef<class::IPhysicsShape>;
 
@@ -34,6 +35,8 @@ pub struct State {
     /// Mesh shapes: each triangle's material slot, and each slot's surface (`SetSurfaceIndex`).
     pub triangle_slots: Vec<u8>,
     pub slot_surfaces: Vec<i32>,
+    /// Friction and elasticity came from the surface (settings below zero), so follow its reloads.
+    pub inherits: (bool, bool),
 }
 
 impl State {
@@ -97,11 +100,24 @@ pub fn update_meta<R: Default>(r: Ref, f: impl FnOnce(&mut ShapeMeta) -> R) -> R
     })
 }
 
-/// Settings values below zero mean "the surface's" (`surface_index`, else `default`).
+/// The surface a shape's physics come from: `surface_index` if it names one, else `default` (0).
+fn resolved(surface_index: i32) -> i32 {
+    if super::surfaces::physical(surface_index).is_some() { surface_index } else { 0 }
+}
+
+/// Settings values below zero mean "the surface's" (see [`resolved`]).
 fn surface(settings: &PhysicsShapeSettings) -> Surface {
-    let fallback = super::surfaces::physical(settings.surface_index).or_else(|| super::surfaces::physical(0)).unwrap_or_default();
+    let fallback = super::surfaces::physical(resolved(settings.surface_index)).unwrap_or_default();
     let pick = |v: f32, d: f32| if v >= 0.0 { v } else { d };
     Surface { friction: pick(settings.friction, fallback.friction), elasticity: pick(settings.elasticity, fallback.elasticity), trigger: settings.flags & SENSOR != 0 }
+}
+
+/// Each material slot's surface (`SurfaceIndices`, -1 for the shape's own), as managed passes them.
+pub fn slot_surfaces(settings: &PhysicsShapeSettings) -> Vec<i32> {
+    let len = usize::try_from(settings.surface_count).unwrap_or(0);
+    let p = abi::RawPtr::<i32>::from_raw(settings.surface_indices as *mut i32);
+    // SAFETY: managed's `SurfaceIndices` points at `SurfaceCount` ints, pinned for the call.
+    unsafe { p.as_slice(len) }.to_vec()
 }
 
 fn meta(settings: &PhysicsShapeSettings) -> ShapeMeta {
@@ -131,9 +147,17 @@ pub fn add_with_slots(
         Some(shape)
     });
     let Some(id) = id else { return HandleId::new(-1) };
-    let state = State { ignore_traces: settings.flags & IGNORE_TRACES != 0, local_velocity: settings.surface_velocity, surface_index: settings.surface_index, triangle_slots, slot_surfaces };
+    let state = State {
+        ignore_traces: settings.flags & IGNORE_TRACES != 0,
+        local_velocity: settings.surface_velocity,
+        surface_index: settings.surface_index,
+        triangle_slots,
+        slot_surfaces,
+        inherits: (settings.friction < 0.0, settings.elasticity < 0.0),
+    };
     let shape = Arc::new(Shape { body: body_ref, id, kind, handle: Handle::default(), geometry: Mutex::new(geometry), state: Mutex::new(state) });
     let r: Ref = objects::create_shared(shape.clone());
+    LIVE.lock().unwrap().insert(r.addr());
     body::with_sim(body_ref, |sim, _| sim.shape_mut(id).map(|c| c.user_data = r.addr() as u128));
     if let Some(body) = body::get(body_ref) {
         body.shapes.lock().unwrap().push(r);
@@ -146,7 +170,55 @@ pub fn forget(r: Ref) {
     if let Some(shape) = get(r) {
         shape.handle.free();
     }
+    LIVE.lock().unwrap().remove(&r.addr());
     objects::destroy(r);
+}
+
+/// Every live shape, for surface reloads.
+static LIVE: LazyLock<Mutex<HashSet<usize>>> = LazyLock::new(Default::default);
+
+/// Give shapes that inherit surface `index`'s friction or elasticity its current values.
+pub fn reapply_surface(index: i32) {
+    let live: Vec<Ref> = LIVE.lock().unwrap().iter().map(|&a| Ref::from_raw(a as *mut _)).collect();
+    for r in live.into_iter().filter(|&r| with_state(r, |st| resolved(st.surface_index) == index)) {
+        apply_inherited(r);
+    }
+}
+
+/// Copy the shape's surface friction and elasticity into its collider where it inherits them.
+fn apply_inherited(r: Ref) {
+    let (inherits, own) = with_state(r, |st| (st.inherits, resolved(st.surface_index)));
+    let p = super::surfaces::physical(own).unwrap_or_default();
+    with_collider(r, |c| {
+        if inherits.0 {
+            c.set_friction(p.friction);
+        }
+        if inherits.1 {
+            c.set_restitution(p.elasticity);
+        }
+    });
+}
+
+/// `SetMaterialIndex`: the shape now uses surface `index` (unknown: `default`).
+pub fn set_surface(r: Ref, index: i32) {
+    with_state(r, |st| st.surface_index = index);
+    apply_inherited(r);
+}
+
+/// `SetFriction`/`SetElasticity` (`elasticity`); below zero reverts to the surface's value.
+pub fn set_physical(r: Ref, elasticity: bool, v: f32) {
+    let inherit = v < 0.0;
+    with_state(r, |st| if elasticity { st.inherits.1 = inherit } else { st.inherits.0 = inherit });
+    if inherit {
+        apply_inherited(r);
+    } else {
+        with_collider(r, |c| if elasticity { c.set_restitution(v) } else { c.set_friction(v) });
+    }
+}
+
+/// The name of the surface the shape uses.
+pub fn surface_name(r: Ref) -> String {
+    super::surfaces::name(with_state(r, |st| resolved(st.surface_index))).unwrap_or_default()
 }
 
 pub fn remove(body_ref: body::Ref, r: Ref) {

@@ -33,6 +33,51 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::APPLY_BUOYANCY_IMPULSE, |r, origin, normal, density, linear_drag, angular_drag, velocity, gravity, dt| {
         with_sim(r, |sim, id| sim.apply_buoyancy(id, to_vec(origin), to_vec(normal), density, linear_drag, angular_drag, to_vec(velocity), to_vec(gravity), dt))
     });
+    bind!(r, b::GET_SCRAPE_CONTACTS, |r, buffer: abi::RawPtr<std::ffi::c_void>, max: i32| {
+        let max = usize::try_from(max).unwrap_or(0);
+        let found = scrape_contacts(r, max);
+        // SAFETY: managed passes a pinned span of `max` ScrapeContacts.
+        let out = unsafe { buffer.cast::<ScrapeContact>().as_mut_slice(max) };
+        let n = found.len().min(out.len());
+        out[..n].copy_from_slice(&found[..n]);
+        n as i32
+    });
+}
+
+/// managed's `PhysicsBody3d.ScrapeContact` (sequential, 40 bytes).
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ScrapeContact {
+    pub other_body: i32,
+    pub point: [f32; 3],
+    pub normal: [f32; 3],
+    pub friction_force: f32,
+    pub self_surface: i32,
+    pub other_surface: i32,
+}
+const _: () = assert!(std::mem::size_of::<ScrapeContact>() == 40);
+
+/// Up to `max` of the body's sliding contacts, with each side's surface at the contact.
+pub fn scrape_contacts(r: super::body::Ref, max: usize) -> Vec<ScrapeContact> {
+    let found = with_sim(r, |sim, id| {
+        let user = |c| sim.shape(c).map_or(0, |c| c.user_data);
+        let scrapes = sim.scrape_contacts(id, max);
+        scrapes.into_iter().map(|s| (s, user(s.shape), user(s.other), sim.triangle_at(s.shape, s.point), sim.triangle_at(s.other, s.point))).collect::<Vec<_>>()
+    });
+    // A shape with no surface of its own uses `default` (0).
+    let surface = |ud, triangle| shape::get(shape::from_user_data(ud)).map_or(-1, |s| s.state.lock().unwrap().surface_at(triangle).max(0));
+    let other_body = |ud| shape::get(shape::from_user_data(ud)).and_then(|s| get(s.body)).map_or(-1, |b| b.handle.id::<abi::class::IPhysicsBody>().id);
+    found
+        .into_iter()
+        .map(|(s, mine, theirs, my_tri, their_tri)| ScrapeContact {
+            other_body: other_body(theirs),
+            point: s.point.to_array(),
+            normal: s.normal.to_array(),
+            friction_force: s.friction_force,
+            self_surface: surface(mine, my_tri),
+            other_surface: surface(theirs, their_tri),
+        })
+        .collect()
 }
 
 fn touching(a: shape::Ref, b: shape::Ref, triggers: bool) -> bool {

@@ -104,7 +104,12 @@ pub fn register(r: &mut Registry) {
     // Editor-only: Hammer's resource references and the Windows file picker.
     bind!(r, symbols::ADD_STRING, |_, _| {});
     bind!(r, windows::FIND_FILE, || StrRet::from(c""));
+    bind!(r, abi::slots::aggregate_glue::GET_MAX_FRAGMENT_COUNT, || MAX_AGGREGATE_FRAGMENTS);
 }
+
+/// The most fragments one `SceneAggregateObject` draws; managed splits map geometry and
+/// compiled scenes into aggregates of at most this many.
+pub const MAX_AGGREGATE_FRAGMENTS: i32 = 4096;
 
 #[cfg(test)]
 mod tests {

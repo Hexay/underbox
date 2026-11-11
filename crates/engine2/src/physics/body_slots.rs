@@ -100,7 +100,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::BUILD_BOUNDS, |r| with_sim(r, |sim, id| {
         sim.body_bounds(id).map(|(lo, hi)| BBox { mins: from_vec(lo), maxs: from_vec(hi) })
     }).unwrap_or_default());
-    bind!(r, b::SET_MATERIAL_INDEX, |_, _| {});
+    bind!(r, b::SET_MATERIAL_INDEX, |r, name: abi::StringToken| {
+        let surface = super::surfaces::by_hash(name.0).unwrap_or(-1);
+        let shapes = get(r).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
+        shapes.into_iter().for_each(|s| shape::set_surface(s, surface));
+    });
     bind!(r, b::SET_CONTACT_RECYCLING, |_, _| {});
     bind!(r, b::RESET_PROXY, |_| {});
 }
