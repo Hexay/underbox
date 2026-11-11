@@ -291,7 +291,7 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 1. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
    CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
-2. Volumetric fog (`IVolumetricFog`), gradient and cubemap fog, the fog's sky tint and sun lobe;
-   exposure adaptation over `Rate` (it snaps now); gizmo lines from GPU buffers.
+2. Fog's shadowed in-scattering, baked indirect and managed-path volume grid (docs/fog.md); `GetSheetInfo` and the shader
+   sheet path (`sheet_sampling.fxc` is a stub).
 3. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.

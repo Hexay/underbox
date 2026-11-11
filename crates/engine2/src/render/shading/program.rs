@@ -129,7 +129,8 @@ pub fn build_compute(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader,
 }
 
 fn parse_default(args: &str) -> Option<Vec4> {
-    let v: Vec<f32> = args.split(',').map(|s| s.trim().parse().ok()).collect::<Option<_>>()?;
+    // HLSL float literals may carry an `f` suffix (Fog.hlsl's `Default3( 1.0f, 1.0f, 1.0f )`).
+    let v: Vec<f32> = args.split(',').map(|s| s.trim().trim_end_matches(['f', 'F']).parse().ok()).collect::<Option<_>>()?;
     let at = |i: usize| v.get(i).copied().unwrap_or(0.0);
     (!v.is_empty()).then(|| Vec4::new(at(0), at(1), at(2), at(3)))
 }

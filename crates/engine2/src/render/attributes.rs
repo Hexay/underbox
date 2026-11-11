@@ -97,6 +97,13 @@ pub fn int(r: Ref, name: StringToken) -> Option<i32> {
     })
 }
 
+pub fn matrix(r: Ref, name: &str) -> Option<Matrix> {
+    on(r, |a| match a.get(Kind::Matrix, StringToken::of(name)) {
+        Some(Value::Matrix(m)) => Some(m),
+        _ => None,
+    })
+}
+
 pub fn pointer(r: Ref, name: StringToken) -> Option<usize> {
     on(r, |a| match a.get(Kind::Ptr, name) {
         Some(Value::Ptr(p)) if p != 0 => Some(p),

@@ -53,7 +53,8 @@ naga can't translate `MainGs`, so gizmo_line and gizmo_sprite are emulated:
 
 The camera's forward and up vectors (`g_vCameraDirWs`, `g_vCameraUpDirWs`) come from the
 view-projection. GPU repro: `sh tools/test.sh engine2 gizmo_tests` (line width and sprite size in
-pixels). Lines in GPU buffers (none in sbox-public's gizmo or DebugOverlay code) still draw 1 px.
+pixels). Bound-buffer and `RenderTools.Draw` gizmo lines take the same path, via read-back
+(`gizmo::expand_bound`).
 
 ## Render systems we don't have: what managed is told
 
@@ -61,7 +62,7 @@ pixels). Lines in GPU buffers (none in sbox-public's gizmo or DebugOverlay code)
 | --- | --- | --- |
 | `IRayTraceSceneWorld` build, `IsRayTracingSupported` | no-op, `false` | skips ray-traced effects |
 | `g_pSceneUtils` tonemap | auto exposure measured and applied as `g_flToneMapScalarLinear` (render/exposure.rs) | managed's tonemapping.shader applies the curve |
-| `g_pSceneUtils` volumetric fog | stores its parameters; not drawn | `SetParams` is called unguarded, so null isn't an option; analytic `Sandbox.Fog` is applied by the stand-in (shading/standin_fog.hlsl) |
+| `g_pSceneUtils` volumetric fog | froxels from `AddVolumetricFogVolume`, sampled through `volumetric_fog.fxc` | `SetParams` is called unguarded, so null isn't an option; see docs/fog.md |
 | `GetBestMultisampleType`, `IsUpscalerSupported`, `SupportsAsyncCompute` | 0 (none), `false`, `false` | single-sample targets, no upscaler, no async queue |
 | Texture web streaming | inactive, no requests, prefetch done | loads stay local |
 | Sprite sheets (`SheetSequence*`) | no frames | static textures |

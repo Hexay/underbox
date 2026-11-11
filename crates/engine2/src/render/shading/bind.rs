@@ -9,7 +9,7 @@ use super::program::{self, Layouts, Shading};
 use super::shadow_slots;
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting, shadow};
-use crate::render::{attributes, bindless, buffers as gpu_buffers, samplers, texture};
+use crate::render::{attributes, bindless, buffers as gpu_buffers, fog, fog_volume, samplers, texture};
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
 use render::wgpu::{self, BindingType as B};
@@ -29,6 +29,7 @@ pub struct Instance {
 
 /// Managed's analytic fog block, which the camera's attributes carry (`Lighting::fog`).
 const FOG_BLOCK: &str = "FogConstants";
+const FOG_VOLUME: &str = "g_tFogVolume";
 
 /// What one draw brings to its material program.
 pub struct Inputs<'a> {
@@ -84,7 +85,7 @@ fn uniform_value<P>(s: &Shading<P>,inputs: &Inputs, name: &str) -> Option<Value>
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let default = || s.attributes.get(name).and_then(|a| a.default);
-    from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(default).map(Value::Vec)
+    from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(default).map(Value::Vec)
 }
 
 /// Managed's bytes for a whole block, sized to the block.
@@ -179,6 +180,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             let bytes = match (inputs.constant_buffer(&b.name).or_else(view_fog), b.name.as_str()) {
                 (Some(given), _) => block_bytes(&given, block.size),
                 (None, view::BLOCK) => block.fill(|n| inputs.view.constant(n)),
+                (None, fog::BLOCK) => block.fill(|n| fog::constant(inputs.lighting, n).or_else(|| uniform_value(s, inputs, n))),
                 (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n)),
                 (None, _) => block.fill(|n| uniform_value(s, inputs, n)),
             };
@@ -205,6 +207,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         }
         B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, b, view_dimension, sample_type)),
         B::Sampler(kind) if b.count.is_some() => Resource::Samplers(bindless_samplers(gpu, b, kind)),
+        B::Texture { .. } if b.name == FOG_VOLUME => Resource::View(fog_volume::view(gpu, inputs.lighting)),
         B::Texture { sample_type, view_dimension, .. } => {
             Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }

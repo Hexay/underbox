@@ -52,13 +52,14 @@ pub struct SceneView {
     pub state: Mutex<ViewState>,
 }
 
-/// What the camera's attributes set for its views' shading: the exposure (render/exposure.rs)
-/// and managed's `FogConstants` / `SkyboxFogConstants` (shading/standin_fog.hlsl).
+/// What the camera's attributes set for its views' shading: the exposure (render/exposure.rs),
+/// managed's `FogConstants` / `SkyboxFogConstants` blocks, and the per-view fog (render/fog.rs).
 #[derive(Clone, Default)]
 pub struct Environment {
     pub tone_map: Option<f32>,
     pub fog: Option<Arc<[u8]>>,
     pub skybox_fog: Option<Arc<[u8]>>,
+    pub view_fog: Option<Arc<crate::render::fog::ViewFog>>,
 }
 
 /// What a camera render decides about its view before the layers are added.

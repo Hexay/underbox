@@ -47,7 +47,7 @@ fn scene_renderer_mesh_builds_and_binds() {
 
 /// The stand-in's 16-unit cube tinted `tint`, seen from above and -X, lit by `lighting`, on black;
 /// `None` (skipped) without an sbox-public checkout or a GPU.
-fn standin_cube(tint: [f32; 4], lighting: &Lighting) -> Option<render::Frame> {
+pub(crate) fn standin_cube(tint: [f32; 4], lighting: &Lighting) -> Option<render::Frame> {
     let Some(core) = core_dir() else {
         eprintln!("skipped: no sbox-public checkout");
         return None;
@@ -107,7 +107,7 @@ fn hammer_point_light_is_not_blown_out() {
     assert!(grey.iter().all(|r| (80..140).contains(r)), "top face near 0.42 of white, got {:?}", grey.iter().max());
 }
 
-/// Managed's `FogConstants` (standin_fog.hlsl): a ramp over 0..1 units fully fogs the cube green;
+/// Managed's `FogConstants` (core's Fog.hlsl): a ramp over 0..1 units fully fogs the cube green;
 /// a ramp starting past it leaves the cube as it was.
 #[test]
 fn analytic_fog_covers_the_cube() {

@@ -17,6 +17,8 @@ pub mod view;
 #[cfg(test)]
 mod coverage;
 #[cfg(test)]
+mod fog_tests;
+#[cfg(test)]
 mod gizmo_tests;
 #[cfg(test)]
 mod sky_tests;
