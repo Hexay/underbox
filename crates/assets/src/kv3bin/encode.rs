@@ -1,6 +1,6 @@
-//! Writing binary KV3 v4 or v5, laid out as ValveResourceFormat's serializer does. Used for test
-//! fixtures (compiled worlds); integers go out as INT64, floats as DOUBLE, and arrays of 1..=255
-//! doubles as byte-length typed arrays (how compiled vectors and matrices look).
+//! Writing binary KV3 v2, v4 or v5, laid out as ValveResourceFormat's serializer does. Used for
+//! test fixtures (compiled worlds, models, materials); integers go out as INT64, floats as DOUBLE,
+//! and arrays of 1..=255 doubles as typed arrays (how compiled vectors and matrices look).
 
 use super::{LZ4, LZ4_FRAME, MAGIC_BASE, TRAILER, ZSTD};
 use kv::Value;
@@ -106,6 +106,12 @@ impl Out {
                 self.arrays += 1;
                 let doubles: Option<Vec<f64>> = items.iter().map(|i| if let Value::Double(d) = i { Some(*d) } else { None }).collect();
                 match doubles.filter(|d| (1..=255).contains(&d.len())) {
+                    Some(d) if version < 4 => {
+                        self.ty(10, flag);
+                        self.b4.extend_from_slice(&(d.len() as i32).to_le_bytes());
+                        self.ty(5, 0);
+                        d.iter().for_each(|x| self.b8.extend_from_slice(&x.to_le_bytes()));
+                    }
                     Some(d) => {
                         self.ty(24, flag);
                         self.b1.push(d.len() as u8);
@@ -172,11 +178,13 @@ fn put(out: &mut Vec<u8>, values: &[usize]) {
     values.iter().for_each(|&v| out.extend_from_slice(&(v as u32).to_le_bytes()));
 }
 
-/// Encode `value` as binary KV3 `version` (4 or 5).
+/// Encode `value` as binary KV3 `version` (2, 4 or 5). v2 is what real engine2 reads in compiled
+/// resources; it has no LZ4 blob frames, so a v2 document with blobs goes out uncompressed.
 pub fn write(value: &Value, version: u32, c: Compression) -> Vec<u8> {
-    assert!(version == 4 || version == 5, "binary KV3 writes v4 or v5");
+    assert!(matches!(version, 2 | 4 | 5), "binary KV3 writes v2, v4 or v5");
     let mut o = Out::default();
     o.value(value, version, 0);
+    let c = if version < 4 && !o.blob_lengths.is_empty() { Compression::None } else { c };
     let (blobs, frames) = o.packed_blobs(c);
     let strings = o.string_bytes();
     let mut head = (MAGIC_BASE | version).to_le_bytes().to_vec();
@@ -218,7 +226,10 @@ pub fn write(value: &Value, version: u32, c: Compression) -> Vec<u8> {
         let packed = c.pack(&buf);
         put(&mut head, &[o.b1.len(), b4.len() / 4, o.b8.len() / 8, strings.len() + o.types.len()]);
         head.extend_from_slice(&hints.to_le_bytes());
-        put(&mut head, &[buf.len(), packed.len() + zstd_blobs, o.blob_lengths.len(), o.blobs.len(), o.b2.len() / 2, 0]);
+        put(&mut head, &[buf.len(), packed.len() + zstd_blobs, o.blob_lengths.len(), o.blobs.len()]);
+        if version >= 4 {
+            put(&mut head, &[o.b2.len() / 2, 0]);
+        }
         body = packed;
     }
     if !o.blob_lengths.is_empty() {

@@ -66,5 +66,5 @@ pub fn puppet_model() -> Model {
 pub fn puppet_files() -> Vec<(String, Vec<u8>)> {
     let (_, w, h, px) = morph::encode(&super::targets(), cube(HALF * 0.5).vertices.len(), super::controllers(), super::rules(), PUPPET_ATLAS);
     let atlas = super::super::texture::Texture { width: w as u16, height: h as u16, depth: 1, format: super::super::texture::Format::RGBA8888, levels: vec![px], ..Default::default() };
-    vec![(format!("{PUPPET}_c"), super::super::model::write(&puppet_model(), Packing::Raw)), (format!("{PUPPET_ATLAS}_c"), super::super::texture::write(&atlas, false))]
+    vec![(format!("{PUPPET}_c"), super::super::model::write(&puppet_model(), Packing::Meshopt)), (format!("{PUPPET_ATLAS}_c"), super::super::texture::write(&atlas, false))]
 }

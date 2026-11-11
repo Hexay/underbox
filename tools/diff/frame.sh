@@ -23,7 +23,7 @@ seed() {
     s=$REAL_ENGINE2_RUNS/content2-$(basename -- "$ART")
     if [ ! -f "$s/.done" ]; then
         rm -rf "$s"; mkdir -p "$s"
-        # Not vmdl_c: ours draws real's compiled dev box as scattered points (docs/differential.md).
+        # Not vmdl_c yet: ours on real's compiled models is unchecked (docs/differential-render.md).
         (cd "$ART/game" && find core -type f \( -name '*.vtex_c' -o -name '*.vmat_c' \) |
             cpio -pdl --quiet "$s")
         touch "$s/.done"

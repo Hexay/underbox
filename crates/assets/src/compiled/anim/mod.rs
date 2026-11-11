@@ -6,6 +6,7 @@
 
 pub mod blend;
 pub mod encode;
+pub mod layout;
 pub mod segment;
 
 use super::kv::{self, int, objects, string, strings};

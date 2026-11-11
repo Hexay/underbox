@@ -12,6 +12,34 @@ use std::collections::HashMap;
 /// `RENDER_PRIM_TRIANGLES`.
 pub const TRIANGLES: i32 = 5;
 
+/// `RenderPrimitiveType_t` in its order, up to the patch lists.
+const PRIMITIVES: [&str; 11] = [
+    "RENDER_PRIM_POINTS",
+    "RENDER_PRIM_LINES",
+    "RENDER_PRIM_LINES_WITH_ADJACENCY",
+    "RENDER_PRIM_LINE_STRIP",
+    "RENDER_PRIM_LINE_STRIP_WITH_ADJACENCY",
+    "RENDER_PRIM_TRIANGLES",
+    "RENDER_PRIM_TRIANGLES_WITH_ADJACENCY",
+    "RENDER_PRIM_TRIANGLE_STRIP",
+    "RENDER_PRIM_TRIANGLE_STRIP_WITH_ADJACENCY",
+    "RENDER_PRIM_INSTANCED_QUADS",
+    "RENDER_PRIM_HETEROGENOUS",
+];
+
+/// Compiled files spell the enum by name; older fixtures wrote its value.
+fn primitive(v: Option<&Value>) -> i32 {
+    match v {
+        Some(Value::String(s)) => PRIMITIVES.iter().position(|p| p == s).map_or(TRIANGLES, |i| i as i32),
+        Some(v) => kv::int_of(v).unwrap_or(TRIANGLES as i64) as i32,
+        None => TRIANGLES,
+    }
+}
+
+fn primitive_name(p: i32) -> &'static str {
+    usize::try_from(p).ok().and_then(|i| PRIMITIVES.get(i)).copied().unwrap_or(PRIMITIVES[TRIANGLES as usize])
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrawCall {
     /// Material resource path (`materials/x.vmat`).
@@ -65,7 +93,7 @@ pub fn build(data: &Object, buffers: &Buffers) -> Result<Mesh, Error> {
             let [r, g, b] = dc.get("m_vTintColor").map_or([1.0; 3], |v| kv::floats_of(Some(v)));
             let start_index = mesh.indices.len() as u32;
             mesh.indices.extend(&indices);
-            let primitive = int(dc, "m_nPrimitiveType") as i32;
+            let primitive = primitive(dc.get("m_nPrimitiveType"));
             mesh.draws.push(DrawCall { material, primitive, start_index, index_count: indices.len() as u32, tint: [r, g, b, float_or(dc, "m_flAlpha", 1.0)] });
         }
     }
@@ -110,20 +138,42 @@ pub fn write_data(mesh: &Mesh) -> Value {
     let (lo, hi) = mesh.bounds.unwrap_or_default();
     let draw = |d: &DrawCall| {
         obj(vec![
-            ("m_nPrimitiveType", int_value(d.primitive)),
+            ("m_nPrimitiveType", Value::String(primitive_name(d.primitive).into())),
             ("m_nBaseVertex", int_value(0)),
             ("m_nVertexCount", int_value(mesh.vertices.len() as i64)),
             ("m_nStartIndex", int_value(d.start_index)),
             ("m_nIndexCount", int_value(d.index_count)),
-            ("m_material", resource(&d.material)),
+            ("m_nStartInstance", int_value(0)),
+            ("m_nInstanceCount", int_value(0)),
+            ("m_flUvDensity", Value::Double(1.0)),
             ("m_vTintColor", floats(&d.tint[..3])),
             ("m_flAlpha", Value::Double(d.tint[3].into())),
-            ("m_vertexBuffers", list([obj(vec![("m_hBuffer", int_value(0)), ("m_nBindOffsetBytes", int_value(0))])])),
+            ("m_CullDataIndex", int_value(-1)),
+            ("m_nMeshID", int_value(0)),
             ("m_indexBuffer", obj(vec![("m_hBuffer", int_value(0)), ("m_nBindOffsetBytes", int_value(0))])),
+            ("m_material", resource(&d.material)),
+            ("m_vertexBuffers", list([obj(vec![("m_hBuffer", int_value(0)), ("m_nBindOffsetBytes", int_value(0))])])),
+            ("m_bUseCompressedNormalTangent", Value::Bool(false)),
         ])
     };
-    let scene_object = obj(vec![("m_vMinBounds", floats(&lo)), ("m_vMaxBounds", floats(&hi)), ("m_drawCalls", list(mesh.draws.iter().map(draw)))]);
-    obj(vec![("m_sceneObjects", list([scene_object])), ("m_name", Value::String(String::new()))])
+    let scene_object = obj(vec![
+        ("m_vMinBounds", floats(&lo)),
+        ("m_vMaxBounds", floats(&hi)),
+        ("m_drawCalls", list(mesh.draws.iter().map(draw))),
+        ("m_drawCullData", list([])),
+        ("m_vTintColor", floats(&[0.0; 4])),
+    ]);
+    // `CRenderMesh` as real's compiler writes it; the skeleton is the model's (see model_write).
+    obj(vec![
+        ("_class", Value::String("CRenderMesh".into())),
+        ("m_sceneObjects", list([scene_object])),
+        ("m_constraints", list([])),
+        ("m_skeleton", obj(vec![("m_bones", list([])), ("m_boneParents", list([])), ("m_nBoneWeightCount", int_value(4))])),
+        ("traceDataAllocated", int_value(0)),
+        ("m_attachments", list([])),
+        ("m_hitboxsets", list([])),
+        ("m_morphSet", Value::Null),
+    ])
 }
 
 /// A standalone `.vmesh_c`: DATA and a VBIB block.
