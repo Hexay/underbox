@@ -32,11 +32,18 @@ accumulated in-scattering (rgb) and transmittance (a). Slices are linear in view
 address it too. It runs once per view, not for child views (3D skybox) or orthographic ones.
 
 Managed's SceneRenderer (`+r_managed_scene 1`) ports the native renderer's fog to
-`cs_volumetric_fog.shader`, which has no source. It binds its own `FogVolume`, a volume texture
-that has no GPU side here. `g_tFogVolume` therefore always binds our grid, or opaque black (no
-fog) when there is none. Without that, the white default texture washed the whole frame out.
-Only scene/execute.rs renders the grid, so managed views get the black one: `corpus/fog`'s managed
-golden has the gradient fog and no volume haze.
+`cs_volumetric_fog.shader`, which has no source, writing its own `FogVolume` volume texture (no GPU
+side here). `render/fog_managed.rs` stands in for that dispatch: it rebuilds the view, volumes and
+settings from `VolumetricFogConstantBuffer_t`, the sun from `DirectionalLightCB` and ambient from
+`ViewLightingConfigV2`, marches the same grid, and keys it by managed's `OutScatteringTexture`.
+Where shading binds that texture as `FogVolume`, `g_tFogVolume` gets the grid. Otherwise it binds
+the view's own grid, or opaque black (no fog); the white default texture would wash the frame out.
+
+- The rebuilt world-to-clip spans the froxel corner rays with w as view depth, which is what
+  managed's `g_mVolFogFromWorld` gives shading; its z only keeps it invertible.
+- Managed scales `Scattering` by 0.0022 for its shader; the stand-in undoes that.
+- Not on the managed path: point and spot lights' in-scattering (they live in managed's binned
+  light buffer), the second pass's temporal blend.
 
 These values are our choice, since no source constrains them:
 
@@ -59,5 +66,6 @@ and in the sky shader's `ApplySky`, never to a raw clear.
 
 ## Tests
 
-`sh tools/test.sh engine2 fog` covers each family through the stand-in, and `render::fog::tests`
-pins the gradient and cube constants to native's formulas. `corpus/fog` is the golden on both paths: a gradient ground fog and one volume with a box behind it and one beside it.
+`sh tools/test.sh engine2 fog` covers each family through the stand-in, `render::fog::tests`
+pins the gradient and cube constants to native's formulas, and `fog_managed_tests` reads managed's
+constants back. `corpus/fog` is the golden on both paths: a gradient ground fog and one volume with a box behind it and one beside it.

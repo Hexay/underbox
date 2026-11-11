@@ -88,50 +88,103 @@ fn bytes(floats: impl IntoIterator<Item = f32>) -> Vec<u8> {
     floats.into_iter().flat_map(f32::to_le_bytes).collect()
 }
 
-fn volume_floats(v: &SceneVolumetricFogVolume) -> Vec<f32> {
-    let (min, max) = (Vec3::new(v.m_v_min.vec.x, v.m_v_min.vec.y, v.m_v_min.vec.z), Vec3::new(v.m_v_max.vec.x, v.m_v_max.vec.y, v.m_v_max.vec.z));
-    let (center, half) = ((min + max) * 0.5, ((max - min) * 0.5).max(Vec3::splat(1e-3)));
-    let color = Vec3::new(v.m_v_color.vec.x, v.m_v_color.vec.y, v.m_v_color.vec.z);
-    let mut out = crate::render::scene::camera::mat4(v.m_mat_world_to_volume).to_cols_array().to_vec();
-    out.extend(center.extend(v.m_f_strength / UNITS_PER_OPTICAL_DEPTH).to_array());
-    out.extend(half.extend(v.m_f_exponent).to_array());
-    out.extend(color.extend(f32::from(v.m_b_spherical)).to_array());
-    out
+/// A fog volume: local bounds, placed by `world_to_volume`.
+pub struct Volume {
+    pub world_to_volume: Mat4,
+    pub min: Vec3,
+    pub max: Vec3,
+    pub color: Vec3,
+    pub strength: f32,
+    pub exponent: f32,
+    pub spherical: bool,
 }
 
-fn params_bytes(view_proj: Mat4, lighting: &Lighting, params: &SceneVolumetricFogParameters, (near, range): (f32, f32), counts: [u32; 2]) -> Vec<u8> {
+impl Volume {
+    fn native(v: &SceneVolumetricFogVolume) -> Volume {
+        let v3 = |v: abi::structs::Vector3| Vec3::new(v.vec.x, v.vec.y, v.vec.z);
+        let world_to_volume = crate::render::scene::camera::mat4(v.m_mat_world_to_volume);
+        Volume { world_to_volume, min: v3(v.m_v_min), max: v3(v.m_v_max), color: v3(v.m_v_color), strength: v.m_f_strength, exponent: v.m_f_exponent, spherical: v.m_b_spherical != 0 }
+    }
+
+    fn floats(&self) -> Vec<f32> {
+        let (center, half) = ((self.min + self.max) * 0.5, ((self.max - self.min) * 0.5).max(Vec3::splat(1e-3)));
+        let mut out = self.world_to_volume.to_cols_array().to_vec();
+        out.extend(center.extend(self.strength / UNITS_PER_OPTICAL_DEPTH).to_array());
+        out.extend(half.extend(self.exponent).to_array());
+        out.extend(self.color.extend(f32::from(self.spherical)).to_array());
+        out
+    }
+}
+
+/// What lights the medium: ambient (already × `IndirectStrength`), the sun (direction toward it,
+/// colour × its fog strength) and local lights (position, radius, colour × fog strength).
+#[derive(Default)]
+pub struct Sources {
+    pub ambient: Vec3,
+    pub sun: Option<(Vec3, Vec3)>,
+    pub lights: Vec<(Vec3, f32, Vec3)>,
+}
+
+impl Sources {
+    fn of(lighting: &Lighting, indirect_strength: f32) -> Sources {
+        let lights = lighting.lights.iter().filter(|l| l.radius > 0.0 && l.fog > 0.0).map(|l| (l.position, l.radius, l.color * l.fog)).collect();
+        Sources { ambient: lighting.ambient.truncate() * indirect_strength, sun: lighting.sun.as_ref().map(|s| (-s.forward(), s.color * s.fog)), lights }
+    }
+}
+
+/// `SceneVolumetricFogParameters`' march settings.
+pub struct Settings {
+    pub draw_distance: f32,
+    pub fade_in: (f32, f32),
+    pub anisotropy: f32,
+    pub scattering: f32,
+}
+
+fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, range): (f32, f32), counts: [u32; 2]) -> Vec<u8> {
     let view = View { view_proj, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
-    let asymmetry = params.m_fl_anisotropy.clamp(-1.0, 1.0) * MAX_ASYMMETRY;
-    let (sun_direction, sun_color) = lighting.sun.as_ref().map_or((Vec3::Z, Vec3::ZERO), |s| (-s.forward(), s.color * s.fog));
+    let asymmetry = settings.anisotropy.clamp(-1.0, 1.0) * MAX_ASYMMETRY;
+    let (sun_direction, sun_color) = sources.sun.unwrap_or((Vec3::Z, Vec3::ZERO));
+    let (fade_start, fade_end) = settings.fade_in;
     let mut out = bytes(view_proj.inverse().to_cols_array());
     out.extend(bytes(view.camera_position().truncate().extend(near).to_array()));
     out.extend(bytes(view.camera_axes().0.truncate().extend(range).to_array()));
-    out.extend(bytes([params.m_fl_fade_in_start, params.m_fl_fade_in_end.max(params.m_fl_fade_in_start + 1e-3), asymmetry, params.m_fl_scattering]));
-    out.extend(bytes((lighting.ambient.truncate() * params.m_fl_indirect_strength).extend(0.0).to_array()));
+    out.extend(bytes([fade_start, fade_end.max(fade_start + 1e-3), asymmetry, settings.scattering]));
+    out.extend(bytes(sources.ambient.extend(0.0).to_array()));
     out.extend(bytes(sun_direction.extend(0.0).to_array()));
     out.extend(bytes(sun_color.extend(0.0).to_array()));
     out.extend([counts[0], counts[1], 0, 0].iter().flat_map(|c| c.to_le_bytes()));
     out
 }
 
-fn light_bytes(lighting: &Lighting) -> (Vec<u8>, u32) {
-    let lit: Vec<_> = lighting.lights.iter().filter(|l| l.radius > 0.0 && l.fog > 0.0).take(MAX_LIGHTS).collect();
-    let mut out: Vec<u8> = lit.iter().flat_map(|l| bytes(l.position.extend(l.radius).to_array().into_iter().chain((l.color * l.fog).extend(0.0).to_array()))).collect();
+fn light_bytes(sources: &Sources) -> (Vec<u8>, u32) {
+    let lit = &sources.lights[..sources.lights.len().min(MAX_LIGHTS)];
+    let mut out: Vec<u8> = lit.iter().flat_map(|(p, r, c)| bytes(p.extend(*r).to_array().into_iter().chain(c.extend(0.0).to_array()))).collect();
     // A storage binding can't be empty.
     out.resize(out.len().max(32), 0);
     (out, lit.len() as u32)
 }
 
-/// March `worlds`' volumes for one view; `None` when nothing could show (no volumes, no device,
-/// or an orthographic view, whose w carries no depth for the froxel mapping).
+/// March `worlds`' volumes for one view; `None` when nothing could show (see [`march`]).
 pub fn render(worlds: &[world::Ref], view_proj: Mat4, lighting: &Lighting, params: &SceneVolumetricFogParameters) -> Option<Arc<Frustum>> {
-    let gpu = device::gpu()?;
-    let volumes: Vec<SceneVolumetricFogVolume> = {
+    let volumes: Vec<Volume> = {
         let all = VOLUMES.lock().unwrap();
-        worlds.iter().filter_map(|w| all.get(&w.addr())).flatten().copied().collect()
+        worlds.iter().filter_map(|w| all.get(&w.addr())).flatten().map(Volume::native).collect()
     };
+    let settings = Settings {
+        draw_distance: params.m_fl_draw_distance,
+        fade_in: (params.m_fl_fade_in_start, params.m_fl_fade_in_end),
+        anisotropy: params.m_fl_anisotropy,
+        scattering: params.m_fl_scattering,
+    };
+    march(&volumes, view_proj, &Sources::of(lighting, params.m_fl_indirect_strength), &settings)
+}
+
+/// March `volumes` for a view; `None` when nothing could show (no volumes, no device, or an
+/// orthographic view, whose w carries no depth for the froxel mapping).
+pub fn march(volumes: &[Volume], view_proj: Mat4, sources: &Sources, settings: &Settings) -> Option<Arc<Frustum>> {
+    let gpu = device::gpu()?;
     let perspective = view_proj.row(3).truncate() != Vec3::ZERO;
-    let far = params.m_fl_draw_distance;
+    let far = settings.draw_distance;
     if volumes.is_empty() || !perspective || far <= 0.0 {
         return None;
     }
@@ -139,9 +192,9 @@ pub fn render(worlds: &[world::Ref], view_proj: Mat4, lighting: &Lighting, param
     // starts one slice in, so either side's constants address this grid.
     let near = far / SIZE[2] as f32;
     let range = far - near;
-    let (lights, light_count) = light_bytes(lighting);
-    let uniform = params_bytes(view_proj, lighting, params, (near, range), [volumes.len() as u32, light_count]);
-    let volume_data = bytes(volumes.iter().flat_map(volume_floats));
+    let (lights, light_count) = light_bytes(sources);
+    let uniform = params_bytes(view_proj, sources, settings, (near, range), [volumes.len() as u32, light_count]);
+    let volume_data = bytes(volumes.iter().flat_map(Volume::floats));
     let buffer = |label, usage, contents: &[u8]| gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some(label), contents, usage });
     let (uniform, volume_data, lights) = (buffer("fog params", wgpu::BufferUsages::UNIFORM, &uniform), buffer("fog volumes", wgpu::BufferUsages::STORAGE, &volume_data), buffer("fog lights", wgpu::BufferUsages::STORAGE, &lights));
     let [width, height, depth] = SIZE;

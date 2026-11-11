@@ -31,6 +31,12 @@ fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, t
     let mut layers = vec![attrs];
     layers.extend(context::get(c).map(|c| c.attributes));
     let threads = threads.map(|n| n.max(1) as u32);
+    if shader.contains(crate::render::fog_managed::SHADER) {
+        if let Err(e) = crate::render::fog_managed::dispatch(&layers) {
+            warn_once(shader, &format!("fog stand-in skipped ({e})"));
+        }
+        return;
+    }
     match gpu::dispatch(gpu, shader, &layers, threads) {
         Ok(()) => {}
         Err(e) if occlusion => {

@@ -207,7 +207,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         }
         B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, b, view_dimension, sample_type)),
         B::Sampler(kind) if b.count.is_some() => Resource::Samplers(bindless_samplers(gpu, b, kind)),
-        B::Texture { .. } if b.name == FOG_VOLUME => Resource::View(fog_volume::view(gpu, inputs.lighting)),
+        B::Texture { .. } if b.name == FOG_VOLUME => Resource::View(managed_fog(s, inputs, b).unwrap_or_else(|| fog_volume::view(gpu, inputs.lighting))),
         B::Texture { sample_type, view_dimension, .. } => {
             Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }
@@ -218,6 +218,13 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         }
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),
     })
+}
+
+/// The grid the `cs_volumetric_fog` stand-in marched for the fog texture managed's SceneRenderer
+/// binds (render/fog_managed.rs).
+fn managed_fog<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
+    let texture = inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n)))?;
+    crate::render::fog_managed::grid(texture.addr()).map(|f| f.view.clone())
 }
 
 /// One bind group per layout of the program, in group order.
