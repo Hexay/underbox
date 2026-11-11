@@ -28,6 +28,7 @@ const SHEET: u32 = 2;
 const METADATA: u32 = 3;
 const COMPRESSED_MIP_SIZE: u32 = 4;
 const LZ4: u32 = 1;
+const ZSTD: u32 = 2;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Texture {
@@ -90,26 +91,44 @@ fn u32_at(b: &[u8], at: usize) -> Result<u32, Error> {
     b.get(at..at + 4).map(|s| u32::from_le_bytes(s.try_into().unwrap())).ok_or_else(|| error("VTEX truncated"))
 }
 
-/// (type, payload) of each extra-data entry; offsets count from their own field.
-fn extras(data: &[u8]) -> Result<Vec<(u32, &[u8])>, Error> {
+/// (type, payload, payload and everything after it).
+type Extra<'a> = (u32, &'a [u8], &'a [u8]);
+
+/// Each extra-data entry; offsets count from their own field.
+fn extras(data: &[u8]) -> Result<Vec<Extra<'_>>, Error> {
     let first = 32 + u32_at(data, 32)? as usize;
     (0..u32_at(data, 36)? as usize)
         .map(|i| {
             let at = first + i * 12;
             let start = at + 4 + u32_at(data, at + 4)? as usize;
             let payload = data.get(start..start + u32_at(data, at + 8)? as usize).ok_or_else(|| error("VTEX extra data out of bounds"))?;
-            Ok((u32_at(data, at)?, payload))
+            Ok((u32_at(data, at)?, payload, &data[start..]))
         })
         .collect()
 }
 
-/// Per-mip stored sizes (mip 0 first) when the mips are LZ4-compressed.
-fn compressed_sizes(extra: &[u8]) -> Result<Option<Vec<usize>>, Error> {
-    if u32_at(extra, 0)? != LZ4 {
+/// The mip compression method and per-mip stored sizes (mip 0 first). Real's entry declares only
+/// its 12-byte head; the size array follows it outside the declared payload.
+fn compressed_sizes(extra: &[u8]) -> Result<Option<(u32, Vec<usize>)>, Error> {
+    let method = u32_at(extra, 0)?;
+    if method != LZ4 && method != ZSTD {
         return Ok(None);
     }
     let first = 4 + u32_at(extra, 4)? as usize;
-    (0..u32_at(extra, 8)? as usize).map(|i| u32_at(extra, first + i * 4).map(|s| s as usize)).collect::<Result<_, _>>().map(Some)
+    let sizes = (0..u32_at(extra, 8)? as usize).map(|i| u32_at(extra, first + i * 4).map(|s| s as usize)).collect::<Result<_, _>>()?;
+    Ok(Some((method, sizes)))
+}
+
+fn decompress(method: u32, bytes: &[u8], size: usize) -> Result<Vec<u8>, Error> {
+    let err = |e: String| Error::Decompress(e);
+    if method == LZ4 {
+        return lz4_flex::block::decompress(bytes, size).map_err(|e| err(e.to_string()));
+    }
+    let mut src = bytes;
+    let decoder = ruzstd::decoding::StreamingDecoder::new(&mut src).map_err(|e| err(e.to_string()))?;
+    let mut out = Vec::with_capacity(size);
+    std::io::Read::read_to_end(&mut std::io::Read::take(decoder, size as u64), &mut out).map_err(|e| err(e.to_string()))?;
+    if out.len() == size { Ok(out) } else { Err(err(format!("mip holds {} bytes, expected {size}", out.len()))) }
 }
 
 pub fn read(file: &[u8]) -> Result<Texture, Error> {
@@ -130,13 +149,13 @@ pub fn read(file: &[u8]) -> Result<Texture, Error> {
     };
     let mips = usize::from(data[27].max(1));
     let mut sizes = None;
-    for (kind, payload) in extras(data)? {
+    for (kind, payload, rest) in extras(data)? {
         match kind {
             METADATA if payload.len() >= 6 => {
                 let (w, h) = (u16_at(payload, 2), u16_at(payload, 4));
                 t.display = (w > 0 && h > 0 && w <= t.width && h <= t.height).then_some((w, h));
             }
-            COMPRESSED_MIP_SIZE => sizes = compressed_sizes(payload)?,
+            COMPRESSED_MIP_SIZE => sizes = compressed_sizes(rest)?,
             SHEET => t.sheet = sheet::read(payload)?,
             _ => {}
         }
@@ -150,9 +169,12 @@ pub fn read(file: &[u8]) -> Result<Texture, Error> {
     let mut levels = vec![Vec::new(); mips];
     for level in (0..mips).rev() {
         let size = t.level_bytes(level);
-        let stored = sizes.as_ref().and_then(|s| s.get(level).copied()).filter(|&s| s < size).unwrap_or(size);
+        let stored = sizes.as_ref().and_then(|(_, s)| s.get(level).copied()).filter(|&s| s < size).unwrap_or(size);
         let bytes = pixels.get(at..at + stored).ok_or_else(|| error(format!("mip {level} runs past the end of the file")))?;
-        levels[level] = if stored < size { lz4_flex::block::decompress(bytes, size).map_err(|e| Error::Decompress(e.to_string()))? } else { bytes.to_vec() };
+        levels[level] = match &sizes {
+            Some((method, _)) if stored < size => decompress(*method, bytes, size)?,
+            _ => bytes.to_vec(),
+        };
         at += stored;
     }
     t.levels = levels;

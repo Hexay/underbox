@@ -91,9 +91,10 @@ pub fn cube(b: &mut Builder, size: V3, segs: [u32; 3], max_uv: (f32, f32)) {
     b.grid([h[0], h[1], -h[2]], neg(x), z, (sx, sz), max_uv);
 }
 
-/// A `width` × `height` plane in XY, centred on the origin, facing +Z.
+/// A `width` × `height` plane in XY, centred on the origin, facing +Z. As real engine2 maps it
+/// (docs/differential.md, Rendering): U runs along +Y, V along +X (texture top at -X).
 pub fn plane(b: &mut Builder, width: f32, height: f32, segs: (u32, u32), max_uv: (f32, f32)) {
-    b.grid([-width / 2.0, -height / 2.0, 0.0], [width, 0.0, 0.0], [0.0, height, 0.0], segs, max_uv);
+    b.grid([width / 2.0, -height / 2.0, 0.0], [0.0, height, 0.0], [-width, 0.0, 0.0], (segs.1, segs.0), max_uv);
 }
 
 /// A UV sphere: `segs_u` around Z, `segs_v` from the +Z pole to the -Z pole.
