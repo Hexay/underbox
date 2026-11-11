@@ -139,7 +139,7 @@ mod tests {
         ];
         def.root = Some(def.add_pose(PoseNode::StateMachine { states, default: 0 }));
         let mut g = Instance::new(def.into_shared(), |_| None);
-        let mut step = |g: &mut Instance| {
+        let step = |g: &mut Instance| {
             g.update(0.1, &Pose(Vec::new()));
             let mut t = g.active_tags();
             t.sort();
