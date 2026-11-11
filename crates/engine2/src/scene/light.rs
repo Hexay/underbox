@@ -157,7 +157,7 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, l::GET_LIGHT_COOKIE, |r| {
         let cookie = with(r, |x| Some(x.cookie)).unwrap_or_default();
-        resource::copy_handle::<_, texture::Texture>(cookie)
+        resource::handed_out::<_, texture::Texture>(Some(cookie))
     });
     // TODO: the renderer's per-light switches and baked-lighting indices (M2).
     bind!(r, l::SET_RENDER_DIFFUSE, |_, _| {});

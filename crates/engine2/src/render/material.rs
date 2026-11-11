@@ -188,8 +188,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, m::SET_1, |h, n, v| set_vector(h, &string(n), v));
     bind!(r, m::GET_VECTOR4, |h, n| params(h, |p| p.vectors.get(&string(n)).copied().unwrap_or_default()));
     bind!(r, m::SET_2, |h, n, t| set_texture(h, &string(n), t));
-    bind!(r, m::GET_TEXTURE, |h, n| params(h, |p| p.textures.get(&string(n)).copied()).map_or(Texture::NULL, copy));
-    bind!(r, m::GET_FIRST_TEXTURE_ATTRIBUTE, |h| params(h, |p| p.textures.values().next().copied()).map_or(Texture::NULL, copy));
+    bind!(r, m::GET_TEXTURE, |h, n| texture(h, &string(n)));
+    bind!(r, m::GET_FIRST_TEXTURE_ATTRIBUTE, first_texture);
     bind!(r, m::SET_EDITED, |h, e| params(h, |p| p.edited = e));
     bind!(r, m::IS_EDITED, |h| params(h, |p| p.edited));
 
@@ -209,9 +209,26 @@ pub fn register(r: &mut Registry) {
     bind!(r, m::GET_FLOAT_ATTRIBUTE_OR_DEFAULT, |h, t, d| value(h, t).unwrap_or(d));
     bind!(r, m::GET_TEXTURE_ATTRIBUTE_OR_DEFAULT, |h, t| {
         let own = on(h, |mat| attributes::token_texture(mat.attributes, t).map(|(t, _)| t));
-        own.or_else(|| params(h, |p| p.textures.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, t)| *t))).map_or(Texture::NULL, copy)
+        handed_out(own.or_else(|| params(h, |p| p.textures.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, t)| *t))))
     });
 }
+
+fn handed_out(t: Option<Texture>) -> Texture {
+    resource::handed_out::<_, texture::Texture>(t)
+}
+
+pub(crate) fn texture(h: Ref, name: &str) -> Texture {
+    handed_out(params(h, |p| p.textures.get(name).copied()))
+}
+
+/// The error material (a missing `.vmat`) has none: managed's `FirstTexture` is then null.
+pub(crate) fn first_texture(h: Ref) -> Texture {
+    handed_out(params(h, |p| p.textures.values().next().copied()))
+}
+
+#[cfg(test)]
+#[path = "material_tests.rs"]
+mod tests;
 
 /// Attribute `t` of a material: its render attributes, else a vector param of that name.
 fn value(h: Ref, t: abi::StringToken) -> Option<f32> {
