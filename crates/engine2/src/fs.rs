@@ -180,9 +180,15 @@ mod tests {
         let found = resolve("audio/ui/cancel.ogg", "GAME");
         let missing = resolve("audio/ui/absent.ogg", "GAME");
         remove_search_path("UNDERBOX_FS_CASE", &root_s);
-        assert_eq!(found, Some(root.join("Audio/Ui/Cancel.ogg")));
+        assert_eq!(found.as_deref().map(spelling), Some(spelling(&root.join("Audio/Ui/Cancel.ogg"))));
         assert_eq!(missing, None);
-        assert_eq!(on_disk(&root.join("audio/ui/absent/x")), root.join("Audio/Ui/absent/x"));
+        assert_eq!(spelling(&on_disk(&root.join("audio/ui/absent/x"))), spelling(&root.join("Audio/Ui/absent/x")));
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Gotcha: Windows' filesystem is case-blind, so the exact spelling already exists there and is kept.
+    fn spelling(p: &std::path::Path) -> String {
+        let s = p.to_string_lossy().into_owned();
+        if cfg!(windows) { s.to_lowercase() } else { s }
     }
 }
