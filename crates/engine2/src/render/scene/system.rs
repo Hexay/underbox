@@ -17,6 +17,7 @@ static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 fn finish() {
     RENDERING.store(false, Ordering::Release);
     draw::gpu_mesh::prune();
+    draw::morph::prune();
 }
 
 fn wait() -> bool {

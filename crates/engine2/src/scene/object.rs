@@ -122,8 +122,13 @@ pub fn create_native<C: NativeClass, D>(world: world::Ref, kind: Kind, state: St
 
 /// The live objects of `worlds`, each world's in creation order.
 pub fn in_worlds(worlds: &[world::Ref]) -> Vec<Arc<SceneObject>> {
+    refs_in_worlds(worlds).into_iter().map(|(_, o)| o).collect()
+}
+
+/// [`in_worlds`] with each object's reference.
+pub fn refs_in_worlds(worlds: &[world::Ref]) -> Vec<(Ref, Arc<SceneObject>)> {
     let addrs = worlds.iter().filter_map(|w| world::get(*w)).flat_map(|w| w.objects.lock().unwrap().clone());
-    addrs.filter_map(|a| get(NativeRef::from_raw(a as *mut _))).collect()
+    addrs.filter_map(|a| get(NativeRef::from_raw(a as *mut _)).map(|o| (NativeRef::from_raw(a as *mut _), o))).collect()
 }
 
 /// Remove an object from its world and parent, tell managed, and free it.

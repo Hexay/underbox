@@ -77,10 +77,11 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref], view_proj: Mat4) {
     let (center, radius) = bounds(view_proj);
     let light = light_view_proj(sun.forward(), center, radius);
     let mut draws = Vec::new();
-    for obj in object::in_worlds(worlds) {
+    for (r, obj) in object::refs_in_worlds(worlds) {
+        let morphs = draw::morph::of(r);
         let s = obj.state.lock().unwrap();
         if s.rendering && obj.light.is_none() {
-            draws.extend(model_draw::object(&s, light).into_iter().map(|d| draw::Draw { shaded: None, ..d }));
+            draws.extend(model_draw::object(&s, morphs.as_ref(), light).into_iter().map(|d| draw::Draw { shaded: None, ..d }));
         }
     }
     let target = Target { depth: map(), ..Default::default() };

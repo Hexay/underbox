@@ -203,7 +203,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::ALLOCATE_VERTEX_CACHE, |_| -1);
     bind!(r, tools::GET_VERTEX_CACHE_BUFFER, PtrHandle::default);
     bind!(r, tools::DISPATCH_MODEL_MESH_SKINNING, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
-    bind!(r, tools::MODEL_MESH_HAS_MORPHS, |_, _| false);
+    bind!(r, tools::MODEL_MESH_HAS_MORPHS, |m, mesh| {
+        let model = crate::model::get(m);
+        usize::try_from(mesh).ok().and_then(|i| model?.content.meshes.get(i).map(|e| !e.mesh.state().morphs.is_empty())).unwrap_or(false)
+    });
     bind!(r, tools::QUEUE_MODEL_MESH_MORPH, |_, _, _| -1);
     bind!(r, tools::GENERATE_MORPHS, |_| {});
     bind!(r, tools::GET_MORPH_SUBRECT, |_, _| {});

@@ -113,6 +113,9 @@ native model one to one, so managed's pipeline code runs unchanged:
    `draw/draw_call_tests.rs` is the headless repro: one box with managed-shaped view constants.
 6. Scene objects own a copy of their model handle (`model::copy`): managed's `FromNative` wrappers
    destroy what they're handed, which used to empty the object.
+7. Morphs (`draw/morph.rs`): an object's flex controller values run through each mesh's flex
+   rules; targets named like a weighted descriptor move a cached CPU copy of the vertex buffer.
+   Native-path objects only: managed's `QueueModelMeshMorph`/skinning slots are still stubs.
 
 Contexts and views execute eagerly on the queue, so `Begin/FinishRenderingViews` only bracket the
 frame (Finish prunes dead GPU meshes) and async readbacks complete inside the call. Display lists

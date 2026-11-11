@@ -7,6 +7,7 @@ pub mod draw_call;
 pub mod gpu_mesh;
 pub mod immediate;
 pub mod model;
+pub mod morph;
 pub mod shaded;
 
 use crate::render::lighting::Lighting;

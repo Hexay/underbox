@@ -84,10 +84,11 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref]) {
         for view in views {
             let tile = out.tiles.len() as u32;
             let mut draws = Vec::new();
-            for obj in object::in_worlds(worlds) {
+            for (r, obj) in object::refs_in_worlds(worlds) {
+                let morphs = draw::morph::of(r);
                 let s = obj.state.lock().unwrap();
                 if s.rendering && obj.light.is_none() {
-                    draws.extend(model_draw::object(&s, view).into_iter().map(|d| draw::Draw { shaded: None, ..d }));
+                    draws.extend(model_draw::object(&s, morphs.as_ref(), view).into_iter().map(|d| draw::Draw { shaded: None, ..d }));
                 }
             }
             let target = Target { depth: out.map, viewport: viewport(tile), ..Default::default() };

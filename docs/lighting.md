@@ -34,21 +34,25 @@ Managed's scene renderer (`r_managed_scene`) is reverse-Z: its cascade maps clea
 `0x7FFFFF00`). Shadow draws carry managed's rasterizer bias (`DrawModelDrawCall` slots →
 `RasterState.depth_bias`).
 
-Open tone gap: managed's lit surfaces read brighter than native's (the showroom floor, native
-(63,81,48) vs managed (136,153,120), is exactly native's sRGB-encoded), while the sky is identical
-in both. Encoding native's `ResolveHDRToFinalSDR` blit matched the floor but washed out the sky
-and every lit colour, so it was reverted: the gap is in lighting or the HDR path, not the blit.
+Tone gap (open): managed's showroom floor (136,153,120) is exactly native's (63,81,48)
+sRGB-encoded. Cause: color textures are sampled without their `SrgbRead( true )` decode — the
+binder ignores the annotation and textures have no sRGB view (`render::Texture`, empty
+`view_formats`). Native writes the undecoded value straight to the 8-bit target, so the two
+errors look right; managed lights in linear HDR and encodes at `ResolveHDRToFinalSDR`, so the
+texture comes out encoded once too often. Encoding native's blit alone washed everything out for
+the same reason. Fix: sRGB views for `SrgbRead` textures, then the encode on native's output.
 
-## Managed sun shadows (open)
+## Managed sun shadows
 
-Managed's cascade renders and binds, yet casts nothing in a client boot. Checked so far:
-- `managed_sun_shadow_darkens_the_floor` (`draw/draw_call_tests.rs`) renders managed's shadow
-  pass and main pass headless at showroom scale (`GetCascades`' 2r × 2r ortho, 4096 pull-back,
-  512², bias −1 / −1.5) and passes.
-- Boot probes: index 4 names `ShadowPool_512` (Depth32Float, 1 mip, 1 layer), bound to the
-  stand-in with sample type Depth; after the frame it holds the boxes (1144 texels, depth
-  0.348..0.382). Projecting the red box top and the floor point it shades with the CB's own
-  matrix lands both on one texel: ref 0.3642 < stored 0.3698, i.e. in shadow.
-- So map, matrix, index and binding agree. Suspect next: ordering — whether the shadow views'
-  clear and draws reach the GPU before the main view samples the map in the same frame
-  (probes read after the frame). Check the submit order of managed's shadow contexts.
+Submit order was fine (`UNDERBOX_SUBMITS=log` prints every submit with its PIX scopes, target and
+view: setup compute, depth prepass, cull, shadow cascades then local maps, opaque, post, output).
+The cause was quality: the engine never called `SystemInfo.SetGpu`, so `RenderSettings.DetectPreset`
+saw no VRAM and stored Low in `config/video.json` — one 512² cascade over 4000 units, ~3 texels
+per showroom shadow. `SourceEngineInit` now reports the adapter (`device::report_to_managed`;
+memory is still 0, so this machine still detects Low), and `client-frame.sh` pins
+`shadow.quality` to High (`SHADOW_QUALITY`, `tools/video-setting.py`): three cascades, 2048².
+
+The stand-in picks the first cascade whose sphere (`g_DirectionalLightCascadeSpheres`, radius²)
+holds the point, with that cascade's bias; cascades 1–3 bind as `g_tUnderboxSunShadow1..3`
+(`shadow::cascade_of`). `draw/managed_shadow_tests.rs` replays the boot's order headless with two
+cascades. `UNDERBOX_STANDIN_DEBUG=1` paints sun visibility, `2` cascade 0's shadow-space position.
