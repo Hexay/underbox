@@ -3,6 +3,7 @@
 use super::body;
 use super::shape::{Type, add, get, remove, toggle_tag, update, update_meta, with_collider, with_meta, with_sim, with_state};
 use crate::math::{from_vec, to_rot, to_vec};
+use crate::model::physics::part_slots::{hull_of, mesh_of};
 use abi::slots::{i_physics_body as b, i_physics_shape as s};
 use abi::structs::{BBox, Capsule, Sphere};
 use abi::{HandleId, Registry, StrRet, bind};
@@ -16,6 +17,16 @@ fn hull(position: abi::structs::Vector3, rotation: abi::structs::Rotation, point
 fn mesh(vertices: &[abi::structs::Vector3], indices: &[i32]) -> Geometry {
     let triangles = indices.as_chunks::<3>().0.iter().filter_map(|t| Some([t[0].try_into().ok()?, t[1].try_into().ok()?, t[2].try_into().ok()?]));
     Geometry::Mesh { vertices: vertices.iter().copied().map(to_vec).collect(), triangles: triangles.collect() }
+}
+
+/// Physics-data points (an `RnHull_t`/`RnMesh_t` view) placed by `xform`, scale included.
+fn placed(points: &[glam::Vec3], xform: abi::structs::Transform) -> Vec<physics::Vector> {
+    let (pos, rot, scale) = (to_vec(xform.position), to_rot(xform.rotation), to_vec(xform.scale));
+    points.iter().map(|p| pos + rot * (physics::Vector::new(p.x, p.y, p.z) * scale)).collect()
+}
+
+fn hull_points(points: Vec<physics::Vector>) -> Geometry {
+    Geometry::Hull { pose: physics::Pose::from_parts(physics::Vector::ZERO, physics::Rotation::IDENTITY), points }
 }
 
 fn bbox((mins, maxs): (physics::Vector, physics::Vector)) -> BBox {
@@ -35,6 +46,19 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::ADD_HULL_SHAPE, |body, position, rotation, points, settings| add(body, Type::Hull, hull(position, rotation, points), settings));
     // TODO: per-triangle surfaces (material count + surface indices in settings).
     bind!(r, b::ADD_MESH_SHAPE, |body, vertices, indices, _materials, settings| add(body, Type::Mesh, mesh(vertices, indices), settings));
+    bind!(r, b::ADD_HULL_SHAPE_1, |body, h, xform, settings| {
+        let points = hull_of(h.as_raw(), |x| placed(&x.vertices, xform));
+        add(body, Type::Hull, hull_points(points), settings)
+    });
+    bind!(r, b::ADD_HULL_SHAPE_2, |body, m, xform, settings| {
+        let points = mesh_of(m.as_raw(), |x| placed(&x.vertices, xform));
+        add(body, Type::Hull, hull_points(points), settings)
+    });
+    // TODO: per-triangle surfaces, as ADD_MESH_SHAPE.
+    bind!(r, b::ADD_MESH_SHAPE_1, |body, m, xform, _materials, settings| {
+        let (vertices, triangles) = mesh_of(m.as_raw(), |x| (placed(&x.vertices, xform), x.triangles.clone()));
+        add(body, Type::Mesh, Geometry::Mesh { vertices, triangles }, settings)
+    });
     bind!(r, b::REMOVE_SHAPE, remove);
     bind!(r, b::PURGE_SHAPES, |body| {
         let shapes = body::get(body).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
