@@ -11,6 +11,9 @@ use super::vbib::Packing;
 use super::vertex::Vertex;
 use crate::bitmap::bc;
 
+mod rigged;
+pub use rigged::*;
+
 pub const MODEL: &str = "models/compiled/crate.vmdl";
 pub const MATERIAL: &str = "materials/compiled/crate.vmat";
 pub const SKIN_MATERIAL: &str = "materials/compiled/crate_dark.vmat";
@@ -102,13 +105,16 @@ pub fn model() -> Model {
     let hull = Shapes { hulls: vec![(corners([-HALF, -HALF, 0.0], [HALF, HALF, 2.0 * HALF]), Ids::default())], ..Shapes::default() };
     Model {
         name: MODEL.into(),
-        meshes: vec![ModelMesh { name: "crate".into(), mesh: cube(HALF), group_mask: 1, lod_mask: 1 }, ModelMesh { name: "crate_lod1".into(), mesh: lod1, group_mask: 1, lod_mask: 2 }],
+        meshes: vec![
+            ModelMesh { name: "crate".into(), mesh: cube(HALF), group_mask: 1, lod_mask: 1, ..ModelMesh::default() },
+            ModelMesh { name: "crate_lod1".into(), mesh: lod1, group_mask: 1, lod_mask: 2, ..ModelMesh::default() },
+        ],
         mesh_groups: vec!["body".into()],
         default_group_mask: 1,
         lod_distances: vec![0.0, 400.0],
         material_groups: vec![MaterialGroup { name: "default".into(), materials: vec![MATERIAL.into()] }, MaterialGroup { name: "dark".into(), materials: vec![SKIN_MATERIAL.into()] }],
         bones: vec![Bone { name: "root".into(), parent: None, position: [0.0; 3], rotation: [0.0, 0.0, 0.0, 1.0] }],
-        physics: Some(Aggregate { parts: vec![part(hull, 20.0)], surfaces: vec![0], attributes: vec![vec!["solid".into()]] }),
+        physics: Some(Aggregate { parts: vec![part(hull, 20.0)], surfaces: vec![0], attributes: vec![vec!["solid".into()]], ..Aggregate::default() }),
         key_values: String::new(),
         ..Model::default()
     }
@@ -119,7 +125,26 @@ pub fn world_physics(ground: f32, boxes: &[([f32; 3], [f32; 3])]) -> Aggregate {
     let g = ground;
     let quad = TriMesh { vertices: vec![[-g, -g, 0.0], [g, -g, 0.0], [g, g, 0.0], [-g, g, 0.0]], triangles: vec![[0, 1, 2], [0, 2, 3]], materials: vec![], ids: Ids::default() };
     let hulls = boxes.iter().map(|(lo, hi)| (corners(*lo, *hi), Ids::default())).collect();
-    Aggregate { parts: vec![part(Shapes { meshes: vec![quad], hulls, ..Shapes::default() }, 0.0)], surfaces: vec![0], attributes: vec![vec!["solid".into(), "world".into()]] }
+    let attributes = vec![vec!["solid".into(), "world".into()]];
+    Aggregate { parts: vec![part(Shapes { meshes: vec![quad], hulls, ..Shapes::default() }, 0.0)], surfaces: vec![0], attributes, ..Aggregate::default() }
+}
+
+pub const SOUND: &str = "sounds/compiled/tone.vsnd";
+
+/// A 16-frame stereo PCM16 tone at 22050 Hz looping frames 4..12: left a ramp, right silent.
+pub fn sound() -> super::sound::Sound {
+    let stream = (0..16i16).flat_map(|i| [i * 1024, 0]).flat_map(i16::to_le_bytes).collect();
+    super::sound::Sound {
+        codec: super::sound::Codec::Pcm16,
+        rate: 22050,
+        channels: 2,
+        sample_count: 16,
+        duration: 16.0 / 22050.0,
+        loop_start: 4,
+        loop_end: 12,
+        format_header: Vec::new(),
+        stream,
+    }
 }
 
 /// (compiled path, bytes) of the crate model, its materials and texture.

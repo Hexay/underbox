@@ -120,13 +120,12 @@ pub fn register(r: &mut Registry) {
     });
 
     // Models never derive from another here, are never translucent as a whole, and carry no
-    // flex controllers, visemes or weight lists (`anim` reports zero of each).
+    // visemes or weight lists (`anim` reports zero of each; flex controllers are `anim::flex`).
     bind!(r, m::GET_BASE_MODEL_NAME, |_| StrRet::from(None::<String>));
     bind!(r, m::GET_BASE_MODEL, |_| super::Ref::NULL);
     bind!(r, m::IS_TRANSLUCENT, |_| false);
     bind!(r, m::IS_TRANSLUCENT_TWO_PASS, |_| false);
     bind!(r, m::HAS_SKINNED_MESHES, |r| on(r, |m| !crate::anim::data::by_name(&m.name).anim.skeleton.is_empty()));
-    bind!(r, m::GET_FLEX_CONTROLLER_NAME, |_, _| StrRet::from(None::<String>));
     bind!(r, m::GET_VISEME_INDEX, |_, _| -1);
     bind!(r, m::GET_VISEME_MORPH, |_, _, _| 0.0);
     bind!(r, m::GET_WEIGHTLIST_NAME, |_, _| StrRet::from(None::<String>));

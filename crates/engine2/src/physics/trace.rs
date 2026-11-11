@@ -74,8 +74,9 @@ fn tags(list: &[u32; 8]) -> impl Iterator<Item = &u32> {
     list.iter().filter(|t| **t != 0)
 }
 
-/// A hit, the shape object it landed on (from its collider's user_data, see shape::add) and its tags.
-type Found = (Hit, shape::Ref, Vec<u32>);
+/// A hit, the shape object it landed on (from its collider's user_data, see shape::add), its
+/// tags, and the triangle on a mesh shape.
+type Found = (Hit, shape::Ref, Vec<u32>, Option<u32>);
 
 /// Every candidate hit (or just the nearest, without a managed filter), with the world locked.
 fn candidates(req: &Request, all: bool) -> Vec<Found> {
@@ -88,7 +89,7 @@ fn candidates(req: &Request, all: bool) -> Vec<Found> {
         let hits = if wants_all { sim.trace_all(&sweep, &keep) } else { sim.trace(&sweep, &keep).into_iter().collect() };
         let owner = |h: &Hit| shape::from_user_data(sim.shape(h.shape).map_or(0, |c| c.user_data));
         let tags = |h: &Hit| sim.shape_meta(h.shape).map(|m| m.tags.clone()).unwrap_or_default();
-        hits.into_iter().map(|h| (h, owner(&h), tags(&h))).collect()
+        hits.into_iter().map(|h| (h, owner(&h), tags(&h), sim.triangle_at(h.shape, h.point))).collect()
     })
 }
 
@@ -100,7 +101,7 @@ fn result(req: &Request, found: Option<&Found>) -> PhysicsTrace_Result {
     let mut out = PhysicsTrace_Result::default();
     (out.start_pos, out.end_pos, out.hit_pos, out.fraction) = (req.start_pos, req.end_pos, req.end_pos, 1.0);
     (out.physics_body_handle, out.physics_shape_handle, out.surface_property, out.triangle_index) = (-1, -1, -1, -1);
-    let Some((hit, owner, tags)) = found else { return out };
+    let Some((hit, owner, tags, triangle)) = found else { return out };
     out.end_pos = from_vec(hit.position);
     out.hit_pos = from_vec(if req.use_hit_position != 0 { hit.point } else { hit.position });
     out.normal = from_vec(hit.normal);
@@ -109,6 +110,8 @@ fn result(req: &Request, found: Option<&Found>) -> PhysicsTrace_Result {
     if let Some(s) = shape::get(*owner) {
         out.physics_shape_handle = s.handle.id::<()>().id;
         out.physics_body_handle = body::get(s.body).map_or(-1, |b| b.handle.id::<()>().id);
+        out.surface_property = s.state.lock().unwrap().surface_at(*triangle);
+        out.triangle_index = triangle.map_or(-1, |t| t as i32);
     }
     for (slot, tag) in out.tags.iter_mut().zip(tags) {
         *slot = *tag;
@@ -119,10 +122,10 @@ fn result(req: &Request, found: Option<&Found>) -> PhysicsTrace_Result {
 /// The hits managed's filter (if any) allows, nearest first. Runs with no lock held.
 fn allowed(req: &Request, found: Vec<Found>) -> impl Iterator<Item = Found> {
     let filter = TraceFilter::from_raw(req.filter_delegate);
-    found.into_iter().filter(move |(_, s, _)| filter.is_none_or(|f| f.allows(handle_id(*s))))
+    found.into_iter().filter(move |(_, s, _, _)| filter.is_none_or(|f| f.allows(handle_id(*s))))
 }
 
-fn trace(req: Request) -> PhysicsTrace_Result {
+pub(super) fn trace(req: Request) -> PhysicsTrace_Result {
     let first = allowed(&req, candidates(&req, false)).next();
     result(&req, first.as_ref())
 }
@@ -131,7 +134,7 @@ fn trace(req: Request) -> PhysicsTrace_Result {
 fn trace_against(req: Request, target: Shape, at: Transform) -> PhysicsTrace_Result {
     let pose = physics::Pose::from_parts(to_vec(at.position), to_rot(at.rotation));
     let hit = sweep(&req).against(&target, pose);
-    result(&req, hit.map(|h| (h, NativeRef::NULL, Vec::new())).as_ref())
+    result(&req, hit.map(|h| (h, NativeRef::NULL, Vec::new(), None)).as_ref())
 }
 
 fn scaled(at: &Transform) -> (impl Fn(Vector3) -> physics::Vector, f32) {

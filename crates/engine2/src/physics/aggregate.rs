@@ -77,7 +77,11 @@ fn add_shapes(b: body::Ref, data: &PhysicsData, p: &Part) {
     s.spheres.iter().for_each(|x| add(shape::Type::Sphere, Shape::Sphere { center: pv(x.center), radius: x.radius }));
     s.capsules.iter().for_each(|x| add(shape::Type::Capsule, Shape::Capsule { a: pv(x.a), b: pv(x.b), radius: x.radius }));
     s.hulls.iter().for_each(|x| add(shape::Type::Hull, Shape::Hull { pose: Pose::IDENTITY, points: x.hull.vertices.iter().copied().map(pv).collect() }));
-    s.meshes.iter().for_each(|x| add(shape::Type::Mesh, Shape::Mesh { vertices: x.vertices.iter().copied().map(pv).collect(), triangles: x.triangles.clone() }));
+    for x in &s.meshes {
+        let mesh = Shape::Mesh { vertices: x.vertices.iter().copied().map(pv).collect(), triangles: x.triangles.clone() };
+        let slots = if x.materials.is_empty() { Vec::new() } else { data.surfaces.clone() };
+        shape::add_with_slots(b, shape::Type::Mesh, mesh, shape_settings(data, p), x.materials.clone(), slots);
+    }
 }
 
 fn pose(t: Transform) -> Pose {

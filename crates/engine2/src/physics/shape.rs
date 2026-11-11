@@ -31,6 +31,24 @@ pub struct State {
     pub ignore_traces: bool,
     pub local_velocity: abi::structs::Vector3,
     pub surface_index: i32,
+    /// Mesh shapes: each triangle's material slot, and each slot's surface (`SetSurfaceIndex`).
+    pub triangle_slots: Vec<u8>,
+    pub slot_surfaces: Vec<i32>,
+}
+
+impl State {
+    /// The surface at `triangle` (a mesh hit's), else the shape's own.
+    pub fn surface_at(&self, triangle: Option<u32>) -> i32 {
+        let slot = triangle.and_then(|t| self.triangle_slots.get(t as usize));
+        slot.and_then(|&s| self.slot_surfaces.get(usize::from(s))).copied().filter(|&s| s >= 0).unwrap_or(self.surface_index)
+    }
+
+    pub fn set_slot_surface(&mut self, slot: usize, surface: i32) {
+        if self.slot_surfaces.len() <= slot {
+            self.slot_surfaces.resize(slot + 1, -1);
+        }
+        self.slot_surfaces[slot] = surface;
+    }
 }
 
 pub struct Shape {
@@ -95,13 +113,25 @@ fn meta(settings: &PhysicsShapeSettings) -> ShapeMeta {
 }
 
 pub fn add(body_ref: body::Ref, kind: Type, geometry: Geometry, settings: PhysicsShapeSettings) -> HandleId<class::IPhysicsShape> {
+    add_with_slots(body_ref, kind, geometry, settings, Vec::new(), Vec::new())
+}
+
+/// As [`add`], for a mesh whose triangles use material slots mapped to surfaces (see [`State`]).
+pub fn add_with_slots(
+    body_ref: body::Ref,
+    kind: Type,
+    geometry: Geometry,
+    settings: PhysicsShapeSettings,
+    triangle_slots: Vec<u8>,
+    slot_surfaces: Vec<i32>,
+) -> HandleId<class::IPhysicsShape> {
     let id = body::with_sim(body_ref, |sim, id| {
         let shape = sim.add_shape(id, &geometry, surface(&settings))?;
         sim.update_shape_meta(shape, |m| *m = meta(&settings));
         Some(shape)
     });
     let Some(id) = id else { return HandleId::new(-1) };
-    let state = State { ignore_traces: settings.flags & IGNORE_TRACES != 0, local_velocity: settings.surface_velocity, surface_index: settings.surface_index };
+    let state = State { ignore_traces: settings.flags & IGNORE_TRACES != 0, local_velocity: settings.surface_velocity, surface_index: settings.surface_index, triangle_slots, slot_surfaces };
     let shape = Arc::new(Shape { body: body_ref, id, kind, handle: Handle::default(), geometry: Mutex::new(geometry), state: Mutex::new(state) });
     let r: Ref = objects::create_shared(shape.clone());
     body::with_sim(body_ref, |sim, _| sim.shape_mut(id).map(|c| c.user_data = r.addr() as u128));

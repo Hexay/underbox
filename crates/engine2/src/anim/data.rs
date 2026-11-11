@@ -31,8 +31,7 @@ fn read(path: &str) -> Option<String> {
 
 fn load(name: &str) -> ModelAnim {
     let Some(text) = read(&crate::model::source_path(name)) else {
-        let skeleton = crate::model::compiled::read(name).map(|m| crate::model::compiled::skeleton(&m)).unwrap_or_default();
-        return ModelAnim { skeleton, ..ModelAnim::default() };
+        return crate::model::compiled::read_rig(name).map(|m| crate::compiled::anim::model_anim(&m)).unwrap_or_default();
     };
     anim::source::vmdl::read(&text, &|p| read(p))
         .inspect_err(|e| abi::rt::log::warn(&format!("{name}: animation data: {e:?}")))
