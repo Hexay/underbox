@@ -193,7 +193,7 @@ fn froxels_blend_with_their_history() {
     assert_eq!(at(&lit(0.0), KEY)[0], 0.0, "dark first frame");
     let first = at(&lit(1.0), KEY);
     assert!(first[0] > 0.0 && first[0] < alone[0] * 0.5, "partly lit after one frame: {first:?} of {alone:?}");
-    let settled = (0..60).map(|_| at(&lit(1.0), KEY)).last().unwrap();
+    let settled = (0..60).fold(first, |_, _| at(&lit(1.0), KEY));
     // History is stored at half precision.
     assert!(settled.iter().zip(alone).all(|(a, b)| (a - b).abs() <= b.abs() * 2e-3), "converged: {settled:?} to {alone:?}");
 }

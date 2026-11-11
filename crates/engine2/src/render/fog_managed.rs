@@ -81,7 +81,9 @@ fn binned_lights(handle: usize, count: usize) -> Vec<FogLight> {
 /// `GpuLight`s (LightBinnerFeature.Lights.cs, packed: 39 words) that light fog, as fog lights.
 pub(crate) fn lights_from(bytes: &[u8]) -> Vec<FogLight> {
     bytes
-        .chunks_exact(LIGHT_BYTES)
+        .as_chunks::<LIGHT_BYTES>()
+        .0
+        .iter()
         .filter_map(|l| {
             let w = words(l);
             // LightToWorld's rows hold forward/left/up/position as columns.
