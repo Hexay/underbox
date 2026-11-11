@@ -106,3 +106,30 @@ fn hammer_point_light_is_not_blown_out() {
     assert!(!grey.is_empty(), "the top face is lit");
     assert!(grey.iter().all(|r| (80..140).contains(r)), "top face near 0.42 of white, got {:?}", grey.iter().max());
 }
+
+/// Managed's `FogConstants` (standin_fog.hlsl): a ramp over 0..1 units fully fogs the cube green;
+/// a ramp starting past it leaves the cube as it was.
+#[test]
+fn analytic_fog_covers_the_cube() {
+    let fog = |start: f32| {
+        // Control (weight, max opacity, ramp, no height), distance (start, end, exponent), colour, layer.
+        let floats: [f32; 24] = [1.0, 1.0, 0.0, 0.0, start, start + 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0];
+        let bytes: Vec<u8> = floats.iter().flat_map(|f| f.to_le_bytes()).collect();
+        Lighting { ambient: Vec4::ONE, fog: Some(bytes.into()), ..Default::default() }
+    };
+    let Some(fogged) = standin_cube([1.0; 4], &fog(0.0)) else { return };
+    assert_eq!(fogged.texel(32, 32)[..3], [0u8, 255, 0][..], "the fog colour");
+    let clear = standin_cube([1.0; 4], &fog(1000.0)).unwrap();
+    assert!(clear.texel(32, 32)[0] > 100, "out of the fog's range: {:?}", clear.texel(32, 32));
+}
+
+/// A program cache entry is stale once the shader's source is another `Arc`, even an equal one.
+#[test]
+fn reloaded_source_invalidates_cached_programs() {
+    let empty = || std::sync::Arc::new(shaders::VfxShader::parse("", std::path::Path::new("x.shader"), &shaders::IncludePaths::new(Vec::new())).unwrap());
+    let (a, b) = (empty(), empty());
+    assert!(super::Generation(Some(a.clone())) == super::Generation(Some(a.clone())));
+    assert!(super::Generation(Some(a)) != super::Generation(Some(b.clone())));
+    assert!(super::Generation(Some(b)) != super::Generation(None));
+    assert!(super::generation(standin::PATH) == super::Generation(None), "stand-ins never reload");
+}

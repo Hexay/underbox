@@ -87,6 +87,10 @@ impl Kind {
     }
 }
 
+pub fn is_path(path: &str) -> bool {
+    matches!(path, PATH | SKY_PATH | GIZMO_LINE_PATH | GIZMO_SPRITE_PATH)
+}
+
 /// The stand-in source cached under `path`, or `None` when `path` isn't a stand-in key.
 pub fn shader(path: &str, includes: &IncludePaths) -> Option<Result<VfxShader, String>> {
     let source = match path {
