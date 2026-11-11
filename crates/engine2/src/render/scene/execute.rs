@@ -6,7 +6,7 @@ use super::layer::{self, Kind, flags, layer_type};
 use super::view::{self, SceneView};
 use crate::handles::Kind as ObjectKind;
 use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
-use crate::render::lighting::{Lighting, shadow};
+use crate::render::lighting::{Lighting, local_shadow, shadow};
 use crate::render::{context, device, texture};
 use crate::scene::object;
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
@@ -42,6 +42,7 @@ pub fn run(v: view::Ref) {
     };
     let mut lighting = Lighting::collect(&worlds, view.ambient);
     shadow::render(&mut lighting, &worlds, view.view_proj);
+    local_shadow::render(&mut lighting, &worlds);
     immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {
         run_layer(&view, v, ctx, l);

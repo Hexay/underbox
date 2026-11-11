@@ -7,6 +7,7 @@
 //! [`Lighting::fallback`], the fixed light the stand-in shader used to hard-code, rather than black.
 
 mod blocks;
+pub mod local_shadow;
 pub mod shadow;
 
 pub use blocks::BLOCKS;
@@ -52,6 +53,8 @@ pub struct Lighting {
     pub lights: Vec<Light>,
     /// The sun's shadow map, once shadow.rs has drawn it for the view.
     pub shadow: Option<shadow::SunShadow>,
+    /// Point and spot shadow tiles, once local_shadow.rs has drawn them.
+    pub local: Option<local_shadow::LocalShadows>,
 }
 
 impl Lighting {

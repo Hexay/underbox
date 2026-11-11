@@ -105,8 +105,12 @@ native model one to one, so managed's pipeline code runs unchanged:
    mode's material, the state's attributes and the context's (`ContextBindings`), so managed's
    constant buffers and `BindTexture` slots reach the binder. `DrawModelDrawCall`
    (`draw/draw_call.rs`) draws one mesh draw call with managed's instance-id buffer as the
-   instance stream and transforms from the `g_TransformBuffer` attribute; its indirect forms are
-   TODO. `BlitTexture` copies or draws through `draw::blit` (scales and converts formats).
+   instance stream and transforms from the `g_TransformBuffer` attribute; the indirect forms read
+   their args back from the GPU buffer. Managed's culled draws only get an `InstanceCount` from
+   `occlusion_cull_cs`, which `render/compute/occlusion.rs` emulates on the CPU (nothing is
+   occluded). `BlitTexture` copies or draws through `draw::blit` (scales, converts formats,
+   applies `nSrgbTransfer`; swap-chain binds write sRGB like native).
+   `draw/draw_call_tests.rs` is the headless repro: one box with managed-shaped view constants.
 6. Scene objects own a copy of their model handle (`model::copy`): managed's `FromNative` wrappers
    destroy what they're handed, which used to empty the object.
 
@@ -161,9 +165,10 @@ sun, the rest are binned) plus the camera's `ambientColor`; worlds without light
 fixed sun so unlit test scenes keep their goldens. It fills `ViewLightingConfigV2`,
 `DirectionalLightCB`, `ClusteredLightingConstants` (one cluster holding every light) and
 `BinnedLightBufferV2` in s&box's layouts, read back from the WGSL (`shading/layout.rs`).
-Falloff is our own packing (`blocks.rs::falloff`). Sun shadows: one 2048² depth map fitted to
-the view frustum and texel-snapped (`lighting/shadow.rs`), sampled by the stand-in with 3×3 PCF
-as `g_tUnderboxSunShadow`. Point and spot shadows are TODO.
+Falloff is packed as native does (see `blocks.rs` module docs). Sun shadows: one 2048² depth map
+fitted to the view frustum and texel-snapped (`lighting/shadow.rs`), sampled by the stand-in with
+3×3 PCF as `g_tUnderboxSunShadow`. Point and spot shadows: a 4×4 atlas of 512² tiles, six per
+point light and one per spot (`lighting/local_shadow.rs`), named by sentinel `ShadowMapIndex`.
 
 ## Headless path and frame-hash tests
 
@@ -192,6 +197,7 @@ as `g_tUnderboxSunShadow`. Point and spot shadows are TODO.
 - `tools/client-frame.sh` boots the client on `corpus/showroom` (camera, sun, three dev boxes on
   a plane), checks the last frames settled on one hash and compares it with
   `corpus/showroom/golden.tsv` per adapter (`UNDERBOX_BLESS=1` records); `target/client-frame/frame.png`.
+  `MANAGED=1` does the same through managed's scene renderer (`golden-managed.tsv`).
 
 ## Windows and input (SDL)
 
@@ -266,17 +272,15 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. `r_managed_scene` frames show only the clear colour: `DrawModelDrawCall` runs for every mesh
-   (scene models report `IsOpaque`, contexts carrying managed's `PerViewConstantBuffer_t` clear
-   and test depth reverse-Z, `BlitTexture` converts into the swap chain), yet nothing lands.
-   Suspects: managed's view-constant and `g_TransformBuffer` byte layouts against the stand-in's
-   WGSL blocks, and the instance-id stream offset. Build a headless repro (one box, one
-   `DrawModelDrawCall`, read back) before another boot. `+r_managed_scene_compare 20` logs the
-   mirror and writes both frames.
-2. Point and spot shadows (`AddShadowView` returns null; `PackSceneLight` answers -1). Combos are
-   always 0/0 (TODO).
-3. `DrawModelDrawCallIndirect`/`MultiIndirect` (occlusion-culled draws), `ctx::SET_DYNAMIC_
-   CONSTANT_BUFFER_DATA`, `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet).
+1. `r_managed_scene` lighting: geometry matches the native frame, but local lights are missing
+   (`clustered_light_culling_cs` is skipped, so cluster counts stay 0) and the sun reads weaker
+   than native. Dump managed's `DirectionalLightCB` bytes against `blocks.rs` before guessing.
+   Other skipped compute: `depthresolve_cs`, `cmaa2_cs`, `downsample_spd` (`render/compute/`).
+2. Managed's shadows: `AddShadowView` returns null and `PackSceneLight` answers -1; the stand-in
+   samples only our own maps (sentinel indices), so managed's draw unshadowed. Combos are always
+   0/0 (TODO).
+3. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
+   CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
 4. Real bindless descriptor sets, a cube-sampling sky stand-in, compiled-texture loading.
 5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
-   generation, the sRGB flag of `BlitTexture`.
+   generation.

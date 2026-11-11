@@ -31,7 +31,7 @@
           "__guid": "7b4c3d6e-9c8f-4f47-8dba-3a4f5e6d7c8b",
           "LightColor": "1,0.45,0.15,1",
           "Radius": 160,
-          "Shadows": false
+          "Shadows": true
         }
       ]
     },
@@ -50,7 +50,7 @@
           "Radius": 400,
           "ConeInner": 15,
           "ConeOuter": 30,
-          "Shadows": false
+          "Shadows": true
         }
       ]
     },

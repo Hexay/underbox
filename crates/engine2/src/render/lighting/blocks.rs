@@ -8,13 +8,13 @@
 //! `FalloffBias = 1 / (r²·q)` so `saturate(1 / (q·d²) - bias)` reaches 0 at the radius. Map lights
 //! carry Hammer's colour × 10000 with q = 1, so 1 at 100 units; components carry q = 1e-4.
 
-use super::{Light, Lighting, shadow};
+use super::{Light, Lighting, local_shadow, shadow};
 use crate::render::shading::layout::{Block, Value};
 use crate::render::texture;
 use glam::{Mat4, Vec4};
 
 /// Uniform blocks this module fills.
-pub const BLOCKS: [&str; 3] = ["ViewLightingConfigV2", "DirectionalLightCB", "ClusteredLightingConstants"];
+pub const BLOCKS: [&str; 4] = ["ViewLightingConfigV2", "DirectionalLightCB", "ClusteredLightingConstants", local_shadow::BLOCK];
 
 fn v(x: f32, y: f32, z: f32, w: f32) -> Option<Value> {
     Some(Value::Vec(Vec4::new(x, y, z, w)))
@@ -46,7 +46,8 @@ impl Light {
         Vec4::new(ci, co, 1.0 / (ci - co).max(1e-4), outer.tan())
     }
 
-    fn binned(&self, name: &str) -> Option<Value> {
+    /// A `BinnedLightBufferV2` member; `shadow` is the light's first local shadow tile.
+    fn binned(&self, name: &str, shadow: Option<u32>) -> Option<Value> {
         let (linear, quadratic, bias) = self.falloff();
         match name {
             "Type" => s(self.kind as f32),
@@ -61,7 +62,8 @@ impl Light {
             "RadiusSquared" => s(self.radius * self.radius),
             "SpotLightInnerOuterConeCosines" => Some(Value::Vec(self.cone_cosines())),
             "FogIntensity" => s(self.fog),
-            "ShadowMapIndex" | "LightCookieTextureIndex" | "ShadowMaskTextureIndex" => s(u32::MAX as f32),
+            "ShadowMapIndex" => s(shadow.map_or(u32::MAX, |t| local_shadow::INDEX + t) as f32),
+            "LightCookieTextureIndex" | "ShadowMaskTextureIndex" => s(u32::MAX as f32),
             _ => None,
         }
     }
@@ -75,6 +77,7 @@ impl Lighting {
             ("ViewLightingConfigV2", "NumLights") => v(n, 0.0, 0.0, 0.0),
             ("ViewLightingConfigV2", "AmbientLightColor") => Some(Value::Vec(self.ambient)),
             ("DirectionalLightCB", _) => self.sun_constant(name),
+            (local_shadow::BLOCK, local_shadow::MATRICES) => self.local.as_ref().map(|l| Value::Array(l.tiles.iter().copied().map(Value::Mat).collect())),
             ("ClusteredLightingConstants", "ClusterCounts") => v(1.0, 1.0, 1.0, 1.0),
             ("ClusteredLightingConstants", "ClusterInvCounts") => v(1.0, 1.0, 1.0, 0.0),
             ("ClusteredLightingConstants", "ClusterZParams") => v(1.0, 0.0, 1e-3, 1e9),
@@ -100,9 +103,13 @@ impl Lighting {
         }
     }
 
-    /// A texture the lighting supplies by shader name (the sun's shadow map).
+    /// A texture the lighting supplies by shader name (the shadow maps).
     pub fn texture(&self, name: &str) -> Option<texture::Ref> {
-        self.shadow.as_ref().filter(|_| name == shadow::TEXTURE).map(|s| s.map)
+        match name {
+            shadow::TEXTURE => self.shadow.as_ref().map(|s| s.map),
+            local_shadow::TEXTURE => self.local.as_ref().map(|l| l.map),
+            _ => None,
+        }
     }
 
     /// A structured buffer's bytes for elements laid out as `element`; `None` for buffers this
@@ -110,7 +117,10 @@ impl Lighting {
     pub fn storage(&self, name: &str, element: &Block) -> Option<Vec<u8>> {
         let n = self.lights.len();
         Some(match name {
-            "BinnedLightBufferV2" => element.fill_elements(n, |i, f| self.lights[i].binned(f)),
+            "BinnedLightBufferV2" => {
+                let first = |i: usize| self.local.as_ref().and_then(|l| l.first.get(i).copied().flatten());
+                element.fill_elements(n, |i, f| self.lights[i].binned(f, first(i)))
+            }
             "ClusterLightCounts" => element.fill_elements(1, |_, _| s(n as f32)),
             "ClusterLightIndices" => element.fill_elements(n, |i, _| s(i as f32)),
             "ClusterEnvMapCounts" | "ClusterDecalCounts" | "ClusterEnvMapIndices" | "ClusterDecalIndices" => element.fill_elements(1, |_, _| None),
