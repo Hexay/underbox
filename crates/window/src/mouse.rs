@@ -23,15 +23,26 @@ pub fn focus() -> Window {
 }
 
 pub fn set_relative_mode(window: Window, relative: bool) -> bool {
+    if crate::relative::is_on(window) {
+        return crate::relative::set(window, relative);
+    }
     // SAFETY: SDL validates the window.
     let ok = unsafe { SDL_SetWindowRelativeMouseMode(window.0, relative) };
+    if ok || !relative {
+        return ok;
+    }
     // No pointer to capture without a window manager (see windows::no_window_manager).
-    ok || crate::windows::no_window_manager()
+    if crate::windows::no_window_manager() {
+        return true;
+    }
+    // SAFETY: SDL validates the window (an unknown one has id 0).
+    let live = unsafe { sdl3_sys::video::SDL_GetWindowID(window.0).0 != 0 };
+    live && crate::relative::set(window, true)
 }
 
 pub fn relative_mode(window: Window) -> bool {
     // SAFETY: SDL validates the window.
-    unsafe { SDL_GetWindowRelativeMouseMode(window.0) }
+    crate::relative::is_on(window) || unsafe { SDL_GetWindowRelativeMouseMode(window.0) }
 }
 
 pub fn warp(window: Window, x: f32, y: f32) {

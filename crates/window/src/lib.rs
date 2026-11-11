@@ -18,6 +18,7 @@ pub mod handle;
 pub mod keyboard;
 pub mod mouse;
 pub mod props;
+pub mod relative;
 pub mod surface;
 pub mod video;
 pub mod windows;
