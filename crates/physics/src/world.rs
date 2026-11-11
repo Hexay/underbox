@@ -71,9 +71,9 @@ impl Default for World {
     fn default() -> Self {
         let mut inner = PhysicsWorld::new();
         inner.integration_parameters.length_unit = INCHES_PER_METRE;
-        // Fitted to real engine2's box landings (docs/differential.md, divergence 2): at 50 Hz a
-        // falling prop moves ~11 in a tick, past Rapier's default 0.8 in speculative margin.
-        inner.integration_parameters.normalized_prediction_distance = 0.4;
+        // Fitted to real engine2's box landings (docs/differential.md, divergence 2). A wider
+        // speculative margin fitted better but kept bodies near animated ones awake (zoo chairs).
+        inner.integration_parameters.num_internal_pgs_iterations = 2;
         inner.integration_parameters.num_internal_stabilization_iterations = 3;
         inner.gravity = DEFAULT_GRAVITY;
         Self {

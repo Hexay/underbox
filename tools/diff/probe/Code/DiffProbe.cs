@@ -8,7 +8,7 @@ using System.Globalization;
 /// </summary>
 public sealed class DiffProbe : Component
 {
-	static readonly int[] Ticks = { 1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150 };
+	static readonly int[] Ticks = { 1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 250 };
 	static readonly Angles[] Tilts = { new( 0, 0, 0 ), new( 45, 0, 0 ), new( 0, 0, 45 ), new( 30, 45, 15 ), new( 60, 10, 0 ), new( 10, 10, 10 ), new( 89, 0, 0 ), new( 35, 45, 0 ) };
 	readonly List<Rigidbody> bodies = new();
 	GameObject errorProp;
@@ -33,6 +33,7 @@ public sealed class DiffProbe : Component
 		for ( int i = 0; i < Tilts.Length; i++ )
 			bodies.Add( Body( $"Tilt{i}", new Vector3( -600 + 150 * i, -800, 200 ), Rotation.From( Tilts[i] ), sphere: false, gravity: true ) );
 		errorProp = ProbeExtras.ErrorProp( new Vector3( 0, -1400, 300 ) );
+		bodies.Add( ProbeExtras.ErrorChair( new Vector3( 600, -1400, 0 ) ) );
 		Mark( $"START bodies={bodies.Count}" );
 	}
 
@@ -56,7 +57,7 @@ public sealed class DiffProbe : Component
 		if ( System.Array.IndexOf( Ticks, tick ) >= 0 )
 		{
 			foreach ( var b in bodies )
-				Mark( $"POS t={tick} {b.GameObject.Name} pos={V( b.WorldPosition )} vel={V( b.Velocity )} ang={V( b.WorldRotation.Angles().AsVector3() )}" );
+				Mark( $"POS t={tick} {b.GameObject.Name} pos={V( b.WorldPosition )} vel={V( b.Velocity )} ang={V( b.WorldRotation.Angles().AsVector3() )} sleep={b.PhysicsBody.Sleeping}" );
 		}
 		if ( tick == 5 )
 		{

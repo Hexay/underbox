@@ -56,6 +56,20 @@ public static class ProbeExtras
 		return go;
 	}
 
+	/// Sandbox's car seat with a missing model: the error model's hull plus a sphere high up on a
+	/// child, resting on the slab. Real puts it to sleep.
+	public static Rigidbody ErrorChair( Vector3 at )
+	{
+		var go = new GameObject( true, "ErrorChair" );
+		go.WorldPosition = at;
+		go.Components.Create<ModelCollider>().Model = Model.Load( "models/does_not_exist.vmdl" );
+		var body = go.Components.Create<Rigidbody>();
+		var head = new GameObject( go, true, "head" );
+		head.LocalPosition = new Vector3( 1.74f, 0, 52.7f );
+		head.Components.Create<SphereCollider>().Radius = 8;
+		return body;
+	}
+
 	/// The error prop's shapes, then rays at it from each side.
 	public static void ErrorShapes( GameObject go, Scene scene )
 	{

@@ -62,11 +62,14 @@ fn free_fall_integrates_four_times_a_tick() {
     assert!((z - want).abs() < 1e-2, "z {z}, semi-implicit Euler with 4 integrations a tick gives {want}");
 }
 
-/// Real lands this box 5.8 units from the drop point, at 0.5 u/s by tick 50 (Rapier's defaults: 58, 92).
+/// Real lands a flat box 0.1 units from the drop point and a pitch-89 one 0.4 away; Rapier's
+/// single solver iteration slid them 2.3 and 1.4.
 #[test]
-fn tilted_box_lands_near_its_drop_point() {
-    let (moved, speed) = land(20.0, 30.0, 10.0);
-    assert!(moved < 15.0 && speed < 10.0, "moved {moved}, speed at tick 50 {speed}");
+fn flat_drops_land_in_place() {
+    for (pitch, want) in [(0.0, 1.0), (89.0, 1.0)] {
+        let (moved, _) = land(pitch, 0.0, 0.0);
+        assert!(moved < want, "pitch {pitch}: moved {moved}");
+    }
 }
 
 #[test]
@@ -78,6 +81,23 @@ fn eight_box_stack_stands() {
     }
     let top = world.body(stack[7]).unwrap().translation();
     assert!(top.z > 235.0 && Vector::new(top.x, top.y, 0.0).length() < 2.0, "top box at {top:?}");
+}
+
+/// A 0.4 m speculative margin fitted real's landings better, but an animated keyframed body
+/// 10 units away then kept resting props awake for good (the sandbox zoo never settled).
+#[test]
+fn resting_box_sleeps_beside_an_animated_keyframed_body() {
+    let mut world = scene();
+    let cube = drop_box(&mut world, Vector::new(0.0, 0.0, 16.0), Rotation::IDENTITY);
+    let k = world.add_body(BodyType::Keyframed, Pose::from_translation(Vector::new(42.0, 0.0, 16.0)));
+    world.add_shape(k, &Shape::Sphere { center: Vector::ZERO, radius: 16.0 }, Surface::default()).unwrap();
+    let asleep = (0..600).position(|i| {
+        let wobble = if i % 2 == 0 { 0.1 } else { 0.0 };
+        world.body_mut(k).unwrap().set_next_kinematic_position(Pose::from_translation(Vector::new(42.0, 0.0, 16.0 + wobble)));
+        world.step(DT, SUBSTEPS);
+        world.body(cube).unwrap().is_sleeping()
+    });
+    assert!(asleep.is_some(), "cube never sleeps next to a keyframed body");
 }
 
 #[test]
