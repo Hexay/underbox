@@ -27,6 +27,9 @@ pub struct Instance {
     pub tint: [f32; 4],
 }
 
+/// Managed's analytic fog block, which the camera's attributes carry (`Lighting::fog`).
+const FOG_BLOCK: &str = "FogConstants";
+
 /// What one draw brings to its material program.
 pub struct Inputs<'a> {
     pub view: &'a View,
@@ -172,7 +175,8 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
     Ok(match b.ty {
         B::Buffer { ty: wgpu::BufferBindingType::Uniform, .. } => {
             let block = s.blocks.get(&(b.group, b.binding)).ok_or_else(|| format!("no layout for block {}", b.name))?;
-            let bytes = match (inputs.constant_buffer(&b.name), b.name.as_str()) {
+            let view_fog = || (b.name == FOG_BLOCK).then(|| inputs.lighting.fog.clone()).flatten();
+            let bytes = match (inputs.constant_buffer(&b.name).or_else(view_fog), b.name.as_str()) {
                 (Some(given), _) => block_bytes(&given, block.size),
                 (None, view::BLOCK) => block.fill(|n| inputs.view.constant(n)),
                 (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n)),

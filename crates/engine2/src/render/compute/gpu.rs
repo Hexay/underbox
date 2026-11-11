@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Run `shader` over `threads`; `Err` when it doesn't translate or bind.
 pub fn dispatch(gpu: &render::Gpu, shader: &str, attrs: &[attributes::Ref], threads: [u32; 3]) -> Result<(), String> {
     let program = shading::compute(gpu, shader, attrs)?;
-    let view = View { view_proj: glam::Mat4::IDENTITY, viewport: [0.0; 4], target: [1.0; 2] };
+    let view = View { view_proj: glam::Mat4::IDENTITY, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
     let (lighting, textures) = (Lighting::default(), HashMap::new());
     let inputs = bind::Inputs { view: &view, lighting: &lighting, instances: &[], textures: &textures, values: &[], attributes: attrs, slots: &[], targets: &[] };
     let groups = gpu.checked(|| bind::bind_groups(gpu, &program, &inputs)).and_then(|g| g)?;

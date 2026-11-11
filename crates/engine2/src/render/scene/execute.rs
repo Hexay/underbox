@@ -85,6 +85,7 @@ pub fn run(v: view::Ref) {
         (s.layers.clone(), s.worlds.clone(), !s.parent.is_null())
     };
     let mut lighting = Lighting::collect(&worlds, view.ambient);
+    (lighting.tone_map, lighting.fog) = (view.environment.tone_map, view.environment.fog.clone());
     // Child views (the 3D skybox) are lit without shadow maps, as native's.
     if !child {
         shadow::render(&mut lighting, &worlds, view.view_proj);
@@ -165,6 +166,11 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
                 abi::callbacks::sandbox_rendering_render_pipeline::on_scene_view_submitted(child);
             }
         }
+        Kind::Exposure { tonemap, src } => {
+            let vp = t.viewport;
+            let rect = abi::structs::NativeRect { x: vp.m_n_top_left_x, y: vp.m_n_top_left_y, w: vp.m_n_width, h: vp.m_n_height };
+            crate::render::exposure::record(abi::NativeRef::from_raw(tonemap as *mut _), src, rect);
+        }
         Kind::Procedural(_) | Kind::Label => {}
     }
 }
@@ -197,6 +203,9 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
                 let material = s.material_override.as_ref().and_then(|m| m.material());
                 draws.extend(sky(model_draw::tint(s.tint), material, view.view_proj, ContextBindings::default()));
             }
+            continue;
+        }
+        if !super::pvs::visible(view.camera.origin, &obj, &s) {
             continue;
         }
         let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };

@@ -111,6 +111,29 @@ fn skybox_world_draws_behind_the_main_world() {
     assert_eq!(f.texel(2, 2), [115, 153, 217, 255], "sky elsewhere");
 }
 
+/// `world::fixture::visibility`'s clusters, with the camera's (1, x -256..256) seeing only
+/// itself: the cube draws while its bounds sit in cluster 1, not once they sit in cluster 2.
+#[test]
+fn pvs_hides_objects_in_clusters_the_camera_cannot_see() {
+    device::create().expect("a wgpu adapter");
+    let (w, cam) = scene();
+    let vis = ::world::vis::Visibility { rows: vec![0b011, 0b010, 0b110, 0b100, 0b110], ..::world::fixture::visibility() };
+    let pvs: crate::world::pvs::Ref = objects::create(crate::world::pvs::Pvs(Some(vis)));
+    *world::get(w).unwrap().pvs.lock().unwrap() = pvs.addr();
+    let cube: object::Ref = abi::NativeRef::from_raw(world::get(w).unwrap().objects.lock().unwrap()[0] as *mut _);
+    let center_with_bounds = |x: f32| {
+        object::with(cube, |s| (s.bounds.mins, s.bounds.maxs) = (crate::math::vec3(x, -8.0, -8.0), crate::math::vec3(x + 16.0, 8.0, 8.0)));
+        let color = texture::create_target("pvs", SIZE, SIZE, 0);
+        assert!(camera::render_to_texture(cam, color, Default::default(), Default::default()));
+        read(color).texel(32, 32).to_vec()
+    };
+    let sky = vec![115, 153, 217, 255];
+    assert_ne!(center_with_bounds(-8.0), sky, "cluster 1 is visible");
+    assert_eq!(center_with_bounds(300.0), sky, "cluster 2 is hidden");
+    *world::get(w).unwrap().pvs.lock().unwrap() = 0;
+    objects::destroy(pvs);
+}
+
 #[test]
 fn render_to_texture_and_bitmap() {
     device::create().expect("a wgpu adapter");

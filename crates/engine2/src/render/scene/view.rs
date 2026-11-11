@@ -48,7 +48,17 @@ pub struct SceneView {
     pub post_process: bool,
     /// The camera's `ambientColor` attribute.
     pub ambient: Vec4,
+    pub environment: Environment,
     pub state: Mutex<ViewState>,
+}
+
+/// What the camera's attributes set for its views' shading: the exposure (render/exposure.rs)
+/// and managed's `FogConstants` / `SkyboxFogConstants` (shading/standin_fog.hlsl).
+#[derive(Clone, Default)]
+pub struct Environment {
+    pub tone_map: Option<f32>,
+    pub fog: Option<Arc<[u8]>>,
+    pub skybox_fog: Option<Arc<[u8]>>,
 }
 
 /// What a camera render decides about its view before the layers are added.
@@ -64,6 +74,7 @@ pub struct Desc {
     pub exclude_tags: Vec<u32>,
     pub post_process: bool,
     pub ambient: Vec4,
+    pub environment: Environment,
     pub unique_id: i32,
     pub managed_camera_id: i32,
 }
@@ -85,6 +96,7 @@ pub fn create(d: Desc) -> Ref {
         exclude_tags: d.exclude_tags,
         post_process: d.post_process,
         ambient: d.ambient,
+        environment: d.environment,
         state: Mutex::new(state),
     };
     let r: Ref = objects::create(view);

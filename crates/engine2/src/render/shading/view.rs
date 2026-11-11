@@ -12,6 +12,8 @@ pub struct View {
     pub viewport: [f32; 4],
     /// Render target size in pixels.
     pub target: [f32; 2],
+    /// `g_flToneMapScalarLinear`, the view's exposure.
+    pub tone_map: f32,
 }
 
 /// The block's binding name, as DXC names the cbuffer.
@@ -52,7 +54,8 @@ impl View {
             "g_vCameraPositionWs" | "g_vMiddleEyePositionWs" => Some(Value::Vec(self.camera_position())),
             "g_vCameraDirWs" => Some(Value::Vec(self.camera_axes().0)),
             "g_vCameraUpDirWs" => Some(Value::Vec(self.camera_axes().1)),
-            "g_flToneMapScalarLinear" | "g_flLightMapScalar" | "g_flEnvMapScalar" | "g_flToneMapScalarGamma" | "g_flViewportMaxZ" => v(1.0, 0.0, 0.0, 0.0),
+            "g_flToneMapScalarLinear" => v(self.tone_map, 0.0, 0.0, 0.0),
+            "g_flLightMapScalar" | "g_flEnvMapScalar" | "g_flToneMapScalarGamma" | "g_flViewportMaxZ" => v(1.0, 0.0, 0.0, 0.0),
             "g_vInvViewportSize" => v(1.0 / w.max(1.0), 1.0 / h.max(1.0), 0.0, 0.0),
             "g_vViewportOffset" => v(x, y, 0.0, 0.0),
             "g_vViewportSize" => v(w, h, 0.0, 0.0),
@@ -75,7 +78,7 @@ mod tests {
     fn camera_position_from_view_projection() {
         let eye = Vec3::new(3.0, -2.0, 5.0);
         let vp = glam::camera::rh::proj::directx::perspective(1.0, 1.5, 0.5, 100.0) * glam::camera::rh::view::look_at_mat4(eye, Vec3::ZERO, Vec3::Y);
-        let view = View { view_proj: vp, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0] };
+        let view = View { view_proj: vp, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0], tone_map: 1.0 };
         assert!(view.camera_position().truncate().distance(eye) < 1e-3);
         let (forward, up) = view.camera_axes();
         assert!(forward.truncate().distance(-eye.normalize()) < 1e-3, "{forward}");

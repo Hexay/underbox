@@ -6,6 +6,7 @@
 pub mod camera;
 pub mod execute;
 pub mod layer;
+mod pvs;
 pub mod setup;
 pub mod skybox;
 pub mod system;

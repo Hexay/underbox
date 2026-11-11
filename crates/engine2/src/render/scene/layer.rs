@@ -37,6 +37,8 @@ pub enum Kind {
     Blit { src: texture::Ref, src_viewport: RenderViewport, srgb: bool },
     /// A child view run at this point (the 3D skybox), owned by the layer.
     View(view::Ref),
+    /// `AddAutoExposure`: measure `src` for the tonemap system at this address (render/exposure.rs).
+    Exposure { tonemap: usize, src: texture::Ref },
 }
 
 #[derive(Default)]

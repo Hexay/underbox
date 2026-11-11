@@ -58,6 +58,7 @@ pub fn layer(view: usize, layer: &SceneLayer, t: &Target, draws: &[Draw]) {
         Kind::Procedural(_) => "procedural".into(),
         Kind::Blit { src, .. } => format!("blit({})", describe(src)),
         Kind::View(child) => format!("view({:#x})", child.addr()),
+        Kind::Exposure { src, .. } => format!("exposure({})", describe(src)),
     };
     let msg = format!("layer: view {view:#x} '{}' {kind} -> {} / {} draws {} with material {}", layer.name, describe(t.color), describe(t.depth), draws.len(), draws.iter().filter(|d| d.shaded.is_some()).count());
     abi::rt::log::log(abi::rt::log::Level::Info, &msg);

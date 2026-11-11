@@ -36,7 +36,7 @@ fn scene_renderer_mesh_builds_and_binds() {
     let inputs = vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).expect("mesh layout feeds the shader");
     assert!(!inputs.keys.is_empty());
 
-    let view = View { view_proj: Mat4::IDENTITY, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0] };
+    let view = View { view_proj: Mat4::IDENTITY, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0], tone_map: 1.0 };
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
     let lighting = Lighting::fallback();

@@ -102,6 +102,7 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
         exclude_tags,
         post_process: field!(get bool, c::GET_ENABLE_POSTPROCESSING, a),
         ambient: attributes::vector4(attrs, StringToken::of("ambientColor")).map_or(Vec4::ZERO, |c| Vec4::new(c.vec.x, c.vec.y, c.vec.z, c.vec.w)),
+        environment: environment(attrs),
         unique_id: field!(get i32, c::GET_VIEW_UNIQUE_ID, a),
         managed_camera_id: camera_id,
     };
@@ -127,6 +128,16 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
     objects::destroy(s);
     view::destroy(v);
     true
+}
+
+/// The exposure (one frame update per render) and fog the camera's attributes carry.
+fn environment(attrs: attributes::Ref) -> view::Environment {
+    let tonemap = attributes::pointer(attrs, StringToken::of("ITonemapSystem"));
+    view::Environment {
+        tone_map: tonemap.map(|t| crate::render::exposure::frame_update(NativeRef::from_raw(t as *mut _), true)),
+        fog: attributes::constant_buffer(attrs, "FogConstants"),
+        skybox_fog: attributes::constant_buffer(attrs, "SkyboxFogConstants"),
+    }
 }
 
 /// `RenderedProjectionToView`, `RenderedViewport` and `RenderedDepthRange`, as managed reads them

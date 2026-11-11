@@ -9,8 +9,7 @@ use abi::structs::{SceneTonemapParameters_t, SceneVolumetricFogParameters};
 use abi::{NativeRef, Registry, bind, class};
 use std::sync::Mutex;
 
-#[derive(Default)]
-pub struct Tonemap(pub Mutex<Option<SceneTonemapParameters_t>>);
+use super::exposure::Tonemap;
 
 #[derive(Default)]
 pub struct Fog(pub Mutex<Option<(SceneVolumetricFogParameters, NativeRef<class::CTextureBase>)>>);
@@ -26,12 +25,12 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, tonemap::SET_TONEMAP_PARAMETERS, |t, p: &mut SceneTonemapParameters_t| {
         if let Some(t) = objects::get::<_, Tonemap>(t) {
-            *t.0.lock().unwrap() = Some(*p);
+            t.0.lock().unwrap().params = Some(*p);
         }
     });
     bind!(r, tonemap::RESET_TONEMAP_PARAMETERS, |t| {
         if let Some(t) = objects::get::<_, Tonemap>(t) {
-            *t.0.lock().unwrap() = None;
+            *t.0.lock().unwrap() = Default::default();
         }
     });
     // Native's signature returns nothing; managed ignores it.

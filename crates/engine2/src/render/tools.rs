@@ -162,14 +162,14 @@ pub fn register(r: &mut Registry) {
         let model = crate::model::get(m);
         usize::try_from(mesh).ok().and_then(|i| model?.content.meshes.get(i).map(|e| !e.mesh.state().morphs.is_empty())).unwrap_or(false)
     });
-    // No indirect compute, ray tracing or auto exposure yet.
+    // No indirect compute or ray tracing yet.
     bind!(r, tools::COMPUTE_INDIRECT, |_, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS, |_, _, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS_INDIRECT, |_, _, _, _, _| {});
     bind!(r, tools::COPY_GPU_BUFFER_HIDDEN_STRUCTURE_COUNT, |_, _, _, _| {});
     bind!(r, tools::SET_GPU_BUFFER_HIDDEN_STRUCTURE_COUNT, |_, _, _| {});
-    bind!(r, tools::TONEMAP_FRAME_UPDATE, |_, _| 1.0);
-    bind!(r, tools::RENDER_AUTO_EXPOSURE, |_, _, _, _, _, _, _| {});
+    bind!(r, tools::TONEMAP_FRAME_UPDATE, crate::render::exposure::frame_update);
+    bind!(r, tools::RENDER_AUTO_EXPOSURE, |_, t, color, x, y, w, h| crate::render::exposure::record(t, color, NativeRect { x, y, w, h }));
     // Contexts execute eagerly on one queue: barriers and semaphores have nothing to order.
     bind!(r, ctx::SEMAPHORE_SIGNAL_AT_END, |_| PtrHandle::default());
     bind!(r, ctx::SEMAPHORE_WAIT_AT_BEGIN, |_, _| {});

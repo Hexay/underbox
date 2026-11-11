@@ -1,5 +1,4 @@
 //! `IVfx` (`VFX_DLL_001`, Facepunch's vfx_vulkan): the shader compiler managed drives.
-//! TODO: compile through the translation pipeline (docs/PLAN.md, Shaders); until then it compiles nothing.
 
 use abi::slots::i_vfx as vfx;
 use abi::{NativeRef, Registry, bind, class};

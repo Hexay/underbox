@@ -61,6 +61,11 @@ pub(super) fn box_in_pvs(r: Ref, n: i32, at: RawPtr<c_void>, lo: Vector3, hi: Ve
     query(r, |v| v.box_visible(&sources(n, at), p(lo), p(hi)))
 }
 
+/// Whether `eye` can see the box `lo..hi` through the PVS at `r` (true without vis data).
+pub fn box_visible_from(r: Ref, eye: glam::Vec3, lo: glam::Vec3, hi: glam::Vec3) -> bool {
+    query(r, |v| v.box_visible(&[eye.to_array()], lo.to_array(), hi.to_array()))
+}
+
 fn on_world<R: Default>(r: scene_world::Ref, f: impl FnOnce(&scene_world::SceneWorld) -> R) -> R {
     scene_world::get(r).map(|w| f(&w)).unwrap_or_default()
 }

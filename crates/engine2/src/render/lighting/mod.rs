@@ -55,6 +55,10 @@ pub struct Lighting {
     pub shadow: Option<shadow::SunShadow>,
     /// Point and spot shadow tiles, once local_shadow.rs has drawn them.
     pub local: Option<local_shadow::LocalShadows>,
+    /// The view's exposure (`g_flToneMapScalarLinear`, render/exposure.rs); none is 1.
+    pub tone_map: Option<f32>,
+    /// The view's analytic fog (`FogConstants`, render/fog.rs), when managed set one.
+    pub fog: Option<std::sync::Arc<[u8]>>,
 }
 
 impl Lighting {

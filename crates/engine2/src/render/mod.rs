@@ -15,6 +15,7 @@ mod frames;
 pub mod game_window;
 pub mod image;
 mod image_convert;
+pub mod exposure;
 pub mod lighting;
 pub mod material;
 pub mod material_mode;

@@ -97,6 +97,13 @@ pub fn int(r: Ref, name: StringToken) -> Option<i32> {
     })
 }
 
+pub fn pointer(r: Ref, name: StringToken) -> Option<usize> {
+    on(r, |a| match a.get(Kind::Ptr, name) {
+        Some(Value::Ptr(p)) if p != 0 => Some(p),
+        _ => None,
+    })
+}
+
 pub fn set_constant_buffer(r: Ref, name: StringToken, bytes: &[u8]) {
     on(r, |a| a.set(Kind::ConstantBuffer, name, Value::ConstantBuffer(bytes.into())));
 }

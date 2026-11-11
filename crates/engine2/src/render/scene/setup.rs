@@ -86,12 +86,21 @@ fn target_info<R: Default>(h: view::RtHandle, f: impl FnOnce(&texture::Texture) 
     texture::resolve(view::rt_texture(h)).map(|t| f(&t)).unwrap_or_default()
 }
 
+/// A layer measuring `color` for the camera's tonemap system, when it has one (auto exposure on).
+fn add_auto_exposure(r: Ref, color: view::RtHandle, viewport: RenderViewport) {
+    let attributes = field!(get NativeRef<class::CRenderAttributes>, s::GET_M_P_ATTRIBUTES, r.addr());
+    let Some(tonemap) = attributes::pointer(attributes, StringToken::of("ITonemapSystem")) else { return };
+    let v = view_of(r);
+    let kind = super::layer::Kind::Exposure { tonemap, src: view::rt_texture(color) };
+    view::add_layer(v, super::layer::create(v, "AutoExposure".into(), viewport, kind, 0, 0), Default::default());
+}
+
 pub fn register(r: &mut Registry) {
     bind!(r, s::ADD_VOLUMETRIC_FOG, |_| {});
     // False (no skybox world): managed then draws the 2D sky itself.
     bind!(r, s::ADD3_D_SKYBOX, super::skybox::add_for_setup);
     bind!(r, s::ADD_TEMPORAL_UPSCALE, |_| {});
-    bind!(r, s::ADD_AUTO_EXPOSURE, |_, _, _| {});
+    bind!(r, s::ADD_AUTO_EXPOSURE, add_auto_exposure);
     // Layers already run in the order managed adds them.
     bind!(r, s::SORT_BY_RENDER_ORDER, |_, _| {});
     bind!(r, s::RENDERS_TAG, renders_tag);

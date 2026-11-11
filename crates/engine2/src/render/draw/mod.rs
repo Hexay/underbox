@@ -133,7 +133,7 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
     }
     targets.scissor = target.scissor.filter(|s| s.w > 0 && s.h > 0).map(|s| [s.x.max(0) as u32, s.y.max(0) as u32, s.w as u32, s.h as u32]);
     let state = |d: &Draw| RasterState { depth_write: d.state.depth_write && targets.depth.is_some(), ..d.state };
-    let view = view_of(&targets);
+    let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
     let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
     let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &[target.color, target.depth]))).collect();
     let (defaults, ids) = shaded::streams(gpu);
@@ -166,5 +166,5 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
 fn view_of(targets: &Targets) -> View {
     let (w, h) = targets.size().unwrap_or((1, 1));
     let viewport = targets.viewport.map_or([0.0, 0.0, w as f32, h as f32], |[x, y, vw, vh, _, _]| [x, y, vw, vh]);
-    View { view_proj: glam::Mat4::IDENTITY, viewport, target: [w as f32, h as f32] }
+    View { view_proj: glam::Mat4::IDENTITY, viewport, target: [w as f32, h as f32], tone_map: 1.0 }
 }
