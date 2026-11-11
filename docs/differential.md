@@ -83,6 +83,9 @@ server boots, loads a local project and plays it.
 | `tools/diff/run.sh <probe\|orbmatch\|sweeper\|zoo> [both\|ours\|real] [tol]` | Run a scenario on one or both engines; logs and `report.txt` go to `target/diff/<scenario>/` |
 | `tools/diff/compare.py <ours.log> <real.log>` | Rank divergences between two logs' `MATCH:`/`GAME:`/`DIFF:` markers |
 | `tools/diff/probe/` | A diff-only project: rigid bodies and traces logged as `DIFF:` markers at ticks 1–150 |
+| `tools/diff/run.sh frame <corpus> [both\|ours\|real]` | One client frame per engine (`frame.sh`); PNGs, `diff.png`, `metrics.txt` in `target/diff/frame/<corpus>/` |
+| `tools/diff/real-client.sh <corpus> <out>` | Real's client under Xvfb + lavapipe; grabs the settled window from Xvfb's `-fbdir` framebuffer |
+| `tools/diff/frame.py <ours.ppm> <real.xwd> <out>` | Per-channel mean abs error, % pixels over a threshold, luma means, 8×8-block SSIM |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the
@@ -214,6 +217,65 @@ same packages and miss the same package models. Differences:
     Its hinges have `TargetVelocity` motors at 0 (max torque 9.2 and 507) and
     `EnableCollision`; that dynamics gap is open (joints).
 
+## Rendering
+
+`run.sh frame` boots both clients on a corpus scene at 1024×768 on lavapipe. Real needs two of its
+own switches: `-nosteam` (else it waits forever for a Steam client) and `-vulkan_allow_cpu` (else
+"No usable Vulkan physical devices were found": it skips CPU device types). Its window sits at
+the origin of a screen-sized Xvfb; four identical grabs one second apart count as settled. Ours is
+seeded with real's compiled core textures and materials (`.vtex_c`, `.vmat_c`; shaders stay each
+engine's own), since sbox-public ships none of core's images. Both pin shadow quality High; the
+rest of the auto-detected Low preset applies to both. Never commit real's frames.
+
+Metrics (mean abs error R/G/B, SSIM) before → after the fixes (showroom before both, outdoor and
+fog before 2):
+
+| Scene | Before | After |
+| --- | --- | --- |
+| showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 |
+| outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 |
+| fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 |
+| skinned, glass, hud | content confounds, below | |
+
+Ranked divergences:
+
+1. **Fixed. Real's compiled textures didn't load on ours.** Real stores mips zstd-compressed
+   (method 2 in the compressed-mip entry, which declares only its 12-byte head; the size array
+   follows it). Ours read only LZ4 and failed with "mip 0 runs past the end". A source `.vmat`
+   naming `x.tga` now also finds the compiler's `x_tga_<hash>.generated.vtex_c` beside it
+   (`compiled/texture.rs`). All 689 core textures read (`real_core_textures_read`, with
+   `UNDERBOX_REAL_CORE`).
+2. **Fixed. The dev plane's texture was rotated 90°.** Real maps `RenderPrimitivePlane` U along +Y
+   and V along +X (`model/primitive.rs`). Ours' stand-in testgrid hid both 1 and 2.
+3. **Volumetric fog drawn though the settings turn it off.** The auto-detected preset stores
+   `volumetricfog.quality -1`, so `quality_profiles.json` sets `r_enable_volume_fog 0`; real draws
+   no volume, ours fogs the box behind it lavender. Ours announces no native convars yet
+   (`convar.rs` TODO), so the write is dropped. Fix: define the profile convars, announce them
+   before `ApplyAll`, and gate `render/fog_volume.rs` on them.
+4. **Real draws no HUD** (hud scene). Both build the panel tree (both log the same missing
+   `hud.cs.scss`); real's frame shows only the box. Unexplained; probe the UI pass next (is
+   real's ScreenPanel drawn when the window never gets focus?).
+5. **Point light hotspot dimmer on ours.** Showroom lamp peak (209,112,94) against real's
+   (246,147,110); sun-lit and shadowed floor agree within 2. Guess: point light falloff or
+   specular in `render/lighting/`.
+6. **3D skybox through distance fog brighter on ours** (outdoor: +8 to +13 per channel) with a
+   vertical seam at x ≈ 375 that real lacks. Guess: skybox fog constants (`render/fog.rs`,
+   `render/scene/skybox.rs`).
+7. **Minification.** Grid lines are black on ours (0) and grey on real (18): ours uploads mip 0
+   only (`compiled/texture.rs`), real samples its mip chain.
+8. **Low. Banding.** Concentric rings in the diff around light pools: 8-bit quantisation differs
+   (real likely dithers).
+
+Agreeing: sky clear colour (exact), ACES auto-exposure on outdoor's floor (exact), sun shadows'
+placement and softness, box shading within 1–6.
+
+Confounds, not render: **skinned** — real rejects our synthetic `.vmdl_c` ("Failed to convert
+introspected block for file: models/compiled/puppet.vmdl") and draws both models as error signs
+(fixture writer, `crates/assets/src/compiled/model.rs`). **glass** — real has no
+`materials/glass.vmat_c` (`assetc` compiles only GameResources) and draws its animated error
+checker, so the scene never settles. Ours given real's compiled core models draws the dev box as
+scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
+
 ## Follow-up lanes
 
 - **Zoo trike (10):** real's motorised hinges keep the trike bouncing for ~15 s; ours rests at
@@ -221,5 +283,7 @@ same packages and miss the same package models. Differences:
 - **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
-- **Coverage:** client-side differentials (frame hashes against `librendersystemvulkan`), net
-  join, and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.
+- **Rendering (3–7):** native convars for the quality profiles; the HUD probe; point light falloff;
+  skybox fog; mips. Content: compile project `.vmat` for real (glass), make the fixture `.vmdl_c`
+  pass real's schema (skinned), read real's compiled `.vmdl_c` on ours.
+- **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.
