@@ -55,9 +55,17 @@ fn destroy(r: Ref) {
     LIVE.fetch_sub(1, Ordering::Relaxed);
 }
 
-/// The settings managed's parameterless `AddBody` implies: a static body at the origin.
+/// The settings managed's parameterless `AddBody` implies: a static body at the origin with
+/// gravity and auto sleep at 2 u/s, as real's `PhysicsWorld.CreateBody()` reports.
 fn default_settings() -> PhysicsBodySettings {
-    PhysicsBodySettings { gravity_scale: 1.0, inertia_scale: 1.0, rotation: crate::math::identity().rotation, ..Default::default() }
+    PhysicsBodySettings {
+        gravity_scale: 1.0,
+        inertia_scale: 1.0,
+        sleep_threshold: physics::DEFAULT_SLEEP_THRESHOLD,
+        flags: body::GRAVITY | body::AUTO_SLEEP | body::AWAKE,
+        rotation: crate::math::identity().rotation,
+        ..Default::default()
+    }
 }
 
 fn add_body(r: Ref, settings: PhysicsBodySettings) -> HandleId<class::IPhysicsBody> {

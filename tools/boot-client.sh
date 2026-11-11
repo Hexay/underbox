@@ -6,7 +6,8 @@
 # log line matches UNTIL (default: presented frame STOP_FRAME, 300), else at max-s; with SETTLE=n, not
 # before the last n presented frames also share a hash (tools/settle-watch.py). FRAMES=<dir>
 # also dumps PPMs (UNDERBOX_FRAMES_EVERY=n keeps every n-th). Runs in this worktree's game dir (tools/game-dir.sh);
-# SEED=<dir> overlays that dir's files for one boot.
+# SEED=<dir> overlays that dir's files for one boot. UNDERBOX_REAL_ENGINE2=<artifact root> boots
+# Facepunch's natives instead, on Xvfb with the Steam stand-in (docs/interop.md).
 # Logs: $OUT/client.log (managed's logs/dotnet.log), $OUT/client.out (stdout/stderr), $OUT/frames.tsv
 # (frame, hash); OUT defaults to target/client. SHADOW_QUALITY=0..3 pins managed's stored shadow
 # quality (Low..Ultra, tools/video-setting.py).
@@ -29,15 +30,34 @@ lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
 sh "$ROOT/tools/submodules.sh"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
+LEASED=$GAME
+XVFB=
+trap 'rm -f "$LEASED/.underbox-lease.$$"; [ -z "$XVFB" ] || kill "$XVFB" 2>/dev/null; for f in ${SEEDED:-}; do rm -f "$GAME/$f"; done' EXIT
+T_PREP=$(lap prepare); t0=$(date +%s.%N)
+if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
+    # Facepunch's engine2 instead of ours (docs/interop.md): it needs an X window and Vulkan.
+    GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$UNDERBOX_REAL_ENGINE2" $$ "$@")
+    set -- -nosteam -vulkan_allow_cpu "$@"
+    if [ -z "${DISPLAY:-}" ]; then
+        rm -f "$OUT/xvfb.fifo" && mkfifo "$OUT/xvfb.fifo"
+        Xvfb -displayfd 3 -screen 0 1280x720x24 -nolisten tcp 3> "$OUT/xvfb.fifo" > "$OUT/xvfb.log" 2>&1 &
+        XVFB=$!
+        read -r d < "$OUT/xvfb.fifo"
+        export DISPLAY=:$d
+    fi
+    export VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/lvp_icd.json} SDL_VIDEO_DRIVER=x11
+    STANDIN=$(sh "$ROOT/tools/diff/standin.sh")
+    # libsteam_api dlopens a bare "steamclient.so" before trying ~/.steam.
+    export LD_LIBRARY_PATH=$GAME/bin/linuxsteamrt64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+else
+    sh "$ROOT/tools/install-engine2.sh" "$GAME"
+fi
 # SEED=<dir>: files laid out like the game dir, copied in for this boot and removed after it.
 SEEDED=
 if [ -n "${SEED:-}" ]; then
     SEEDED=$(cd "$SEED" && find . -type f)
     cp -a "$SEED/." "$GAME/"
 fi
-trap 'rm -f "$GAME/.underbox-lease.$$"; for f in $SEEDED; do rm -f "$GAME/$f"; done' EXIT
-T_PREP=$(lap prepare); t0=$(date +%s.%N)
-sh "$ROOT/tools/install-engine2.sh" "$GAME"
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
 [ -z "${SHADOW_QUALITY:-}" ] || python3 -I "$ROOT/tools/video-setting.py" "$GAME" shadow.quality "$SHADOW_QUALITY"
 
@@ -54,7 +74,7 @@ export UNDERBOX_AUDIO=${UNDERBOX_AUDIO:-null}
 cd "$GAME"
 # No display here: SDL falls back to its offscreen driver; force it so a stray DISPLAY can't win.
 SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES:-log} ALSA_CONFIG_PATH="$OUT/asound.conf" \
-    timeout -s TERM -k 10 "$SECS" dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
+    LD_PRELOAD=${STANDIN:-} timeout -s TERM -k 10 "$SECS" dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
 CLIENT=$!
 if [ -n "$UNTIL" ]; then
     # The kill sits inside the pipeline's last stage: the pipeline itself only ends when tail does.

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Boot a real game from a checkout (Facepunch/sandbox, apetavern/grubs, sbox-public's samples) on our
 # libengine2; print evidence lines and a PASS/FAIL summary.
-# usage: [MODE=server|join|host|grubs|walker|render|play|sound] [MAP=<map>] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
+# usage: [MODE=server|join|interop|host|grubs|walker|render|play|sound] [MAP=<map>] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
 #   MAP     passed as `+game <sbproj> <map>`: what a MapInstance with UseMapFromLaunch loads
 #   server  dedicated server on the scene until its bodies settle and it has idled
 #   join    the server plus a second instance joining it with +connect; PASS when the client's own player
@@ -12,6 +12,7 @@
 #           PASS when terrain and equipment load
 #   walker  join on sbox-walker's own map (MAP defaults to scenes/scenemap.scene); PASS adds the joined
 #           player standing on the map's floor (docs/walker.md)
+#   interop join with Facepunch's engine2 as the client (docs/interop.md); SKIP without its artifacts
 #   render  host; its last frame goes to $OUT/frame.png
 #   play    a client in a real SDL window on Xvfb, driven by XTest (tools/game/play.sh): hold W, then turn
 #           the mouse. PLAY_VIA=join (default): PASS when the dedicated server sees the joined player move
@@ -32,6 +33,13 @@ CHECKOUT=$(cd -- "${1:?usage: tools/game.sh <checkout> [scene]}" && pwd)
 MODE=${MODE:-server}
 PLAY_VIA=${PLAY_VIA:-join}
 if [ "$MODE" = walker ]; then MODE=join WALKER=1 MAP=${MAP-scenes/scenemap.scene}; fi
+if [ "$MODE" = interop ]; then
+    . "$ROOT/tools/diff/env.sh"
+    CLIENT_ENGINE2=${CLIENT_ENGINE2:-${UNDERBOX_REAL_ENGINE2:-$(ls -td "$REAL_ENGINE2_CACHE"/*/game/addons/menu 2>/dev/null |
+        head -n 1 | sed 's#/game/addons/menu$##')}}
+    [ -n "$CLIENT_ENGINE2" ] || { echo "SKIP: no real engine2 artifacts with addons (docs/interop.md)"; exit 0; }
+    MODE=join INTEROP=1 SERVER_ENGINE2=
+fi
 case $MODE in
     server) IDLE=15 ;;
     join) IDLE=90 ;;
@@ -46,6 +54,9 @@ elif [ "$MODE" = grubs ]; then SCENE=scenes/beach.scene
 elif [ -f "$CHECKOUT/Assets/scenes/zoo.scene" ]; then SCENE=scenes/zoo.scene
 else SCENE=; fi
 SECS=${SECS:-300}
+# Facepunch's engine2 artifact root per side, or empty for ours (docs/interop.md).
+CLIENT_ENGINE2=${CLIENT_ENGINE2-${UNDERBOX_REAL_ENGINE2:-}}
+SERVER_ENGINE2=${SERVER_ENGINE2-${UNDERBOX_REAL_ENGINE2:-}}
 NAME=$(basename -- "$CHECKOUT")
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${SBOX:-}")
 OUT=${OUT:-$ROOT/target/game/$NAME}
@@ -108,7 +119,7 @@ run_client() {
 
 host_client() {
     # shellcheck disable=SC2086
-    run_client OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL="$CLIENT_UNTIL" GRACE="${CLIENT_GRACE:-3}" SHADOW_QUALITY="${SHADOW_QUALITY:-2}" \
+    run_client UNDERBOX_REAL_ENGINE2="$CLIENT_ENGINE2" OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL="$CLIENT_UNTIL" GRACE="${CLIENT_GRACE:-3}" SHADOW_QUALITY="${SHADOW_QUALITY:-2}" \
         sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" ${MAP:+"$MAP"} ${CLIENT_ARGS:-}
 }
 
@@ -120,10 +131,12 @@ join_client() {
         --manifest-url "http://127.0.0.1:$hport/manifest.json" --manifest-out "$OUT/serve/manifest.json" > /dev/null
     python3 -I -m http.server --bind 127.0.0.1 --directory "$OUT/serve" "$hport" > "$OUT/http.log" 2>&1 &
     http=$!
+    # A leaked server holds the port, and the next join's client then reads a stale cached manifest.
+    trap 'kill "$http" 2>/dev/null || true' EXIT INT TERM
     until='GAME:PLAYER_STANDING .*local=True|wasn.t found|Unable to download|Kicked|Disconnected' grace=3
     [ "$MODE" = play ] && until=$CLIENT_UNTIL'|wasn.t found|Unable to download' grace=$CLIENT_GRACE
     # shellcheck disable=SC2086
-    run_client NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 SEED="$OUT/seed" OUT="$OUT" GRACE=$grace UNTIL="$until" \
+    run_client UNDERBOX_REAL_ENGINE2="$CLIENT_ENGINE2" NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 SEED="$OUT/seed" OUT="$OUT" GRACE=$grace UNTIL="$until" \
         FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- +connect "127.0.0.1:$PORT" ${CLIENT_ARGS:-}
     kill "$http" 2>/dev/null || true
 }
@@ -145,7 +158,7 @@ else
         play) until='GAME:END|GAME:PLAYER_TURNED|\] disconnected' grace=12 ;;
         *) until='GAME:END' grace=3 ;;
     esac
-    OUT=$OUT UNTIL=$until GRACE=$grace \
+    UNDERBOX_REAL_ENGINE2=$SERVER_ENGINE2 OUT=$OUT UNTIL=$until GRACE=$grace \
         sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" ${MAP:+"$MAP"} +port "$PORT" > "$OUT/boot.txt" 2>&1 &
     SERVER=$!
     if [ "$MODE" != server ]; then

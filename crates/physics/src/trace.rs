@@ -3,8 +3,9 @@
 use crate::shape::{Shape, Surface};
 use crate::world::World;
 use rapier3d::math::{Pose, Rotation, Vector};
-use rapier3d::parry::query::{PointQueryWithLocation, ShapeCastOptions, ShapeCastStatus};
-use rapier3d::prelude::{Collider, ColliderHandle, QueryFilter, Ray};
+use rapier3d::parry::query::{PointQueryWithLocation, ShapeCastHit, ShapeCastOptions, ShapeCastStatus};
+use rapier3d::parry::shape::Shape as ParryShape;
+use rapier3d::prelude::{Collider, ColliderHandle, QueryFilter};
 
 /// A trace: `probe` (`None` for a ray) at `rotation`, swept from `start` to `end`.
 #[derive(Debug, Clone)]
@@ -50,32 +51,45 @@ fn skinned(toi: f32, delta: Vector, normal: Vector) -> f32 {
 impl World {
     /// The first shape `keep` accepts along the sweep.
     pub fn trace(&self, sweep: &Sweep, keep: &dyn Fn(ColliderHandle, &Collider) -> bool) -> Option<Hit> {
-        let pipeline = self.raw().query_pipeline_with_filter(QueryFilter::default().predicate(&keep));
         let delta = sweep.end - sweep.start;
         let Some(probe) = &sweep.probe else {
-            let (shape, hit) = pipeline.cast_ray_and_get_normal(&Ray::new(sweep.start, delta), 1.0, true)?;
-            let point = sweep.start + delta * hit.time_of_impact;
-            return Some(Hit { shape, fraction: hit.time_of_impact, position: point, point, normal: hit.normal, started_in_solid: hit.time_of_impact == 0.0 });
+            return self.trace_ray(sweep.start, delta, keep);
         };
         let collider = probe.collider(Surface::default())?.build();
         let pose = Pose::from_parts(sweep.start, sweep.rotation) * *collider.position();
-        let options = ShapeCastOptions { max_time_of_impact: 1.0, compute_impact_geometry_on_penetration: true, ..Default::default() };
-        let (shape, mut hit) = pipeline.cast_shape(&pose, delta, collider.shape(), options)?;
+        if delta == Vector::ZERO {
+            return self.overlap_hit(&pose, collider.shape(), sweep.start, keep);
+        }
+        let (shape, hit) = self.cast_refined(&pose, delta, collider.shape(), 0.0, keep)?;
         let started_in_solid = hit.status == ShapeCastStatus::PenetratingOrWithinTargetDist && hit.time_of_impact == 0.0;
-        // Gotcha: parry's time of impact over a long sweep can overshoot by ~0.1; recast the last stretch.
-        let back = (hit.time_of_impact - REFINE / delta.length().max(f32::EPSILON)).max(0.0);
-        if back > 0.0 {
-            let only = |h: ColliderHandle, c: &Collider| h == shape && keep(h, c);
-            let near = self.raw().query_pipeline_with_filter(QueryFilter::default().predicate(&only));
-            let pose = Pose::from_translation(delta * back) * pose;
-            if let Some((_, mut refined)) = near.cast_shape(&pose, delta * (1.0 - back), collider.shape(), options) {
+        let normal = if started_in_solid { self.entry_normal(shape, &pose, delta, collider.shape()).unwrap_or(hit.normal1) } else { hit.normal1 };
+        let fraction = skinned(hit.time_of_impact, delta, hit.normal1);
+        let position = sweep.start + delta * fraction;
+        Some(Hit { shape, fraction, position, point: hit.witness1, normal, started_in_solid })
+    }
+
+    /// A shape cast stopping `target_distance` short, its time of impact refined near the hit.
+    pub(crate) fn cast_refined(&self, pose: &Pose, delta: Vector, probe: &dyn ParryShape, target_distance: f32, keep: &dyn Fn(ColliderHandle, &Collider) -> bool) -> Option<(ColliderHandle, ShapeCastHit)> {
+        let pipeline = self.raw().query_pipeline_with_filter(QueryFilter::default().predicate(&keep));
+        let options = ShapeCastOptions { max_time_of_impact: 1.0, target_distance, compute_impact_geometry_on_penetration: true, ..Default::default() };
+        let (shape, mut hit) = pipeline.cast_shape(pose, delta, probe, options)?;
+        // Gotcha: parry's time of impact over a long sweep overshoots (~0.1 over 600 units, ~2 over
+        // 6000); recast the last stretch, coarsely then finely.
+        let length = delta.length().max(f32::EPSILON);
+        let only = |h: ColliderHandle, c: &Collider| h == shape && keep(h, c);
+        let near = self.raw().query_pipeline_with_filter(QueryFilter::default().predicate(&only));
+        for margin in [REFINE + length * 1e-3, REFINE] {
+            let back = (hit.time_of_impact - margin / length).max(0.0);
+            if back <= 0.0 {
+                continue;
+            }
+            let pose = Pose::from_translation(delta * back) * *pose;
+            if let Some((_, mut refined)) = near.cast_shape(&pose, delta * (1.0 - back), probe, options) {
                 refined.time_of_impact = back + refined.time_of_impact * (1.0 - back);
                 hit = refined;
             }
         }
-        let fraction = skinned(hit.time_of_impact, delta, hit.normal1);
-        let position = sweep.start + delta * fraction;
-        Some(Hit { shape, fraction, position, point: hit.witness1, normal: hit.normal1, started_in_solid })
+        Some((shape, hit))
     }
 
     /// The triangle of mesh shape `shape` nearest world `point` (a hit's contact point). For a

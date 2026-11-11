@@ -36,6 +36,8 @@ T_PREP=$(lap prepare); t0=$(date +%s.%N)
 if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
     # Facepunch's engine2 instead of ours: see docs/differential.md
     GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$UNDERBOX_REAL_ENGINE2" $$ "$@")
+    # libsteam_api dlopens a bare "steamclient.so" (else ~/.steam): without it, no networking at all.
+    export LD_LIBRARY_PATH=$GAME/bin/linuxsteamrt64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 else
     sh "$ROOT/tools/install-engine2.sh" "$GAME"
 fi
