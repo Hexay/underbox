@@ -11,6 +11,8 @@ CORPUS=${1:?usage: tools/diff/frame.sh <corpus> [both|ours|real] [artifact-root]
 WHICH=${2:-both}
 ART=${3:-}
 OUT=$ROOT/target/diff/frame/$CORPUS
+# Both engines get the auto-detected Low preset's fog quality (Off); shadows stay pinned High.
+export FOG_QUALITY=${FOG_QUALITY:--1}
 mkdir -p "$OUT"
 [ -n "$ART" ] || ART=$(ls -td "$REAL_ENGINE2_CACHE"/*/game/bin/linuxsteamrt64 2>/dev/null | head -n 1 | sed 's#/game/bin/linuxsteamrt64$##')
 [ -n "$ART" ] || { echo "frame: no real engine2; run tools/diff/fetch.sh" >&2; exit 3; }

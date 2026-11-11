@@ -30,7 +30,9 @@ Native only renders this (`cs_volumetric_fog.shader.meta` has no source), so the
 `fog_volume.wgsl`, 96×56×64 froxels, marched front to back per column, each slice storing the
 accumulated in-scattering (rgb) and transmittance (a). Slices are linear in view depth from
 `DrawDistance / 64` to `DrawDistance`, native's slicing, so managed's SceneRenderer constants
-address it too. It runs once per view, not for child views (3D skybox) or orthographic ones.
+address it too. It runs once per view, not for child views (3D skybox) or orthographic ones,
+and not while `r_enable_volume_fog` is 0: the quality profile's Off level (the Low preset) sets
+that native convar (`render/convars.rs`, announced at `SourceEngineInit`).
 
 Managed's SceneRenderer (`+r_managed_scene 1`) ports the native renderer's fog to
 `cs_volumetric_fog.shader`, which has no source, writing its own `FogVolume` volume texture (no GPU
