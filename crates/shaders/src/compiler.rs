@@ -64,6 +64,8 @@ impl Compiler {
         let (words, semantics) = spirv::strip_reflection(&spirv::strip_compute_derivatives(&words));
         let words = crate::rematerialize::access_chains(&crate::image_coords::declare_integer_vectors(&words));
         let words = crate::bindings::unalias(&crate::row_major::transpose_members(&crate::comparison::split(&words)));
+        let words = crate::bindless_fetch::outline_bindless_fetches(&words);
+        dump_spirv(shader, program, &words);
         let t = translate::spirv_to_wgsl(&words)?;
         let reflection = reflect::reflect(&t.module, &t.info, program.stage, &semantics)
             .map_err(|message| Error { phase: Phase::Validate, message })?;
@@ -90,6 +92,15 @@ impl Compiler {
             program.source.as_bytes(),
         ])
     }
+}
+
+/// `UNDERBOX_DUMP_SPV=<dir>` writes what naga gets (after the passes) as `<shader>.<stage>.spv`;
+/// the cache must miss for it to run, so point `UNDERBOX_SHADER_CACHE` somewhere empty.
+fn dump_spirv(shader: &VfxShader, program: &Program, words: &[u32]) {
+    let Some(dir) = std::env::var_os("UNDERBOX_DUMP_SPV").map(std::path::PathBuf::from) else { return };
+    let name = shader.path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
+    let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(format!("{name}.{:?}.spv", program.stage)), bytes));
 }
 
 /// The defines one variant compiles with: `PROGRAM`, `VULKAN`, each feature (the value of the static

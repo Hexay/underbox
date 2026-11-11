@@ -2,6 +2,7 @@
 //! (static, dynamic) combo with a disk cache. See research/shaders.md.
 
 pub mod annotation;
+mod bindless_fetch;
 pub mod bindings;
 pub mod blocks;
 mod builtin;

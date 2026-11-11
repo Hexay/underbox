@@ -14,8 +14,8 @@ word buffer, crates/shaders `word_buffers.rs`; `compute/occlusion.rs` is the CPU
 ops; each `RWTexture2D` binds the mip its attribute names; seven storage images need the
 adapter's limit). Also on the GPU: `clutter_cull_cs`, `ddgi_depth_copy_cs`,
 `envmap_filtering_cs` (8×8×6 groups: the device takes the adapter's workgroup limits) and
-`screen_space_reflections_cs` (research/shaders.md has the passes). `particle_lighting_cs` doesn't
-translate, so its dispatch is skipped. `compute/gpu_tests.rs` lists which must build. Storage images need the
+`screen_space_reflections_cs` and `particle_lighting_cs` (research/shaders.md has the passes).
+`compute/gpu_tests.rs` lists which must build. Storage images need the
 adapter's format features (`TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES`: lavapipe writes
 `Rg32Float` read-write).
 

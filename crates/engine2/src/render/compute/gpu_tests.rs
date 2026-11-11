@@ -11,8 +11,7 @@ const SHADERS: [(&str, bool); 10] = [
     ("common/DDGI/ddgi_depth_copy_cs", true),
     ("envmap_filtering_cs", true),
     ("screen_space_reflections_cs", true),
-    // naga's SPIR-V frontend: "invalid image" (research/shaders.md).
-    ("particle_lighting_cs", false),
+    ("particle_lighting_cs", true),
 ];
 
 #[test]

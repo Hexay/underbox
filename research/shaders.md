@@ -90,12 +90,14 @@ Fixed by passes:
   (`translate::lower_vector_logic`), and `isfinite(x)` becomes `abs(x) <= FLT_MAX` in compat,
   because WGSL has no `isinf` (`screen_space_reflections_cs`).
 - `SPV_KHR_compute_shader_derivatives` is stripped (`downsample_spd`).
+- "invalid image [26]" (`particle_lighting_cs`): naga types a fetch's image by its variable, so
+  DDGI's `Bindless::GetTexture3D(i).Load` saw naga type 26, the `g_bindless_Texture3D` binding
+  array, not its element (the env-map cube was a wrong suspect: it's sampled, which naga
+  unwraps). `bindless_fetch.rs` outlines each such fetch into a function taking the image.
+  `ConstOffset` on a fetch is dropped by naga (WGSL's `textureLoad` has none).
+- `UNDERBOX_DUMP_SPV=<dir>` writes the module naga gets per stage (cache misses only).
 
 Remaining failures (`UNDERBOX_CORPUS_ONLY=a,b` runs only matching shaders):
 - **DXC:** `ObjectHighlight` has a GS block without `MainGs`.
 - **Geometry shaders:** `gizmo_line`, `gizmo_sprite`. These stay failures here because the corpus
   compiles their source; at runtime the renderer emulates them (docs/skinning.md).
-- **"invalid image [26]"** (`particle_lighting_cs`): an image op whose operand naga's
-  `get_image_expr_ty` doesn't resolve to an image type. Unconfirmed suspect: the bindless env-map
-  cube read through `EnvMapTexture(...)`, which only this compute shader uses unconditionally.
-  Next step: dump its SPIR-V and find what type 26 is.
