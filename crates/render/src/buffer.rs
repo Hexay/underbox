@@ -18,8 +18,8 @@ impl BufferKind {
             BufferKind::Vertex => U::VERTEX | U::STORAGE,
             BufferKind::Index => U::INDEX | U::STORAGE,
             BufferKind::Uniform => U::UNIFORM,
-            // Vertex too: managed's instance-id buffers feed the instance stream.
-            BufferKind::Storage => U::STORAGE | U::INDIRECT | U::VERTEX,
+            // Managed GpuBuffers also feed instance streams (vertex) and the UI batcher's indices.
+            BufferKind::Storage => U::STORAGE | U::INDIRECT | U::VERTEX | U::INDEX,
         }
     }
 }

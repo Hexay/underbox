@@ -18,6 +18,8 @@ pub struct Attr {
     pub compare: Option<wgpu::CompareFunction>,
     /// A texture's `SrgbRead( true )`: sampled through its sRGB view.
     pub srgb: bool,
+    /// An engine-supplied value's `Source( ... )`: `Viewport` (shading/view.rs).
+    pub source: Option<String>,
 }
 
 fn compare_func(s: &str) -> Option<wgpu::CompareFunction> {
@@ -154,7 +156,8 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
         let default = ["Default", "Default1", "Default2", "Default3", "Default4"].iter().find_map(|k| a.get(k).and_then(parse_default));
         let compare = a.get("ComparisonFunc").and_then(compare_func);
         let srgb = a.get("SrgbRead").is_some_and(|v| matches!(v.trim(), "true" | "1"));
-        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, srgb });
+        let source = a.get("Source").map(|s| s.trim().to_owned());
+        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, srgb, source });
     }
     out
 }
@@ -174,4 +177,16 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     let mut storage = layout::storage_elements(&vs.wgsl);
     storage.extend(layout::storage_elements(&ps.wgsl));
     Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader, v) })
+}
+
+/// The batched UI shaders place quads through `g_vViewport < Source( Viewport ) >`; left zero,
+/// every vertex divided by it and nothing drew.
+#[test]
+fn source_annotations_take_the_view_value() {
+    let src = "MODES { Default(); }\nVS\n{\n\tfloat4 g_vViewport < Source( Viewport ); >;\n}\n";
+    let shader = VfxShader::parse(src, std::path::Path::new("source_test.shader"), &shaders::IncludePaths::new(Vec::new())).unwrap();
+    let attrs = attributes(&shader);
+    let source = attrs["g_vViewport"].source.as_deref().expect("Source( Viewport ) kept");
+    let view = super::view::View { view_proj: glam::Mat4::IDENTITY, viewport: [8.0, 4.0, 1024.0, 768.0], target: [1040.0, 780.0], tone_map: 1.0 };
+    assert_eq!(view.source(source), Some(Vec4::new(8.0, 4.0, 1024.0, 768.0)));
 }

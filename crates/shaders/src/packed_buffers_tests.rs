@@ -84,6 +84,16 @@ fn unsupported_uses_and_types_stay() {
     }
 }
 
+/// ui_cssbox_batched's text instances: a struct included under a `#define` rename, then the name
+/// reused. Unrewritten, every instance after the first read the wrong words (one glyph drew).
+#[test]
+fn structs_renamed_by_define_are_laid_out_under_their_real_name() {
+    let src = "#define Box Text\nstruct Box { float4 r; int n; };\n#undef Box\nStructuredBuffer<Text> T;\nstruct Box { float4 r; };\nStructuredBuffer<Box> B;\nfloat F( uint i ) { return T[i].n + B[i].r.x; }\n";
+    let out = rewrite(src);
+    assert!(out.contains("StructuredBuffer<uint> T; Text T_UbLoad( uint ub_i ) { uint ub_w = ub_i * 5;"), "{out}");
+    assert!(out.contains("StructuredBuffer<Box> B;\n"), "the later Box is unpadded: {out}");
+}
+
 #[test]
 fn unpadded_elements_keep_their_type() {
     // Tightly packed and std430 agree: 4-byte scalars, a float4 at 16, a float2 at 8.

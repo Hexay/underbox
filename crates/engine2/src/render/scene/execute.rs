@@ -98,15 +98,15 @@ pub fn run(v: view::Ref) {
     for l in layers {
         run_layer(&view, v, ctx, l);
         if let Some(layer) = layer::get(l) {
-            let t = target(&view, l, &layer.state.lock().unwrap());
+            let t = target(&view, l);
             super::trace::probe(v.addr(), &layer, &t);
         }
     }
     context::release(ctx);
 }
 
-fn target(view: &SceneView, l: layer::Ref, s: &layer::LayerState) -> Target {
-    let (color, depth) = if s.output_set { (s.color, s.depth) } else { (view.color, view.depth) };
+fn target(view: &SceneView, l: layer::Ref) -> Target {
+    let (color, depth) = layer::targets(l);
     let vp = layer::viewport(l);
     let viewport = if vp.m_n_width > 0 && vp.m_n_height > 0 { vp } else { view.viewport };
     Target { color, depth, viewport, ..Default::default() }
@@ -128,11 +128,16 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
     if super::trace::skipped(&layer.name) {
         return;
     }
-    let (t, clear_color, required, excluded, match_id) = {
+    let t = target(view, l);
+    let (clear_color, required, excluded, match_id) = {
         let s = layer.state.lock().unwrap();
-        (target(view, l, &s), s.clear_color.vec, s.required, s.excluded, s.match_id)
+        (s.clear_color.vec, s.required, s.excluded, s.match_id)
     };
     context::bind_target(ctx, &t);
+    // Draws see the layer's attributes beneath the context's (HookLayers' `UIGammaOutput`).
+    if let Some(c) = context::get(ctx) {
+        crate::render::attributes::set_parent(c.attributes, layer.attributes);
+    }
     if !matches!(layer.kind, Kind::Render(_)) {
         super::trace::layer(v.addr(), &layer, &t, &[]);
     }

@@ -5,6 +5,7 @@
 # adapter. The frame is written as $OUT/frame.png (OUT defaults to target/client-frame).
 # usage: [UNDERBOX_BLESS=1] [CORPUS=showroom] [MANAGED=1] tools/client-frame.sh [max-s=240] [sbox-public]
 # CORPUS picks another corpus project with its own golden.tsv (mapworld: a loaded map).
+# UNTIL replaces the `game.load success` line the grace counts from (a later frame for slow scenes).
 # MANAGED=1 draws through managed's scene renderer (+r_managed_scene 1), checked against
 # golden-managed.tsv, frame in target/client-frame-managed.
 # Shadow quality is pinned to High (SHADOW_QUALITY, like managed's benchmark rung): this machine
@@ -19,7 +20,7 @@ GOLDEN=$ROOT/corpus/$CORPUS/golden$SUFFIX.tsv
 SETTLE=5
 rm -rf "$OUT"; mkdir -p "$OUT/frames"
 SECS=$1 SBOX=$2; shift 2
-OUT="$OUT" FRAMES="$OUT/frames" SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL='game.load success' GRACE=${GRACE:-6} \
+OUT="$OUT" FRAMES="$OUT/frames" SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL=${UNTIL:-game.load success} GRACE=${GRACE:-6} \
     sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$ROOT/corpus/$CORPUS/.sbproj" "$@" > "$OUT/boot.txt" 2>&1 || true
 ADAPTER=$(grep -ohE 'render device: .*' "$OUT/client.out" | head -n 1 | sed 's/^render device: //')
 [ -n "$ADAPTER" ] || { tail -n 20 "$OUT/boot.txt"; echo "RESULT: FAIL (no render device)"; exit 1; }

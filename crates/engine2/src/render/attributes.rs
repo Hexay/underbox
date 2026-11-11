@@ -104,6 +104,13 @@ pub fn matrix(r: Ref, name: &str) -> Option<Matrix> {
     })
 }
 
+/// A matrix value as a `float4x4` constant reads it: native uploads managed's row-major bytes
+/// into column-major HLSL, so the shader's `mul( M, v )` applies managed's row-vector transform.
+pub fn shader_matrix(r: Ref, name: &str) -> Option<glam::Mat4> {
+    let n = matrix(r, name)?.numerics;
+    Some(glam::Mat4::from_cols_array(&[n.m11, n.m12, n.m13, n.m14, n.m21, n.m22, n.m23, n.m24, n.m31, n.m32, n.m33, n.m34, n.m41, n.m42, n.m43, n.m44]))
+}
+
 pub fn pointer(r: Ref, name: StringToken) -> Option<usize> {
     on(r, |a| match a.get(Kind::Ptr, name) {
         Some(Value::Ptr(p)) if p != 0 => Some(p),
@@ -162,6 +169,7 @@ pub fn set(r: Ref, name: &str, value: Value) {
         Value::Combo(_) => Kind::Combo,
         Value::Float(_) => Kind::Float,
         Value::Buffer(_) => Kind::Buffer,
+        Value::Matrix(_) => Kind::Matrix,
         _ => return,
     };
     on(r, |a| a.set(kind, StringToken::of(name), value));

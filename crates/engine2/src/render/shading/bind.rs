@@ -62,7 +62,7 @@ impl Inputs<'_> {
 }
 
 /// The names a reflected resource answers to: its HLSL name and its vfx `Attribute( "..." )`.
-fn names<'a, P>(s: &'a Shading<P>, name: &'a str) -> impl Iterator<Item = &'a str> {
+pub(super) fn names<'a, P>(s: &'a Shading<P>, name: &'a str) -> impl Iterator<Item = &'a str> {
     std::iter::once(name).chain(s.attributes.get(name).and_then(|a| a.attribute.as_deref()))
 }
 
@@ -81,11 +81,15 @@ fn transforms(instances: &[Instance]) -> Vec<u8> {
     out
 }
 
-fn uniform_value<P>(s: &Shading<P>,inputs: &Inputs, name: &str) -> Option<Value> {
+pub(super) fn uniform_value<P>(s: &Shading<P>, inputs: &Inputs, name: &str) -> Option<Value> {
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
-    let default = || s.attributes.get(name).and_then(|a| a.default);
-    from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(default).map(Value::Vec)
+    let attr = s.attributes.get(name);
+    let source = || attr.and_then(|a| inputs.view.source(a.source.as_deref()?));
+    let default = || attr.and_then(|a| a.default);
+    let matrix = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_matrix(*a, n))).map(Value::Mat);
+    let vector = from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(source);
+    vector.map(Value::Vec).or_else(matrix).or_else(|| default().map(Value::Vec))
 }
 
 /// Managed's bytes for a whole block, sized to the block.
@@ -248,6 +252,9 @@ pub fn bind_groups<P: Layouts>(gpu: &render::Gpu, s: &Shading<P>, inputs: &Input
     let mut groups = Vec::new();
     for (g, layout) in s.program.bind_group_layouts().iter().enumerate() {
         let mine: Vec<&Binding> = s.bindings.iter().filter(|b| b.group == g as u32).collect();
+        if super::bind_log::enabled(&s.label) {
+            super::bind_log::describe(s, inputs, &mine);
+        }
         let resources = mine.iter().map(|b| resource(gpu, s, inputs, b)).collect::<Result<Vec<_>, _>>()?;
         // wgpu's array resources borrow slices of references, which must outlive the entries.
         let arrays: Vec<(Vec<&wgpu::TextureView>, Vec<&wgpu::Sampler>)> = resources
@@ -278,17 +285,5 @@ pub fn bind_groups<P: Layouts>(gpu: &render::Gpu, s: &Shading<P>, inputs: &Input
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn transform_rows_and_packed_tint() {
-        let world = Mat4::from_translation(glam::Vec3::new(1.0, 2.0, 3.0));
-        let bytes = transforms(&[Instance { world, tint: [1.0, 0.5, 0.0, 0.25] }]);
-        let f = |i: usize| f32::from_le_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap());
-        // Row0 = (1, 0, 0, tx), Row1 = (0, 1, 0, ty), Row2 = (0, 0, 1, tz).
-        assert_eq!([f(0), f(3), f(5), f(7), f(10), f(11)], [1.0, 1.0, 1.0, 2.0, 1.0, 3.0]);
-        assert_eq!(f(12), 0.25);
-        assert_eq!(u32::from_le_bytes(bytes[52..56].try_into().unwrap()), 0xFF8000);
-    }
-}
+#[path = "bind_tests.rs"]
+mod tests;

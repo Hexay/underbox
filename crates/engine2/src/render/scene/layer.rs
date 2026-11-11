@@ -94,6 +94,16 @@ pub fn set_output(r: Ref, color: texture::Ref, depth: texture::Ref) {
     with(r, |s| (s.color, s.depth, s.output_set) = (color, depth, true));
 }
 
+/// The colour and depth targets the layer draws into: its output, else its view's.
+pub fn targets(r: Ref) -> (texture::Ref, texture::Ref) {
+    let Some(layer) = get(r) else { return Default::default() };
+    let s = layer.state.lock().unwrap();
+    if s.output_set {
+        return (s.color, s.depth);
+    }
+    view::get(layer.view).map(|v| (v.color, v.depth)).unwrap_or_default()
+}
+
 pub fn layer_flags(r: Ref) -> i64 {
     field!(get i64, l::GET_M_N_LAYER_FLAGS, r.addr())
 }
@@ -135,8 +145,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, l::SET_CLEAR_COLOR, |r, c, _target| with(r, |s| s.clear_color = c));
     bind!(r, l::GET_TEXTURE_VALUE, |_, _, default| default);
     bind!(r, l::GET_TEXTURE_VALUE_1, |_, _| texture::Ref::default());
-    bind!(r, l::GET_COLOR_TARGET, |r| with(r, |s| s.color));
-    bind!(r, l::GET_DEPTH_TARGET, |r| with(r, |s| s.depth));
+    bind!(r, l::GET_COLOR_TARGET, |r| targets(r).0);
+    bind!(r, l::GET_DEPTH_TARGET, |r| targets(r).1);
     bind!(r, l::SET_OUTPUT, |r, c, d| set_output(r, view::rt_texture(c), view::rt_texture(d)));
     bind!(r, l::SET_OUTPUT_1, |r, c, d, _color_space| set_output(r, view::rt_texture(c), view::rt_texture(d)));
     bind!(r, l::SET_OVERLAY_STENCIL, |_, _| {});

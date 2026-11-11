@@ -54,6 +54,13 @@ impl View {
         m
     }
 
+    /// A global's `Source( ... )` value. `Viewport` is the raster viewport in pixels, which the UI
+    /// shaders map screen positions through.
+    // TODO: TextureDim / InvTextureDim need the texture the variable is paired with.
+    pub fn source(&self, source: &str) -> Option<Vec4> {
+        (source == "Viewport").then(|| Vec4::from_array(self.viewport))
+    }
+
     pub fn constant(&self, name: &str) -> Option<Value> {
         let [x, y, w, h] = self.viewport;
         let [tw, th] = self.target;

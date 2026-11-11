@@ -42,6 +42,21 @@ pub fn struct_bodies(s: &str) -> impl Iterator<Item = (&str, (usize, usize))> {
     })
 }
 
+/// The name a struct declared as `name` at `at` really gets: ui_cssbox_batched includes
+/// text.hlsl's `BoxInstanceData` under `#define BoxInstanceData TextInstanceData`.
+fn defined_as<'a>(s: &'a str, name: &'a str, at: usize) -> &'a str {
+    let mut out = name;
+    for line in s[..at].lines().map(str::trim_start).filter(|l| l.starts_with('#')) {
+        let mut words = line[1..].split_whitespace();
+        match (words.next(), words.next(), words.next(), words.next()) {
+            (Some("define"), Some(n), Some(to), None) if n == name && to.bytes().all(is_ident) => out = to,
+            (Some("undef"), Some(n), ..) if n == name => out = name,
+            _ => {}
+        }
+    }
+    out
+}
+
 impl Structs {
     pub fn parse(s: &str) -> Structs {
         let enums = occurrences(s, "enum")
@@ -56,6 +71,7 @@ impl Structs {
         let row_major = s.contains("pack_matrix") && s.lines().any(|l| l.contains("pack_matrix") && l.contains("row_major"));
         let mut out = Structs { structs: HashMap::new(), enums };
         for (name, (start, end)) in struct_bodies(s) {
+            let name = defined_as(s, name, start);
             out.structs.insert(name.to_string(), Err("defined in terms of itself".into()));
             let fields = out.fields_of(&strip_methods(&s[start..end]), row_major);
             out.structs.insert(name.to_string(), fields);

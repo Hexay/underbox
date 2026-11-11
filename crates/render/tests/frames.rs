@@ -87,6 +87,13 @@ fn buffer_round_trips() {
     assert_eq!(buf.read(gpu, 2, 5), vec![3, 4, 5, 6, 7]);
 }
 
+/// Managed GpuBuffers are storage buffers it also binds as vertex, index and indirect-args buffers.
+#[test]
+fn storage_buffers_bind_as_any_stream() {
+    let usage = Buffer::new(gpu(), "any", BufferKind::Storage, 16).buffer.usage();
+    assert!(usage.contains(wgpu::BufferUsages::INDEX | wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDIRECT), "{usage:?}");
+}
+
 /// A red quad over the left half and a green quad over the top-right quarter, drawn green first
 /// but nearer the camera, so the depth test (not draw order) decides the overlap.
 #[test]

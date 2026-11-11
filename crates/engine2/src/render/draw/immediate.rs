@@ -143,17 +143,30 @@ fn expand_gizmo(gpu: &render::Gpu, draw: &mut Draw, prim: i64, layout: &Layout) 
 fn draw_bound(c: Ctx, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) {
     let Some((mut draw, layout)) = with(c, |s| bound_draw(s, prim, range, instances, base_vertex, indexed)) else { return };
     draw.shaded = render_state_shading(c, &layout);
+    if draw.shaded.is_none() && draw.vertex.is_empty() {
+        return;
+    }
     if let Some(gpu) = device::gpu() {
         expand_gizmo(gpu, &mut draw, prim, &layout);
     }
     submit(c, &[draw]);
 }
 
+/// What a draw without a vertex buffer binds: shaders that build vertices from `SV_VertexID` and
+/// `SV_InstanceID` (the UI's batched boxes) read nothing from it.
+fn no_vertices() -> Option<(Arc<render::Buffer>, Arc<Layout>)> {
+    static NONE: std::sync::OnceLock<(Arc<render::Buffer>, Arc<Layout>)> = std::sync::OnceLock::new();
+    let gpu = device::gpu()?;
+    // Sized for 64k vertices at its 4-byte stride, in case wgpu bounds-checks the slot.
+    let buffer = || Arc::new(render::Buffer::new(gpu, "no vertices", BufferKind::Vertex, 4 << 16));
+    Some(NONE.get_or_init(|| (buffer(), Arc::new(Layout { name: "no vertices".into(), stride: 4, fields: Vec::new() }))).clone())
+}
+
 fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) -> Option<(Draw, Arc<Layout>)> {
-    let (src, offset) = s.vertices.as_ref()?;
-    let (vertices, layout) = match src {
-        Vertices::Mesh(b) => (gpu_mesh::vertices(b)?, s.layout.clone().unwrap_or_else(|| b.meta.clone())),
-        Vertices::Gpu(b) => (b.clone(), s.layout.clone()?),
+    let (vertices, layout, offset) = match &s.vertices {
+        Some((Vertices::Mesh(b), offset)) => (gpu_mesh::vertices(b)?, s.layout.clone().unwrap_or_else(|| b.meta.clone()), offset),
+        Some((Vertices::Gpu(b), offset)) => (b.clone(), s.layout.clone()?, offset),
+        None => no_vertices().map(|(b, l)| (b, l, &0))?,
     };
     let indices = match (&s.indices, indexed) {
         (Some(Indices::Mesh(b)), true) => Some(gpu_mesh::indices(b)?),
@@ -163,7 +176,8 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
     let range = range.start.max(0) as u32..range.end.max(0) as u32;
     let uniforms = DrawUniforms { mvp: s.view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
     let state = RasterState { topology: topology(prim), ..Default::default() };
-    let vertex = gpu_mesh::vertex_keys(&layout)?;
+    // Empty without a position: only a material program can draw it (draw_bound).
+    let vertex = gpu_mesh::vertex_keys(&layout).unwrap_or_default();
     Some((Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None }, layout))
 }
 

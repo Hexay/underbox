@@ -18,5 +18,9 @@ step frame-outdoor env CORPUS=outdoor sh "$ROOT/tools/client-frame.sh"
 step frame-outdoor-managed env CORPUS=outdoor MANAGED=1 sh "$ROOT/tools/client-frame.sh"
 step frame-fog env CORPUS=fog sh "$ROOT/tools/client-frame.sh"
 step frame-fog-managed env CORPUS=fog MANAGED=1 sh "$ROOT/tools/client-frame.sh"
+# hud's first UI frame (~#15) stalls lavapipe for up to ~30 s, so wait for frames past it.
+HUD="CORPUS=hud UNTIL=frame:.GameWindow.#40. GRACE=1"
+step frame-hud env $HUD sh "$ROOT/tools/client-frame.sh"
+step frame-hud-managed env $HUD MANAGED=1 sh "$ROOT/tools/client-frame.sh"
 step coverage cargo run -q --manifest-path "$ROOT/Cargo.toml" -p engine2 --bin coverage -j4
 echo "RESULT: PASS"

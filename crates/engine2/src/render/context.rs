@@ -126,8 +126,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::CLEAR_TEXTURE, |_, t, c| texture::clear(t, c));
     bind!(r, ctx::BIND_RENDER_TARGETS, |r, color, depth, _layer| bind_targets(r, color, depth));
     bind!(r, ctx::BIND_RENDER_TARGETS_1, |r, color| bind_targets(r, color, NativeRef::default()));
-    // TODO: a layer's own targets come with ISceneLayer; until then restoring unbinds.
-    bind!(r, ctx::RESTORE_RENDER_TARGETS, |r, _layer| bind_targets(r, NativeRef::default(), NativeRef::default()));
+    // Managed sets the viewport itself right after (NativeFrameView.RestoreTargets).
+    bind!(r, ctx::RESTORE_RENDER_TARGETS, |r, layer| {
+        let (color, depth) = crate::render::scene::layer::targets(layer);
+        bind_targets(r, color, depth);
+    });
     bind!(r, ctx::SET_VIEWPORT, |r, rect| set_viewport(r, rect.x, rect.y, rect.w, rect.h));
     bind!(r, ctx::SET_VIEWPORT_1, |r, v| with(r, |b| b.viewport = v));
     bind!(r, ctx::SET_VIEWPORT_2, set_viewport);
