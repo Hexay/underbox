@@ -2,7 +2,7 @@
 
 | Step | Command |
 | --- | --- |
-| Dist build | `tools/dist.sh [out]`: release libengine2 in the `bin/linuxsteamrt64` layout plus `manifest.txt`, in `dist/` |
+| Dist build | `tools/dist.sh [out]`: release libengine2 in the `bin/linuxsteamrt64` layout plus `manifest.txt`, `LICENSE`, `NOTICE` and `licenses/` (each `third_party` submodule's licence), in `dist/` |
 | Dependency check | `tools/dist-check.sh <libengine2.so>` (dist.sh runs it; `DIST_GLIBC_MAX=2.35` also caps glibc) |
 | Boot a dist build | `UNDERBOX_ENGINE2=$PWD/dist/bin/linuxsteamrt64/libengine2.so tools/match.sh` (any boot script) |
 

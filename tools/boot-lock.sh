@@ -4,7 +4,8 @@
 # Re-entrant: a nested call (UNDERBOX_BOOT_LOCKED set, or an ancestor process holds the lock) runs cmd
 # directly. Waits at most BOOT_LOCK_WAIT (default 600) s, then names the holder and exits 75.
 set -eu
-LOCK=${UNDERBOX_BOOT_LOCK:-/srv/agents/cache/underbox-boot.lock}
+. "$(dirname -- "$0")/cache-dir.sh"
+LOCK=$UNDERBOX_BOOT_LOCK
 WAIT=${BOOT_LOCK_WAIT:-600}
 [ -n "${UNDERBOX_BOOT_LOCKED:-}" ] && exec "$@"
 [ -e "$LOCK" ] || : >> "$LOCK"

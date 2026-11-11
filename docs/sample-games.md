@@ -17,7 +17,7 @@ scenes use `models/dev/box.vmdl` and `plane.vmdl`, which engine2 builds from the
 | `game.minimal` | passes: `bodies=3`, `GAME:STANDING ... on=Plane` | `MODE=render` passes: 3 magenta boxes on a green plane, flat blue sky | none (no game code) |
 | `game.playercontroller` (`basic_example.scene`) | passes: `GAME:STANDING RealGameWatchController@128,128,0 on=Plane`. The scene's own player stands at the origin, so the probe drops beside it | third person over the Citizen, which is an error model (`human.vmdl` is source only) | `MODE=play PLAY_VIA=host`: `GAME:CAMERA_MOVED view dist=42`, `GAME:CAMERA_TURNED view yaw=0->-11` |
 
-Commands: `tools/game.sh /srv/agents/work/sbox-public/game/samples/sweeper` (likewise
+Commands: `tools/game.sh <sbox-public>/game/samples/sweeper` (likewise
 `templates/game.minimal`, `templates/game.playercontroller`), with `MODE=render` or
 `MODE=play PLAY_VIA=host`.
 

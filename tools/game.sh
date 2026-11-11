@@ -20,7 +20,7 @@
 # Scene: scenes/beach.scene for grubs, else scenes/zoo.scene if the checkout has it, else the project's StartupScene.
 # Clients render on lavapipe: headless (SDL offscreen) except in play. UNDERBOX_RENDER=empty fails a client
 # at its swap chain. CLIENT_ARGS: extra client launch args (e.g. +hotload_log 2).
-# The checkout stays read-only: runs happen in a scratch copy under /srv/agents/cache, which gets the
+# The checkout stays read-only: runs happen in a scratch copy under $UNDERBOX_GAME_COPIES, which gets the
 # watcher tools/game/RealGameWatch.cs and the chosen startup scene. Stops at the watcher's GAME:END.
 # Optional and never part of tools/verify.sh: it needs checkouts this repo does not ship.
 # Package downloads stay off: the game processes get a dead HTTP(S) proxy, so any request for sbox.game
@@ -50,7 +50,8 @@ NAME=$(basename -- "$CHECKOUT")
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${SBOX:-}")
 OUT=${OUT:-$ROOT/target/game/$NAME}
 PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" $$)}
-COPIES=/srv/agents/cache/underbox-real-games
+. "$ROOT/tools/cache-dir.sh"
+COPIES=$UNDERBOX_GAME_COPIES
 COPY=$COPIES/$NAME-$(printf %s "$ROOT" | cksum | cut -d' ' -f1)
 mkdir -p "$OUT" "$COPIES"
 . "$ROOT/tools/game/report.sh"
