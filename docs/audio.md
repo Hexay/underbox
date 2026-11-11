@@ -50,9 +50,9 @@ Tests drive `audio::output::Queue` directly: push blocks, pull frames, compare b
 ## Sounds
 
 `PrecacheSound("x.vsnd")` resolves through the native filesystem: a source file next to it
-(`x.wav`, `.mp3`, `.ogg`, `.flac`) decoded by symphonia. `CreateSound` takes managed's PCM: format 0
+(`x.wav`, `.mp3`, `.ogg`, `.flac`) decoded by symphonia, else the compiled `x.vsnd_c` (header + trailing
+stream, keeping its loop points; layout in research/resources.md). `CreateSound` takes managed's PCM: format 0
 PCM16, 1 PCM8, 3 f32 (managed decodes ADPCM itself). Everything is decoded once into planar f32.
-TODO: compiled `.vsnd_c` (DATA block KV3 header + trailing stream).
 
 ## Effects (as managed defines them)
 

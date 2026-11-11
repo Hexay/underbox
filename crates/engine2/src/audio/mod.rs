@@ -1,6 +1,9 @@
 //! Audio slots over the `audio` crate. Managed mixes; native loads sounds, samples voices, runs
 //! effects and DSP, codes voice and feeds the device. See docs/audio.md.
 
+mod compiled;
+#[cfg(test)]
+mod compiled_tests;
 pub mod device;
 mod dsp;
 mod effects;

@@ -129,6 +129,24 @@ pub fn world_physics(ground: f32, boxes: &[([f32; 3], [f32; 3])]) -> Aggregate {
     Aggregate { parts: vec![part(Shapes { meshes: vec![quad], hulls, ..Shapes::default() }, 0.0)], surfaces: vec![0], attributes, ..Aggregate::default() }
 }
 
+pub const SOUND: &str = "sounds/compiled/tone.vsnd";
+
+/// A 16-frame stereo PCM16 tone at 22050 Hz looping frames 4..12: left a ramp, right silent.
+pub fn sound() -> super::sound::Sound {
+    let stream = (0..16i16).flat_map(|i| [i * 1024, 0]).flat_map(i16::to_le_bytes).collect();
+    super::sound::Sound {
+        codec: super::sound::Codec::Pcm16,
+        rate: 22050,
+        channels: 2,
+        sample_count: 16,
+        duration: 16.0 / 22050.0,
+        loop_start: 4,
+        loop_end: 12,
+        format_header: Vec::new(),
+        stream,
+    }
+}
+
 /// (compiled path, bytes) of the crate model, its materials and texture.
 pub fn crate_files() -> Vec<(String, Vec<u8>)> {
     vec![

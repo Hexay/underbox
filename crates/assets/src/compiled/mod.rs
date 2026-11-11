@@ -16,6 +16,7 @@ pub mod physics;
 pub mod rig;
 #[cfg(test)]
 mod rigged_tests;
+pub mod sound;
 #[cfg(test)]
 mod tests;
 pub mod texture;
