@@ -1,0 +1,118 @@
+{
+  "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a11",
+  "GameObjects": [
+    {
+      "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a12",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a13",
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": true,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a14",
+      "Flags": 0,
+      "Name": "Floor",
+      "Scale": "4,4,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a15",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.4,0.5,0.3,1"
+        }
+      ]
+    },
+    {
+      "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a16",
+      "Flags": 0,
+      "Name": "Red Box",
+      "Position": "60,0,25",
+      "Rotation": "0,0,0.2588,0.9659",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a17",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.9,0.15,0.1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a18",
+      "Flags": 0,
+      "Name": "Glass Pane",
+      "Position": "-40,20,45",
+      "Scale": "0.2,2.4,1.8",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a19",
+          "BodyGroups": 18446744073709551615,
+          "MaterialOverride": "materials/glass.vmat",
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "1,1,1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a1a",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,130",
+      "Rotation": "0,0.2215,0,0.9751",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "5b1e0c7a-2d4f-4e8a-9b3c-6a7d8e9f0a1b",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

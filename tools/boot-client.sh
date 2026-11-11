@@ -3,7 +3,8 @@
 # headless on SDL's offscreen driver, logging every presented frame's hash, and summarise.
 # usage: [UNTIL=regex] [STOP_FRAME=n] [GRACE=s] [FRAMES=log|dir] tools/boot-client.sh [max-s=90] [sbox-public] [-- client args]
 # Client args default to `-mcp +game corpus/orbmatch/.sbproj`. Stops GRACE (default 2) s after a
-# log line matches UNTIL (default: presented frame STOP_FRAME, 300), else at max-s. FRAMES=<dir>
+# log line matches UNTIL (default: presented frame STOP_FRAME, 300), else at max-s; with SETTLE=n, not
+# before the last n presented frames also share a hash (tools/settle-watch.py). FRAMES=<dir>
 # also dumps PPMs (UNDERBOX_FRAMES_EVERY=n keeps every n-th). Runs in this worktree's game dir (tools/game-dir.sh);
 # SEED=<dir> overlays that dir's files for one boot.
 # Logs: $OUT/client.log (managed's logs/dotnet.log), $OUT/client.out (stdout/stderr), $OUT/frames.tsv
@@ -57,8 +58,12 @@ SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES:-log} A
 CLIENT=$!
 if [ -n "$UNTIL" ]; then
     # The kill sits inside the pipeline's last stage: the pipeline itself only ends when tail does.
+    stop_when() {
+        if [ -n "${SETTLE:-}" ]; then python3 -I "$ROOT/tools/settle-watch.py" "$UNTIL" "$GRACE" "$SETTLE"
+        else grep -qE -m1 -- "$UNTIL" && sleep "$GRACE"; fi
+    }
     tail -n +1 -F --pid=$CLIENT "$LOG" "$OUT/client.out" 2>/dev/null |
-        { grep -qE -m1 -- "$UNTIL" && sleep "$GRACE" && kill -TERM $CLIENT 2>/dev/null; } &
+        { stop_when && kill -TERM $CLIENT 2>/dev/null; } &
 fi
 wait $CLIENT || echo "exit: $?"
 T_CLIENT=$(lap client)

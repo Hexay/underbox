@@ -37,7 +37,7 @@ fn pipeline(gpu: &render::Gpu) -> &'static wgpu::ComputePipeline {
     })
 }
 
-fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, range): (f32, f32), counts: [u32; 2], history: Option<&History>, shadow: Option<Mat4>) -> Vec<u8> {
+fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, range): (f32, f32), counts: [u32; 2], history: Option<&History>, shadow: Option<(Mat4, bool)>) -> Vec<u8> {
     let view = View { view_proj, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
     let asymmetry = settings.anisotropy.clamp(-1.0, 1.0) * MAX_ASYMMETRY;
     let (sun_direction, sun_color) = sources.sun.unwrap_or((Vec3::Z, Vec3::ZERO));
@@ -49,17 +49,20 @@ fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, 
     out.extend(bytes(sources.ambient.extend(0.0).to_array()));
     out.extend(bytes(sun_direction.extend(0.0).to_array()));
     out.extend(bytes(sun_color.extend(0.0).to_array()));
-    out.extend([counts[0], counts[1], u32::from(history.is_some()), u32::from(shadow.is_some())].iter().flat_map(|c| c.to_le_bytes()));
+    out.extend([counts[0], counts[1], u32::from(history.is_some()), shadow.map_or(0, |(_, reverse)| 1 + u32::from(reverse))].iter().flat_map(|c| c.to_le_bytes()));
     out.extend(bytes(history.map_or(Mat4::IDENTITY, |h| h.world_to_clip).to_cols_array()));
     out.extend(bytes(history.map_or([1.0, 0.0, 1.0, 0.0], |h| [CURRENT_WEIGHT, h.near, h.range, 0.0])));
-    out.extend(bytes(shadow.unwrap_or(Mat4::IDENTITY).to_cols_array()));
+    out.extend(bytes(shadow.map_or(Mat4::IDENTITY, |s| s.0).to_cols_array()));
     out
 }
 
-/// The sun's world → shadow-map transform and map, when it has one on the GPU.
-fn shadow_map(sources: &Sources) -> Option<(Mat4, Arc<crate::render::texture::Texture>)> {
+/// The sun's world → shadow-map transform, whether it is reverse-Z, and its map, when the map is
+/// on the GPU in a depth-only format (`texture_depth_2d` can't view a stencil format).
+fn shadow_map(sources: &Sources) -> Option<((Mat4, bool), Arc<crate::render::texture::Texture>)> {
     let s = sources.shadow?;
-    Some((s.world_to_shadow, crate::render::texture::resolve(s.map).filter(|t| t.gpu.is_some())?))
+    let depth_only = |f: wgpu::TextureFormat| f.is_depth_stencil_format() && !f.has_stencil_aspect();
+    let map = crate::render::texture::resolve(s.map).filter(|t| t.gpu.as_ref().is_some_and(|g| depth_only(g.desc.format)))?;
+    Some(((s.world_to_shadow, s.reverse_z), map))
 }
 
 /// Bound in place of a shadow map; the march never reads it (`counts.w` is 0).

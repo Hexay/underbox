@@ -4,6 +4,7 @@
 //! write. Shading binds that grid wherever managed binds the texture as `FogVolume`. docs/fog.md.
 
 use crate::render::fog_volume::{self, FogLight, Frustum, Settings, Sources, Volume};
+use crate::render::lighting::shadow;
 use crate::render::{attributes, buffers, device};
 use glam::{Mat4, Vec3, Vec4};
 use std::collections::HashMap;
@@ -58,8 +59,10 @@ pub fn dispatch(attrs: &[attributes::Ref]) -> Result<(), String> {
     // NumLights: dynamic, then baked indexed lights.
     let count = config.iter().take(2).map(|n| n.to_bits() as usize).sum();
     let lights = attrs.iter().find_map(|a| attributes::buffer(*a, LIGHTS)).map_or_else(Vec::new, |h| binned_lights(h, count));
-    // TODO: managed's cascade 0 as the shadow (reverse-Z map, matrix from DirectionalLightCB).
-    let sources = Sources { ambient: ambient * fog.f(at::INDIRECT_STRENGTH), sun: block("DirectionalLightCB").and_then(|b| sun(&b)), shadow: None, lights };
+    let directional = block("DirectionalLightCB");
+    let sun = directional.as_deref().and_then(sun);
+    let shadow = directional.as_deref().and_then(shadow::managed_sun_shadow).filter(|_| sun.is_some());
+    let sources = Sources { ambient: ambient * fog.f(at::INDIRECT_STRENGTH), sun, shadow, lights };
     let grid = fog_volume::march(&fog.volumes(), fog.view_proj()?, &sources, &fog.settings(), out.addr());
     let mut grids = GRIDS.lock().unwrap();
     match grid {

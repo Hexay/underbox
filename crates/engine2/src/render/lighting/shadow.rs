@@ -28,6 +28,8 @@ pub struct SunShadow {
     /// World → (u, v, depth) in the shadow map.
     pub world_to_shadow: Mat4,
     pub map: texture::Ref,
+    /// Nearer is larger (managed's cascades); ours store nearer as smaller.
+    pub reverse_z: bool,
 }
 
 /// One map for the process: views render one at a time and each redraws it before its layers.
@@ -86,7 +88,7 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref], view_proj: Mat4) {
     }
     let target = Target { depth: map(), ..Default::default() };
     draw::execute(&target, lighting, Load { color: None, depth: Some(1.0) }, &draws);
-    lighting.shadow = Some(SunShadow { world_to_shadow: to_texture() * light, map: target.depth });
+    lighting.shadow = Some(SunShadow { world_to_shadow: to_texture() * light, map: target.depth, reverse_z: false });
 }
 
 /// Managed's cascade `n` map binds as `g_tUnderboxSunShadow` (cascade 0) or `g_tUnderboxSunShadow<n>`.
@@ -105,6 +107,13 @@ pub fn managed_cascade(cb: &[u8], cascade: usize) -> Option<texture::Ref> {
     // Words 72..76: g_DirectionalLightShadowMapTextureIndex; 76: g_DirectionalLightCascadeCount.
     (cascade < word(76)? as usize).then_some(())?;
     crate::render::bindless::at(word(72 + cascade)?).map(|(t, _)| t)
+}
+
+/// Managed's cascade 0 as a [`SunShadow`], from its `DirectionalLightCB` bytes.
+pub fn managed_sun_shadow(cb: &[u8]) -> Option<SunShadow> {
+    // Words 8..24: g_DirectionalLightWorldToShadowViewMatrices[0], world → uv and depth.
+    let m: [f32; 16] = std::array::from_fn(|i| cb.get((8 + i) * 4..(9 + i) * 4).map_or(0.0, |w| f32::from_le_bytes([w[0], w[1], w[2], w[3]])));
+    Some(SunShadow { world_to_shadow: Mat4::from_cols_array(&m), map: managed_cascade(cb, 0)?, reverse_z: true })
 }
 
 #[cfg(test)]

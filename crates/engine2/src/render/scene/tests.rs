@@ -26,7 +26,7 @@ extern "C" fn register_handle(_: *mut c_void, _: u32) -> i32 {
 extern "C" fn free_handle(_: i32) {}
 
 /// Stand in for managed's handle index (callbacks 16 and 17), as physics/aggregate_tests.rs does.
-fn fake_managed() {
+pub(crate) fn fake_managed() {
     let mut table = vec![0usize; abi::CALLBACK_COUNT];
     table[16] = register_handle as *const () as usize;
     table[17] = free_handle as *const () as usize;

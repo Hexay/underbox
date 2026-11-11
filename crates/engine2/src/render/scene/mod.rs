@@ -17,7 +17,7 @@ pub mod view;
 #[cfg(test)]
 mod layer_tests;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 /// Read or write a generated field (`bind_fields`) of the object at `addr`, keyed by its getter.
 macro_rules! field {

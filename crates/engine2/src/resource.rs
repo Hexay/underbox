@@ -24,6 +24,19 @@ pub fn copy_handle<C: NativeClass, T: Send + Sync + 'static>(handle: NativeRef<C
     resolve::<C, T>(handle).map_or(NativeRef::NULL, new_handle::<C, T>)
 }
 
+struct Empty;
+
+/// A strong handle to nothing, which native getters return for a missing resource: managed's
+/// `FromNative` wrappers call `IsStrongHandleValid` first, which throws on a null pointer.
+pub fn empty_handle<C: NativeClass>() -> NativeRef<C> {
+    objects::create::<C, _>(Empty)
+}
+
+/// A copy for managed to own, which is an empty handle where `handle` holds nothing.
+pub fn handed_out<C: NativeClass, T: Send + Sync + 'static>(handle: Option<NativeRef<C>>) -> NativeRef<C> {
+    handle.and_then(resolve::<C, T>).map_or_else(empty_handle, new_handle::<C, T>)
+}
+
 pub fn destroy_handle<C>(handle: NativeRef<C>) {
     objects::destroy(handle);
 }

@@ -332,7 +332,7 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. Fog's baked indirect and managed-path sun shadows (docs/fog.md); `GetSheetInfo` and the shader sheet path
+1. Fog's baked indirect and managed cascades past 0 (docs/fog.md); `GetSheetInfo` and the shader sheet path
    (`sheet_sampling.fxc` is a stub).
 2. Material features as static combos (today they only pick the blend), MSAA, cube and stereo
    renders, GPU timestamps, mip generation.
