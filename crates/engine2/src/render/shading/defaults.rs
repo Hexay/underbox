@@ -1,6 +1,6 @@
 //! Stand-ins a material program binds when the draw doesn't supply a resource: a 1×1 texture per
 //! (view dimension, sample type) — white for float textures, zero otherwise — and default
-//! samplers (trilinear wrap; comparison samplers compare with the vfx `ComparisonFunc`, less-equal
+//! samplers (trilinear wrap, anisotropic where the vfx asks for `ANISO`; comparison samplers compare with the vfx `ComparisonFunc`, less-equal
 //! by default).
 
 use render::wgpu::{self, SamplerBindingType, TextureSampleType, TextureViewDimension as D};
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 static TEXTURES: LazyLock<Mutex<HashMap<(D, TextureSampleType), wgpu::TextureView>>> = LazyLock::new(Default::default);
-type SamplerKey = (SamplerBindingType, Option<wgpu::CompareFunction>);
+type SamplerKey = (SamplerBindingType, Option<wgpu::CompareFunction>, u16);
 static SAMPLERS: LazyLock<Mutex<HashMap<SamplerKey, wgpu::Sampler>>> = LazyLock::new(Default::default);
 
 fn format(sample: TextureSampleType) -> (wgpu::TextureFormat, u32) {
@@ -62,10 +62,16 @@ pub fn texture(gpu: &render::Gpu, dim: D, sample: TextureSampleType) -> wgpu::Te
     TEXTURES.lock().unwrap().entry((dim, sample)).or_insert_with(|| create(gpu, dim, sample)).clone()
 }
 
-pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu::CompareFunction>) -> wgpu::Sampler {
+/// `r_max_anisotropy` of the Low texture quality profile (core/cfg/quality_profiles.json), the
+/// preset real auto-detects on the CPU device. TODO: read the convar once native convars exist.
+const MAX_ANISOTROPY: u16 = 4;
+
+/// The default sampler for a binding of `kind`; `anisotropic` for a vfx `Filter( ANISO )`.
+pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu::CompareFunction>, anisotropic: bool) -> wgpu::Sampler {
+    let anisotropy = if anisotropic && kind == SamplerBindingType::Filtering { MAX_ANISOTROPY } else { 1 };
     let mut cache = SAMPLERS.lock().unwrap();
     cache
-        .entry((kind, compare))
+        .entry((kind, compare, anisotropy))
         .or_insert_with(|| {
             let filter = if kind == SamplerBindingType::NonFiltering { wgpu::FilterMode::Nearest } else { wgpu::FilterMode::Linear };
             gpu.device.create_sampler(&wgpu::SamplerDescriptor {
@@ -77,6 +83,7 @@ pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu
                 min_filter: filter,
                 mipmap_filter: if kind == SamplerBindingType::NonFiltering { wgpu::MipmapFilterMode::Nearest } else { wgpu::MipmapFilterMode::Linear },
                 compare: (kind == SamplerBindingType::Comparison).then_some(compare.unwrap_or(wgpu::CompareFunction::LessEqual)),
+                anisotropy_clamp: anisotropy,
                 ..Default::default()
             })
         })

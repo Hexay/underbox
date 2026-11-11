@@ -62,6 +62,16 @@ fn compiled_texture_decodes_to_rgba() {
 }
 
 #[test]
+fn compiled_texture_keeps_its_mip_chain() {
+    use assets::compiled::texture as vtex;
+    let level = |size: usize, v: u8| vec![v; size * size * 4];
+    let t = vtex::Texture { width: 4, height: 4, depth: 1, format: vtex::Format::RGBA8888, levels: vec![level(4, 10), level(2, 20), level(1, 30)], ..Default::default() };
+    let d = super::texture::decode(&t).unwrap();
+    assert_eq!((d.config.m_n_num_mip_levels, d.data.len()), (3, 4 * 4 * 4));
+    assert_eq!(d.smaller, [level(2, 20), level(1, 30)].concat());
+}
+
+#[test]
 fn image_reference_loads_its_generated_vtex() {
     let dir = game_dir();
     let bytes = fixture::crate_files().into_iter().find(|(p, _)| *p == format!("{}_c", fixture::TEXTURE)).unwrap().1;

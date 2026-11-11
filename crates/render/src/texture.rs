@@ -128,6 +128,27 @@ impl Texture {
         );
     }
 
+    /// Fill mips 1 and up from `chain`: each level's layers tightly packed, level after level. Stops
+    /// at the first level `chain` runs short of; returns how many levels it wrote.
+    pub fn upload_smaller_mips(&self, gpu: &Gpu, chain: &[u8]) -> u32 {
+        let Some(texel) = self.texel_size() else { return 0 };
+        let layers = self.desc.layers.max(1);
+        let mut at = 0;
+        for mip in 1..self.desc.mips.max(1) {
+            let (w, h) = self.mip_size(mip);
+            let len = (w * h * texel * layers) as usize;
+            let Some(data) = chain.get(at..at + len) else { return mip - 1 };
+            gpu.queue.write_texture(
+                wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+                data,
+                wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * texel), rows_per_image: Some(h) },
+                wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) },
+            );
+            at += len;
+        }
+        self.desc.mips.max(1) - 1
+    }
+
     /// Clear mip 0 with an empty render pass: to `color` for a colour format, or to `depth` (and
     /// stencil 0) for a depth format. The value for the other kind is ignored.
     pub fn clear(&self, gpu: &Gpu, color: wgpu::Color, depth: f32) {
