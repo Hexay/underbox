@@ -6,6 +6,7 @@ pub mod compiled;
 pub mod data;
 pub mod data_slots;
 pub mod desc;
+pub mod error;
 pub mod hull;
 mod joint_fields;
 pub(crate) mod part_slots;
