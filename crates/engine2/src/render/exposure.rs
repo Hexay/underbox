@@ -2,8 +2,8 @@
 //! and the `AddAutoExposure` layer measure the HDR scene colour's log-average luminance;
 //! `TonemapFrameUpdate` turns the last measurement into the scalar shaders read as
 //! `g_flToneMapScalarLinear`: `clamp(KEY / luminance, min, max) * compensation`. The colour is
-//! measured before exposure (managed's tonemap pass applies it), so one frame settles it.
-//! TODO: adapt over `Rate` instead of snapping to the target.
+//! measured before exposure (managed's tonemap pass applies it). The first measurement snaps
+//! (native resets tonemapping on a new view); later ones adapt over the render time ([`adapt`]).
 
 use crate::render::{readback, texture};
 use abi::NativeRef;
@@ -22,11 +22,13 @@ pub struct State {
     pub params: Option<SceneTonemapParameters_t>,
     pub luminance: Option<f32>,
     pub scalar: f32,
+    /// The render time of the last update that had a measurement; `None` until the first.
+    pub updated: Option<f32>,
 }
 
 impl Default for State {
     fn default() -> Self {
-        State { params: None, luminance: None, scalar: 1.0 }
+        State { params: None, luminance: None, scalar: 1.0, updated: None }
     }
 }
 
@@ -46,11 +48,39 @@ pub fn target(p: &SceneTonemapParameters_t, luminance: f32) -> f32 {
     (KEY / luminance.max(1e-4)).clamp(min, max) * compensation
 }
 
-/// `TonemapFrameUpdate`: the scalar, moved to the last measurement's target when `update`.
+/// `scalar` moved `dt` seconds towards `target`. `ExposureAdaptationSpeedUp`/`Down` (f-stops a
+/// second) step in log space; otherwise the legacy `Rate` closes `Rate · dt` of the gap a frame,
+/// `AccelerateExposureDown` times faster when darkening. Neither set (≤ 0) snaps.
+pub fn adapt(p: &SceneTonemapParameters_t, scalar: f32, target: f32, dt: f32) -> f32 {
+    let dt = dt.max(0.0);
+    let darker = target < scalar;
+    let (up, down) = (p.m_fl_exposure_adaptation_speed_up, p.m_fl_exposure_adaptation_speed_down);
+    if up > 0.0 || down > 0.0 {
+        let speed = if darker { down } else { up };
+        if speed <= 0.0 {
+            return target;
+        }
+        let (from, to) = (scalar.max(1e-6).log2(), target.max(1e-6).log2());
+        return (from + (to - from).clamp(-speed * dt, speed * dt)).exp2();
+    }
+    if p.m_fl_rate <= 0.0 {
+        return target;
+    }
+    let accelerate = if darker && p.m_fl_accelerate_exposure_down > 0.0 { p.m_fl_accelerate_exposure_down } else { 1.0 };
+    scalar + (target - scalar) * (p.m_fl_rate * accelerate * dt).clamp(0.0, 1.0)
+}
+
+/// `TonemapFrameUpdate`: the scalar, moved towards the last measurement's target when `update`.
 pub fn frame_update(t: Ref, update: bool) -> f32 {
+    update_at(t, update, crate::render::scene::system::render_time())
+}
+
+fn update_at(t: Ref, update: bool, now: f32) -> f32 {
     with(t, |s| {
         if let (true, Some(p), Some(l)) = (update, s.params, s.luminance) {
-            s.scalar = target(&p, l);
+            let goal = target(&p, l);
+            s.scalar = s.updated.map_or(goal, |then| adapt(&p, s.scalar, goal, now - then));
+            s.updated = Some(now);
         }
         if crate::render::scene::trace::enabled() {
             let msg = format!("exposure: update {update} params {} luminance {:?} scalar {}", s.params.is_some(), s.luminance, s.scalar);
@@ -103,9 +133,8 @@ pub fn record(t: Ref, color: texture::Ref, rect: NativeRect) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn exposure_targets_middle_grey_within_bounds() {
-        let p = SceneTonemapParameters_t {
+    fn params() -> SceneTonemapParameters_t {
+        SceneTonemapParameters_t {
             m_fl_auto_exposure_min: 1.0,
             m_fl_auto_exposure_max: 3.0,
             m_fl_exposure_compensation_scalar: 2.0,
@@ -117,10 +146,39 @@ mod tests {
             m_fl_exposure_adaptation_speed_up: -1.0,
             m_fl_exposure_adaptation_speed_down: -1.0,
             m_fl_tonemap_ev_smoothing_range: -1.0,
-        };
+        }
+    }
+
+    #[test]
+    fn exposure_targets_middle_grey_within_bounds() {
+        let p = params();
         assert_eq!(target(&p, 0.09), 4.0, "0.18 / 0.09 = 2, times the compensation");
         assert_eq!(target(&p, 0.01), 6.0, "clamped to the maximum");
         assert_eq!(target(&p, 1.0), 2.0, "clamped to the minimum");
         assert_eq!((half(0x3c00), half(0xc000), half(0x0001)), (1.0, -2.0, 2f32.powi(-24)));
+    }
+
+    /// Frames at 10 Hz: the first measurement snaps, a darker scene then brightens over `Rate`
+    /// (a tenth of the gap a frame at rate 1), never overshooting; a second update in the same
+    /// frame changes nothing.
+    #[test]
+    fn exposure_adapts_across_frames() {
+        let p = SceneTonemapParameters_t { m_fl_auto_exposure_max: 10.0, m_fl_exposure_compensation_scalar: 1.0, ..params() };
+        let t: Ref = objects::create(Tonemap::default());
+        let measure = |l: f32| with(t, |s| (s.params, s.luminance) = (Some(p), Some(l)));
+        measure(0.18);
+        assert_eq!(update_at(t, true, 1.0), 1.0, "snapped to the first target");
+        measure(0.09);
+        let frames: Vec<f32> = (1..=40).map(|i| update_at(t, true, 1.0 + i as f32 * 0.1)).collect();
+        assert!((frames[0] - 1.1).abs() < 1e-5, "a tenth of the way to 2: {}", frames[0]);
+        assert!(frames.windows(2).all(|w| w[1] > w[0] && w[1] < 2.0), "rises monotonically below the target");
+        assert!(frames[39] > 1.95, "most of the way after 4 s: {}", frames[39]);
+        assert_eq!(update_at(t, true, 5.0), frames[39], "no time passed");
+        let stops = SceneTonemapParameters_t { m_fl_exposure_adaptation_speed_up: 1.0, m_fl_exposure_adaptation_speed_down: 2.0, ..p };
+        assert!((adapt(&stops, 1.0, 8.0, 0.5) - 2f32.sqrt()).abs() < 1e-5, "half a stop up in half a second");
+        assert!((adapt(&stops, 4.0, 1.0, 0.5) - 2.0).abs() < 1e-5, "a stop down at twice the speed");
+        assert_eq!(adapt(&stops, 1.0, 1.2, 10.0), 1.2, "never past the target");
+        assert_eq!(adapt(&SceneTonemapParameters_t { m_fl_rate: -1.0, ..p }, 1.0, 3.0, 0.01), 3.0, "no rate snaps");
+        objects::destroy(t);
     }
 }

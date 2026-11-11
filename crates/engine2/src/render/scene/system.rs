@@ -14,6 +14,11 @@ static RENDER_TIME: AtomicU32 = AtomicU32::new(0);
 static PROFILER_MODE: AtomicU64 = AtomicU64::new(0);
 static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 
+/// The time managed set for this frame (`SetNextRenderTime`), in seconds.
+pub fn render_time() -> f32 {
+    f32::from_bits(RENDER_TIME.load(Ordering::Relaxed))
+}
+
 fn finish() {
     RENDERING.store(false, Ordering::Release);
     draw::gpu_mesh::prune();
@@ -91,5 +96,5 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::BEGIN_MANAGED_PERF_MARKER, |_, _, _, _| RawPtr::NULL);
     bind!(r, s::END_MANAGED_PERF_MARKER, |_, _| {});
     bind!(r, s::SET_NEXT_RENDER_TIME, |t: f32| RENDER_TIME.store(t.to_bits(), Ordering::Relaxed));
-    bind!(r, s::GET_CURRENT_RENDER_TIME, || f32::from_bits(RENDER_TIME.load(Ordering::Relaxed)));
+    bind!(r, s::GET_CURRENT_RENDER_TIME, render_time);
 }
