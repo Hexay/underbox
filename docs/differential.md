@@ -292,6 +292,7 @@ scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Rendering (3, 4, 6):** native convars for the quality profiles (then read `r_max_anisotropy`
-  instead of the fixed 4); the HUD probe; skybox fog. Content: compile project `.vmat` for real (glass), make the fixture `.vmdl_c`
-  pass real's schema (skinned), read real's compiled `.vmdl_c` on ours.
+  instead of the fixed 4); the HUD probe; skybox fog. Content: compile project `.vmat` for real
+  (glass), make the fixture `.vmdl_c` pass real's schema (skinned), read real's compiled
+  `.vmdl_c` on ours.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.
