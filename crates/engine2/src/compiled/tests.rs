@@ -62,6 +62,17 @@ fn compiled_texture_decodes_to_rgba() {
 }
 
 #[test]
+fn image_reference_loads_its_generated_vtex() {
+    let dir = game_dir();
+    let bytes = fixture::crate_files().into_iter().find(|(p, _)| *p == format!("{}_c", fixture::TEXTURE)).unwrap().1;
+    std::fs::write(dir.join("materials/compiled/crate_photo_tga_0f1e2d3c.generated.vtex_c"), bytes).unwrap();
+    assert_eq!(super::texture::generated_sibling("materials/compiled/crate_photo.tga").as_deref(), Some("materials/compiled/crate_photo_tga_0f1e2d3c.generated.vtex_c"));
+    assert_eq!(super::texture::generated_sibling("materials/compiled/crate_photo.vtex"), None);
+    let t = super::texture::load("materials/compiled/crate_photo.tga").unwrap();
+    assert_eq!((t.config.m_n_width, t.config.m_n_height), (16, 16));
+}
+
+#[test]
 fn compiled_material_has_shader_params_and_textures() {
     game_dir();
     let m = super::material::load(fixture::MATERIAL).unwrap();

@@ -56,9 +56,29 @@ pub fn decode(t: &vtex::Texture) -> Option<Decoded> {
     Some(Decoded { config, data, sheet: t.sheet.clone() })
 }
 
-/// The compiled texture at `path`, decoded; `None` without a readable `.vtex_c`.
+/// Image files a material source may name instead of a `.vtex`.
+const IMAGE_EXTENSIONS: [&str; 6] = ["tga", "png", "jpg", "jpeg", "psd", "exr"];
+
+/// For an image a material source names (`dir/x.tga`), the compiled texture the resource compiler
+/// wrote beside it: `dir/x_tga_<settings hash>.generated.vtex_c`.
+pub fn generated_sibling(path: &str) -> Option<String> {
+    let path = path.replace('\\', "/");
+    let (dir, file) = path.rsplit_once('/').unwrap_or(("", &path));
+    let (stem, ext) = file.rsplit_once('.')?;
+    if !IMAGE_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()) {
+        return None;
+    }
+    let prefix = format!("{stem}_{ext}_").to_ascii_lowercase();
+    crate::fs::search_roots().into_iter().find_map(|root| {
+        let names = std::fs::read_dir(root.join(dir)).ok()?.flatten().map(|e| e.file_name().to_string_lossy().into_owned());
+        let name = names.filter(|n| n.to_ascii_lowercase().starts_with(&prefix) && n.to_ascii_lowercase().ends_with(".generated.vtex_c")).min()?;
+        Some(if dir.is_empty() { name } else { format!("{dir}/{name}") })
+    })
+}
+
+/// The compiled texture at `path` (or its generated sibling), decoded; `None` without a readable `.vtex_c`.
 pub fn load(path: &str) -> Option<Decoded> {
-    let file = crate::fs::read(&compiled_path(path), "GAME")?;
+    let file = crate::fs::read(&compiled_path(path), "GAME").or_else(|| crate::fs::read(&generated_sibling(path)?, "GAME"))?;
     let t = vtex::read(&file).inspect_err(|e| abi::rt::log::warn(&format!("{path}: {e:?}"))).ok()?;
     let decoded = decode(&t);
     if decoded.is_none() {

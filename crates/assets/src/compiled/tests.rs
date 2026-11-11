@@ -70,6 +70,46 @@ fn texture_round_trips_compressed_and_raw() {
     }
 }
 
+/// `t` laid out as real engine2's compiler writes it: zstd mip 0, raw smaller mips, and a
+/// compressed-mip entry that declares only its 12-byte head with the size array after it.
+fn real_zstd_vtex(t: &Texture) -> Vec<u8> {
+    let zstd = |l: &[u8]| ruzstd::encoding::compress_to_vec(l, ruzstd::encoding::CompressionLevel::Fastest);
+    let stored: Vec<Vec<u8>> = t.levels.iter().enumerate().map(|(i, l)| if i == 0 { zstd(l) } else { l.clone() }).collect();
+    assert!(stored[0].len() < t.levels[0].len());
+    let mut data = vec![1, 0];
+    data.extend(t.flags.to_le_bytes());
+    t.reflectivity.iter().for_each(|f| data.extend(f.to_le_bytes()));
+    [t.width, t.height, t.depth].iter().for_each(|v| data.extend(v.to_le_bytes()));
+    data.extend([t.format.0, t.levels.len() as u8]);
+    [0, 8, 1, 4, 8, 12, 2, 8, stored.len() as u32].iter().for_each(|v| data.extend(v.to_le_bytes()));
+    stored.iter().for_each(|s| data.extend((s.len() as u32).to_le_bytes()));
+    let mut file = super::write(1, &[], vec![(*b"DATA", data)]);
+    stored.iter().rev().for_each(|s| file.extend(s));
+    file
+}
+
+#[test]
+fn real_zstd_mips_read_like_ours() {
+    let want = fixture::texture();
+    assert_eq!(texture::read(&real_zstd_vtex(&want)).unwrap(), want);
+}
+
+/// With `UNDERBOX_REAL_CORE=<real engine2's game/core>`, every compiled core texture reads.
+#[test]
+fn real_core_textures_read() {
+    let Some(core) = std::env::var_os("UNDERBOX_REAL_CORE") else { return };
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for e in std::fs::read_dir(dir).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() { walk(&p, out) } else if p.extension().is_some_and(|x| x == "vtex_c") { out.push(p) }
+        }
+    }
+    let mut files = Vec::new();
+    walk(std::path::Path::new(&core), &mut files);
+    let failed: Vec<_> = files.iter().filter(|f| texture::read(&std::fs::read(f).unwrap()).is_err()).collect();
+    assert!(failed.is_empty(), "{} of {} unreadable, e.g. {:?}", failed.len(), files.len(), &failed[..failed.len().min(5)]);
+}
+
 #[test]
 fn bc1_checker_decodes_to_its_colours() {
     let t = texture::read(&texture::write(&fixture::texture(), true)).unwrap();
