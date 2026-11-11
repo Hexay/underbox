@@ -11,6 +11,10 @@ pub fn texture(path: &str) -> Option<(u32, u32, Vec<u8>)> {
     if stem.ends_with("dev/helper/testgrid_color") {
         return Some(testgrid());
     }
+    // Real's compiled default normal map: a flat hemi-octahedral normal and roughness 0.5 in blue.
+    if stem.ends_with("materials/default/default_normal") {
+        return Some((1, 1, vec![128, 128, 128, 255]));
+    }
     let flare = stem.contains("textures/particles/flares/") && !stem.contains("light_cone");
     (flare || stem.contains("textures/lightcookies/")).then(glow)
 }
@@ -64,6 +68,7 @@ mod tests {
         assert_eq!((w, h, data.len()), (GRID_SIZE, GRID_SIZE, (GRID_SIZE * GRID_SIZE * 4) as usize));
         assert!(texture("materials/dev/helper/testgrid_color.vtex_c").is_some());
         assert!(texture("materials/default/default_color.tga").is_none());
+        assert_eq!(texture("materials/default/default_normal.tga"), Some((1, 1, vec![128, 128, 128, 255])));
         // A cell interior differs from its neighbour, and edges are darker than both.
         let at = |x: u32, y: u32| data[((y * GRID_SIZE + x) * 4) as usize];
         assert_ne!(at(32, 32), at(96, 32));
