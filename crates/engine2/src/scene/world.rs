@@ -44,7 +44,6 @@ fn create(name: Option<&std::ffi::CStr>) -> HandleId<class::ISceneWorld> {
 /// Delete every object, then the world itself.
 fn destroy(r: Ref) {
     delete_all(r);
-    super::world_queries::forget(r);
     if let Some(world) = get(r) {
         world.handle.free();
     }

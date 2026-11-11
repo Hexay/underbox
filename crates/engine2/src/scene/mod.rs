@@ -10,11 +10,9 @@ mod object_slots;
 mod probes;
 mod sky;
 pub mod world;
-mod world_queries;
 
 pub fn register(r: &mut abi::Registry) {
     world::register(r);
-    world_queries::register(r);
     object_slots::register(r);
     create::register(r);
     aggregate::register(r);
