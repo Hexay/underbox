@@ -14,14 +14,19 @@ impl ComputeProgram {
     pub fn new(gpu: &Gpu, label: &str, stage: &Stage, bind_group_layouts: Vec<wgpu::BindGroupLayout>, workgroup_size: [u32; 3]) -> ComputeProgram {
         let refs: Vec<_> = bind_group_layouts.iter().map(Some).collect();
         let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some(label), bind_group_layouts: &refs, immediate_size: 0 });
-        let pipeline = gpu.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some(label),
-            layout: Some(&layout),
-            module: &stage.module,
-            entry_point: Some(&stage.entry),
-            compilation_options: Default::default(),
-            cache: None,
-        });
+        let pipeline = crate::gpu::timed(
+            || format!("compute pipeline {label}"),
+            || {
+                gpu.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some(label),
+                    layout: Some(&layout),
+                    module: &stage.module,
+                    entry_point: Some(&stage.entry),
+                    compilation_options: Default::default(),
+                    cache: None,
+                })
+            },
+        );
         ComputeProgram { label: label.into(), bind_group_layouts, workgroup_size, pipeline }
     }
 

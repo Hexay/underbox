@@ -90,7 +90,7 @@ impl Program {
         let buffers: Vec<_> = key.vertex.iter().map(|b| Some(b.as_layout())).collect();
         let blend = s.blend.filter(|_| key.color.is_some_and(|f| f.guaranteed_format_features(gpu.device.features()).flags.contains(wgpu::TextureFormatFeatureFlags::BLENDABLE)));
         let targets = [key.color.map(|format| wgpu::ColorTargetState { format, blend, write_mask: s.write_mask })];
-        gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        crate::gpu::timed(|| format!("render pipeline {}", self.label), || gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(&self.label),
             layout: Some(&self.layout),
             vertex: wgpu::VertexState { module: &self.vertex.module, entry_point: Some(&self.vertex.entry), compilation_options: Default::default(), buffers: &buffers },
@@ -111,6 +111,6 @@ impl Program {
             }),
             multiview_mask: None,
             cache: None,
-        })
+        }))
     }
 }

@@ -29,7 +29,7 @@ pub use buffer::{Buffer, BufferKind};
 pub use compute::ComputeProgram;
 pub use forward::{Camera, DrawItem, ForwardPass};
 pub use frame::{Comparison, Frame};
-pub use gpu::{Gpu, GpuError};
+pub use gpu::{Gpu, GpuError, timed as gpu_timed};
 pub use mesh::{Mesh, Vertex};
 pub use placeholder::{DRAW_UNIFORM_SIZE, Placeholder, Semantic};
 pub use program::{Program, Stage};

@@ -54,7 +54,8 @@ pub struct Shading<P = render::Program> {
 
 fn stage(compiler: &Compiler, shader: &VfxShader, stage: Stage, v: &Variant) -> Result<CompiledStage, String> {
     let program = shader.program_for(stage).ok_or_else(|| format!("no {stage:?} program"))?;
-    compiler.compile(shader, program, v).map_err(|e| format!("{stage:?} {:?}: {}", e.phase, e.message.lines().next().unwrap_or("")))
+    let what = || format!("translating {} {stage:?}", shader.path.display());
+    render::gpu_timed(what, || compiler.compile(shader, program, v)).map_err(|e| format!("{stage:?} {:?}: {}", e.phase, e.message.lines().next().unwrap_or("")))
 }
 
 /// Bindings the per-draw binder can't fill: bindless arrays, storage images, external textures.

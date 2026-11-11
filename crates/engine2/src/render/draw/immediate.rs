@@ -85,7 +85,10 @@ fn uniforms(c: Ctx, world: Mat4, tint: [f32; 4]) -> DrawUniforms {
 
 pub fn submit(c: Ctx, draws: &[Draw]) {
     if !draws.is_empty() {
-        crate::render::submits::log(c, &format!("draw x{}", draws.len()));
+        if crate::render::submits::enabled() {
+            let shaders: Vec<&str> = draws.iter().map(|d| d.shaded.as_ref().map_or("placeholder", |s| s.material.shader())).collect();
+            crate::render::submits::log(c, &format!("draw x{} [{}]", draws.len(), shaders.join(", ")));
+        }
         super::execute(&context::target(c), &lighting(c), Load::default(), draws);
     }
 }

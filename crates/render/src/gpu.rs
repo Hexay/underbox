@@ -149,7 +149,7 @@ impl Gpu {
             return drained;
         }
         let timeout = Duration::from_millis(self.wait_timeout_ms.load(Ordering::Relaxed));
-        match self.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: Some(timeout) }) {
+        match timed(|| "waiting for the GPU".into(), || self.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: Some(timeout) })) {
             Ok(_) => true,
             Err(e) => {
                 self.hung.store(true, Ordering::Relaxed);
@@ -178,6 +178,18 @@ impl Gpu {
     pub fn set_wait_timeout(&self, timeout: Duration) {
         self.wait_timeout_ms.store(timeout.as_millis().max(1) as u64, Ordering::Relaxed);
     }
+}
+
+/// Runs `f`, logging `what` when it takes a second or more: pipeline compiles and GPU waits are
+/// what stall a frame on lavapipe.
+pub fn timed<R>(what: impl FnOnce() -> String, f: impl FnOnce() -> R) -> R {
+    let start = std::time::Instant::now();
+    let r = f();
+    let took = start.elapsed();
+    if took >= Duration::from_secs(1) {
+        eprintln!("wgpu: slow: {} took {:.1} s", what(), took.as_secs_f32());
+    }
+    r
 }
 
 fn default_wait_timeout_ms() -> u64 {
