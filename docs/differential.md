@@ -228,14 +228,14 @@ engine's own), since sbox-public ships none of core's images. Both pin shadow qu
 volumetric fog Off (`FOG_QUALITY`, the auto-detected Low preset's level; the goldens pin High); the
 rest of the Low preset applies to both. Never commit real's frames.
 
-Metrics (mean abs error R/G/B, SSIM) before the fixes, after 1–2, after 3 and 6:
+Metrics (mean abs error R/G/B, SSIM) before the fixes, after 1–2, and after 3 and 5–7:
 
-| Scene | Before | After 1–2 | After 3, 6 |
+| Scene | Before | After 1–2 | After 3, 5–7 |
 | --- | --- | --- | --- |
-| showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 | |
-| outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 | 0.15 / 0.12 / 0.11, 0.999 |
-| fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 | 1.4 / 1.3 / 1.0, 0.977 |
-| skinned, glass, hud | content confounds, below | |
+| showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 | 0.11 / 0.34 / 0.42, 0.999 |
+| outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 | 0.11 / 0.13 / 0.12, 0.999 |
+| fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 | 0.23 / 0.27 / 0.32, 0.997 |
+| skinned, glass, hud | content confounds, below | | |
 
 Ranked divergences:
 
@@ -257,18 +257,26 @@ Ranked divergences:
 4. **Real draws no HUD** (hud scene). Both build the panel tree (both log the same missing
    `hud.cs.scss`); real's frame shows only the box. Unexplained; probe the UI pass next (is
    real's ScreenPanel drawn when the window never gets focus?).
-5. **Point light hotspot dimmer on ours.** Showroom lamp peak (209,112,94) against real's
-   (246,147,110); sun-lit and shadowed floor agree within 2. Guess: point light falloff or
-   specular in `render/lighting/`.
+5. **Fixed. Point light hotspot dimmer on ours.** Showroom lamp peak was (209,112,94) against
+   real's (246,147,110); now both (247,148,111). The hotspot is specular, which the stand-in for
+   closed `complex` lacked: it now lights as `vr_lighting.fxc` does, normalized pow(N·L) diffuse
+   plus GGX specular, with roughness from `g_tNormal`'s blue channel (core's default normal map
+   holds 0.5) and F0 0.04 (`shading/standin_lighting.hlsl`). Falloff and packing matched already;
+   a point light now also packs native's zero axes and (0, -1, 1, 0) cone, and the spot cone
+   factor is left unclamped as real's is (`lighting/blocks.rs`).
 6. **Fixed. 3D skybox through distance fog brighter on ours** (outdoor: +8 to +13 per channel)
    with a seam at x ≈ 375 between two faces of a skybox box. Not the fog constants: the skybox's
    child view took the camera's ambient colour (and, with none, the stand-in's fallback sun).
    Real lights it with the skybox world's own lights only, so a skybox without one is black under
    its fog (`render/scene/skybox.rs`, `Lighting::of_worlds`).
-7. **Minification.** Grid lines are black on ours (0) and grey on real (18): ours uploads mip 0
-   only (`compiled/texture.rs`), real samples its mip chain.
-8. **Low. Banding.** Concentric rings in the diff around light pools: 8-bit quantisation differs
-   (real likely dithers).
+7. **Fixed. Minification.** Grid lines were black on ours: ours uploaded mip 0 only. Compiled
+   textures now upload every stored mip (`compiled/texture.rs`), and a vfx `Filter( ANISO )`
+   sampler without a managed state gets anisotropy 4, the Low profile's `r_max_anisotropy`
+   (`shading/defaults.rs`; mips alone left far lines too bright). Mean luma of showroom's grid
+   line pixels, ours/real: near floor 35.7/43.3 → 43.5/43.3, far floor 75.6/78.6 → 78.9/78.6.
+8. **Low. Banding.** Concentric rings in the diff around light pools are 1-LSB offsets: along a
+   gradient both frames step through the same number of levels (no dithering on real), with
+   boundaries a pixel or two apart. Shadow edges differ by a pixel too. Not pursued.
 
 Agreeing: sky clear colour (exact), ACES auto-exposure on outdoor's floor (exact), sun shadows'
 placement and softness, box shading within 1–6.
@@ -287,8 +295,10 @@ scattered points, so `frame.sh` doesn't seed `.vmdl_c`.
 - **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
-- **Rendering (4, 5, 7):** the HUD probe; point light falloff; mips. The texture quality group's
-  convars (`r_texture_stream_*`, `r_max_anisotropy`) live in real's rendersystem and aren't defined
-  yet; managed warns once and skips them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say. Content: compile project `.vmat` for real (glass), make the fixture `.vmdl_c`
-  pass real's schema (skinned), read real's compiled `.vmdl_c` on ours.
+- **Rendering (4, 8):** the HUD probe. The texture quality group's convars
+  (`r_texture_stream_*`, `r_max_anisotropy`) live in real's rendersystem and aren't defined yet;
+  managed warns once and skips them. Define them, then read `r_max_anisotropy` instead of the
+  fixed 4. The froxel grid stays 96×56×64 whatever `volume_fog_*` say. Content: compile project
+  `.vmat` for real (glass), make the fixture `.vmdl_c` pass real's schema (skinned), read real's
+  compiled `.vmdl_c` on ours.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

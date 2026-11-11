@@ -155,6 +155,10 @@ PS
 	float4 g_vColorTint < Attribute( "g_vColorTint" ); Default4( 1.0, 1.0, 1.0, 1.0 ); >;
 	float g_flModelTintAmount < Attribute( "g_flModelTintAmount" ); Default( 1.0 ); >;
 	float g_flOpacityScale < Attribute( "g_flOpacityScale" ); Default( 1.0 ); >;
+	// complex's normal map: hemi-octahedral normal in rg, roughness in b (unused normal kept flat).
+	Texture2D g_tNormal < Attribute( "g_tNormal" ); >;
+	float g_flRoughnessScaleFactor < Attribute( "g_flRoughnessScaleFactor" ); Default( 1.0 ); >;
+	float g_flMetalness < Attribute( "g_flMetalness" ); Default( 0.0 ); >;
 	// 1 for shaders that map here from an unlit original (standin.rs).
 	float g_flStandinUnlit < Attribute( "StandinUnlit" ); Default( 0.0 ); >;
 	// UNDERBOX_STANDIN_DEBUG (standin.rs): 1 paints sun visibility, 2 cascade 0's shadow-space position.
@@ -164,21 +168,6 @@ PS
 	{
 		float4 vColor : SV_Target0;
 	};
-
-	// Diffuse only; falloff and cone as vr_lighting.fxc computes them.
-	float3 BinnedLightDiffuse( BinnedLight l, float3 vPositionWs, float3 vNormalWs )
-	{
-		float3 vRay = l.Position - vPositionWs;
-		float flDistSq = dot( vRay, vRay );
-		if ( flDistSq > l.RadiusSquared )
-			return 0.0;
-		float3 vDir = vRay * rsqrt( max( flDistSq, 1e-6 ) );
-		float4 vCone = l.SpotLightInnerOuterConeCosines;
-		float flCone = saturate( ( dot( vDir, -l.Forward ) - vCone.y ) * vCone.z );
-		float flDot = dot( float2( sqrt( flDistSq ), flDistSq ), float2( l.LinearFalloff, l.QuadraticFalloff ) );
-		float flFalloff = saturate( 1.0 / max( flDot, 1e-6 ) - l.FalloffBias );
-		return l.Color * saturate( dot( vNormalWs, vDir ) ) * flCone * flFalloff;
-	}
 
 	//@sun_shadows
 
@@ -230,21 +219,7 @@ PS
 		return flSum / 9.0;
 	}
 
-	float3 Irradiance( float3 vPositionWs, float3 vNormalWs )
-	{
-		float3 vLight = AmbientLightColor.rgb;
-		if ( g_DirectionalLightEnabled )
-			vLight += g_DirectionalLightColor.rgb * saturate( dot( vNormalWs, -g_DirectionalLightDirection.xyz ) ) * SunVisibility( vPositionWs, vNormalWs );
-		for ( int n = 0; n < NumLights.x; n++ )
-		{
-			BinnedLight l = LoadLight( n );
-			float3 vDiffuse = BinnedLightDiffuse( l, vPositionWs, vNormalWs );
-			if ( any( vDiffuse > 0.0 ) )
-				vDiffuse *= LocalVisibility( l, vPositionWs, vNormalWs );
-			vLight += vDiffuse;
-		}
-		return vLight;
-	}
+	//@lighting
 
 	PS_OUTPUT MainPs( PS_INPUT i )
 	{
@@ -254,8 +229,19 @@ PS
 		float3 vColor = vAlbedo.rgb * g_vColorTint.rgb * vTint;
 
 		float3 vNormalWs = normalize( i.vNormalWs );
-		float3 vLight = Irradiance( i.vPositionWs, vNormalWs );
-		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), vColor * lerp( vLight, 1.0, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * i.vTint.a );
+		Surface s;
+		s.vPositionWs = i.vPositionWs;
+		s.vNormalWs = vNormalWs;
+		s.vToCameraWs = CalculatePositionToCameraDirWs( i.vPositionWs );
+		// Before any branch: derivatives (BRDF.hlsl's AdjustRoughnessByGeometricNormal).
+		float3 vDx = ddx( vNormalWs ), vDy = ddy( vNormalWs );
+		float flGeometric = pow( saturate( max( dot( vDx, vDx ), dot( vDy, vDy ) ) ), 0.333 );
+		float flRoughness = pow( g_tNormal.Sample( g_sStandin, i.vTexCoord ).b, g_flRoughnessScaleFactor );
+		s.flRoughness = max( flRoughness, flGeometric );
+		s.vSpecularColor = lerp( float3( 0.04, 0.04, 0.04 ), vColor, g_flMetalness );
+		DirectLight d = Direct( s );
+		float3 vLit = vColor * ( 1.0 - g_flMetalness ) * ( AmbientLightColor.rgb + d.vDiffuse ) + d.vSpecular;
+		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), lerp( vLit, vColor, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * i.vTint.a );
 		if ( g_flStandinDebug == 1.0 )
 			o.vColor = float4( SunVisibility( i.vPositionWs, vNormalWs ).xxx, 1.0 );
 		else if ( g_flStandinDebug == 2.0 )

@@ -83,6 +83,9 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
 /// A compiled texture's pixels and sprite sheet as a texture.
 pub(crate) fn decoded(name: &str, c: crate::compiled::texture::Decoded, guid: Guid) -> Texture {
     let gpu = gpu_texture(name, &c.config, &c.data);
+    if let (Some(device), Some(tex)) = (device::gpu(), &gpu) {
+        tex.upload_smaller_mips(device, &c.smaller);
+    }
     let sheet = super::sheet::Sheet::new(c.sheet);
     Texture { desc: Box::new(desc_of(&c.config)), config: c.config, name: name.into(), data: Mutex::new(c.data), gpu, error: false, guid, sheet }
 }

@@ -30,9 +30,11 @@ pub const GPU_LIGHT_WORDS: usize = 39;
 
 impl Light {
     /// `LightToWorld`'s rows in memory: columns forward, left, up, position. Read column-major,
-    /// the shader's rows 0 and 3 are forward and position.
+    /// the shader's rows 0 and 3 are forward and position. A point light's axes stay zero, as
+    /// native packs it: its cone test then reads `0 - (-1)`, so the cone factor is exactly 1.
     fn light_to_world_rows(&self) -> [Vec4; 4] {
-        let (f, l, u, p) = (self.rotation * Vec3::X, self.rotation * Vec3::Y, self.rotation * Vec3::Z, self.position);
+        let axes = |v: Vec3| if self.cone.is_some() { self.rotation * v } else { Vec3::ZERO };
+        let (f, l, u, p) = (axes(Vec3::X), axes(Vec3::Y), axes(Vec3::Z), self.position);
         [Vec4::new(f.x, l.x, u.x, p.x), Vec4::new(f.y, l.y, u.y, p.y), Vec4::new(f.z, l.z, u.z, p.z), Vec4::W]
     }
 
@@ -42,13 +44,13 @@ impl Light {
         (0.0, q, 1.0 / (f32::EPSILON + self.radius * self.radius * q))
     }
 
-    /// `SpotLightInnerOuterConeCosines`; a point light's never rejects and saturates to 1.
+    /// `SpotLightInnerOuterConeCosines`; a point light's is native's (0, -1, 1, 0).
     fn cone_cosines(&self) -> Vec4 {
-        let Some((inner, outer)) = self.cone else { return Vec4::new(0.0, -2.0, 1.0, 0.0) };
+        let Some((inner, outer)) = self.cone else { return Vec4::new(0.0, -1.0, 1.0, 0.0) };
         let outer = outer.clamp(0.01, 89.9).to_radians();
         let inner = inner.to_radians().clamp(0.0, outer);
         let (ci, co) = (inner.cos(), outer.cos());
-        Vec4::new(ci, co, 1.0 / (ci - co).max(1e-4), outer.tan())
+        Vec4::new(ci, co, 1.0 / (ci - co).max(0.01), outer.tan())
     }
 
     /// The light as one `GPULight`; `shadow` is its first local shadow tile.
@@ -171,11 +173,13 @@ mod tests {
     /// matrix columns from word 3, colour at 19, radius² at 26, shadow map index at 34.
     #[test]
     fn gpu_light_matches_managed_scalar_layout() {
-        let mut l = point(5.0);
+        let mut l = Light { kind: kind::SPOT, cone: Some((15.0, 30.0)), ..point(5.0) };
         l.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
         let w = l.gpu_light(Some(2)).map(f32::from_bits);
         let forward = Vec3::new(w[3], w[7], w[11]);
         assert!(forward.distance(Vec3::Y) < 1e-6, "{forward}");
+        let p = point(5.0).gpu_light(None).map(f32::from_bits);
+        assert_eq!(([p[3], p[7], p[11]], [p[29], p[30], p[31]]), ([0.0; 3], [0.0, -1.0, 1.0]));
         assert_eq!([w[6], w[10], w[14], w[18]], [1.0, 2.0, 3.0, 1.0]);
         assert_eq!([w[19], w[26]], [1.0, 25.0]);
         assert_eq!(l.gpu_light(Some(2))[34], local_shadow::INDEX + 2);
