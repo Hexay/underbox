@@ -12,7 +12,8 @@ pub fn enabled() -> bool {
     *ENABLED
 }
 
-/// `UNDERBOX_SKIP_LAYERS=name,name`: layers not executed, for bisecting what covers a frame.
+/// `UNDERBOX_SKIP_LAYERS=name,name`: layers, or compute shaders by file stem (`cmaa2_cs`), not
+/// executed, for bisecting what covers a frame.
 pub fn skipped(layer: &str) -> bool {
     static SKIP: LazyLock<Vec<String>> = LazyLock::new(|| std::env::var("UNDERBOX_SKIP_LAYERS").map(|v| v.split(',').map(str::to_owned).collect()).unwrap_or_default());
     SKIP.iter().any(|s| s == layer)

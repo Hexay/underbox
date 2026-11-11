@@ -10,6 +10,7 @@
 # golden-managed.tsv, frame in target/client-frame-managed.
 # Shadow quality is pinned to High (SHADOW_QUALITY, like managed's benchmark rung): this machine
 # would detect Low. UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
+# CMAA2 is skipped: its output depends on the order its atomics land, which threaded lavapipe varies per frame.
 # Don't wrap this in flock: boot-client.sh runs in this worktree's own game dir (docs/dev-loop.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -20,7 +21,7 @@ GOLDEN=$ROOT/corpus/$CORPUS/golden$SUFFIX.tsv
 SETTLE=5
 rm -rf "$OUT"; mkdir -p "$OUT/frames"
 SECS=$1 SBOX=$2; shift 2
-OUT="$OUT" FRAMES="$OUT/frames" SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL=${UNTIL:-game.load success} GRACE=${GRACE:-6} \
+UNDERBOX_SKIP_LAYERS=${UNDERBOX_SKIP_LAYERS:-cmaa2_cs} OUT="$OUT" FRAMES="$OUT/frames" SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL=${UNTIL:-game.load success} GRACE=${GRACE:-6} \
     sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$ROOT/corpus/$CORPUS/.sbproj" "$@" > "$OUT/boot.txt" 2>&1 || true
 ADAPTER=$(grep -ohE 'render device: .*' "$OUT/client.out" | head -n 1 | sed 's/^render device: //')
 [ -n "$ADAPTER" ] || { tail -n 20 "$OUT/boot.txt"; echo "RESULT: FAIL (no render device)"; exit 1; }

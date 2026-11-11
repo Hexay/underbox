@@ -16,6 +16,9 @@ pub enum Work<'a> {
 
 /// Run `shader` over `work`; `Err` when it doesn't translate or bind.
 pub fn dispatch(gpu: &render::Gpu, shader: &str, attrs: &[attributes::Ref], work: Work) -> Result<(), String> {
+    if crate::render::scene::trace::skipped(shader.rsplit('/').next().unwrap_or(shader).trim_end_matches(".shader")) {
+        return Ok(());
+    }
     let program = shading::compute(gpu, shader, attrs)?;
     let view = View { view_proj: glam::Mat4::IDENTITY, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
     let (lighting, textures) = (Lighting::default(), HashMap::new());
