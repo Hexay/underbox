@@ -17,6 +17,12 @@ pub const RIGGED: &str = "models/compiled/rigged.vmdl";
 pub const ATLAS: &str = "models/compiled/rigged_morphs.vtex";
 pub const GROUP: &str = "models/compiled/rigged.vagrp";
 pub const VANIM: &str = "models/compiled/rigged_stretch.vanim";
+/// The wave's one event: a left footstep at frame 2.
+pub fn footstep() -> super::super::anim::Event {
+    let data = super::super::kv::obj(vec![("Foot", super::super::kv::int_value(0)), ("volume", ::kv::Value::Double(0.5))]);
+    super::super::anim::Event { frame: 2, cycle: 0.5, name: "AE_FOOTSTEP".into(), data }
+}
+
 /// The spine's rotation about z at wave frame `f`, in degrees.
 pub const WAVE_DEGREES: [f32; 5] = [0.0, 20.0, 40.0, 60.0, 80.0];
 /// The head's offset from its bind position at wave frame `f`.
@@ -67,8 +73,8 @@ pub fn animations() -> Vec<Animation> {
     };
     let nod = [0.0, 15.0, 0.0].iter().map(|&d| vec![Key::IDENTITY, Key::IDENTITY, tilt(d)]).collect();
     vec![
-        Animation { name: "wave".into(), fps: 10.0, looping: true, delta: false, hidden: false, frames: wave, morphs: smile },
-        Animation { name: "nod".into(), fps: 30.0, looping: false, delta: true, hidden: false, frames: nod, morphs: Vec::new() },
+        Animation { name: "wave".into(), fps: 10.0, looping: true, frames: wave, morphs: smile, events: vec![footstep()], ..Animation::default() },
+        Animation { name: "nod".into(), fps: 30.0, delta: true, frames: nod, ..Animation::default() },
     ]
 }
 

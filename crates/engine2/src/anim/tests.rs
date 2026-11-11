@@ -36,6 +36,8 @@ fn build(name: &std::ffi::CStr) -> NativeRef<class::CModel> {
         c.name = "wave".into();
         c.fps = 1.0;
         c.looping = true;
+        let data = kv::Value::Object(kv::Object(vec![("Foot".to_owned(), kv::Value::Int(1))]));
+        c.events = vec![anim::clip::ClipEvent { time: 0.25, name: "AE_FOOTSTEP".into(), data }];
     });
     let arm = transform(Vec3::new(5.0, 0.0, 0.0), Quat::IDENTITY);
     for turn in [0.0, FRAC_PI_2] {
@@ -92,6 +94,36 @@ fn sequence_playback_moves_world_bones() {
     let mut child = AnimState::new(model);
     child.merge_from(&s.named_world(), &object);
     assert!(child.world[1].pos.abs_diff_eq(s.world[1].pos, 1e-5), "bone merge copies same-named bones");
+}
+
+static FIRED: Mutex<Vec<(String, f32, f32, kv::Value)>> = Mutex::new(Vec::new());
+
+extern "C" fn on_event(name: *const std::ffi::c_char, cycle: f32, time: f32, data: *mut std::ffi::c_void) {
+    let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_string_lossy().into_owned();
+    let data = crate::kv3::node::get(NativeRef::from_raw(data.cast())).map(|n| crate::kv3::to_value(&n)).unwrap_or(kv::Value::Null);
+    FIRED.lock().unwrap().push((name, cycle, time, data));
+}
+
+/// `wave` has a footstep at 0.25 s: it fires once per lap, through managed's event callback.
+#[test]
+fn sequence_events_reach_the_event_callback() {
+    let model = build(c"anim_test_events");
+    let mut s = AnimState::new(model);
+    s.sequence.play("wave");
+    s.update(0.2, Xform::IDENTITY);
+    assert!(s.pending.is_empty(), "before the footstep");
+    s.update(0.2, Xform::IDENTITY);
+    assert_eq!(s.pending.len(), 1);
+    let events = std::mem::take(&mut s.pending);
+    super::callback::animation_events(on_event as *const () as usize, &events);
+    let fired = std::mem::take(&mut *FIRED.lock().unwrap());
+    let [(name, cycle, time, data)] = &fired[..] else { panic!("{fired:?}") };
+    assert_eq!((name.as_str(), *cycle, *time), ("AE_FOOTSTEP", 0.25, 0.25));
+    assert_eq!(data.as_object().and_then(|o| o.get("Foot")), Some(&kv::Value::Int(1)), "the payload as a KeyValues3");
+    s.update(0.7, Xform::IDENTITY);
+    assert!(s.pending.is_empty(), "the rest of the lap");
+    s.update(0.2, Xform::IDENTITY);
+    assert_eq!(s.pending.len(), 1, "the next lap's footstep");
 }
 
 #[test]

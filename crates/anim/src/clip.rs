@@ -18,11 +18,50 @@ pub struct Clip {
     /// `morphs[f][controller]` over the model's flex controllers ([`crate::ModelAnim::flex`]);
     /// empty when the clip drives no morphs.
     pub morphs: Vec<Vec<f32>>,
+    pub events: Vec<ClipEvent>,
+}
+
+/// A named event at a time in the clip, with its payload (`AE_FOOTSTEP {Foot, volume}`...).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClipEvent {
+    pub time: f32,
+    pub name: String,
+    pub data: kv::Value,
+}
+
+/// An event a playing clip passed: which, and the clip's cycle (0..1) and time there.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fired {
+    pub name: String,
+    pub data: kv::Value,
+    pub cycle: f32,
+    pub time: f32,
 }
 
 impl Clip {
     pub fn new(name: &str, fps: f32) -> Self {
-        Self { name: name.to_owned(), fps, frames: Vec::new(), looping: false, delta: false, interpolate: true, hidden: false, morphs: Vec::new() }
+        Self { name: name.to_owned(), fps, frames: Vec::new(), looping: false, delta: false, interpolate: true, hidden: false, morphs: Vec::new(), events: Vec::new() }
+    }
+
+    /// Events in `[from, to)` of unwrapped playback time: every lap of a looping clip, else
+    /// clamped to the clip.
+    pub fn events_in(&self, from: f32, to: f32, looping: bool) -> Vec<Fired> {
+        let d = self.duration();
+        if self.events.is_empty() || to <= from {
+            return Vec::new();
+        }
+        let laps = if looping && d > 0.0 { (from / d).floor() as i64..=(to / d).floor() as i64 } else { 0..=0 };
+        let mut out = Vec::new();
+        for lap in laps {
+            for e in &self.events {
+                let at = e.time + lap as f32 * d;
+                if (from..to).contains(&at) {
+                    let cycle = if d > 0.0 { e.time / d } else { 0.0 };
+                    out.push(Fired { name: e.name.clone(), data: e.data.clone(), cycle, time: e.time });
+                }
+            }
+        }
+        out
     }
 
     /// Each flex controller's value at `time`; `None` when the clip drives no morphs.

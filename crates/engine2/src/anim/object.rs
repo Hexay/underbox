@@ -15,6 +15,8 @@ use std::sync::{Arc, LazyLock, Mutex, Weak};
 pub type Ref = NativeRef<class::CSceneAnimatableObject>;
 pub type Shared = Arc<Mutex<AnimState>>;
 
+const MAX_PENDING_EVENTS: usize = 64;
+
 pub struct Graph2 {
     pub resource: graph::Ref2,
     pub instance: Instance,
@@ -54,6 +56,8 @@ pub struct AnimState {
     /// Managed callbacks: AnimGraph2 controller created; legacy graph changed.
     pub on_controller: usize,
     pub on_graph1: usize,
+    /// Clip events passed by updates, until `RunAnimationEvents` hands them to managed.
+    pub pending: Vec<anim::clip::Fired>,
 }
 
 struct Entry {
@@ -121,6 +125,7 @@ impl AnimState {
             flex: HashMap::new(),
             on_controller: 0,
             on_graph1: 0,
+            pending: Vec::new(),
         }
     }
 
@@ -177,18 +182,24 @@ impl AnimState {
                 }
                 let pose = g.instance.update(dt, &bind);
                 g.recording.record(dt, &g.instance.params, character);
+                self.pending.extend(g.instance.take_events());
                 pose
             }
             (_, Some(clip)) => {
                 let t0 = self.sequence.sample_time(clip);
                 self.sequence.advance(dt);
                 let t1 = self.sequence.sample_time(clip);
-                self.root_motion = clip.root_motion(t0, if t1 < t0 { t1 + clip.duration() } else { t1 });
+                let unwrapped = if t1 < t0 { t1 + clip.duration() } else { t1 };
+                self.root_motion = clip.root_motion(t0, unwrapped);
+                self.pending.extend(clip.events_in(t0, unwrapped, true));
                 clip.sample(t1, &bind)
             }
             _ => bind,
         };
         self.local = pose.0;
+        // Objects managed never runs events for would otherwise grow this forever.
+        let over = self.pending.len().saturating_sub(MAX_PENDING_EVENTS);
+        self.pending.drain(..over);
         if let Some(g) = &mut self.graph1 {
             g.params.reset_auto();
         }

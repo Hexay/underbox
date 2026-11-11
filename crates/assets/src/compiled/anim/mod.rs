@@ -41,6 +41,27 @@ pub struct Animation {
     pub frames: Vec<Vec<Key>>,
     /// `morphs[f][controller]`; empty when nothing keys a morph.
     pub morphs: Vec<Vec<f32>>,
+    pub events: Vec<Event>,
+}
+
+/// An `m_eventArray` entry: `AE_FOOTSTEP`, `AE_CL_PLAYSOUND`, `AE_GENERIC_EVENT`... with its
+/// KV3 payload (what managed's `SceneModel.OnAnimationEvent` reads).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Event {
+    pub frame: i64,
+    pub cycle: f32,
+    pub name: String,
+    pub data: Value,
+}
+
+fn events(desc: &Object) -> Vec<Event> {
+    let event = |e: &Object| Event {
+        frame: int(e, "m_nFrame"),
+        cycle: kv::float(e, "m_flCycle"),
+        name: string(e, "m_sEventName"),
+        data: e.get("m_EventData").cloned().unwrap_or(Value::Null),
+    };
+    objects(desc, "m_eventArray").map(event).filter(|e| !e.name.is_empty()).collect()
 }
 
 /// What animations bind against: the model's bones and flex controller names.
@@ -156,6 +177,7 @@ fn animation(desc: &Object, segments: &[Option<Segment>], rig: &Rig) -> Animatio
         hidden: kv::bool(flags, "m_bHidden"),
         frames,
         morphs: if morphed { morphs } else { Vec::new() },
+        events: events(desc),
     }
 }
 

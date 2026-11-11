@@ -80,9 +80,12 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::DIRECT_PLAYBACK_GET_SEQUENCE_DURATION, |r| on_sequence(r, |_, c| c.duration()));
     bind!(r, o::DIRECT_PLAYBACK_SET_SEQUENCE_START_TIME, |r, t| with(r, |s| s.sequence.time = t));
 
-    // TODO: clip events (footsteps, sounds, tags) once clips carry them.
-    bind!(r, o::PENDING_ANIMATION_EVENTS, |_| 0);
-    bind!(r, o::RUN_ANIMATION_EVENTS, |_, _| {});
+    bind!(r, o::PENDING_ANIMATION_EVENTS, |r| with(r, |s| s.pending.len() as i32));
+    bind!(r, o::RUN_ANIMATION_EVENTS, |r, cb: RawPtr<c_void>| {
+        let events = with(r, |s| std::mem::take(&mut s.pending));
+        callback::animation_events(cb.as_ptr() as usize, &events);
+    });
+    // TODO: anim tags need the graph's tag data (AnimGraph1 tag spans aren't read yet).
     bind!(r, o::DISPATCH_TAG_EVENTS, |_, _| {});
 
     // Morph overrides are in `super::flex`.

@@ -36,8 +36,16 @@ pub fn clip(a: &canim::Animation) -> Clip {
         delta: a.delta,
         hidden: a.hidden,
         morphs: a.morphs.clone(),
+        events: a.events.iter().map(|e| event(a, e)).collect(),
         ..Clip::new(&a.name, a.fps)
     }
+}
+
+/// At its frame; an event with no frame but a cycle sits at that fraction of the clip.
+fn event(a: &canim::Animation, e: &canim::Event) -> anim::clip::ClipEvent {
+    let duration = if a.fps > 0.0 { a.frames.len().saturating_sub(1) as f32 / a.fps } else { 0.0 };
+    let time = if e.frame > 0 || e.cycle <= 0.0 { e.frame as f32 / a.fps.max(f32::EPSILON) } else { e.cycle * duration };
+    anim::clip::ClipEvent { time: time.min(duration), name: e.name.clone(), data: e.data.clone() }
 }
 
 pub fn model_anim(m: &model::Model) -> ModelAnim {

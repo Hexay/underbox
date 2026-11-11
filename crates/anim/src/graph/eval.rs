@@ -5,7 +5,7 @@ use super::eval_more::Rig;
 use super::smooth::{self, Smooth};
 use super::value::{StateCtx, Values};
 use super::{Definition, PoseId, PoseNode, State};
-use crate::clip::Clip;
+use crate::clip::{Clip, Fired};
 use crate::params::Params;
 use crate::pose::Pose;
 use std::sync::Arc;
@@ -44,6 +44,8 @@ pub struct Instance {
     clips: Vec<Option<Arc<Clip>>>,
     pub(super) nodes: Vec<NodeState>,
     smooth: Vec<Smooth>,
+    /// Clip events passed since the last `take_events`.
+    events: Vec<Fired>,
 }
 
 impl Instance {
@@ -53,7 +55,12 @@ impl Instance {
         let clips = def.slots.iter().map(|s| clip(s)).collect();
         let nodes = vec![NodeState::Idle; def.poses.len()];
         let smooth = vec![Smooth::default(); def.values.len()];
-        Self { def, params, rig: None, clips, nodes, smooth }
+        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new() }
+    }
+
+    /// The clip events playing clips passed since the last call.
+    pub fn take_events(&mut self) -> Vec<Fired> {
+        std::mem::take(&mut self.events)
     }
 
     pub fn definition(&self) -> &Arc<Definition> {
@@ -129,12 +136,13 @@ impl Instance {
     }
 
     fn clip(&mut self, id: PoseId, slot: usize, looping: bool, dt: f32, bind: &Pose) -> Out {
-        let time = match self.nodes[id] {
-            NodeState::Clip { time } => time + dt,
-            _ => 0.0,
+        let (from, time) = match self.nodes[id] {
+            NodeState::Clip { time } => (time, time + dt),
+            _ => (0.0, 0.0),
         };
         self.nodes[id] = NodeState::Clip { time };
         let Some(clip) = self.clips.get(slot).cloned().flatten() else { return Out { pose: bind.clone(), finished: true } };
+        self.events.extend(clip.events_in(from, time, looping));
         let d = clip.duration();
         let t = if looping && d > 0.0 { time.rem_euclid(d) } else { time.clamp(0.0, d) };
         let mut pose = bind.clone();
