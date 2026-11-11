@@ -109,6 +109,14 @@ pub fn constant_buffer(r: Ref, name: &str) -> Option<Arc<[u8]>> {
     })
 }
 
+/// The combo value `SetComboValue` stored as `name` (with parents).
+pub fn combo(r: Ref, name: &str) -> Option<i64> {
+    on(r, |a| match a.get(Kind::Combo, StringToken::of(name)) {
+        Some(Value::Combo(c)) => Some(i64::from(c)),
+        _ => None,
+    })
+}
+
 /// A numeric value named `name` (with parents) as a shader reads it: float, vector, int, bool or
 /// combo, widened to four components.
 pub fn shader_value(r: Ref, name: &str) -> Option<glam::Vec4> {

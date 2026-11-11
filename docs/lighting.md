@@ -5,12 +5,13 @@ Part of the renderer (docs/renderer.md).
 ## Compute
 
 `RenderTools.Compute` (`render/compute/`) translates the `.shader`'s CS stage like any other
-(`shading::compute`, combos 0/0) into a `render::ComputeProgram` and dispatches
-`ceil(threads / workgroup size)` groups, bound by name from attributes and the view's lighting.
-On the GPU: `clustered_light_culling_cs`, `depthresolve_cs`, `postprocess/cmaa2_cs`. On the CPU:
-`occlusion_cull_cs` (naga rejects DXC's output; `render/compute/` keeps a CPU cull). Skipped with a
-warning: `downsample_spd` (needs `SPV_KHR_compute_shader_derivatives`). `compute/gpu_tests.rs`
-lists which must build. Storage images need the adapter's format features
+(`shading::compute`, at the static/dynamic combos the dispatch's attributes set) into a
+`render::ComputeProgram` and dispatches `ceil(threads / workgroup size)` groups, bound by name
+from attributes and the view's lighting. On the GPU: `clustered_light_culling_cs`,
+`depthresolve_cs`, `postprocess/cmaa2_cs`, `occlusion_cull_cs` (its struct-field atomics become a
+word buffer, crates/shaders `word_buffers.rs`; `compute/occlusion.rs` is the CPU fallback). Skipped
+with a warning: `downsample_spd` (needs `SPV_KHR_compute_shader_derivatives`).
+`compute/gpu_tests.rs` lists which must build. Storage images need the adapter's format features
 (`TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES`: lavapipe writes `Rg32Float` read-write).
 
 ## Lighting and shadows
@@ -32,12 +33,12 @@ world direction is `-forward` (native `GetWorldDirection` points at the light, `
 Managed's scene renderer (`r_managed_scene`) is reverse-Z: its cascade maps clear to 0 and compare
 `GREATER_EQUAL`; the stand-in tells them from ours by `ShadowMapIndex` (ours is the sentinel
 `0x7FFFFF00`). Shadow draws carry managed's rasterizer bias (`DrawModelDrawCall` slots →
-`RasterState.depth_bias`).
+`RasterState.depth_bias`). Managed's point and spot shadows: the stand-in reads its
+`ProjectedCubeShadows`/`ProjectedShadows` structs as words (standin_managed_shadows.hlsl) and
+compares against the maps they name, rendered face by face through `BindDepthTarget`'s slice.
 
-Open tone gap: managed's lit surfaces read brighter than native's (the showroom floor, native
-(63,81,48) vs managed (136,153,120), is exactly native's sRGB-encoded), while the sky is identical
-in both. Encoding native's `ResolveHDRToFinalSDR` blit matched the floor but washed out the sky
-and every lit colour, so it was reverted: the gap is in lighting or the HDR path, not the blit.
+Both paths shade linear and encode once at output (docs/renderer.md, colour model): the showroom
+floor matches between them to within a unit per channel.
 
 ## Managed sun shadows (open)
 

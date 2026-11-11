@@ -170,11 +170,13 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
                 return Ok(Resource::Buffer(given));
             }
             let element = s.storage.get(&(b.group, b.binding));
-            let bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
+            let mut bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
                 Some(bytes) => bytes,
                 None if b.name == TRANSFORMS => transforms(inputs.instances),
                 None => vec![0; min_binding_size.map_or(256, |n| n.get().max(256)) as usize],
             };
+            // An empty light list is shorter than one element (clustered_light_culling_cs binds 176).
+            bytes.resize(bytes.len().max(min_binding_size.map_or(0, |n| n.get() as usize)), 0);
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
         B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, b, view_dimension, sample_type)),

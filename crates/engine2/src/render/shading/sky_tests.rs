@@ -24,6 +24,19 @@ fn cube() -> texture::Ref {
 }
 
 #[test]
+fn every_standin_builds() {
+    let (Some(core), Some(gpu)) = (core_dir(), device::create()) else {
+        eprintln!("skipped: no sbox-public checkout or GPU");
+        return;
+    };
+    let compiler = shaders::Compiler::new().unwrap();
+    for path in [standin::PATH, standin::SKY_PATH, standin::GIZMO_PATH] {
+        let shader = standin::shader(path, &shaders::IncludePaths::new([core.clone()])).unwrap().unwrap();
+        program::build(gpu, &compiler, &shader, path, &shaders::Variant::default()).unwrap_or_else(|e| panic!("{path}: {e}"));
+    }
+}
+
+#[test]
 fn sky_standin_samples_the_face_it_looks_at() {
     let (Some(core), Some(gpu)) = (core_dir(), device::create()) else {
         eprintln!("skipped: no sbox-public checkout or GPU");

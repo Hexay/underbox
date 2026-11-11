@@ -1,7 +1,7 @@
 //! Point and spot light shadows: one depth atlas of [`TILE`]² tiles, a spot light taking one tile
 //! (a perspective over its outer cone) and a point light six (cube faces, in the order +X, -X,
 //! +Y, -Y, +Z, -Z). A light's `ShadowMapIndex` is [`INDEX`] + its first tile (managed's renderer
-//! writes bindless indices instead, which the stand-in leaves unshadowed); the stand-in reads the
+//! writes indices into its own `ProjectedShadows` buffers instead, below [`INDEX`]); the stand-in reads the
 //! tile's world → atlas (u, v, depth) matrix from [`MATRICES`] and samples [`TEXTURE`]. Lights
 //! past the atlas's [`TILES`] go unshadowed.
 

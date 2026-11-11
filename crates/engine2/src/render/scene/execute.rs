@@ -52,18 +52,27 @@ pub fn default_layers(v: view::Ref, clear_flags: i32, clear_color: abi::structs:
     }
 }
 
-/// An `RGBA16161616F` target the size of `color`, one per size for the process; null without a
-/// GPU colour target.
+/// An `RGBA16161616F` target the size of `color`, one per colour target (views on other threads
+/// render concurrently) and dropped with it; null without a GPU colour target.
 fn hdr_target(color: texture::Ref) -> texture::Ref {
-    static TARGETS: std::sync::Mutex<Vec<((u32, u32), texture::Ref)>> = std::sync::Mutex::new(Vec::new());
-    let Some(size) = texture::resolve(color).and_then(|t| t.gpu.as_ref().map(|g| (g.desc.width, g.desc.height))) else { return texture::Ref::default() };
+    type Entry = (texture::Ref, (u32, u32), texture::Ref);
+    static TARGETS: std::sync::Mutex<Vec<Entry>> = std::sync::Mutex::new(Vec::new());
+    let size_of = |t: texture::Ref| texture::resolve(t).and_then(|t| t.gpu.as_ref().map(|g| (g.desc.width, g.desc.height)));
+    let Some(size) = size_of(color) else { return texture::Ref::default() };
     let mut targets = TARGETS.lock().unwrap();
-    if let Some((_, t)) = targets.iter().find(|(s, _)| *s == size) {
+    targets.retain(|(c, s, hdr)| {
+        let keep = size_of(*c) == Some(*s);
+        if !keep {
+            crate::resource::destroy_handle(*hdr);
+        }
+        keep
+    });
+    if let Some((_, _, t)) = targets.iter().find(|(c, _, _)| *c == color) {
         return *t;
     }
     const RGBA16161616F: i32 = 24;
     let t = texture::create_target("underbox_hdr_color", size.0, size.1, RGBA16161616F);
-    targets.push((size, t));
+    targets.push((color, size, t));
     t
 }
 

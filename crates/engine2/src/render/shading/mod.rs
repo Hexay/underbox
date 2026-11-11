@@ -38,8 +38,8 @@ pub type Extra = Vec<(&'static str, f32)>;
 /// The program a material's shader draws with, and its [`Extra`] values; `None` when neither the
 /// shader nor a stand-in builds.
 pub fn for_shader(gpu: &render::Gpu, shader_path: &str) -> Option<(Arc<Shading>, Extra)> {
-    if crate::shader::find(shader_path).is_none()
-        && let Some(kind) = standin::mapped(shader_path)
+    if let Some(kind) = standin::mapped(shader_path)
+        && (kind == standin::Kind::Gizmo || crate::shader::find(shader_path).is_none())
     {
         return Some((program(gpu, kind.path())?, kind.values()));
     }
@@ -72,20 +72,23 @@ pub fn program(gpu: &render::Gpu, shader_path: &str) -> Option<Arc<Shading>> {
 
 pub type Compute = Shading<render::ComputeProgram>;
 
-/// A shader's compute program, compiled on first use; `Err` (cached too) when it doesn't translate.
-// TODO: combos from the dispatch's attributes (D_MSAA, ...); always 0, 0 for now.
-pub fn compute(gpu: &render::Gpu, shader_path: &str) -> Result<Arc<Compute>, String> {
+/// A shader's compute program at the combos the dispatch's attributes set (`SetComboValue`, first
+/// layer first), compiled on first use; `Err` (cached too) when it doesn't translate.
+pub fn compute(gpu: &render::Gpu, shader_path: &str, attrs: &[crate::render::attributes::Ref]) -> Result<Arc<Compute>, String> {
     type Built = Result<Arc<Compute>, String>;
-    static COMPUTE: LazyLock<Mutex<HashMap<String, Built>>> = LazyLock::new(Default::default);
-    if let Some(cached) = COMPUTE.lock().unwrap().get(shader_path) {
+    static COMPUTE: LazyLock<Mutex<HashMap<Key, Built>>> = LazyLock::new(Default::default);
+    let shader = source(shader_path)?;
+    let cs = shader.programs.iter().find(|p| p.stage == shaders::Stage::Cs).ok_or("no CS program")?;
+    let value = |name: &str| attrs.iter().find_map(|a| crate::render::attributes::combo(*a, name));
+    let key = (shader_path.to_owned(), cs.statics.encode(value), cs.dynamics.encode(value));
+    if let Some(cached) = COMPUTE.lock().unwrap().get(&key) {
         return cached.clone();
     }
     let built = (|| {
         let compiler = COMPILER.as_ref().ok_or("no shader compiler")?;
-        let shader = source(shader_path)?;
-        program::build_compute(gpu, compiler, &shader, shader_path, &shaders::Variant::new(0, 0))
+        program::build_compute(gpu, compiler, &shader, shader_path, &shaders::Variant::new(key.1, key.2))
     })()
     .map(Arc::new);
-    COMPUTE.lock().unwrap().insert(shader_path.to_owned(), built.clone());
+    COMPUTE.lock().unwrap().insert(key, built.clone());
     built
 }

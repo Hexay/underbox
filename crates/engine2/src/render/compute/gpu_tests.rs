@@ -1,10 +1,9 @@
 use crate::render::shading::{program, tests::core_dir};
 
 /// The compute shaders managed's scene renderer dispatches, and whether they run on the GPU.
-/// downsample_spd: naga has no `SPV_KHR_compute_shader_derivatives`; occlusion_cull_cs: an
-/// atomic on a struct field fails naga validation (it runs on the CPU, occlusion.rs).
+/// downsample_spd: naga has no `SPV_KHR_compute_shader_derivatives`.
 const SHADERS: [(&str, bool); 5] =
-    [("clustered_light_culling_cs", true), ("depthresolve_cs", true), ("postprocess/cmaa2_cs", true), ("downsample_spd", false), ("occlusion_cull_cs", false)];
+    [("clustered_light_culling_cs", true), ("depthresolve_cs", true), ("postprocess/cmaa2_cs", true), ("downsample_spd", false), ("occlusion_cull_cs", true)];
 
 #[test]
 fn compute_shaders_translate_where_naga_can() {
