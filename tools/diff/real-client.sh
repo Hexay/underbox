@@ -23,6 +23,8 @@ rm -rf "$OUT"; mkdir -p "$OUT/fb"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
 LEASED=$GAME
 GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$ART" $$ +game "$PROJ")
+# As tools/client-frame.sh pins ours.
+python3 -I "$ROOT/tools/video-setting.py" "$GAME" shadow.quality "${SHADOW_QUALITY:-2}"
 # The window sits at the root's origin only when the screen is the window's size (no WM).
 D=:$(( 200 + $$ % 700 ))
 Xvfb "$D" -screen 0 "${SIZE}x24" -fbdir "$OUT/fb" -nocursor -nolisten tcp > "$OUT/xvfb.log" 2>&1 &
@@ -43,12 +45,14 @@ grab() {
         sleep 1
     done
     sleep "$GRACE"
-    last= run=0
+    last= run=0 n=0
     while kill -0 $CLIENT 2>/dev/null; do
         cp "$OUT/fb/Xvfb_screen0" "$OUT/grab.xwd"
         sum=$(cksum < "$OUT/grab.xwd")
         if [ "$sum" = "$last" ]; then run=$((run + 1)); else run=1; last=$sum; fi
         [ "$run" -ge "$SETTLE" ] && { mv "$OUT/grab.xwd" "$OUT/frame.xwd"; return 0; }
+        n=$((n + 1))
+        [ "$n" -ge "${GRABS:-40}" ] && { mv "$OUT/grab.xwd" "$OUT/frame.xwd"; echo "real-client: unsettled after $n grabs; kept the last"; return 0; }
         sleep 1
     done
     return 1

@@ -34,6 +34,20 @@ fn dev_plane_and_sphere() {
 }
 
 #[test]
+fn plane_maps_u_along_y_and_v_along_x_facing_up() {
+    let mut b = primitive::Builder::default();
+    primitive::plane(&mut b, 100.0, 100.0, (1, 1), (1.0, 1.0));
+    let uv_at = |x: f32, y: f32| b.vertices.iter().find(|v| v.position[0] == x && v.position[1] == y).unwrap().uv;
+    // Real engine2's testgrid: texture top-left at the near-right corner as seen from -X.
+    assert_eq!([uv_at(-50.0, -50.0), uv_at(-50.0, 50.0), uv_at(50.0, -50.0), uv_at(50.0, 50.0)], [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]);
+    for t in b.indices.chunks(3) {
+        let [a, p, c] = [0, 1, 2].map(|i| b.vertices[t[i] as usize].position);
+        let z = (p[0] - a[0]) * (c[1] - a[1]) - (p[1] - a[1]) * (c[0] - a[0]);
+        assert!(z > 0.0 && b.vertices[t[0] as usize].normal[2] == 1.0, "faces +Z");
+    }
+}
+
+#[test]
 fn mesh_files_are_reported_missing() {
     let Some(src) = core("models/dev/error.vmdl") else { return };
     let model = from_vmdl(&src).unwrap();
