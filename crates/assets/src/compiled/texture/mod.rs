@@ -91,9 +91,11 @@ fn u32_at(b: &[u8], at: usize) -> Result<u32, Error> {
     b.get(at..at + 4).map(|s| u32::from_le_bytes(s.try_into().unwrap())).ok_or_else(|| error("VTEX truncated"))
 }
 
-/// (type, payload, payload and everything after it) of each extra-data entry; offsets count from
-/// their own field.
-fn extras(data: &[u8]) -> Result<Vec<(u32, &[u8], &[u8])>, Error> {
+/// (type, payload, payload and everything after it).
+type Extra<'a> = (u32, &'a [u8], &'a [u8]);
+
+/// Each extra-data entry; offsets count from their own field.
+fn extras(data: &[u8]) -> Result<Vec<Extra<'_>>, Error> {
     let first = 32 + u32_at(data, 32)? as usize;
     (0..u32_at(data, 36)? as usize)
         .map(|i| {
