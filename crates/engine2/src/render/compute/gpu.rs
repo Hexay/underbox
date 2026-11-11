@@ -4,7 +4,7 @@
 
 use crate::render::attributes;
 use crate::render::lighting::Lighting;
-use crate::render::shading::{self, bind, view::View};
+use crate::render::shading::{self, bind, texel_words, view::View};
 use std::collections::HashMap;
 
 /// How much work a dispatch does.
@@ -24,8 +24,11 @@ pub fn dispatch(gpu: &render::Gpu, shader: &str, attrs: &[attributes::Ref], work
     let (lighting, textures) = (Lighting::default(), HashMap::new());
     let inputs = bind::Inputs { view: &view, lighting: &lighting, instances: &[], textures: &textures, values: &[], attributes: attrs, slots: &[], targets: &[] };
     let groups = gpu.checked(|| bind::bind_groups(gpu, &program, &inputs)).and_then(|g| g)?;
-    gpu.checked(|| match work {
+    let words = texel_words::Synced::load(gpu, &program, &inputs);
+    let ran = gpu.checked(|| match work {
         Work::Threads(threads) => program.program.dispatch(gpu, &groups, threads),
         Work::Indirect(args, offset) => program.program.dispatch_indirect(gpu, &groups, args, offset),
-    })
+    });
+    words.store(gpu);
+    ran
 }

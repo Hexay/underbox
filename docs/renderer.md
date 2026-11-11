@@ -329,10 +329,5 @@ windows, framebuffers, properties and window events on the offscreen driver.
    CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
 2. Fog's shadowed in-scattering and baked indirect (docs/fog.md); `GetSheetInfo` and the shader
    sheet path (`sheet_sampling.fxc` is a stub).
-3. CMAA2 runs (its texel atomics go through word buffers, `shading/texel_words.rs`), but on
-   threaded lavapipe its output changes frame to frame with the order its atomics land, by up to
-   ~70/255 on a few dozen edge pixels: more than a sum order explains, so look for an
-   order-dependent drop (the 32-item list walk, the groupshared item budget). It is stable with
-   `LP_NUM_THREADS=0`; `client-frame.sh` skips it (`UNDERBOX_SKIP_LAYERS=cmaa2_cs`).
-4. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
+3. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.
