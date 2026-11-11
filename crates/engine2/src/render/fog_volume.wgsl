@@ -22,7 +22,10 @@ struct Volume {
 
 struct Light {
     position_radius: vec4f,
-    color: vec4f,
+    // w: the outer cone cosine.
+    color_outer: vec4f,
+    // w: the inner cone cosine.
+    direction_inner: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> p: Params;
@@ -58,8 +61,10 @@ fn incoming(world: vec3f, direction: vec3f) -> vec3f {
         let l = lights[i];
         let to_light = l.position_radius.xyz - world;
         let falloff = saturate(1.0 - dot(to_light, to_light) / (l.position_radius.w * l.position_radius.w));
-        if falloff > 0.0 {
-            light += l.color.rgb * falloff * falloff * phase(dot(direction, normalize(to_light)));
+        let toward = normalize(to_light);
+        let cone = smoothstep(l.color_outer.w, l.direction_inner.w, dot(-toward, l.direction_inner.xyz));
+        if falloff > 0.0 && cone > 0.0 {
+            light += l.color_outer.rgb * falloff * falloff * cone * phase(dot(direction, toward));
         }
     }
     return light;

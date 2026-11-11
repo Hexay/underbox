@@ -55,3 +55,34 @@ fn volumes_and_settings_read_back() {
     assert_eq!((s.draw_distance, s.anisotropy), (2000.0, 0.5));
     assert!((s.scattering - 2.0).abs() < 1e-5 && (s.fade_in.0 - 100.0).abs() < 1e-3 && (s.fade_in.1 - 300.0).abs() < 1e-3, "{:?} {}", s.fade_in, s.scattering);
 }
+
+/// One `GpuLight` as LightBinnerFeature packs it: rows of a VMatrix whose columns are
+/// forward/left/up/position.
+fn gpu_light(position: Vec3, forward: Vec3, color: Vec3, radius: f32, cone: (f32, f32), fog: f32) -> Vec<u8> {
+    let mut w = [0f32; 39];
+    w[0] = f32::from_bits(if cone.0 != 0.0 { 3 } else { 1 });
+    let left = Vec3::Z.cross(forward).normalize_or_zero();
+    let up = forward.cross(left);
+    for (row, i) in [3, 7, 11].into_iter().enumerate() {
+        w[i..i + 4].copy_from_slice(&[forward[row], left[row], up[row], position[row]]);
+    }
+    w[15..19].copy_from_slice(&[0.0, 0.0, 0.0, 1.0]);
+    w[19..22].copy_from_slice(&color.to_array());
+    (w[25], w[26]) = (radius, radius * radius);
+    (w[29], w[30]) = cone;
+    w[33] = fog;
+    w.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+#[test]
+fn binned_lights_read_as_fog_lights() {
+    let mut bytes = gpu_light(Vec3::new(1.0, 2.0, 3.0), Vec3::X, Vec3::new(2.0, 1.0, 0.5), 300.0, (0.0, 0.0), 0.5);
+    bytes.extend(gpu_light(Vec3::new(-5.0, 0.0, 9.0), Vec3::NEG_Z, Vec3::ONE, 128.0, (0.9, 0.8), 1.0));
+    // A light with fog off doesn't light the medium.
+    bytes.extend(gpu_light(Vec3::ZERO, Vec3::X, Vec3::ONE, 100.0, (0.0, 0.0), 0.0));
+    let lights = super::lights_from(&bytes);
+    assert_eq!(lights.len(), 2);
+    assert_eq!((lights[0].position, lights[0].radius, lights[0].color, lights[0].spot), (Vec3::new(1.0, 2.0, 3.0), 300.0, Vec3::new(1.0, 0.5, 0.25), None));
+    assert_eq!(lights[1].spot, Some((Vec3::NEG_Z, 0.9, 0.8)));
+    assert_eq!(lights[1].position, Vec3::new(-5.0, 0.0, 9.0));
+}

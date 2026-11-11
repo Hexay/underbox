@@ -3,14 +3,16 @@
 //! managed fills (`Pipeline/Fog/VolumetricFog.cs`), keyed by the `OutScatteringTexture` it would
 //! write. Shading binds that grid wherever managed binds the texture as `FogVolume`. docs/fog.md.
 
-use crate::render::attributes;
-use crate::render::fog_volume::{self, Frustum, Settings, Sources, Volume};
+use crate::render::fog_volume::{self, FogLight, Frustum, Settings, Sources, Volume};
+use crate::render::{attributes, buffers, device};
 use glam::{Mat4, Vec3, Vec4};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 pub const SHADER: &str = "cs_volumetric_fog";
 pub const CONSTANTS: &str = "VolumetricFogConstantBuffer_t";
+const LIGHTS: &str = "BinnedLightBufferV2";
+const LIGHT_BYTES: usize = 156;
 const MAX_VOLUMES: usize = 128;
 /// Managed hands the shader `Scattering` × this (`VolumetricFog.BeginFrame`); ours takes it raw.
 const SCATTERING_SCALE: f32 = 0.0022;
@@ -51,8 +53,12 @@ pub fn dispatch(attrs: &[attributes::Ref]) -> Result<(), String> {
     let block = |name: &str| attrs.iter().find_map(|a| attributes::constant_buffer(*a, name));
     let out = attrs.iter().find_map(|a| attributes::texture(*a, "OutScatteringTexture")).ok_or("no OutScatteringTexture")?;
     let fog = Constants(block(CONSTANTS).ok_or("no VolumetricFogConstantBuffer_t")?.to_vec());
-    let ambient = block("ViewLightingConfigV2").map_or(Vec3::ZERO, |b| vec3(&words(&b), 1028));
-    let sources = Sources { ambient: ambient * fog.f(at::INDIRECT_STRENGTH), sun: block("DirectionalLightCB").and_then(|b| sun(&b)), lights: Vec::new() };
+    let config = block("ViewLightingConfigV2").map(|b| words(&b)).unwrap_or_default();
+    let ambient = vec3(&config, 1028);
+    // NumLights: dynamic, then baked indexed lights.
+    let count = config.iter().take(2).map(|n| n.to_bits() as usize).sum();
+    let lights = attrs.iter().find_map(|a| attributes::buffer(*a, LIGHTS)).map_or_else(Vec::new, |h| binned_lights(h, count));
+    let sources = Sources { ambient: ambient * fog.f(at::INDIRECT_STRENGTH), sun: block("DirectionalLightCB").and_then(|b| sun(&b)), lights };
     let grid = fog_volume::march(&fog.volumes(), fog.view_proj()?, &sources, &fog.settings());
     let mut grids = GRIDS.lock().unwrap();
     match grid {
@@ -60,6 +66,31 @@ pub fn dispatch(attrs: &[attributes::Ref]) -> Result<(), String> {
         None => grids.remove(&out.addr()),
     };
     Ok(())
+}
+
+/// The first `count` of managed's binned lights, read back from the GPU.
+fn binned_lights(handle: usize, count: usize) -> Vec<FogLight> {
+    let (Some(gpu), Some(buffer)) = (device::gpu(), buffers::get(buffers::Handle::new(handle))) else { return Vec::new() };
+    let len = (count as u64 * LIGHT_BYTES as u64).min(buffer.size() / LIGHT_BYTES as u64 * LIGHT_BYTES as u64);
+    if len == 0 {
+        return Vec::new();
+    }
+    lights_from(&buffer.read(gpu, 0, len))
+}
+
+/// `GpuLight`s (LightBinnerFeature.Lights.cs, packed: 39 words) that light fog, as fog lights.
+pub(crate) fn lights_from(bytes: &[u8]) -> Vec<FogLight> {
+    bytes
+        .chunks_exact(LIGHT_BYTES)
+        .filter_map(|l| {
+            let w = words(l);
+            // LightToWorld's rows hold forward/left/up/position as columns.
+            let (forward, position) = (Vec3::new(w[3], w[7], w[11]), Vec3::new(w[6], w[10], w[14]));
+            let (radius, fog, cone) = (w[25], w[33], (w[29], w[30]));
+            let color = vec3(&w, 19) * fog;
+            (radius > 0.0 && color.max_element() > 0.0).then(|| FogLight { position, radius, color, spot: (cone.0 != 0.0).then_some((forward, cone.0, cone.1)) })
+        })
+        .collect()
 }
 
 fn words(bytes: &[u8]) -> Vec<f32> {

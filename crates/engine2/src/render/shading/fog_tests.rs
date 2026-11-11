@@ -154,3 +154,25 @@ fn volumetric_fog_attenuates_and_scatters() {
     fog_volume::remove(world.addr(), 1);
     assert!(fog_volume::render(&[world], view_proj, &ambient, &params).is_none(), "removed");
 }
+
+/// A spot at the eye lights the medium inside its cone only: the centre column scatters with
+/// the spot aimed down the view, and not with it aimed away.
+#[test]
+fn spot_lights_scatter_inside_their_cone() {
+    let Some(_) = middle(&with_view_fog(ViewFog::default())) else { return };
+    let eye = Vec3::new(-30.0, 0.0, 30.0);
+    let view_proj = render::Camera::perspective(90f32.to_radians(), 1.0, 1.0, eye, Vec3::ZERO).view_proj;
+    let settings = || fog_volume::Settings { draw_distance: 1000.0, fade_in: (-2.0, -1.0), anisotropy: 0.0, scattering: 1.0 };
+    let volumes = [fog_volume::Volume::native(&volume(4.0))];
+    let scatter = |aim: Vec3| {
+        let spot = fog_volume::FogLight { position: eye, radius: 500.0, color: Vec3::splat(4.0), spot: Some((aim, 0.95, 0.9)) };
+        let sources = fog_volume::Sources { lights: vec![spot], ..Default::default() };
+        let grid = fog_volume::march(&volumes, view_proj, &sources, &settings()).expect("froxels");
+        fog_volume::froxel(&grid, [48, 28, 2])
+    };
+    let ahead = (Vec3::ZERO - eye).normalize();
+    let lit = scatter(ahead);
+    assert!(lit[0] > 0.01 && lit[1] == 0.0, "inside the cone, the red medium scatters: {lit:?}");
+    let dark = scatter(-ahead);
+    assert!(dark[0] == 0.0, "outside the cone: {dark:?}");
+}

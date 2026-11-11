@@ -100,7 +100,7 @@ pub struct Volume {
 }
 
 impl Volume {
-    fn native(v: &SceneVolumetricFogVolume) -> Volume {
+    pub(crate) fn native(v: &SceneVolumetricFogVolume) -> Volume {
         let v3 = |v: abi::structs::Vector3| Vec3::new(v.vec.x, v.vec.y, v.vec.z);
         let world_to_volume = crate::render::scene::camera::mat4(v.m_mat_world_to_volume);
         Volume { world_to_volume, min: v3(v.m_v_min), max: v3(v.m_v_max), color: v3(v.m_v_color), strength: v.m_f_strength, exponent: v.m_f_exponent, spherical: v.m_b_spherical != 0 }
@@ -117,17 +117,45 @@ impl Volume {
 }
 
 /// What lights the medium: ambient (already × `IndirectStrength`), the sun (direction toward it,
-/// colour × its fog strength) and local lights (position, radius, colour × fog strength).
+/// colour × its fog strength) and local lights.
 #[derive(Default)]
 pub struct Sources {
     pub ambient: Vec3,
     pub sun: Option<(Vec3, Vec3)>,
-    pub lights: Vec<(Vec3, f32, Vec3)>,
+    pub lights: Vec<FogLight>,
+}
+
+/// A point or spot light in the medium; `color` is already × its fog strength.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FogLight {
+    pub position: Vec3,
+    pub radius: f32,
+    pub color: Vec3,
+    /// A spot's direction and its inner and outer cone cosines.
+    pub spot: Option<(Vec3, f32, f32)>,
+}
+
+impl FogLight {
+    fn floats(&self) -> [f32; 12] {
+        // A point light's cone test passes everywhere: smoothstep(-2, -1, cosine) is 1.
+        let (direction, inner, outer) = self.spot.unwrap_or((Vec3::X, -1.0, -2.0));
+        let mut out = [0.0; 12];
+        out[..4].copy_from_slice(&self.position.extend(self.radius).to_array());
+        out[4..8].copy_from_slice(&self.color.extend(outer).to_array());
+        out[8..].copy_from_slice(&direction.normalize_or_zero().extend(inner.max(outer + 1e-4)).to_array());
+        out
+    }
 }
 
 impl Sources {
     fn of(lighting: &Lighting, indirect_strength: f32) -> Sources {
-        let lights = lighting.lights.iter().filter(|l| l.radius > 0.0 && l.fog > 0.0).map(|l| (l.position, l.radius, l.color * l.fog)).collect();
+        let cosines = |(inner, outer): (f32, f32)| (inner.to_radians().cos(), outer.to_radians().cos());
+        let lights = lighting
+            .lights
+            .iter()
+            .filter(|l| l.radius > 0.0 && l.fog > 0.0)
+            .map(|l| FogLight { position: l.position, radius: l.radius, color: l.color * l.fog, spot: l.cone.map(|c| { let (i, o) = cosines(c); (l.forward(), i, o) }) })
+            .collect();
         Sources { ambient: lighting.ambient.truncate() * indirect_strength, sun: lighting.sun.as_ref().map(|s| (-s.forward(), s.color * s.fog)), lights }
     }
 }
@@ -158,9 +186,9 @@ fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, 
 
 fn light_bytes(sources: &Sources) -> (Vec<u8>, u32) {
     let lit = &sources.lights[..sources.lights.len().min(MAX_LIGHTS)];
-    let mut out: Vec<u8> = lit.iter().flat_map(|(p, r, c)| bytes(p.extend(*r).to_array().into_iter().chain(c.extend(0.0).to_array()))).collect();
+    let mut out: Vec<u8> = bytes(lit.iter().flat_map(FogLight::floats));
     // A storage binding can't be empty.
-    out.resize(out.len().max(32), 0);
+    out.resize(out.len().max(48), 0);
     (out, lit.len() as u32)
 }
 
