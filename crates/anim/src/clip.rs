@@ -68,8 +68,12 @@ impl Clip {
 
     /// Each flex controller's value at `time`; `None` when the clip drives no morphs.
     pub fn morphs_at(&self, time: f32) -> Option<Vec<f32>> {
+        self.morphs_at_frame(self.frame_at(time))
+    }
+
+    /// [`Clip::morphs_at`] at fractional frame `f` (no wrapping).
+    pub fn morphs_at_frame(&self, f: f32) -> Option<Vec<f32>> {
         let last = self.morphs.len().checked_sub(1)?;
-        let f = self.frame_at(time);
         let i = (f.floor() as usize).min(last);
         let j = (i + 1).min(last);
         let t = if self.interpolate { f - i as f32 } else { 0.0 };

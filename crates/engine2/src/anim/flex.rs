@@ -13,7 +13,8 @@ impl AnimState {
 
     /// Each flex controller's value now; what a renderer feeds the model's flex rules.
     pub fn flex_values(&self) -> Vec<f32> {
-        let clip = self.data.anim.clip(&self.sequence.name).and_then(|c| c.morphs_at(self.sequence.time));
+        // sample_time already wraps or clamps per SetSequenceLooping; morphs_at would re-wrap by the clip's flag.
+        let clip = self.data.anim.clip(&self.sequence.name).and_then(|c| c.morphs_at_frame(self.sequence.sample_time(c) * c.fps));
         (0..self.data.anim.flex.len()).map(|i| self.flex.get(&(i as i32)).copied().or_else(|| clip.as_ref()?.get(i).copied()).unwrap_or(0.0)).collect()
     }
 }
@@ -47,4 +48,38 @@ pub fn register(r: &mut Registry) {
             s.flex.remove(&i);
         }
     }));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anim::clip::Clip;
+    use anim::{ModelAnim, Xform};
+    use std::sync::Arc;
+
+    /// A looping 1 fps clip whose `smile` morph ramps 0 → 1 over its one second.
+    fn smiling() -> AnimState {
+        let mut clip = Clip::new("smile", 1.0);
+        clip.looping = true;
+        clip.frames = vec![vec![Xform::IDENTITY]; 2];
+        clip.morphs = vec![vec![0.0], vec![1.0]];
+        data::insert("flex_test_smile", ModelAnim { flex: vec!["smile".into()], clips: vec![Arc::new(clip)], ..Default::default() });
+        let mut s = AnimState::new(abi::NativeRef::NULL);
+        s.data = data::by_name("flex_test_smile");
+        s.sequence.play("smile");
+        s
+    }
+
+    #[test]
+    fn morphs_follow_the_sequence_looping_override() {
+        let mut s = smiling();
+        s.sequence.advance(1.25);
+        assert!((s.flex_values()[0] - 0.25).abs() < 1e-5, "a looping clip wraps");
+        s.sequence.looping = Some(false);
+        assert_eq!(s.flex_values(), vec![1.0], "Looping=false holds the last frame");
+        s.sequence.advance(10.0);
+        assert_eq!(s.flex_values(), vec![1.0], "and stays settled");
+        s.flex.insert(0, 0.5);
+        assert_eq!(s.flex_values(), vec![0.5], "an override wins");
+    }
 }

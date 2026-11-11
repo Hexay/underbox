@@ -31,8 +31,8 @@ Native's model, which managed's `MeshRenderFeature.Skinning.cs` mirrors:
   - A model with a ragdoll engages `BonePhysics`, which holds the bones in bind pose. The
     `corpus/skinned` puppet fixture (`crates/assets/src/compiled/fixture/puppet.rs`) therefore has
     no physics, and its `bow` clip doesn't loop, so the frame settles.
-  - The anim lane's `flex.rs` samples morphs at raw `sequence.time` with the clip's own looping
-    flag. A looping clip's morphs therefore never settle, even with `Looping=false` (not ours to fix).
+  - `anim/flex.rs` samples morphs at the player's `sample_time` (which honours
+    `SetSequenceLooping`) by frame, so a looping clip played with `Looping=false` settles.
 - Repros: `sh tools/test.sh engine2 skin::tests` (the fixture, skinning_cs output, two-weight
   blending) and `CORPUS=skinned [MANAGED=1] sh tools/client-frame.sh`.
 
