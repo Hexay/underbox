@@ -38,6 +38,23 @@ pub(super) enum NodeState {
 pub(super) struct Out {
     pub pose: Pose,
     pub finished: bool,
+    /// Seconds left in the playing duration (to the end of the current loop), from the
+    /// dominant input; 0 for nodes without a duration (see `tags`).
+    pub remaining: f32,
+}
+
+impl Out {
+    pub fn ended(pose: Pose) -> Self {
+        Out { pose, finished: true, remaining: 0.0 }
+    }
+
+    /// `remaining` in the caller's time when it plays its input at `speed`.
+    fn at_speed(mut self, speed: f32) -> Self {
+        if speed > 0.0 {
+            self.remaining /= speed;
+        }
+        self
+    }
 }
 
 pub struct Instance {
@@ -113,20 +130,20 @@ impl Instance {
 
     pub(super) fn eval(&mut self, id: PoseId, dt: f32, bind: &Pose) -> Out {
         let def = self.def.clone();
-        let done = |pose| Out { pose, finished: false };
+        let done = |pose| Out { pose, finished: false, remaining: 0.0 };
         match &def.poses[id] {
             PoseNode::Zero => done(Pose::zero(bind.0.len())),
             PoseNode::Reference => done(bind.clone()),
-            PoseNode::Clip { slot, looping, speed } => self.clip(id, *slot, *looping, dt * speed, bind),
+            PoseNode::Clip { slot, looping, speed } => self.clip(id, *slot, *looping, dt * speed, bind).at_speed(*speed),
             PoseNode::SpeedScale { source, speed } => {
                 let s = self.values(StateCtx::default()).float(*speed);
-                self.eval(*source, dt * s, bind)
+                self.eval(*source, dt * s, bind).at_speed(s)
             }
             PoseNode::Blend { base, layer, weight } => {
                 let w = self.values(StateCtx::default()).float(*weight).clamp(0.0, 1.0);
                 let a = self.eval(*base, dt, bind);
                 let b = self.eval(*layer, dt, bind);
-                Out { pose: a.pose.blend(&b.pose, w), finished: a.finished }
+                Out { pose: a.pose.blend(&b.pose, w), ..a }
             }
             PoseNode::Blend1D { param, points } => self.blend1d(*param, points, dt, bind),
             PoseNode::Blend2D { x, y, points, triangles } => self.blend2d((*x, *y), points, triangles, dt, bind),
@@ -139,7 +156,7 @@ impl Instance {
                 let p = self.chosen(id, |s| s.pick_variation(*seed, options, weights.as_deref()));
                 self.eval(p, dt, bind)
             }
-            PoseNode::Variation { .. } => Out { pose: bind.clone(), finished: true },
+            PoseNode::Variation { .. } => Out::ended(bind.clone()),
             PoseNode::TwoBoneIk(n) => self.two_bone_ik(id, n, dt, bind),
             PoseNode::LookAt(n) => self.look_at(n, dt, bind),
         }
@@ -151,18 +168,18 @@ impl Instance {
             _ => (0.0, 0.0),
         };
         self.nodes[id] = NodeState::Clip { time };
-        let Some(clip) = self.clips.get(slot).cloned().flatten() else { return Out { pose: bind.clone(), finished: true } };
+        let Some(clip) = self.clips.get(slot).cloned().flatten() else { return Out::ended(bind.clone()) };
         self.events.extend(clip.events_in(from, time, looping));
         let d = clip.duration();
         let t = if looping && d > 0.0 { time.rem_euclid(d) } else { time.clamp(0.0, d) };
         let mut pose = bind.clone();
         clip.sample_frame(t * clip.fps, &mut pose);
-        Out { pose, finished: !looping && time >= d }
+        Out { pose, finished: !looping && time >= d, remaining: d - t }
     }
 
     fn blend1d(&mut self, param: usize, points: &[(f32, PoseId)], dt: f32, bind: &Pose) -> Out {
         let v = self.values(StateCtx::default()).float(param);
-        let Some(&(_, first_pose)) = points.first() else { return Out { pose: bind.clone(), finished: true } };
+        let Some(&(_, first_pose)) = points.first() else { return Out::ended(bind.clone()) };
         let upper = points.iter().position(|&(x, _)| x > v);
         let (a, b, t) = match upper {
             None => (points[points.len() - 1].1, None, 0.0),
@@ -176,7 +193,8 @@ impl Instance {
         match b {
             Some(b) => {
                 let hi = self.eval(b, dt, bind);
-                Out { pose: lo.pose.blend(&hi.pose, t), finished: if t < 0.5 { lo.finished } else { hi.finished } }
+                let pose = lo.pose.blend(&hi.pose, t);
+                if t < 0.5 { Out { pose, ..lo } } else { Out { pose, ..hi } }
             }
             None => lo,
         }
@@ -195,11 +213,12 @@ impl Instance {
             }
         }
         if states.is_empty() {
-            return Out { pose: bind.clone(), finished: true };
+            return Out::ended(bind.clone());
         }
         let cur = self.eval(states[m.current].pose, dt, bind);
         m.elapsed += dt;
         m.finished = cur.finished;
+        let mut remaining = cur.remaining;
         let mut pose = match m.from {
             Some((from, progress, duration)) => {
                 let progress = progress + dt;
@@ -218,16 +237,17 @@ impl Instance {
             m = Machine { started: true, current: t.to, from: (t.duration > 0.0).then_some((old, 0.0, t.duration)), ..Machine::default() };
             self.reset(states[t.to].pose);
             let new = self.eval(states[t.to].pose, 0.0, bind);
+            remaining = new.remaining;
             if m.from.is_none() {
                 pose = new.pose;
                 left = Some(old);
             }
             entered = true;
         }
-        let step = MachineStep { current: m.current, elapsed: m.elapsed, blending_from: m.from.map(|f| f.0), entered, left };
+        let step = MachineStep { current: m.current, elapsed: m.elapsed, remaining, blending_from: m.from.map(|f| f.0), entered, left };
         self.raise_state_tags(states, &step);
         self.nodes[id] = NodeState::Machine(m);
-        Out { pose, finished: m.finished }
+        Out { pose, finished: m.finished, remaining }
     }
 
     /// Restart `id` and everything under it (a state machine restarts its states on entry).

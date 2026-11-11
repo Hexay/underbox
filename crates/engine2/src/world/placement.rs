@@ -1,10 +1,10 @@
 //! What a world-node scene object places: one model at its transform, or, for an aggregate with
 //! fragments, one object per fragment over a one-draw copy of the aggregate's model (so each
-//! carries its own transform and tint). Fragment LOD masks aren't applied: every fragment draws.
+//! carries its own transform, tint and LOD groups; research/world.md "Engine side").
 
 use abi::structs::Vector4;
 use glam::{Affine3A, Mat3, Vec3};
-use world::node::{Matrix, SceneObject};
+use world::node::{Fragment, Matrix, SceneObject};
 
 pub struct Placement {
     pub model: crate::model::Ref,
@@ -19,14 +19,19 @@ pub fn local(m: &Matrix) -> Affine3A {
     Affine3A::from_mat3_translation(Mat3::from_cols(col(0), col(1), col(2)), col(3))
 }
 
-/// `model` drawing only draw call `draw` of its first mesh, in every LOD.
-fn fragment_model(model: &str, draw: usize) -> Option<crate::model::Ref> {
-    let mut m = crate::model::compiled::read(model)?;
+/// The aggregate model drawing only `f`'s draw call of its first mesh, in `f`'s LOD groups with
+/// its LOD setup's switch distances (every LOD without a mask).
+fn fragment_model(so: &SceneObject, f: &Fragment) -> Option<crate::model::Ref> {
+    let mut m = crate::model::compiled::read(&so.model)?;
     let mut mesh = m.meshes.first()?.clone();
-    mesh.mesh.draws = vec![mesh.mesh.draws.get(draw)?.clone()];
-    mesh.lod_mask = u64::MAX;
+    mesh.mesh.draws = vec![mesh.mesh.draws.get(f.draw_call)?.clone()];
+    mesh.lod_mask = if f.lod_mask == 0 { u64::MAX } else { u64::from(f.lod_mask) };
     m.meshes = vec![mesh];
-    Some(crate::model::create_runtime(&format!("{model}#draw{draw}"), crate::model::compiled::content(&m)))
+    if let Some(setup) = usize::try_from(f.lod_setup).ok().and_then(|i| so.lod_setups.get(i)) {
+        m.lod_distances = setup.switch_distances.clone();
+    }
+    let name = format!("{}#draw{}", so.model, f.draw_call);
+    Some(crate::model::create_runtime(&name, crate::model::compiled::content(&m)))
 }
 
 fn load(model: &str) -> crate::model::Ref {
@@ -49,7 +54,7 @@ pub fn of(so: &SceneObject) -> Vec<Placement> {
         .map(|f| {
             let [r, g, b] = f.tint;
             let at = f.transform.as_ref().map_or(Affine3A::IDENTITY, local);
-            Some(Placement { model: fragment_model(&so.model, f.draw_call)?, at, tint: crate::math::vec4(r, g, b, 1.0), fade_end: 0.0, lod: None })
+            Some(Placement { model: fragment_model(so, f)?, at, tint: crate::math::vec4(r, g, b, 1.0), fade_end: 0.0, lod: None })
         })
         .collect();
     match fragments {

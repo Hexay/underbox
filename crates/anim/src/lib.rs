@@ -10,6 +10,7 @@ pub mod pose;
 pub mod sequence;
 pub mod skeleton;
 pub mod source;
+pub mod tag_spans;
 pub mod xform;
 
 pub use clip::Clip;

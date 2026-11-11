@@ -98,6 +98,10 @@ fn jump_machine() -> B {
             items::set(timed, "ID", intern(b, "airborne") as i64);
             items::set(timed, "ComparisonOperator", 1);
             field!(f32, c_state_node_timed_event::GET_M_TIME_VALUE, timed, 0.1);
+            let left = push_item::<_, class::CStateNode_TimedEvent>(list::<_, class::CUtlVector_CStateNode_TimedEvent_>(s, "TimedRemainingEvents"));
+            items::set(left, "ID", intern(b, "touchdown") as i64);
+            items::set(left, "ComparisonOperator", 0);
+            field!(f32, c_state_node_timed_event::GET_M_TIME_VALUE, left, 0.2);
         }
     }
     let t = add_node::<class::CTransitionNode_Definition>(b);
@@ -140,6 +144,7 @@ fn state_machine_transitions_on_bool() {
     assert!(states[1].transitions.is_empty());
     let jump = &states[1].events;
     assert_eq!((&jump.entry[..], &jump.exit[..], &jump.elapsed[..]), (&["takeoff".to_string()][..], &["landing".to_string()][..], &[("airborne".to_string(), 0.1, false)][..]));
+    assert_eq!(jump.remaining, [("touchdown".to_string(), 0.2, true)]);
     assert_eq!(states[0].events, Default::default());
 }
 

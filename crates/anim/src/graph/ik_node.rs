@@ -62,7 +62,7 @@ impl Instance {
             ik::twist_toward(s, &mut solved, effector, bind, n.twist.min(1.0));
         }
         let pose = if n.blend_target { solved } else { out.pose.blend(&solved, w) };
-        Out { pose, finished: out.finished }
+        Out { pose, ..out }
     }
 
     pub(super) fn look_at(&mut self, n: &LookAt, dt: f32, bind: &Pose) -> Out {
@@ -79,6 +79,6 @@ impl Instance {
         if pose.0.len() >= s.len() {
             ik::look_at(s, &mut pose, frame, yaw, pitch, &bones);
         }
-        Out { pose, finished: out.finished }
+        Out { pose, ..out }
     }
 }

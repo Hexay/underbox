@@ -158,6 +158,28 @@ fn aggregate_fragments_and_lod_overrides_place() {
     ]);
     let draws = |o| object::with(o, |s| crate::model::get(s.model).map(|m| m.content.meshes.len()));
     assert_eq!((draws(objects[1]), draws(objects[2])), (Some(1), Some(1)), "one mesh each, one draw call");
+    let mask = |o| object::with(o, |s| crate::model::get(s.model).map(|m| m.content.meshes[0].lod_mask));
+    assert_eq!(mask(objects[1]), Some(crate::model::content::ALL_LODS), "a zero LOD group mask draws in every LOD");
+    reference::release(r);
+    reference::service();
+    crate::fs::remove_search_path("GAME", dir.to_str().unwrap());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// `world::fixture::lod_aggregate_map`: each fragment's model draws in its own LOD groups only
+/// (so LOD 0 draws just draw 0) and switches at its LOD setup's distances.
+#[test]
+fn aggregate_fragments_take_lod_masks_and_setup_distances() {
+    let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!("underbox_mapworld_lod_{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("maps")).unwrap();
+    std::fs::write(dir.join("maps/aggmap_lod.vpk"), world::fixture::lod_aggregate_map("aggmap_lod").single()).unwrap();
+    crate::fs::add_search_path("GAME", dir.to_str().unwrap(), true);
+    let w = scene();
+    let r = create_world("maps/aggmap_lod.vpk", w, crate::math::identity());
+    let lods = |o| object::with(o, |s| crate::model::get(s.model).map(|m| (m.content.meshes.iter().map(|x| x.lod_mask).collect::<Vec<_>>(), m.content.lod_distances.clone())));
+    let objects = placed(w);
+    assert_eq!(objects.iter().map(|&o| lods(o)).collect::<Vec<_>>(), [Some((vec![0b01], vec![0.0, 300.0])), Some((vec![0b10], vec![0.0, 300.0]))]);
     reference::release(r);
     reference::service();
     crate::fs::remove_search_path("GAME", dir.to_str().unwrap());

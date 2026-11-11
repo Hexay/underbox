@@ -4,9 +4,10 @@
 //! - entry events while transitioning in, and on the update a state is entered;
 //! - exit events while transitioning out, and on the update an instant transition leaves;
 //! - fully-in-state events while the state plays with no transition running;
-//! - elapsed events while time in state is at most (or at least) their time.
-//!
-//! Remaining-time events need a state duration the evaluator doesn't track and are not read.
+//! - elapsed events while time in state is at most (or at least) their time;
+//! - remaining events likewise against the time left in the state's playing duration: its
+//!   dominant clip's seconds to the end of the current loop, scaled by speed (Esoterica's
+//!   `(1 - percentage through) * duration`); states without a clip have 0 left.
 
 use super::eval::Instance;
 use super::State;
@@ -18,12 +19,15 @@ pub struct StateEvents {
     pub fully_in: Vec<String>,
     /// (id, seconds, at most): active while time in state is ≤ (else ≥) the seconds.
     pub elapsed: Vec<(String, f32, bool)>,
+    /// (id, seconds, at most): as `elapsed`, against the seconds left in the state.
+    pub remaining: Vec<(String, f32, bool)>,
 }
 
 /// What one machine's update did, for its tags.
 pub(super) struct MachineStep {
     pub current: usize,
     pub elapsed: f32,
+    pub remaining: f32,
     /// The state blending out, if a transition is running.
     pub blending_from: Option<usize>,
     /// `current` was entered this update.
@@ -47,8 +51,12 @@ impl Instance {
         if let Some(left) = step.left.and_then(|l| states.get(l)) {
             raise(&left.events.exit);
         }
-        let timed = cur.elapsed.iter().filter(|(_, t, at_most)| if *at_most { step.elapsed <= *t } else { step.elapsed >= *t });
-        self.tags.extend(timed.map(|(id, ..)| id.clone()));
+        let timed = |events: &[(String, f32, bool)], now: f32| {
+            let hit = move |(_, t, at_most): &&(String, f32, bool)| if *at_most { now <= *t } else { now >= *t };
+            events.iter().filter(hit).map(|(id, ..)| id.clone()).collect::<Vec<_>>()
+        };
+        self.tags.extend(timed(&cur.elapsed, step.elapsed));
+        self.tags.extend(timed(&cur.remaining, step.remaining));
     }
 
     /// The tags the last update raised, deduplicated.
@@ -152,6 +160,25 @@ mod tests {
         assert_eq!(step(&mut g), tags(&["a_exit", "b_in"]), "and runs");
         assert!(step(&mut g).is_empty(), "B fully in raises nothing");
         assert!(!g.is_tag_active("b_in"));
+    }
+
+    /// One state looping `walk` (1 s) at speed 2: 0.5 s per loop, so 0.5, 0.4, 0.3, 0.2, 0.1 s
+    /// left over five 0.1 s updates (a clip starts at 0 on its first update).
+    #[test]
+    fn remaining_time_events_follow_the_states_clip() {
+        let mut def = Definition::default();
+        let slot = def.slot("walk");
+        let pose = def.add_pose(PoseNode::Clip { slot, looping: true, speed: 2.0 });
+        let events = StateEvents { remaining: vec![("ending".into(), 0.25, true), ("lots_left".into(), 0.35, false)], ..Default::default() };
+        def.root = Some(def.add_pose(PoseNode::StateMachine { states: vec![State { name: "A".into(), pose, transitions: vec![], events }], default: 0 }));
+        let mut g = Instance::new(def.into_shared(), crate::graph::tests::clips);
+        let seen: Vec<Vec<String>> = (0..5)
+            .map(|_| {
+                g.update(0.1, &Pose::zero(1));
+                g.active_tags()
+            })
+            .collect();
+        assert_eq!(seen, [tags(&["lots_left"]), tags(&["lots_left"]), tags(&[]), tags(&["ending"]), tags(&["ending"])]);
     }
 
     #[test]

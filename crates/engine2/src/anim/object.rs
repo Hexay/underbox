@@ -31,6 +31,8 @@ pub struct Graph1 {
     pub graph: Arc<graph::Graph1>,
     pub params: Params,
     pub instances: Vec<NativeRef<class::IAnimParameterInstance>>,
+    /// Tag span changes since the last `DispatchTagEvents`.
+    pub tags: TagTracker,
 }
 
 pub struct AnimState {
@@ -161,7 +163,7 @@ impl AnimState {
         for old in self.graph1.take().into_iter().flat_map(|g| g.instances) {
             objects::destroy(old);
         }
-        self.graph1 = graph.map(|graph| Graph1 { params: Params::new(graph.params.clone()), graph, instances: Vec::new() });
+        self.graph1 = graph.map(|graph| Graph1 { params: Params::new(graph.params.clone()), graph, instances: Vec::new(), tags: TagTracker::default() });
         true
     }
 
@@ -176,6 +178,7 @@ impl AnimState {
         self.dt = dt;
         self.root_motion = Xform::IDENTITY;
         let bind = self.bind_pose();
+        let mut legacy_tags = Vec::new();
         let pose = match (&mut self.graph2, self.data.anim.clip(&self.sequence.name)) {
             (Some(g), _) if self.use_graph && g.recording.is_playing() => return,
             (Some(g), _) if self.use_graph => {
@@ -189,9 +192,13 @@ impl AnimState {
                 pose
             }
             (_, Some(clip)) => {
-                let t0 = self.sequence.sample_time(clip);
+                let (t0, c0) = (self.sequence.sample_time(clip), self.sequence.cycle(clip));
                 self.sequence.advance(dt);
-                let t1 = self.sequence.sample_time(clip);
+                let (t1, c1) = (self.sequence.sample_time(clip), self.sequence.cycle(clip));
+                if let Some(g) = &self.graph1 {
+                    let spans = anim::tag_spans::for_sequence(&g.graph.tags, &self.sequence.name);
+                    legacy_tags = anim::tag_spans::swept(spans, c0, if c1 < c0 { c1 + 1.0 } else { c1 });
+                }
                 let unwrapped = if t1 < t0 { t1 + clip.duration() } else { t1 };
                 self.root_motion = clip.root_motion(t0, unwrapped);
                 self.pending.extend(clip.events_in(t0, unwrapped, true));
@@ -204,6 +211,7 @@ impl AnimState {
         let over = self.pending.len().saturating_sub(MAX_PENDING_EVENTS);
         self.pending.drain(..over);
         if let Some(g) = &mut self.graph1 {
+            g.tags.observe(&legacy_tags);
             g.params.reset_auto();
         }
     }

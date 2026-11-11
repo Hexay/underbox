@@ -85,9 +85,12 @@ pub fn register(r: &mut Registry) {
         let events = with(r, |s| std::mem::take(&mut s.pending));
         callback::animation_events(cb.as_ptr() as usize, &events);
     });
-    // TODO: AnimGraph1 tag spans aren't read; only AnimGraph2 state tags dispatch.
     bind!(r, o::DISPATCH_TAG_EVENTS, |r, cb: RawPtr<c_void>| {
-        let tags = with(r, |s| s.graph2.as_mut().map(|g| g.tags.drain()).unwrap_or_default());
+        let tags = with(r, |s| {
+            let mut tags = s.graph2.as_mut().map(|g| g.tags.drain()).unwrap_or_default();
+            tags.extend(s.graph1.as_mut().map(|g| g.tags.drain()).unwrap_or_default());
+            tags
+        });
         callback::tag_events(cb.as_ptr() as usize, &tags);
     });
 

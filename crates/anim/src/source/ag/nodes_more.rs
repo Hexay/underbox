@@ -10,19 +10,22 @@ fn list(n: &Json, key: &str) -> Vec<Json> {
     n.get(key).and_then(Json::as_array).cloned().unwrap_or_default()
 }
 
-/// A state's `Events` and elapsed `TimedEvents` (the editor's `StateEvent`/`TimedStateEvent`).
+/// A state's `Events` and `TimedEvents` (the editor's `StateEvent`/`TimedStateEvent`).
 pub(super) fn state_events(s: &Json) -> StateEvents {
     let flag = |e: &Json, k: &str, default: bool| e.get(k).and_then(Json::as_bool).unwrap_or(default);
     let events = list(s, "Events");
     let ids = |k: &str, default: bool| events.iter().filter(|e| flag(e, k, default) && !str_of(e, "Id").trim().is_empty()).map(|e| str_of(e, "Id").to_owned()).collect();
     let is = |e: &Json, k: &str, name: &str, index: i64| matches!(e.get(k), Some(Json::String(s)) if s == name) || e.get(k).and_then(Json::as_i64) == Some(index);
-    let elapsed = list(s, "TimedEvents")
-        .iter()
-        .filter(|e| e.get("Type").is_none() || is(e, "Type", "TimeElapsed", 0))
-        .filter(|e| !str_of(e, "Id").trim().is_empty())
-        .map(|e| (str_of(e, "Id").to_owned(), f32_of(e, "Time", 0.0), is(e, "Operator", "LessThanEqual", 0)))
-        .collect();
-    StateEvents { entry: ids("IsEntry", true), exit: ids("IsExit", false), fully_in: ids("IsFullyInState", false), elapsed }
+    let timed_events = list(s, "TimedEvents");
+    let timed = |remaining: bool| {
+        timed_events
+            .iter()
+            .filter(|e| if remaining { is(e, "Type", "TimeRemaining", 1) } else { e.get("Type").is_none() || is(e, "Type", "TimeElapsed", 0) })
+            .filter(|e| !str_of(e, "Id").trim().is_empty())
+            .map(|e| (str_of(e, "Id").to_owned(), f32_of(e, "Time", 0.0), is(e, "Operator", "LessThanEqual", 0)))
+            .collect()
+    };
+    StateEvents { entry: ids("IsEntry", true), exit: ids("IsExit", false), fully_in: ids("IsFullyInState", false), elapsed: timed(false), remaining: timed(true) }
 }
 
 fn start(n: &Json) -> Option<f32> {

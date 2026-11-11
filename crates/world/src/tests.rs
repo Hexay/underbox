@@ -77,4 +77,13 @@ fn aggregate_fragments_take_transforms_in_order_and_lod_overrides_read() {
     let moved = [[1.0, 0.0, 0.0, 100.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
     assert_eq!(f.iter().map(|f| (f.draw_call, f.transform)).collect::<Vec<_>>(), [(0, Some(moved)), (1, None)]);
     assert!((f[0].tint[1] - 128.0 / 255.0).abs() < 1e-6 && f[0].tint[2] == 0.0 && f[1].tint == [1.0; 3], "tints are 0..255");
+    assert!(n.objects[1].lod_setups.is_empty() && f.iter().all(|f| f.lod_setup == -1 && f.lod_mask == 0), "no setups: every LOD");
+}
+
+#[test]
+fn aggregate_lod_setups_and_fragment_masks_read() {
+    let n = node::parse(&fixture::lod_aggregate_node("crate.vmdl")).unwrap();
+    let agg = &n.objects[0];
+    assert_eq!(agg.lod_setups, [node::LodSetup { origin: [1.0, 2.0, 3.0], max_object_scale: 2.0, switch_distances: vec![0.0, 300.0] }]);
+    assert_eq!(agg.fragments.iter().map(|f| (f.draw_call, f.lod_setup, f.lod_mask)).collect::<Vec<_>>(), [(0, 0, 0b01), (1, 0, 0b10)]);
 }
