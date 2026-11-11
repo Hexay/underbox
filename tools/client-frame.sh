@@ -1,7 +1,8 @@
 #!/bin/sh
 # Golden client frame: boot the client headless on corpus/showroom (camera, light, dev boxes on a
-# plane), let it render GRACE s (default 6) past `game.load success`, and check that the last
-# presented frames settled on one hash and that it matches corpus/showroom/golden.tsv for this
+# plane), let it render at least GRACE s (default 6) past `game.load success` and until the last
+# SETTLE presented frames share one hash (else up to max-s; a loaded machine renders fewer frames
+# per second, so temporal effects need longer), and check that hash against corpus/showroom/golden.tsv for this
 # adapter. The frame is written as $OUT/frame.png (OUT defaults to target/client-frame).
 # usage: [UNDERBOX_BLESS=1] [CORPUS=showroom] [MANAGED=1] tools/client-frame.sh [max-s=240] [sbox-public]
 # CORPUS picks another corpus project with its own golden.tsv (mapworld: a loaded map).
@@ -20,7 +21,7 @@ GOLDEN=$ROOT/corpus/$CORPUS/golden$SUFFIX.tsv
 SETTLE=5
 rm -rf "$OUT"; mkdir -p "$OUT/frames"
 SECS=$1 SBOX=$2; shift 2
-OUT="$OUT" FRAMES="$OUT/frames" SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL=${UNTIL:-game.load success} GRACE=${GRACE:-6} \
+OUT="$OUT" FRAMES="$OUT/frames" SETTLE=$SETTLE SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL=${UNTIL:-game.load success} GRACE=${GRACE:-6} \
     sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$ROOT/corpus/$CORPUS/.sbproj" "$@" > "$OUT/boot.txt" 2>&1 || true
 ADAPTER=$(grep -ohE 'render device: .*' "$OUT/client.out" | head -n 1 | sed 's/^render device: //')
 [ -n "$ADAPTER" ] || { tail -n 20 "$OUT/boot.txt"; echo "RESULT: FAIL (no render device)"; exit 1; }
