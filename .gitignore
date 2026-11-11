@@ -1,4 +1,5 @@
 /target/
+/dist/
 tools/interop-dump/bin/
 tools/interop-dump/obj/
 # Compiled resources: we build them from source at boot.

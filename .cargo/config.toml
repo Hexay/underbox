@@ -1,0 +1,4 @@
+# Replaces alsa-sys's build script: no `-lasound`, so libengine2 loads without ALSA installed.
+# crates/audio/src/alsa_dl defines the snd_* symbols and dlopens libasound.so.2 (docs/release.md).
+[target.x86_64-unknown-linux-gnu.alsa]
+rustc-link-lib = []

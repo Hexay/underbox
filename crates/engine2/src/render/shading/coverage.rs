@@ -62,7 +62,7 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
 #[test]
 #[ignore = "runs DXC over every shader the corpus materials name"]
 fn material_coverage() {
-    let (Some(core), Ok(gpu)) = (super::tests::core_dir(), render::Gpu::headless()) else {
+    let (Some(core), Some(gpu)) = (super::tests::core_dir(), crate::render::device::create()) else {
         eprintln!("skipped: no sbox-public checkout or GPU");
         return;
     };
@@ -74,7 +74,7 @@ fn material_coverage() {
     let mut rows = Vec::new();
     let mut real = 0;
     for (stem, n) in &by_shader {
-        let v = verdict(&gpu, &compiler, &core, stem);
+        let v = verdict(gpu, &compiler, &core, stem);
         if !v.starts_with("placeholder") {
             real += n;
         }

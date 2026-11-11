@@ -16,16 +16,32 @@ fn info(d: &cpal::Device, default: Option<&str>) -> DeviceInfo {
     DeviceInfo { is_default: default == Some(id.as_str()), id, name }
 }
 
+/// cpal's default host; `Err` when the OS audio library isn't installed (a dedicated server).
+fn host() -> Result<cpal::Host, String> {
+    #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+    if !crate::alsa_dl::load() {
+        return Err("libasound.so.2 not found".into());
+    }
+    Ok(cpal::default_host())
+}
+
 pub fn outputs() -> Vec<DeviceInfo> {
-    let host = cpal::default_host();
+    let Ok(host) = host() else { return Vec::new() };
     let default = host.default_output_device().and_then(|d| d.id().ok()).map(|i| i.to_string());
     host.output_devices().map(|ds| ds.map(|d| info(&d, default.as_deref())).collect()).unwrap_or_default()
 }
 
 pub fn inputs() -> Vec<DeviceInfo> {
-    let host = cpal::default_host();
+    let Ok(host) = host() else { return Vec::new() };
     let default = host.default_input_device().and_then(|d| d.id().ok()).map(|i| i.to_string());
     host.input_devices().map(|ds| ds.map(|d| info(&d, default.as_deref())).collect()).unwrap_or_default()
+}
+
+#[cfg(test)]
+#[test]
+fn listing_devices_links_and_runs_without_a_device() {
+    // Links the alsa crate into a test binary: catches a linker that skips alsa_dl's trampolines.
+    let _ = (outputs(), inputs());
 }
 
 /// A running cpal stream; dropping it stops the stream.
@@ -73,7 +89,7 @@ fn find(devices: impl Iterator<Item = cpal::Device>, id_or_name: &str) -> Option
 pub fn open_output(id: Option<&str>) -> Result<Output, String> {
     let id = id.filter(|s| !s.is_empty()).map(str::to_owned);
     let (running, (name, queue)) = run(move || {
-        let host = cpal::default_host();
+        let host = host()?;
         let device = match &id {
             Some(id) => host.output_devices().ok().and_then(|ds| find(ds, id)),
             None => host.default_output_device(),
@@ -136,7 +152,7 @@ pub fn open_capture(name: Option<&str>, rate: u32) -> Result<Capture, String> {
     let buffer = Arc::new(Mutex::new(VecDeque::new()));
     let sink = buffer.clone();
     let (running, ()) = run(move || {
-        let host = cpal::default_host();
+        let host = host()?;
         let device = match &name {
             Some(n) => host.input_devices().ok().and_then(|ds| find(ds, n)),
             None => host.default_input_device(),
