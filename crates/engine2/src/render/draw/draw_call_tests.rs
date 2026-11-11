@@ -122,6 +122,10 @@ fn managed_scene_renderer_draws_a_box() {
     assert_eq!(culled, CLEAR, "no survivors, no box");
     let kept = middle(&|| draw_indirect(c, draw, mat, model, (0, 0), (0, 0.0), (ids, 1), (args, 20)));
     assert_eq!(kept, direct, "a survivor draws as the direct call does");
+    material::set_vector(mat, "F_TRANSLUCENT", crate::math::vec4(1.0, 0.0, 0.0, 0.0));
+    material::set_vector(mat, "g_flOpacityScale", crate::math::vec4(0.5, 0.0, 0.0, 0.0));
+    let [r, _, b, _] = middle(&|| draw_model(c, draw, material::resolve(mat).unwrap(), model, (0, 0), (0, 0.0), ids, &[Sub { first: 1, count: 1, range: None }]));
+    assert!(r < direct[0] && r > 20 && b > 60, "a translucent material blends over the clear, got {r} {b} of {direct:?}");
     buffers::destroy(args);
     for t in [color, depth] {
         crate::resource::destroy_handle(t);

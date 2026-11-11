@@ -94,7 +94,9 @@ fn draw_model(c: context::Ref, attrs: attributes::Ref, material: Arc<Material>, 
         if let Some((range, base)) = &sub.range {
             (draw.range, draw.base_vertex) = (range.clone(), *base);
         }
-        draws.push(draw);
+        // Depth-only passes (shadow maps) keep depth writes: translucent casters still cast.
+        let colour = !context::target(c).color.is_null();
+        draws.push(if colour && model_draw::translucent(&draw) { model_draw::as_translucent(draw) } else { draw });
     }
     immediate::submit(c, &draws);
     true
