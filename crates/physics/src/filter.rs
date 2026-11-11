@@ -1,7 +1,8 @@
 //! Per-shape filter data and the Rapier hooks that apply collision rules to each pair.
 
 use crate::rules::{CollisionRules, Rule};
-use rapier3d::prelude::{ColliderHandle, PairFilterContext, PhysicsHooks, SolverFlags};
+use crate::world::World;
+use rapier3d::prelude::{ActiveHooks, ColliderHandle, PairFilterContext, PhysicsHooks, RigidBodyHandle, SolverFlags};
 use std::collections::HashMap;
 
 /// managed's `CollisionFunctionMask`.
@@ -84,5 +85,29 @@ impl PhysicsHooks for Hooks<'_> {
 
     fn filter_intersection_pair(&self, cx: &PairFilterContext) -> bool {
         self.classify(cx.collider1, cx.collider2, true) != Contact::None
+    }
+}
+
+impl World {
+    /// Only shapes some pair could filter run the hooks: Rapier never recycles a hooked pair's
+    /// contacts, and real engine2 keeps a contact's points and normal until they drift
+    /// (docs/differential-joints.md, orbmatch). Rapier filters a pair if either shape has hooks.
+    /// Jointed bodies keep them too: recycled contacts freeze their normals in world space and
+    /// fight the soft joint locks, so a car on its wheels creeps instead of resting.
+    pub(crate) fn refresh_hooks(&mut self, id: ColliderHandle) {
+        let (Some(meta), Some(c)) = (self.meta.get(&id), self.inner.colliders.get(id)) else { return };
+        let jointed = c.parent().is_some_and(|b| self.inner.impulse_joints.attached_joints(b).next().is_some());
+        let clean = !jointed && meta.functions & function::SOLID != 0 && !self.rules.needs_filter(&meta.tags);
+        let hooks = if clean { ActiveHooks::empty() } else { ActiveHooks::FILTER_CONTACT_PAIRS | ActiveHooks::FILTER_INTERSECTION_PAIR };
+        if let Some(c) = self.inner.colliders.get_mut(id) {
+            c.set_active_hooks(hooks);
+        }
+    }
+
+    pub(crate) fn refresh_body_hooks(&mut self, body: RigidBodyHandle) {
+        let shapes = self.inner.bodies.get(body).map(|rb| rb.colliders().to_vec()).unwrap_or_default();
+        for id in shapes {
+            self.refresh_hooks(id);
+        }
     }
 }

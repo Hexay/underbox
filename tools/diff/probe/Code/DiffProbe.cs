@@ -69,6 +69,7 @@ public sealed class DiffProbe : Component
 			ProbeRest.Depth();
 			ProbeRest.Sleep();
 			ProbeJoint.Run();
+			ProbePush.Run();
 		}
 		if ( tick == Ticks[^1] ) Mark( "END" );
 	}

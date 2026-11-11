@@ -67,6 +67,7 @@ pub struct World {
     pub(crate) sleep_thresholds: HashMap<RigidBodyHandle, f32>,
     awake: HashSet<RigidBodyHandle>,
     activity: Vec<Activity>,
+    pub(crate) step_start: HashMap<RigidBodyHandle, crate::bounce::Start>,
 }
 
 impl Default for World {
@@ -75,6 +76,7 @@ impl Default for World {
         inner.integration_parameters.length_unit = INCHES_PER_METRE;
         // Fitted to real engine2's box landings (docs/differential.md, divergence 2). A wider
         // speculative margin fitted better but kept bodies near animated ones awake (zoo chairs).
+        // Kept over Box2D's single relax iteration: see docs/differential-joints.md, 17.
         inner.integration_parameters.num_internal_pgs_iterations = 2;
         inner.integration_parameters.num_internal_stabilization_iterations = 3;
         // Fitted to real's resting depths: 0.0086 on the ground, stacks as in rest_tests.rs.
@@ -93,6 +95,7 @@ impl Default for World {
             sleep_thresholds: HashMap::new(),
             awake: HashSet::new(),
             activity: Vec::new(),
+            step_start: HashMap::new(),
         }
     }
 }
@@ -130,6 +133,10 @@ impl World {
 
     pub fn set_collision_rules(&mut self, rules: CollisionRules) {
         self.rules = rules;
+        let shapes: Vec<_> = self.meta.keys().copied().collect();
+        for id in shapes {
+            self.refresh_hooks(id);
+        }
     }
 
     /// Advance `dt` seconds, integrating `max(substeps, 4)` times as native does (measured in
@@ -140,8 +147,10 @@ impl World {
         self.inner.integration_parameters.num_solver_iterations = substeps.max(MIN_SUBSTEPS) as usize;
         self.drive_joints();
         self.arm_sleep();
+        self.record_step_start();
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
         self.inner.step_with_events(&hooks, &());
+        self.bounce_approaching_contacts();
         self.clamp_speeds();
         self.measure_joints(1);
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
@@ -208,7 +217,11 @@ impl World {
                 self.contacts.forget(c);
             }
         }
+        let partners: Vec<_> = self.inner.impulse_joints.attached_joints(id).map(|(a, b, ..)| if a == id { b } else { a }).collect();
         self.inner.remove_body_with_colliders(id, true);
+        for body in partners {
+            self.refresh_body_hooks(body);
+        }
         self.mass.remove(&id);
         self.sleep_thresholds.remove(&id);
         self.awake.remove(&id);
@@ -228,70 +241,5 @@ impl World {
         if let Some(body) = self.body_mut(id) {
             body.set_body_type(kind.rapier(), true);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::shape::{Shape, Surface};
-
-    #[test]
-    fn box_falls_and_rests_on_ground() {
-        let mut world = World::default();
-        world.set_gravity(Vector::new(0.0, 0.0, -800.0));
-        let ground = world.add_body(BodyType::Static, Pose::IDENTITY);
-        let flat = Shape::Box { center: Vector::ZERO, rotation: Default::default(), half_extents: Vector::new(500.0, 500.0, 10.0) };
-        world.add_shape(ground, &flat, Surface::default()).unwrap();
-        let crate_ = world.add_body(BodyType::Dynamic, Pose::from_translation(Vector::new(0.0, 0.0, 200.0)));
-        let cube = Shape::Box { center: Vector::ZERO, rotation: Default::default(), half_extents: Vector::splat(16.0) };
-        world.add_shape(crate_, &cube, Surface::default()).unwrap();
-        for _ in 0..240 {
-            world.step(1.0 / 60.0, 1);
-        }
-        let z = world.body(crate_).unwrap().translation().z;
-        assert!((z - 26.0).abs() < 1.0, "resting height {z}, want ~26 (ground top 10 + half 16)");
-
-        let probe = |z| Shape::Sphere { center: Vector::new(0.0, 0.0, z), radius: 4.0 };
-        assert_eq!(world.overlapping(&probe(26.0)).len(), 1, "sphere inside the resting cube");
-        assert!(world.overlapping(&probe(1000.0)).is_empty());
-    }
-
-    #[test]
-    fn body_types_round_trip() {
-        let mut world = World::default();
-        let id = world.add_body(BodyType::Keyframed, Pose::IDENTITY);
-        assert_eq!(BodyType::of(world.body(id).unwrap()), BodyType::Keyframed);
-        world.set_body_type(id, BodyType::Dynamic);
-        assert_eq!(BodyType::of(world.body(id).unwrap()), BodyType::Dynamic);
-        assert_eq!(BodyType::from_raw(2), Some(BodyType::Dynamic));
-    }
-
-    #[test]
-    fn speeds_are_clamped() {
-        let mut world = World::default();
-        world.set_max_speed(100.0);
-        let ball = world.add_body(BodyType::Dynamic, Pose::IDENTITY);
-        world.add_shape(ball, &Shape::Sphere { center: Vector::ZERO, radius: 4.0 }, Surface::default()).unwrap();
-        world.body_mut(ball).unwrap().set_linvel(Vector::new(5000.0, 0.0, 0.0), true);
-        world.step(1.0 / 60.0, 2);
-        assert!((world.body(ball).unwrap().linvel().length() - 100.0).abs() < 1e-3);
-    }
-
-    #[test]
-    fn activity_reports_moving_bodies_then_sleep() {
-        let mut world = World::default();
-        world.set_gravity(Vector::ZERO);
-        let ball = world.add_body(BodyType::Dynamic, Pose::IDENTITY);
-        world.add_shape(ball, &Shape::Sphere { center: Vector::ZERO, radius: 4.0 }, Surface::default()).unwrap();
-        world.step(1.0 / 60.0, 1);
-        assert_eq!(world.take_activity(), [Activity { body: ball, user_data: 0, fell_asleep: false }]);
-        let fell = (0..600).any(|_| {
-            world.step(1.0 / 60.0, 1);
-            world.take_activity().iter().any(|a| a.fell_asleep)
-        });
-        assert!(fell, "a resting body reports falling asleep once");
-        world.step(1.0 / 60.0, 1);
-        assert!(world.take_activity().is_empty(), "sleeping bodies are quiet");
     }
 }

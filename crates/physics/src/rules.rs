@@ -1,6 +1,6 @@
 //! Collision rules: what two shapes do when they meet, from their tags (managed's `CollisionRules`).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// managed's `CollisionRules.Result`, ordered from most to least colliding (after `Unset`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -18,6 +18,8 @@ pub enum Rule {
 pub struct CollisionRules {
     defaults: HashMap<u32, Rule>,
     pairs: HashMap<(u32, u32), Rule>,
+    /// Shapes with any of these tags run the pair filter; see `needs_filter`.
+    filtering: HashSet<u32>,
 }
 
 fn key(a: u32, b: u32) -> (u32, u32) {
@@ -27,12 +29,30 @@ fn key(a: u32, b: u32) -> (u32, u32) {
 impl CollisionRules {
     /// Duplicate pairs keep their least colliding rule, as managed does.
     pub fn new(defaults: impl IntoIterator<Item = (u32, Rule)>, pairs: impl IntoIterator<Item = (u32, u32, Rule)>) -> Self {
-        let mut rules = Self { defaults: defaults.into_iter().collect(), pairs: HashMap::new() };
+        let mut rules = Self { defaults: defaults.into_iter().collect(), ..Self::default() };
         for (a, b, rule) in pairs.into_iter().filter(|p| p.2 != Rule::Unset) {
             let slot = rules.pairs.entry(key(a, b)).or_default();
             *slot = (*slot).max(rule);
         }
+        rules.filtering = rules.defaults.iter().filter(|(_, r)| **r > Rule::Collide).map(|(t, _)| *t).collect();
+        let mut open: Vec<_> = rules.pairs.iter().filter(|(_, r)| **r > Rule::Collide).map(|(k, _)| *k).collect();
+        // Greedy cover: one tag of every uncolliding pair, the tag in the most open pairs first.
+        loop {
+            open.retain(|(a, b)| !rules.filtering.contains(a) && !rules.filtering.contains(b));
+            let mut degree: HashMap<u32, usize> = HashMap::new();
+            for t in open.iter().flat_map(|(a, b)| [*a, *b]) {
+                *degree.entry(t).or_default() += 1;
+            }
+            let Some((tag, _)) = degree.into_iter().max_by_key(|&(t, n)| (n, std::cmp::Reverse(t))) else { break };
+            rules.filtering.insert(tag);
+        }
         rules
+    }
+
+    /// Whether a shape tagged `tags` must run the pair filter. Any pair of shapes that both don't
+    /// collides: every uncolliding pair rule and default involves a filtering tag.
+    pub fn needs_filter(&self, tags: &[u32]) -> bool {
+        tags.iter().any(|t| self.filtering.contains(t))
     }
 
     /// The rule between two tag sets: the least colliding explicit pair rule, else the least
@@ -88,6 +108,16 @@ mod tests {
         assert_eq!(rules.between(&[], &[]), Rule::Collide);
         // solid+ladder vs solid has an explicit Collide pair, so ladder's Ignore default is skipped.
         assert_eq!(rules.between(&[SOLID, LADDER], &[SOLID]), Rule::Collide);
+    }
+
+    #[test]
+    fn one_tag_of_each_uncolliding_rule_filters() {
+        let rules = stock();
+        for tags in [&[SOLID, DEBRIS][..], &[SOLID, PLAYERCLIP], &[]] {
+            assert!(!rules.needs_filter(tags), "{tags:?}");
+        }
+        assert!(rules.needs_filter(&[SOLID, TRIGGER]), "covers trigger-solid and trigger-playerclip");
+        assert!(rules.needs_filter(&[LADDER]), "an ignoring default");
     }
 
     #[test]
