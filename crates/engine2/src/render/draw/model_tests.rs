@@ -10,7 +10,7 @@ fn covers_centre(eye: Vec3) -> bool {
     let mesh = &content.meshes[0].mesh;
     let view_proj = render::Camera::perspective(90f32.to_radians(), 1.0, 1.0, eye, eye + Vec3::X).view_proj;
     let uniforms = DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
-    let d = draw_call(mesh, &mesh.draw_calls()[0], uniforms, view_proj, RasterState::default()).unwrap();
+    let d = cull_placeholder(draw_call(mesh, &mesh.draw_calls()[0], uniforms, view_proj, RasterState::default()).unwrap());
     assert!(d.shaded.is_none(), "no material: the placeholder draws it");
     let (color, depth) = (texture::create_target("cull", 16, 16, 0), texture::create_target("cull depth", 16, 16, 62));
     let target = Target { color, depth, ..Default::default() };

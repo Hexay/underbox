@@ -105,8 +105,8 @@ native model one to one, so managed's pipeline code runs unchanged:
    draw when formats or sizes differ (ResolveHDRToFinalSDR: Rgba16Float → Rgba8Unorm). Then
    `OnSceneViewSubmitted` (36). `UNDERBOX_LAYERS=log` prints one line per layer (target, draws,
    draws with a material) and each distinct object drawn; `=probe` adds two texels of the target
-   after every layer. `UNDERBOX_SKIP_LAYERS=a,b` leaves those layers out. The placeholder (no
-   material) culls back faces, as native's default material does.
+   after every layer. `UNDERBOX_SKIP_LAYERS=a,b` leaves those layers out. A scene object drawn
+   by the placeholder (no material) culls back faces, as native's default material does.
 4. A model becomes one `Draw` per mesh draw call (LOD 0, enabled mesh groups): MeshGlue buffers
    upload by version (`draw/gpu_mesh.rs`). The call's material (loaded with the model, or the
    object's `SetMaterialOverrideForMeshInstances`) resolves to a program (`draw/shaded.rs`, see
