@@ -7,7 +7,7 @@ use super::view::{self, SceneView};
 use crate::handles::Kind as ObjectKind;
 use crate::mesh::layout::{Field, Layout};
 use crate::render::draw::shaded::{self, ContextBindings};
-use crate::render::draw::{self, Draw, Target, immediate, model as model_draw, morph};
+use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
 use crate::render::material::Material;
 use crate::render::shading::bind::Instance;
 use crate::render::lighting::{Lighting, local_shadow, shadow};
@@ -177,7 +177,7 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
     let sky_layer = f.match_id == StringToken::of("SkyBox").0;
     let worlds = view.state.lock().unwrap().worlds.clone();
     for (r, obj) in object::refs_in_worlds(&worlds) {
-        let morphs = morph::of(r);
+        let deform = model_draw::Deform::of(r);
         let s = obj.state.lock().unwrap();
         if !s.rendering || !tags_pass(view, &s.tags) {
             continue;
@@ -197,7 +197,7 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
         match obj.kind {
             ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
             _ if f.translucent => {}
-            _ => draws.extend(model_draw::object(&s, morphs.as_ref(), view.view_proj)),
+            _ => draws.extend(model_draw::object(&s, &deform, view.view_proj)),
         }
     }
     (draws, managed)

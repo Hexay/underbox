@@ -68,9 +68,27 @@ fn morph(t: &assets::compiled::morph::Target) -> Morph {
     Morph { name: t.name.clone(), deltas }
 }
 
-fn render_mesh(name: &str, m: &mesh::Mesh, targets: &[assets::compiled::morph::Target], materials: &mut Materials) -> Arc<RenderMesh> {
+/// Bone indices and weights as unorm bytes summing to 255 (rounding error goes to the largest).
+fn skin(v: &assets::compiled::vertex::Vertex) -> ([u8; 4], [u8; 4]) {
+    let total: f32 = v.weights.iter().sum();
+    let scale = if total > 0.0 { 255.0 / total } else { 0.0 };
+    let mut w = v.weights.map(|x| (x * scale).round().clamp(0.0, 255.0) as u8);
+    let sum: i32 = w.iter().map(|x| i32::from(*x)).sum();
+    if sum > 0 {
+        let big = (0..4).max_by_key(|&i| w[i]).unwrap_or(0);
+        w[big] = (i32::from(w[big]) + 255 - sum).clamp(0, 255) as u8;
+    }
+    (v.bones, w)
+}
+
+/// `skinned` (the model has a skeleton to pose) keeps each vertex's bones and weights.
+fn render_mesh(name: &str, m: &mesh::Mesh, targets: &[assets::compiled::morph::Target], materials: &mut Materials, skinned: bool) -> Arc<RenderMesh> {
     let vertices: Vec<Vertex> = m.vertices.iter().map(vertex).collect();
-    let rm = RenderMesh::from_vertices(name, &vertices, &m.indices);
+    let rm = if skinned {
+        RenderMesh::from_skinned_vertices(name, &vertices, &m.vertices.iter().map(skin).collect::<Vec<_>>(), &m.indices)
+    } else {
+        RenderMesh::from_vertices(name, &vertices, &m.indices)
+    };
     {
         let mut s = rm.state();
         s.draw_calls = m
@@ -95,10 +113,11 @@ fn render_mesh(name: &str, m: &mesh::Mesh, targets: &[assets::compiled::morph::T
 /// The engine's content for a compiled model.
 pub fn content(m: &model::Model) -> Content {
     let mut materials = Materials::default();
+    let skinned = m.bones.len() > 1;
     let meshes = m
         .meshes
         .iter()
-        .map(|mm| ModelMesh { mesh: render_mesh(&mm.name, &mm.mesh, &mm.targets, &mut materials), group_mask: mm.group_mask, lod_mask: mm.lod_mask as u8 })
+        .map(|mm| ModelMesh { mesh: render_mesh(&mm.name, &mm.mesh, &mm.targets, &mut materials, skinned), group_mask: mm.group_mask, lod_mask: mm.lod_mask as u8 })
         .collect();
     let material_groups = m
         .material_groups

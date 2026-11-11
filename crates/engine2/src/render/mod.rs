@@ -21,6 +21,7 @@ mod material_source;
 pub mod readback;
 pub mod scene;
 pub mod shading;
+pub mod skin;
 pub mod stats;
 pub(crate) mod submits;
 pub mod swap_chain;
@@ -49,6 +50,7 @@ pub fn register(r: &mut Registry) {
     material_mode::register(r);
     readback::register(r);
     scene::register(r);
+    skin::register(r);
     stats::register(r);
     swap_chain::register(r);
     texture::register(r);

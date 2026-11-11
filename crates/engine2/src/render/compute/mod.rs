@@ -2,7 +2,7 @@
 //! translates; those that don't fall back to a CPU port when other draws depend on their output
 //! (occlusion.rs), else they are skipped with a warning once per shader.
 
-mod gpu;
+pub(crate) mod gpu;
 mod occlusion;
 
 pub(crate) use occlusion::words;
@@ -13,7 +13,7 @@ use abi::{Registry, bind};
 use std::collections::HashSet;
 use std::sync::{LazyLock, Mutex};
 
-fn warn_once(shader: &str, what: &str) {
+pub(crate) fn warn_once(shader: &str, what: &str) {
     static WARNED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
     if WARNED.lock().unwrap().insert(shader.to_owned()) {
         abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader}: {what}"));

@@ -94,6 +94,17 @@ impl Layout {
         })
     }
 
+    /// [`Layout::sbox_vertex`] followed by four bone indices and four unorm weights (summing to
+    /// 255), for compiled meshes with a skeleton: what skinning_cs reads (render/skin).
+    pub fn sbox_skinned_vertex() -> Arc<Layout> {
+        let base = Self::sbox_vertex();
+        let mut fields = base.fields.clone();
+        let at = base.stride;
+        fields.push(Field { semantic: "blendindices".into(), index: 0, format: format::RGBA8_UINT, offset: at });
+        fields.push(Field { semantic: "blendweight".into(), index: 0, format: format::RGBA8_UNORM, offset: at + 4 });
+        Arc::new(Layout { name: "SkinnedVertex".into(), stride: at + 8, fields })
+    }
+
     /// Which `VertexStreams` this layout carries.
     pub fn streams(&self) -> i32 {
         self.fields.iter().fold(0, |m, f| {

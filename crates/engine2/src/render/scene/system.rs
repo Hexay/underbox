@@ -47,6 +47,7 @@ fn next_id() -> u32 {
 pub fn register(r: &mut Registry) {
     bind!(r, s::BEGIN_RENDERING_VIEWS, |_stats| {
         crate::render::submits::begin_frame();
+        crate::render::skin::begin_frame();
         RENDERING.store(true, Ordering::Release);
     });
     bind!(r, s::FINISH_RENDERING_VIEWS, finish);

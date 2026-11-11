@@ -1,7 +1,7 @@
 //! The rest of `RenderTools`, `IRenderContext` and `g_pRenderDevice`: copies between targets, the
 //! sky, per-object draw lists managed's scene renderer reads (`Sandbox.SceneRenderer`), sampler
-//! and bindless ids, and the GPU features the placeholder renderer doesn't have (compute, ray
-//! tracing, skinning, morphs, lightmaps), which answer "none" so managed skips them.
+//! and bindless ids, and the GPU features the renderer doesn't have yet (indirect compute, ray
+//! tracing, lightmaps), which answer "none" so managed skips them. Skinning: render/skin.
 
 use crate::render::draw::{self, immediate, model as model_draw};
 use crate::render::{context, device, texture};
@@ -172,23 +172,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::RESET_MATERIAL_BIND, |_| {});
     bind!(r, tools::GET_MATERIAL_BIND_COUNTS, material_bind_counts);
     bind!(r, tools::GET_MATERIAL_SIMILARITY_KEY, |m| m.addr() as u64);
-    // Model draw calls through managed's material system; without it these draw nothing.
-    bind!(r, tools::BIND_MODEL_DRAW_CALL, |_, _, _, _, _| false);
-    bind!(r, tools::BIND_MODEL_DRAW_CALL_VERTEX_IDS, |_, _, _, _, _| false);
-    bind!(r, tools::SET_RENDER_STATE_FOR_MODEL_DRAW_CALL, |_, _, _, _, _, _, _, _, _, _, _| false);
-    // No skinning, morphs, compute, ray tracing or auto exposure on the placeholder renderer.
-    bind!(r, tools::GET_MODEL_MESH_SKINNING, |_, _, _, _| -1);
-    bind!(r, tools::GET_MODEL_MESH_SKINNING_BONES, |_, _, _, _, _| false);
-    bind!(r, tools::ALLOCATE_VERTEX_CACHE, |_| -1);
-    bind!(r, tools::GET_VERTEX_CACHE_BUFFER, PtrHandle::default);
-    bind!(r, tools::DISPATCH_MODEL_MESH_SKINNING, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
     bind!(r, tools::MODEL_MESH_HAS_MORPHS, |m, mesh| {
         let model = crate::model::get(m);
         usize::try_from(mesh).ok().and_then(|i| model?.content.meshes.get(i).map(|e| !e.mesh.state().morphs.is_empty())).unwrap_or(false)
     });
-    bind!(r, tools::QUEUE_MODEL_MESH_MORPH, |_, _, _| -1);
-    bind!(r, tools::GENERATE_MORPHS, |_| {});
-    bind!(r, tools::GET_MORPH_SUBRECT, |_, _| {});
+    // No indirect compute, ray tracing or auto exposure yet.
     bind!(r, tools::COMPUTE_INDIRECT, |_, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS, |_, _, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS_INDIRECT, |_, _, _, _, _| {});

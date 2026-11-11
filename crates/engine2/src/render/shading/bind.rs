@@ -18,6 +18,8 @@ use std::collections::HashMap;
 
 /// `transform_buffer.fxc`'s `g_TransformBuffer`, 64 bytes per instance.
 const TRANSFORMS: &str = "g_TransformBuffer";
+/// `vs_decompress.fxc`'s skinned vertices (render/skin/cache.rs).
+const VERTEX_CACHE: &str = "AnimatedVertexCache";
 
 #[derive(Clone, Copy, Debug)]
 pub struct Instance {
@@ -171,8 +173,13 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::UNIFORM, &bytes))
         }
         B::Buffer { ty: wgpu::BufferBindingType::Storage { .. }, min_binding_size, .. } => {
-            if let Some(given) = inputs.gpu_buffer(&b.name) {
+            if let Some(given) = names(s, &b.name).find_map(|n| inputs.gpu_buffer(n)) {
                 return Ok(Resource::Buffer(given));
+            }
+            if names(s, &b.name).any(|n| n == VERTEX_CACHE)
+                && let Some(cache) = crate::render::skin::cache::buffer()
+            {
+                return Ok(Resource::Buffer(cache.buffer.clone()));
             }
             let element = s.storage.get(&(b.group, b.binding));
             let mut bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {

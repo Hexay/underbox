@@ -100,7 +100,7 @@ impl Scene {
 
     /// Every box and the floor into the bound targets; `bias` as the shadow layer passes it.
     fn draw(&self, bias: (i32, f32)) {
-        assert!(draw_model(self.c, self.draw, self.mat, self.model, (0, 0), bias, self.ids, &[Sub { first: 0, count: self.count, range: None }]));
+        assert!(draw_model(self.c, self.draw, crate::render::material::resolve(self.mat).unwrap(), self.model, (0, 0), bias, self.ids, &[Sub { first: 0, count: self.count, range: None }]));
     }
 
     /// `ShadowSystem.BeginPass` then the casters: bind `map`, clear it (with whatever view

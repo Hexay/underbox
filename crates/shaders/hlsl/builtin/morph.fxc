@@ -5,7 +5,7 @@
 
 #include "transform_buffer.fxc"
 
-// Atlas rectangle of this instance's morph targets: U offset, V offset, U range, V range.
+// Where this instance's morph composite is (see Morph below), as managed's SetMorphSubrect stores it.
 struct MorphSubrectData_t
 {
 	float4 vAtlasRect;
@@ -20,9 +20,19 @@ MorphSubrectData_t CalculateMorphSubrectData( uint nBaseSlot )
 	return o;
 }
 
-// TODO: apply morph deltas once the renderer produces the morph atlas (layout to be defined with it).
+// The renderer's composite (engine2 render/skin/morphs.rs): per vertex a position delta (w:
+// wrinkle) and a normal delta; vAtlasRect.x is the instance's first float4, .y how many it has.
+StructuredBuffer<float4> g_MorphComposite < Attribute( "MorphComposite" ); >;
+
 void Morph( inout float3 vPosition, inout float3 vNormal, inout float flWrinkle, uint nVertex, MorphSubrectData_t data )
 {
+	if ( 2 * nVertex + 1 >= uint( data.vAtlasRect.y ) )
+		return;
+	uint nAt = uint( data.vAtlasRect.x ) + 2 * nVertex;
+	float4 vDelta = g_MorphComposite[ nAt ];
+	vPosition += vDelta.xyz;
+	flWrinkle += vDelta.w;
+	vNormal += g_MorphComposite[ nAt + 1 ].xyz;
 }
 #endif
 

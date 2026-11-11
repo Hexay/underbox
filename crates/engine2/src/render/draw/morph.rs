@@ -21,6 +21,13 @@ pub struct ObjectMorphs {
     meshes: Vec<Weights>,
 }
 
+impl ObjectMorphs {
+    /// The weights of mesh `index` (content order).
+    pub fn mesh(&self, index: usize) -> Option<&Weights> {
+        self.meshes.get(index)
+    }
+}
+
 /// Each mesh's morph set (flex rules), in content order.
 type Sets = Arc<Vec<Option<MorphSet>>>;
 

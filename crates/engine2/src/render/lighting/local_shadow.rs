@@ -85,10 +85,10 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref]) {
             let tile = out.tiles.len() as u32;
             let mut draws = Vec::new();
             for (r, obj) in object::refs_in_worlds(worlds) {
-                let morphs = draw::morph::of(r);
+                let deform = model_draw::Deform::of(r);
                 let s = obj.state.lock().unwrap();
                 if s.rendering && obj.light.is_none() {
-                    draws.extend(model_draw::object(&s, morphs.as_ref(), view).into_iter().map(|d| draw::Draw { shaded: None, ..d }));
+                    draws.extend(model_draw::object(&s, &deform, view).into_iter().map(model_draw::depth_only));
                 }
             }
             let target = Target { depth: out.map, viewport: viewport(tile), ..Default::default() };

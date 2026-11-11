@@ -136,6 +136,19 @@ pub fn shader_value(r: Ref, name: &str) -> Option<glam::Vec4> {
     })
 }
 
+/// Set `name` as native code would: an int, bool, combo, float or buffer value.
+pub fn set(r: Ref, name: &str, value: Value) {
+    let kind = match value {
+        Value::Int(_) => Kind::Int,
+        Value::Bool(_) => Kind::Bool,
+        Value::Combo(_) => Kind::Combo,
+        Value::Float(_) => Kind::Float,
+        Value::Buffer(_) => Kind::Buffer,
+        _ => return,
+    };
+    on(r, |a| a.set(kind, StringToken::of(name), value));
+}
+
 pub fn set_buffer(r: Ref, name: StringToken, handle: usize) {
     on(r, |a| a.set(Kind::Buffer, name, Value::Buffer(handle)));
 }

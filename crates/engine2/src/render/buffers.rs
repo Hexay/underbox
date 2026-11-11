@@ -29,6 +29,18 @@ pub(crate) fn create(_kind: i64, desc: BufferDesc, _usage: i64, name: Option<&CS
     Handle::new(id)
 }
 
+/// A handle for a buffer the engine made itself (the vertex cache, a skinning dispatch's inputs).
+pub(crate) fn insert(buffer: Arc<render::Buffer>) -> Handle {
+    let id = NEXT.fetch_add(1, Ordering::Relaxed);
+    BUFFERS.write().unwrap().insert(id, buffer);
+    Handle::new(id)
+}
+
+/// Point an existing handle at another buffer (a grown vertex cache).
+pub(crate) fn replace(h: Handle, buffer: Arc<render::Buffer>) {
+    BUFFERS.write().unwrap().insert(h.value, buffer);
+}
+
 pub(crate) fn destroy(h: Handle) {
     BUFFERS.write().unwrap().remove(&h.value);
 }

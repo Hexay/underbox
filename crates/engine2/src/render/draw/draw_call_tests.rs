@@ -116,7 +116,7 @@ fn managed_scene_renderer_draws_a_box() {
         px.texel(32, 32)[..4].try_into().unwrap()
     };
     let red = |[r, g, b, _]: [u8; 4]| r > 60 && g < 10 && b < 10;
-    let direct = middle(&|| draw_model(c, draw, mat, model, (0, 0), (0, 0.0), ids,&[Sub { first: 1, count: 1, range: None }]));
+    let direct = middle(&|| draw_model(c, draw, material::resolve(mat).unwrap(), model, (0, 0), (0, 0.0), ids,&[Sub { first: 1, count: 1, range: None }]));
     assert!(red(direct), "the red box in the middle, got {direct:?}");
     let culled = middle(&|| draw_indirect(c, draw, mat, model, (0, 0), (0, 0.0), (ids, 1), (args, 0)));
     assert_eq!(culled, CLEAR, "no survivors, no box");

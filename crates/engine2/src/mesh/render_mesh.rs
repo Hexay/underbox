@@ -93,13 +93,28 @@ impl RenderMesh {
 
     /// A triangle mesh over owned data (compiled geometry), with its material by name unresolved.
     pub fn from_vertices(name: &str, vertices: &[Vertex], indices: &[u32]) -> Arc<Self> {
+        Self::from_bytes(name, Layout::sbox_vertex(), Vertex::as_bytes(vertices).to_vec(), vertices.len(), indices)
+    }
+
+    /// [`RenderMesh::from_vertices`] with each vertex's bone indices and unorm weights after it
+    /// ([`Layout::sbox_skinned_vertex`]).
+    pub fn from_skinned_vertices(name: &str, vertices: &[Vertex], skin: &[([u8; 4], [u8; 4])], indices: &[u32]) -> Arc<Self> {
+        let mut bytes = Vec::with_capacity(vertices.len() * (size_of::<Vertex>() + 8));
+        for (v, (bones, weights)) in vertices.chunks(1).zip(skin) {
+            bytes.extend_from_slice(Vertex::as_bytes(v));
+            bytes.extend_from_slice(bones);
+            bytes.extend_from_slice(weights);
+        }
+        Self::from_bytes(name, Layout::sbox_skinned_vertex(), bytes, vertices.len(), indices)
+    }
+
+    fn from_bytes(name: &str, layout: Arc<Layout>, bytes: Vec<u8>, count: usize, indices: &[u32]) -> Arc<Self> {
         let mesh = Self::new(name, None, TRIANGLES);
         {
             let mut s = mesh.state();
-            let bytes = Vertex::as_bytes(vertices).to_vec();
-            s.vertices = Some(Arc::new(VertexBuffer::new(Layout::sbox_vertex(), bytes)));
+            s.vertices = Some(Arc::new(VertexBuffer::new(layout, bytes)));
             s.indices = Some(Arc::new(IndexBuffer::new(true, indices.iter().flat_map(|i| i.to_le_bytes()).collect())));
-            s.vertex_range = (0, vertices.len() as i32);
+            s.vertex_range = (0, count as i32);
             s.index_range = (0, indices.len() as i32);
         }
         mesh

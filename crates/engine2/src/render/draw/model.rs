@@ -1,5 +1,6 @@
 //! A model's meshes as [`Draw`]s: every draw call of every mesh in the enabled mesh groups at
-//! LOD 0, with the object's transform and tint, and its morph weights (morph.rs).
+//! LOD 0, with the object's transform and tint, its morph weights (morph.rs) and bones
+//! (render/skin).
 
 use super::morph::{self, ObjectMorphs};
 use super::{Draw, gpu_mesh, shaded, topology};
@@ -8,6 +9,7 @@ use crate::mesh::material_ref::MaterialRef;
 use crate::mesh::render_mesh::{DrawCall, RenderMesh};
 use crate::model::Model;
 use crate::render::shading::bind::Instance;
+use crate::render::skin;
 use abi::structs::{Transform, Vector4};
 use glam::{Mat4, Quat, Vec3};
 use render::RasterState;
@@ -57,17 +59,50 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
 }
 
-/// A scene object's model draws, seen through `view_proj`, morphed by `morphs` (from
-/// [`morph::of`]); none without a model.
-pub fn object(s: &crate::scene::object::State, morphs: Option<&ObjectMorphs>, view_proj: Mat4) -> Vec<Draw> {
+/// What deforms an object's meshes, read before its state is locked: morph weights and, for an
+/// animatable object, its bones.
+pub struct Deform {
+    key: usize,
+    morphs: Option<ObjectMorphs>,
+    pose: Option<skin::native::Pose>,
+}
+
+impl Deform {
+    /// Locks the object's state: call it before taking that lock.
+    pub fn of(r: crate::scene::object::Ref) -> Deform {
+        Deform { key: r.addr(), morphs: morph::of(r), pose: skin::native::pose(r) }
+    }
+}
+
+/// A scene object's model draws, seen through `view_proj`, deformed by `deform`; none without a
+/// model. Skinned meshes draw from the vertex cache (render/skin), the rest morph on the CPU.
+pub fn object(s: &crate::scene::object::State, deform: &Deform, view_proj: Mat4) -> Vec<Draw> {
     let Some(model) = crate::model::get(s.model) else { return Vec::new() };
     let mut out = Vec::new();
     each_call(&model, s.mesh_groups, s.material_override.as_ref(), |i, mesh, call| {
-        let vertices = morphs.and_then(|m| morph::vertices(m, i, mesh));
         let world = matrix(&s.transform);
-        out.extend(draw_call_of(mesh, vertices, call, DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) }, view_proj, RasterState::default()));
+        let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) };
+        let posed = deform.pose.as_ref().and_then(|p| Some((p, skin::mesh_skin(&model, s.model, i)?)));
+        let skinned = posed.and_then(|(pose, sk)| skin::native::skinned(deform.key, i, &sk, s.model, pose, tint(s.tint), deform.morphs.as_ref().and_then(|m| Some((m.mesh(i)?, mesh)))));
+        let Some(attrs) = skinned else {
+            let vertices = deform.morphs.as_ref().and_then(|m| morph::vertices(m, i, mesh));
+            out.extend(draw_call_of(mesh, vertices, call, uniforms, view_proj, RasterState::default()));
+            return;
+        };
+        let mut draw = draw_call_of(mesh, None, call, DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..uniforms }, view_proj, RasterState::default());
+        if let Some(shaded) = draw.as_mut().and_then(|d| d.shaded.as_mut()) {
+            shaded.context.attributes.push(attrs);
+        }
+        out.extend(draw);
     });
     out
+}
+
+/// `d` for a depth-only pass: the placeholder, unless it draws from the vertex cache, which
+/// only its material program reads.
+pub fn depth_only(d: Draw) -> Draw {
+    let cached = d.shaded.as_ref().is_some_and(|s| !s.context.attributes.is_empty());
+    if cached { d } else { Draw { shaded: None, ..d } }
 }
 
 /// Every draw of `model` placed at `world` (model to world), seen through `view_proj`, each with
