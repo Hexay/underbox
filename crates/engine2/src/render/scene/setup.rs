@@ -88,8 +88,8 @@ fn target_info<R: Default>(h: view::RtHandle, f: impl FnOnce(&texture::Texture) 
 
 pub fn register(r: &mut Registry) {
     bind!(r, s::ADD_VOLUMETRIC_FOG, |_| {});
-    // No 3D skybox: managed then draws the 2D sky only.
-    bind!(r, s::ADD3_D_SKYBOX, |_| false);
+    // False (no skybox world): managed then draws the 2D sky itself.
+    bind!(r, s::ADD3_D_SKYBOX, super::skybox::add_for_setup);
     bind!(r, s::ADD_TEMPORAL_UPSCALE, |_| {});
     bind!(r, s::ADD_AUTO_EXPOSURE, |_, _, _| {});
     // Layers already run in the order managed adds them.

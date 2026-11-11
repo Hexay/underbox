@@ -7,6 +7,7 @@ pub mod camera;
 pub mod execute;
 pub mod layer;
 pub mod setup;
+pub mod skybox;
 pub mod system;
 pub(crate) mod trace;
 pub mod view;

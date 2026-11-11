@@ -35,6 +35,8 @@ pub enum Kind {
     Procedural(usize),
     /// `srgb`: `RENDER_SRGB`, the target stores sRGB (native writes through an sRGB view).
     Blit { src: texture::Ref, src_viewport: RenderViewport, srgb: bool },
+    /// A child view run at this point (the 3D skybox), owned by the layer.
+    View(view::Ref),
 }
 
 #[derive(Default)]
@@ -71,6 +73,9 @@ pub fn create(view: view::Ref, name: String, viewport: RenderViewport, kind: Kin
 pub fn destroy(r: Ref) {
     if let Some(layer) = get(r) {
         objects::destroy(layer.attributes);
+        if let Kind::View(child) = layer.kind {
+            view::destroy(child);
+        }
     }
     objects::destroy(r);
 }

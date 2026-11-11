@@ -90,6 +90,27 @@ fn camera_draws_model_over_sky() {
     a.check_golden(&golden, "camera_draws_model_over_sky", &device::gpu().unwrap().describe());
 }
 
+/// A red cube in a 3D skybox at scale 16: skybox (30, 0, 6) is main-world (480, 0, 96), 256
+/// units wide, so it shows above the main cube (rows 16..36) and behind it.
+#[test]
+fn skybox_world_draws_behind_the_main_world() {
+    device::create().expect("a wgpu adapter");
+    let (w, cam) = scene();
+    let sky: world::Ref = objects::create_shared(Arc::new(SceneWorld::default()));
+    let model = crate::model::create_runtime("models/test/cube.vmdl", Content::default());
+    let at = Transform { position: crate::math::vec3(30.0, 0.0, 6.0), ..crate::math::identity() };
+    let state = State { model, transform: at, tint: crate::math::vec4(1.0, 0.0, 0.0, 1.0), ..State::default() };
+    object::create::<class::CSceneObject, class::CSceneObject>(sky, Kind::SceneObject, state);
+    *world::get(w).unwrap().skybox.lock().unwrap() = world::Skybox { world: sky.addr(), scale: 16.0, ..Default::default() };
+    let color = texture::create_target("skybox", SIZE, SIZE, 0);
+    assert!(camera::render_to_texture(cam, color, Default::default(), Default::default()));
+    let f = read(color);
+    let (above, front) = (f.texel(32, 18), f.texel(32, 30));
+    assert!(above[0] > 100 && above[1] < 40 && above[2] < 40, "skybox cube above the main cube: {above:?}");
+    assert!(front[1] > 40 && front[0].abs_diff(front[1]) < 60, "the main cube stays in front: {front:?}");
+    assert_eq!(f.texel(2, 2), [115, 153, 217, 255], "sky elsewhere");
+}
+
 #[test]
 fn render_to_texture_and_bitmap() {
     device::create().expect("a wgpu adapter");

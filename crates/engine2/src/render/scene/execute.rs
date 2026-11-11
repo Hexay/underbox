@@ -45,6 +45,7 @@ pub fn default_layers(v: view::Ref, clear_flags: i32, clear_color: abi::structs:
     let sky = add("Sky", Kind::Render(StringToken::of("Forward")), 0);
     layer::with(sky, |s| s.match_id = StringToken::of("SkyBox").0);
     add("Opaque", Kind::Render(StringToken::of("Forward")), IS_OPAQUE);
+    super::skybox::add(v, if hdr.is_null() { view.color } else { hdr }, view.depth, None);
     if !hdr.is_null() {
         let resolve = Kind::Blit { src: hdr, src_viewport: vp, srgb: true };
         let l = view::add_layer(v, layer::create(v, "ResolveHDRToFinalSDR".into(), vp, resolve, 0, 0), Default::default());
@@ -79,13 +80,16 @@ fn hdr_target(color: texture::Ref) -> texture::Ref {
 pub fn run(v: view::Ref) {
     let Some(view) = view::get(v) else { return };
     let ctx = context::create(0);
-    let (layers, worlds) = {
+    let (layers, worlds, child) = {
         let s = view.state.lock().unwrap();
-        (s.layers.clone(), s.worlds.clone())
+        (s.layers.clone(), s.worlds.clone(), !s.parent.is_null())
     };
     let mut lighting = Lighting::collect(&worlds, view.ambient);
-    shadow::render(&mut lighting, &worlds, view.view_proj);
-    local_shadow::render(&mut lighting, &worlds);
+    // Child views (the 3D skybox) are lit without shadow maps, as native's.
+    if !child {
+        shadow::render(&mut lighting, &worlds, view.view_proj);
+        local_shadow::render(&mut lighting, &worlds);
+    }
     immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {
         run_layer(&view, v, ctx, l);
@@ -154,6 +158,12 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             let combo = crate::render::attributes::shader_value(layer.attributes, "D_SRGB_TRANSFER").map_or(0, |v| v.x as i32);
             let transfer = draw::blit_transfer(srgb.then_some((a.desc.format, b.desc.format)), combo);
             draw::blit(a, rect, b, draw::viewport_rect(b, &t.viewport), transfer);
+        }
+        Kind::View(child) => {
+            run(child);
+            if abi::rt::callbacks::is_set(36) {
+                abi::callbacks::sandbox_rendering_render_pipeline::on_scene_view_submitted(child);
+            }
         }
         Kind::Procedural(_) | Kind::Label => {}
     }
