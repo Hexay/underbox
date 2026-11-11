@@ -3,7 +3,10 @@
 
 use super::tests::standin_cube;
 use crate::render::fog::{self, ViewFog};
+use crate::render::draw::{self, Target};
+use crate::render::lighting::shadow::SunShadow;
 use crate::render::lighting::{Light, Lighting, kind};
+use render::pass::Load;
 use crate::render::{bindless, fog_volume, scene::camera, texture};
 use abi::NativeRef;
 use abi::structs::{SceneVolumetricFogParameters, SceneVolumetricFogVolume, TextureCreationConfig_t};
@@ -196,4 +199,32 @@ fn froxels_blend_with_their_history() {
     let settled = (0..60).fold(first, |_, _| at(&lit(1.0), KEY));
     // History is stored at half precision.
     assert!(settled.iter().zip(alone).all(|(a, b)| (a - b).abs() <= b.abs() * 2e-3), "converged: {settled:?} to {alone:?}");
+}
+
+/// Every point maps to the shadow map's centre at depth 0.5: a map cleared to 0.2 (an occluder
+/// in front) shadows the sun's in-scattering, one cleared to 1 scatters as no map does.
+#[test]
+fn sun_shadow_map_gates_in_scattering() {
+    let Some(_) = middle(&with_view_fog(ViewFog::default())) else { return };
+    let eye = Vec3::new(-30.0, 0.0, 30.0);
+    let view_proj = render::Camera::perspective(90f32.to_radians(), 1.0, 1.0, eye, Vec3::ZERO).view_proj;
+    let settings = fog_volume::Settings { draw_distance: 1000.0, fade_in: (-2.0, -1.0), anisotropy: 0.0, scattering: 1.0 };
+    let volumes = [fog_volume::Volume::native(&volume(4.0))];
+    let map = texture::create_target("fog shadow", 16, 16, 62);
+    let world_to_shadow = Mat4::from_cols(Vec4::ZERO, Vec4::ZERO, Vec4::ZERO, Vec4::new(0.5, 0.5, 0.5, 1.0));
+    let scatter = |shadow: Option<SunShadow>| {
+        let sources = fog_volume::Sources { sun: Some(((eye - Vec3::ZERO).normalize(), Vec3::splat(4.0))), shadow, ..Default::default() };
+        fog_volume::froxel(&fog_volume::march(&volumes, view_proj, &sources, &settings, 0).expect("froxels"), [48, 28, 2])
+    };
+    let cleared_to = |depth: f32| {
+        let target = Target { depth: map, ..Default::default() };
+        draw::execute(&target, &Lighting::default(), Load { color: None, depth: Some(depth) }, &[]);
+        Some(SunShadow { world_to_shadow, map })
+    };
+    let open = scatter(None);
+    assert!(open[0] > 0.01, "the sun scatters without a map: {open:?}");
+    assert_eq!(scatter(cleared_to(1.0)), open, "nothing in front");
+    let shadowed = scatter(cleared_to(0.2));
+    assert!(shadowed[0] == 0.0 && shadowed[3] == open[3], "no sun, same density: {shadowed:?}");
+    crate::resource::destroy_handle(map);
 }

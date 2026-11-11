@@ -211,9 +211,8 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             if let Some(given) = names(s, &b.name).find_map(|n| inputs.gpu_buffer(n)) {
                 return Ok(Resource::Buffer(given));
             }
-            if let Some(image) = texel_words::image_of(&b.name) {
-                let t = inputs.attributes.iter().find_map(|a| names(s, image).find_map(|n| attributes::texture(*a, n))).and_then(texture::resolve);
-                return t.and_then(|t| texel_words::buffer(gpu, &t)).map(Resource::Buffer).ok_or_else(|| format!("{}: no texture", b.name));
+            if texel_words::image_of(&b.name).is_some() {
+                return texel_words::bound(gpu, s, inputs, &b.name).map(|(_, words)| Resource::Buffer(words)).ok_or_else(|| format!("{}: no texture", b.name));
             }
             if names(s, &b.name).any(|n| n == VERTEX_CACHE)
                 && let Some(cache) = crate::render::skin::cache::buffer()

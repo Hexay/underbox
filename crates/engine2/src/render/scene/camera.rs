@@ -41,7 +41,7 @@ pub(crate) fn mat4(m: Matrix) -> Mat4 {
 }
 
 /// The camera and pixel viewport the renderer's fields describe, for a `width × height` target.
-fn camera(r: Ref, width: u32, height: u32) -> (Camera, Option<Mat4>, RenderViewport) {
+pub(super) fn camera(r: Ref, width: u32, height: u32) -> (Camera, Option<Mat4>, RenderViewport) {
     let a = r.addr();
     let vp: Vector4 = field!(get Vector4, c::GET_VIEWPORT, a);
     let v = if vp.vec.z > 0.0 && vp.vec.w > 0.0 { vp.vec } else { abi::structs::System_Numerics_Vector4 { x: 0.0, y: 0.0, z: 1.0, w: 1.0 } };

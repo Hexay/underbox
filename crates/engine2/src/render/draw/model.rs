@@ -138,6 +138,34 @@ pub fn draws(model: &Model, world: Mat4, view_proj: Mat4, tint: [f32; 4], mesh_g
     out
 }
 
+/// `IsOpaque` and/or `IsTranslucent` for a model's draw calls, by whether each call's material
+/// blends ([`Material::blend`](crate::render::material::Material::blend)); native's
+/// `UpdateFlagsBasedOnMaterial`. A call without a material is opaque.
+pub fn surface_flags(model: abi::NativeRef<abi::class::CModel>, mesh_groups: u64, material: Option<&Arc<MaterialRef>>) -> i64 {
+    use crate::scene::object::{IS_OPAQUE, IS_TRANSLUCENT};
+    let Some(model) = crate::model::get(model) else { return IS_OPAQUE };
+    let mut flags = 0;
+    each_call(&model, mesh_groups, material, |_, _, call| {
+        let blends = call.material.as_ref().and_then(|m| m.material()).is_some_and(|m| m.blend().is_some());
+        flags |= if blends { IS_TRANSLUCENT } else { IS_OPAQUE };
+    });
+    if flags == 0 { IS_OPAQUE } else { flags }
+}
+
+/// Whether a draw belongs in the translucent layers: its material blends.
+pub fn translucent(d: &Draw) -> bool {
+    d.shaded.as_ref().is_some_and(|s| s.material.blend().is_some())
+}
+
+/// `d` drawn translucently: its material's blend, no depth writes, back faces culled unless
+/// `F_RENDER_BACKFACES` (else a closed mesh blends twice). A shader's own render state still wins.
+pub fn as_translucent(d: Draw) -> Draw {
+    let material = d.shaded.as_ref().map(|s| &s.material);
+    let blend = material.and_then(|m| m.blend()).map(|b| b.state());
+    let cull = if material.is_some_and(|m| m.feature("F_RENDER_BACKFACES")) { None } else { Some(render::wgpu::Face::Back) };
+    Draw { state: RasterState { blend: blend.or(d.state.blend), depth_write: false, cull, ..d.state }, ..d }
+}
+
 /// `f(mesh index, mesh, call)` for each draw call of the LOD 0 meshes in `mesh_groups`, with
 /// `material` overriding the calls' own.
 fn each_call(model: &Model, mesh_groups: u64, material: Option<&Arc<MaterialRef>>, mut f: impl FnMut(usize, &RenderMesh, &DrawCall)) {

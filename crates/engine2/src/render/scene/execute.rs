@@ -2,17 +2,17 @@
 //! layers draw the matching objects of the view's worlds (models through the placeholder, managed
 //! objects through `SceneCustomObject.RenderObject`); procedural layers call managed back.
 
-use super::layer::{self, Kind, flags, layer_type};
+use super::collect::{Filter, collect};
+use super::layer::{self, Kind, flags};
 use super::view::{self, SceneView};
-use crate::handles::Kind as ObjectKind;
 use crate::mesh::layout::{Field, Layout};
 use crate::render::draw::shaded::{self, ContextBindings};
-use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
+use crate::render::draw::{self, Draw, Target, immediate};
 use crate::render::material::Material;
 use crate::render::shading::bind::Instance;
 use crate::render::lighting::{Lighting, local_shadow, shadow};
 use crate::render::{context, device, fog_volume, texture};
-use crate::scene::object;
+use crate::scene::object::{IS_OPAQUE, IS_TRANSLUCENT};
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
 use abi::structs::{ISceneLayer, ISceneView, IRenderContext, ManagedRenderSetup_t, SceneSystemPerFrameStats_t};
 use abi::StringToken;
@@ -21,11 +21,10 @@ use render::pass::{DrawUniforms, Load};
 use render::{BufferKind, Placeholder, RasterState, Semantic};
 use std::sync::{Arc, OnceLock};
 
-use crate::scene::object::IS_OPAQUE;
 /// Placeholder sky colour (linear; sRGB (0.45, 0.6, 0.85)), times the sky object's tint. TODO: the sky material.
 const SKY: [f32; 4] = [0.170_645, 0.318_547, 0.692_071, 1.0];
 
-/// Clear, sky and one opaque layer: what a view gets when managed adds no layers (no managed
+/// Clear, sky, opaque and translucent layers: what a view gets when managed adds no layers (no managed
 /// pipeline, as in tests, or a pipeline that declined).
 /// Like native's pipeline, they draw linear into an HDR target and resolve it to the view's
 /// colour with the sRGB encode.
@@ -46,6 +45,7 @@ pub fn default_layers(v: view::Ref, clear_flags: i32, clear_color: abi::structs:
     layer::with(sky, |s| s.match_id = StringToken::of("SkyBox").0);
     add("Opaque", Kind::Render(StringToken::of("Forward")), IS_OPAQUE);
     super::skybox::add(v, if hdr.is_null() { view.color } else { hdr }, view.depth, None);
+    add("Translucent", Kind::Render(StringToken::of("Forward")), IS_TRANSLUCENT);
     if !hdr.is_null() {
         let resolve = Kind::Blit { src: hdr, src_viewport: vp, srgb: true };
         let l = view::add_layer(v, layer::create(v, "ResolveHDRToFinalSDR".into(), vp, resolve, 0, 0), Default::default());
@@ -148,12 +148,10 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(1.0) }, &[]);
         }
         Kind::Render(_) => {
-            let lt = layer_type(l);
-            if layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 || lt == layer::layer_type::DEPTH_PREPASS {
+            if layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 {
                 return;
             }
-            let filter = Filter { required, excluded, match_id, ignore_match: layer::layer_flags(l) & flags::IGNORE_LAYER_MATCH_ID != 0, translucent: lt == layer::layer_type::TRANSLUCENT };
-            let (draws, managed) = collect(view, &filter);
+            let (draws, managed) = collect(view, &Filter::of(l, required, excluded, match_id));
             super::trace::layer(v.addr(), &layer, &t, &draws);
             draw::execute(&t, &immediate::lighting(ctx), Load::default(), &draws);
             if custom_objects_callable() {
@@ -192,57 +190,6 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
 
 fn custom_objects_callable() -> bool {
     abi::rt::callbacks::is_set(47)
-}
-
-struct Filter {
-    required: i64,
-    excluded: i64,
-    match_id: u32,
-    ignore_match: bool,
-    translucent: bool,
-}
-
-/// The draws for the view's objects this layer matches, and the managed objects to call back.
-fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::class::CManagedSceneObject>>) {
-    let (mut draws, mut managed) = (Vec::new(), Vec::new());
-    let sky_layer = f.match_id == StringToken::of("SkyBox").0;
-    let worlds = view.state.lock().unwrap().worlds.clone();
-    for (r, obj) in object::refs_in_worlds(&worlds) {
-        let deform = model_draw::Deform::of(r);
-        let s = obj.state.lock().unwrap();
-        if !s.rendering || !tags_pass(view, &s.tags) {
-            continue;
-        }
-        if obj.kind == ObjectKind::SceneSkyBoxObject {
-            if sky_layer {
-                let material = s.material_override.as_ref().and_then(|m| m.material());
-                draws.extend(sky(model_draw::tint(s.tint), material, view.view_proj, ContextBindings::default()));
-            }
-            continue;
-        }
-        if !super::pvs::visible(view.camera.origin, &obj, &s) {
-            continue;
-        }
-        let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };
-        let flags = s.effective_flags();
-        if !matched || flags & f.required != f.required || flags & f.excluded != 0 {
-            continue;
-        }
-        match obj.kind {
-            ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
-            _ if f.translucent => {}
-            _ => {
-                super::trace::object(&s);
-                draws.extend(model_draw::object(&s, &deform, view.view_proj));
-            }
-        }
-    }
-    (draws, managed)
-}
-
-fn tags_pass(view: &SceneView, tags: &[u32]) -> bool {
-    let wanted = view.render_tags.is_empty() || tags.iter().any(|t| view.render_tags.contains(t));
-    wanted && !tags.iter().any(|t| view.exclude_tags.contains(t))
 }
 
 /// A full-screen triangle at the far plane, behind everything drawn with depth: the sky

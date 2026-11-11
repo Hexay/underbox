@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-const SIZE: u32 = 64;
+pub(super) const SIZE: u32 = 64;
 
 extern "C" fn register_handle(_: *mut c_void, _: u32) -> i32 {
     static NEXT: AtomicI32 = AtomicI32::new(1);
@@ -41,7 +41,7 @@ fn chain() -> swap_chain::Handle {
 }
 
 /// The stand-in cube (16 units) at the origin and a sky, seen from 64 units back along -X.
-fn scene() -> (world::Ref, camera::Ref) {
+pub(super) fn scene() -> (world::Ref, camera::Ref) {
     fake_managed();
     let w: world::Ref = objects::create_shared(Arc::new(SceneWorld::default()));
     let model = crate::model::create_runtime("models/test/cube.vmdl", Content::default());
@@ -59,7 +59,7 @@ fn scene() -> (world::Ref, camera::Ref) {
     (w, cam)
 }
 
-fn read(t: texture::Ref) -> render::Frame {
+pub(super) fn read(t: texture::Ref) -> render::Frame {
     texture::resolve(t).unwrap().gpu.as_ref().unwrap().read_back(device::gpu().unwrap())
 }
 

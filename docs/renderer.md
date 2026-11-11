@@ -106,11 +106,18 @@ native model one to one, so managed's pipeline code runs unchanged:
    `RenderedViewport` and `RenderedDepthRange`.
 2. No layers added (no managed pipeline, as in tests) → `execute::default_layers`: clear
    (`clearColor`/`clearFlags` attributes, the colour linearized like managed's `ToLinear`), sky,
-   opaque, all into an Rgba16Float HDR target per colour target, then `ResolveHDRToFinalSDR`.
+   opaque, 3D skybox, translucent, all into an Rgba16Float HDR target per colour target, then
+   `ResolveHDRToFinalSDR`.
 3. The view runs immediately (`execute::run`), layer by layer on one context: Clear → load ops;
-   Render → the worlds' objects that pass tags, layer match id and required/excluded flags (a model
-   counts as `IsOpaque`); depth prepass, light binner setup and translucent model draws are
-   skipped under the placeholder; managed objects call back `RenderObject` (47); Procedural →
+   Render → the worlds' objects that pass tags, layer match id and required/excluded flags
+   (`scene/collect.rs`). A model reports `IsOpaque` and/or `IsTranslucent` by whether its draw
+   calls' materials blend (`F_TRANSLUCENT`, `F_ADDITIVE[_BLEND]`, read from the `.vmat`'s features
+   as scalar params; they don't select static combos yet). Opaque layers take the non-blending
+   draws; translucent layers (`LayerEnum` 1, or requiring `IsTranslucent`) the blending ones, per
+   object back to front from the eye, blended, without depth writes and back faces culled unless
+   `F_RENDER_BACKFACES`; the depth prepass (`LayerEnum` 7) the opaque ones with colour writes off,
+   so the opaque layer's `LessEqual` passes the same depth. Light binner setup layers are
+   skipped; managed objects call back `RenderObject` (47); Procedural →
    managed's `void(ManagedRenderSetup_t)` pointer; Blit → texture copy, or a `render::Blitter`
    draw when formats or sizes differ (ResolveHDRToFinalSDR: Rgba16Float → Rgba8Unorm). Then
    `OnSceneViewSubmitted` (36). `UNDERBOX_LAYERS=log` prints one line per layer (target, draws,
@@ -325,14 +332,13 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
-   CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
-2. Fog's shadowed in-scattering and baked indirect (docs/fog.md); `GetSheetInfo` and the shader
-   sheet path (`sheet_sampling.fxc` is a stub).
-3. CMAA2 runs (its texel atomics go through word buffers, `shading/texel_words.rs`), but on
-   threaded lavapipe its output changes frame to frame with the order its atomics land, by up to
-   ~70/255 on a few dozen edge pixels: more than a sum order explains, so look for an
-   order-dependent drop (the 32-item list walk, the groupshared item budget). It is stable with
-   `LP_NUM_THREADS=0`; `client-frame.sh` skips it (`UNDERBOX_SKIP_LAYERS=cmaa2_cs`).
-4. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
-   generation.
+1. Fog's baked indirect and managed-path sun shadows (docs/fog.md); `GetSheetInfo` and the shader sheet path
+   (`sheet_sampling.fxc` is a stub).
+2. Material features as static combos (today they only pick the blend), MSAA, cube and stereo
+   renders, GPU timestamps, mip generation.
+
+Not planned until a caller shows up: `BindVertexShader`/`BindPixelShader` take a
+`RenderShaderHandle_t`, which nothing in the interop produces and no sbox-public code passes;
+`ctx::SET_DYNAMIC_CONSTANT_BUFFER_DATA` binds raw bytes by register slot, which our binder (by
+reflected name) has no slot map for, and nothing in sbox-public calls it. `render/bindings.rs`
+accepts and drops all three.

@@ -53,6 +53,8 @@ pub fn load(path: &str) -> Option<Loaded> {
         .into_iter()
         .map(|(attr, tex)| (attr, texture::load(CString::new(tex).ok().as_deref(), Guid::default())))
         .collect();
-    let vectors = material.values.iter().map(|(k, [x, y, z, w])| (k.clone(), vec4(*x, *y, *z, *w))).collect();
+    // Features ride along as scalars: draws read F_TRANSLUCENT and friends (Material::blend).
+    let features = material.features.iter().map(|(k, v)| (k.clone(), vec4(*v as f32, 0.0, 0.0, 0.0)));
+    let vectors = material.values.iter().map(|(k, [x, y, z, w])| (k.clone(), vec4(*x, *y, *z, *w))).chain(features).collect();
     Some(Loaded { shader: material.shader, vectors, textures })
 }
