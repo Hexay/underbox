@@ -36,6 +36,11 @@ pub fn find(path: &str) -> Option<Arc<VfxShader>> {
     by_path(path).shader.read().unwrap().clone()
 }
 
+/// The name of shader handle `h` (its resource path, or the name it was compiled under).
+pub fn name_of(h: NativeRef<class::CVfx>) -> Option<String> {
+    resource::resolve::<_, Vfx>(h).map(|v| v.resource.clone().unwrap_or_else(|| v.name.clone()))
+}
+
 fn by_path(path: &str) -> Arc<Vfx> {
     let path = resource_path(path);
     LOADED.find_or_insert(&path, || {

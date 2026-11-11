@@ -59,24 +59,38 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
 }
 
-/// What deforms an object's meshes, read before its state is locked: morph weights and, for an
-/// animatable object, its bones.
+/// What shapes an object's draws, read before its state is locked: morph weights and, for an
+/// animatable object, its bones; an aggregate's fragments; a dynamic object's own vertices.
 pub struct Deform {
     key: usize,
     morphs: Option<ObjectMorphs>,
     pose: Option<skin::native::Pose>,
+    fragments: Option<Arc<[crate::scene::aggregate::Fragment]>>,
+    dynamic: Option<crate::scene::object::Ref>,
 }
 
 impl Deform {
     /// Locks the object's state: call it before taking that lock.
     pub fn of(r: crate::scene::object::Ref) -> Deform {
-        Deform { key: r.addr(), morphs: morph::of(r), pose: skin::native::pose(r) }
+        let dynamic = crate::scene::dynamic::mesh(r).map(|_| r);
+        Deform { key: r.addr(), morphs: morph::of(r), pose: skin::native::pose(r), fragments: crate::scene::aggregate::fragments(r), dynamic }
+    }
+
+    /// Dynamic objects (debug overlays, gizmos) stay out of shadow maps.
+    pub fn casts_shadow(&self) -> bool {
+        self.dynamic.is_none()
     }
 }
 
-/// A scene object's model draws, seen through `view_proj`, deformed by `deform`; none without a
-/// model. Skinned meshes draw from the vertex cache (render/skin), the rest morph on the CPU.
+/// A scene object's draws, seen through `view_proj`, deformed by `deform`; none without a model
+/// or vertices. Skinned meshes draw from the vertex cache (render/skin), the rest morph on the CPU.
 pub fn object(s: &crate::scene::object::State, deform: &Deform, view_proj: Mat4) -> Vec<Draw> {
+    if let Some(f) = &deform.fragments {
+        return super::dynamic::aggregate(f, s, view_proj);
+    }
+    if let Some(r) = deform.dynamic {
+        return super::dynamic::dynamic(r, s, view_proj).into_iter().collect();
+    }
     let Some(model) = crate::model::get(s.model) else { return Vec::new() };
     let mut out = Vec::new();
     each_call(&model, s.mesh_groups, s.material_override.as_ref(), |i, mesh, call| {

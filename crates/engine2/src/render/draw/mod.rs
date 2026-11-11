@@ -4,10 +4,12 @@
 //! [`shaded`]; the rest, and any that fail to bind, use the placeholder.
 
 pub mod draw_call;
+pub mod dynamic;
 pub mod gpu_mesh;
 pub mod immediate;
 pub mod model;
 pub mod morph;
+pub mod screen_rect;
 pub mod shaded;
 
 use crate::render::lighting::Lighting;

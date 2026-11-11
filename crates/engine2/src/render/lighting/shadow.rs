@@ -80,7 +80,7 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref], view_proj: Mat4) {
     for (r, obj) in object::refs_in_worlds(worlds) {
         let deform = model_draw::Deform::of(r);
         let s = obj.state.lock().unwrap();
-        if s.rendering && obj.light.is_none() {
+        if s.rendering && obj.light.is_none() && deform.casts_shadow() {
             draws.extend(model_draw::object(&s, &deform, light).into_iter().map(model_draw::depth_only));
         }
     }
