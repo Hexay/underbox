@@ -4,7 +4,7 @@
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 step() { printf '== %s: ' "$1"; shift; out=$("$@" 2>&1) || { echo FAIL; printf '%s\n' "$out" | tail -n 20; exit 1; }; printf '%s\n' "$out" | tail -n 1; }
-crates=${*:-"assets world anim physics render shaders engine2"}
+crates=${*:-"gns assets world anim physics render shaders engine2"}
 for c in $crates; do step "test $c" sh "$ROOT/tools/test.sh" "$c"; done
 step clippy env -u CARGO_INCREMENTAL cargo clippy -q --manifest-path "$ROOT/Cargo.toml" --workspace --all-targets -j4 -- -D warnings
 step match sh "$ROOT/tools/match.sh"
