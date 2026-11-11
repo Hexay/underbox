@@ -5,8 +5,8 @@
 //! Real: const bool/float/ID/vector, control and virtual parameters, cached values (as their
 //! source), not/and/or, float comparison and range comparison, ID comparison, float math, clamp,
 //! remap, switch, float selector and ID→float (as nested selects), time-in-state/elapsed time
-//! conditions, state completed. Everything else is a neutral `false`/0/empty-ID stand-in, listed
-//! in `unsupported`.
+//! conditions, state completed, and `convert_more`'s. Everything else is a neutral
+//! `false`/0/empty-ID stand-in, listed in `unsupported`.
 
 use super::snapshot::{Node, Snapshot};
 use anim::graph::{Cmp, Definition, MathOp, Operand, PoseId, ValueId, ValueNode};
@@ -193,7 +193,7 @@ impl<'a> Conv<'a> {
             }
             "CTimeConditionNode" => self.time_condition(n)?,
             "CStateCompletedConditionNode" => ValueNode::StateCompleted,
-            _ => return None,
+            c => self.value_more(c, n)?,
         };
         Some(self.def.add_value(node))
     }

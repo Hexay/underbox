@@ -89,8 +89,9 @@ A sequence plays its first reference under its own name; blends aren't evaluated
 **Rects:** `{m_nXLeftDst, m_nYTopDst, m_flUWidthSrc, m_flVHeightSrc, m_bundleDatas[] {m_flULeftSrc, m_flVTopSrc, m_ranges, m_offsets}}`.
 A texel decodes as `rgba / 255 * range + offset`. Grid cell `y * width + x` is that mesh vertex.
 
-**Flex rules:** stack programs (`FLEX_OP_*`, by number or name) from controller values to descriptor weights. 2-way, n-way,
-eyelid and remap ops aren't evaluated (their rules yield 0).
+**Flex rules:** stack programs (`FLEX_OP_*`, by number or name) from controller values to descriptor weights. Op data
+that names a controller is an int; an index popped off the stack is the float's bit pattern. 2-way/n-way/eyelid ops
+read controllers remapped from their own min/max (see `crates/assets/src/compiled/flex/eval.rs`).
 
 ## Attachments and hitboxes (mesh data)
 

@@ -4,6 +4,7 @@
 //! Unsupported node classes compile to a neutral stand-in and are listed in `unsupported`.
 
 mod nodes;
+mod nodes_more;
 
 use crate::graph::{Definition, PoseId, ValueId};
 use crate::params::{ParamDef, Target, Value};

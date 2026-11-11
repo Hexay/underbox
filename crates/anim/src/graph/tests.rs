@@ -11,7 +11,7 @@ fn hold(name: &str, x: f32) -> Arc<Clip> {
     Arc::new(c)
 }
 
-fn clips(name: &str) -> Option<Arc<Clip>> {
+pub(super) fn clips(name: &str) -> Option<Arc<Clip>> {
     match name {
         "idle" => Some(hold(name, 0.0)),
         "walk" => Some(hold(name, 10.0)),
@@ -21,11 +21,11 @@ fn clips(name: &str) -> Option<Arc<Clip>> {
     }
 }
 
-fn x(pose: &Pose) -> f32 {
+pub(super) fn x(pose: &Pose) -> f32 {
     pose.0[0].pos.x
 }
 
-fn clip(def: &mut Definition, name: &str, looping: bool) -> PoseId {
+pub(super) fn clip(def: &mut Definition, name: &str, looping: bool) -> PoseId {
     let slot = def.slot(name);
     def.add_pose(PoseNode::Clip { slot, looping, speed: 1.0 })
 }
@@ -116,7 +116,7 @@ fn time_in_state_and_value_math() {
     let is_swim = def.add_value(ValueNode::IdMatches { id, ids: vec!["SWIM".into()], negate: false });
     let shared = def.into_shared();
     let mut g = Instance::new(shared.clone(), clips);
-    let values = value::Values { def: &shared, params: &g.params, ctx: Default::default() };
+    let values = value::Values { def: &shared, params: &g.params, ctx: Default::default(), smooth: &[] };
     assert_eq!((values.float(sum), values.float(remap), values.bool(is_swim)), (2.0, 15.0, true));
     let unary = |op| value::math(-2.75, 0.0, op);
     assert_eq!(

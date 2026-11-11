@@ -139,7 +139,8 @@ impl AnimState {
         }
         let Some(def) = graph::definition(resource) else { return false };
         let data = self.data.clone();
-        let instance = Instance::new(def, |slot| data.anim.clip(slot).cloned());
+        let mut instance = Instance::new(def, |slot| data.anim.clip(slot).cloned());
+        instance.rig = Some(anim::graph::Rig { skeleton: Arc::new(data.anim.skeleton.clone()), world: Xform::IDENTITY });
         let controller = objects::create(super::controller::Handle(me));
         self.graph2 = Some(Graph2 { resource, instance, controller, recording: Recording::default() });
         true
@@ -171,6 +172,9 @@ impl AnimState {
         let pose = match (&mut self.graph2, self.data.anim.clip(&self.sequence.name)) {
             (Some(g), _) if self.use_graph && g.recording.is_playing() => return,
             (Some(g), _) if self.use_graph => {
+                if let Some(rig) = &mut g.instance.rig {
+                    rig.world = character;
+                }
                 let pose = g.instance.update(dt, &bind);
                 g.recording.record(dt, &g.instance.params, character);
                 pose

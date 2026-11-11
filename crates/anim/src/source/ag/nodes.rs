@@ -11,12 +11,7 @@ const PASS_THROUGH: &[(&str, &str)] = &[
     ("StateMachineLayerNode", "StateMachine"),
     ("LocalLayerNode", "Input"),
     ("RootMotionOverrideNode", "Input"),
-    ("LookAtNode", "Input"),
-    ("TwoBoneIKNode", "Input"),
 ];
-
-/// Value nodes we don't evaluate yet but can pass one input through.
-const VALUE_THROUGH: &[(&str, &str)] = &[("FloatSpringNode", "Value"), ("FloatEaseNode", "Value")];
 
 fn cmp(name: &str) -> Option<Cmp> {
     Some(match name {
@@ -123,11 +118,8 @@ impl Compiler {
                 ValueNode::TimeInState { cmp: cmp(str_of(n, "Operator")).unwrap_or(Cmp::Ge), seconds: f32_of(n, "Value", 0.0) }
             }
             "StateCompletedConditionNode" => ValueNode::StateCompleted,
-            c => match VALUE_THROUGH.iter().find(|(k, _)| *k == c) {
-                Some((_, field)) => {
-                    self.unsupported(c);
-                    return input(self, field);
-                }
+            c => match self.value_more(c, n, scope) {
+                Some(v) => v,
                 None => {
                     self.unsupported(c);
                     ValueNode::Const(Value::Bool(false))
@@ -149,7 +141,7 @@ impl Compiler {
     }
 
     /// The result of a nested graph (`{ "nodes": [...] }`) seen from `parent`.
-    fn graph_result(&mut self, graph: Option<&Json>, parent: &Scope) -> PoseId {
+    pub(super) fn graph_result(&mut self, graph: Option<&Json>, parent: &Scope) -> PoseId {
         let Some(graph) = graph.filter(|g| g.is_object()) else { return self.def.add_pose(PoseNode::Reference) };
         let scope = Scope::new(graph, Some(parent));
         let result = scope.result().and_then(|r| r.get("Pose"));
@@ -182,6 +174,9 @@ impl Compiler {
             "GroupInputNode" => return self.pose_input(n.get("Source"), scope),
             "StateMachineNode" => self.state_machine(n, scope),
             c => {
+                if let Some(p) = self.pose_more(c, n, scope) {
+                    return self.def.add_pose(p);
+                }
                 self.unsupported(c);
                 match PASS_THROUGH.iter().find(|(k, _)| *k == c) {
                     Some((_, field)) => return self.pose_input(n.get(*field), scope),

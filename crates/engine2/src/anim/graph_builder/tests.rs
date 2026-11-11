@@ -147,7 +147,7 @@ fn compile_round_trips_through_create_compiled() {
     assert!(snapshot::decode(b"\x01\x02facepunch").is_none(), "foreign bytes are no snapshot");
 }
 
-/// ID `move` (0) compared to `Run` (1) picks a speed (2) scaling (4) an IK (5) over the
+/// ID `move` (0) compared to `Run` (1) picks a speed (2) scaling (4) a scale node (5) over the
 /// reference pose (3); a spring (6) nothing reads.
 #[test]
 fn id_comparison_keeps_names_and_stand_ins_are_listed() {
@@ -174,21 +174,21 @@ fn id_comparison_keeps_names_and_stand_ins_are_listed() {
     let scale = add_node::<class::CSpeedScaleNode_Definition>(b);
     field!(i16, c_speed_scale_node_definition::GET_M_CHILD_NODE_IDX, scale, 5);
     field!(i16, c_speed_scale_node_definition::GET_M_INPUT_VALUE_NODE_IDX, scale, 2);
-    let ik = add_node::<class::CTwoBoneIKNode_Definition>(b);
-    field!(i16, c_two_bone_ik_node_definition::GET_M_CHILD_NODE_IDX, ik, 3);
+    let scale_node = add_node::<class::CScaleNode_Definition>(b);
+    field!(i16, c_scale_node_definition::GET_M_CHILD_NODE_IDX, scale_node, 3);
     add_node::<class::CFloatSpringNode_Definition>(b);
     let snap = capture(b, 4, "", "").unwrap();
     delete(b);
-    assert!(items::item(ik).is_none(), "nodes die with their builder");
+    assert!(items::item(scale_node).is_none(), "nodes die with their builder");
 
     let out = super::convert::convert(&snap);
     let def = &out.def;
     let p = &def.params[0];
     assert_eq!((&p.default, &p.options[..]), (&Value::Id("Walk".into()), &["Walk".to_string(), "Run".to_string()][..]));
     let Some(&PoseNode::SpeedScale { source, speed }) = def.root.map(|r| &def.poses[r]) else { panic!("{def:?}") };
-    assert_eq!(def.poses[source], PoseNode::Reference, "the IK passes its child through");
+    assert_eq!(def.poses[source], PoseNode::Reference, "the scale node passes its child through");
     let ValueNode::Select { cond, yes: Operand::Const(2.0), no: Operand::Const(1.0) } = def.values[speed] else { panic!("{:?}", def.values[speed]) };
     let ValueNode::IdMatches { id, ref ids, negate: false } = def.values[cond] else { panic!("{:?}", def.values[cond]) };
     assert_eq!((&def.values[id], &ids[..]), (&ValueNode::Param(0), &["Run".to_string()][..]));
-    assert_eq!(out.unsupported, ["CTwoBoneIKNode"]);
+    assert_eq!(out.unsupported, ["CScaleNode"]);
 }

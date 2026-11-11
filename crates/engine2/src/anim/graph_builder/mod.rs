@@ -8,6 +8,7 @@
 //! Facepunch's own compiled bytes aren't our snapshot and still make no graph.
 
 mod convert;
+mod convert_more;
 mod convert_pose;
 mod items;
 mod node_methods;
@@ -17,6 +18,8 @@ mod vectors;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_nodes;
 
 use abi::slots::c_graph_builder as gb;
 use abi::{NativeRef, Registry, StrRet, StringToken, bind, class};

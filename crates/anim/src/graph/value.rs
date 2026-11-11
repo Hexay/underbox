@@ -1,6 +1,7 @@
 //! Value-node evaluation. Values are pure functions of parameters and the state context, so
 //! they're recomputed on demand rather than cached.
 
+use super::smooth::Smooth;
 use super::{Cmp, Definition, MathOp, Operand, ValueId, ValueNode};
 use crate::params::{Params, Value};
 
@@ -42,10 +43,13 @@ pub(super) fn math(a: f32, b: f32, op: MathOp) -> f32 {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Values<'a> {
     pub def: &'a Definition,
     pub params: &'a Params,
     pub ctx: StateCtx,
+    /// Ease/spring state per value node (see `smooth`); empty reads their input.
+    pub(super) smooth: &'a [Smooth],
 }
 
 impl Values<'_> {
@@ -79,6 +83,10 @@ impl Values<'_> {
             ValueNode::Select { cond, yes, no } => Value::Float(self.operand(if self.bool(*cond) { *yes } else { *no })),
             ValueNode::TimeInState { cmp, seconds } => Value::Bool(compare(self.ctx.elapsed, *cmp, *seconds, 0.0)),
             ValueNode::StateCompleted => Value::Bool(self.ctx.completed),
+            ValueNode::Ease { input, .. } | ValueNode::Spring { input, .. } => match self.smooth.get(id) {
+                Some(s) => Value::Float(s.value),
+                None => Value::Float(self.float(*input)),
+            },
         }
     }
 

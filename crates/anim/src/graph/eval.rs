@@ -1,6 +1,8 @@
 //! Graph instances: per-node runtime state, advanced and sampled in one recursive pass from the
 //! root. Only active nodes advance; entering a state restarts its subtree.
 
+use super::eval_more::Rig;
+use super::smooth::{self, Smooth};
 use super::value::{StateCtx, Values};
 use super::{Definition, PoseId, PoseNode, State};
 use crate::clip::Clip;
@@ -9,7 +11,7 @@ use crate::pose::Pose;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, Default)]
-struct Machine {
+pub(super) struct Machine {
     started: bool,
     current: usize,
     elapsed: f32,
@@ -20,23 +22,28 @@ struct Machine {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-enum NodeState {
+pub(super) enum NodeState {
     #[default]
     Idle,
     Clip { time: f32 },
     Machine(Machine),
+    /// A selector's option, picked when it started.
+    Chosen(PoseId),
 }
 
-struct Out {
-    pose: Pose,
-    finished: bool,
+pub(super) struct Out {
+    pub pose: Pose,
+    pub finished: bool,
 }
 
 pub struct Instance {
     def: Arc<Definition>,
     pub params: Params,
+    /// The skeleton and world placement IK nodes solve against; without it they pass through.
+    pub rig: Option<Rig>,
     clips: Vec<Option<Arc<Clip>>>,
-    nodes: Vec<NodeState>,
+    pub(super) nodes: Vec<NodeState>,
+    smooth: Vec<Smooth>,
 }
 
 impl Instance {
@@ -45,7 +52,8 @@ impl Instance {
         let params = Params::new(def.params.clone().into());
         let clips = def.slots.iter().map(|s| clip(s)).collect();
         let nodes = vec![NodeState::Idle; def.poses.len()];
-        Self { def, params, clips, nodes }
+        let smooth = vec![Smooth::default(); def.values.len()];
+        Self { def, params, rig: None, clips, nodes, smooth }
     }
 
     pub fn definition(&self) -> &Arc<Definition> {
@@ -63,21 +71,30 @@ impl Instance {
     /// Forget every node's progress, as if just created (parameters are kept).
     pub fn restart(&mut self) {
         self.nodes.fill(NodeState::Idle);
+        self.smooth.fill(Smooth::default());
     }
 
     /// Advance by `dt` seconds and return the pose. `bind` is the skeleton's bind pose.
     pub fn update(&mut self, dt: f32, bind: &Pose) -> Pose {
+        let mut states = std::mem::take(&mut self.smooth);
+        smooth::advance(&self.values(StateCtx::default()), &mut states, dt);
+        self.smooth = states;
         match self.def.root {
             Some(root) => self.eval(root, dt, bind).pose,
             None => bind.clone(),
         }
     }
 
-    fn values(&self, ctx: StateCtx) -> Values<'_> {
-        Values { def: &self.def, params: &self.params, ctx }
+    /// The current value of value node `id` (eases and springs as of the last update).
+    pub fn value(&self, id: super::ValueId) -> crate::params::Value {
+        self.values(StateCtx::default()).get(id)
     }
 
-    fn eval(&mut self, id: PoseId, dt: f32, bind: &Pose) -> Out {
+    pub(super) fn values(&self, ctx: StateCtx) -> Values<'_> {
+        Values { def: &self.def, params: &self.params, ctx, smooth: &self.smooth }
+    }
+
+    pub(super) fn eval(&mut self, id: PoseId, dt: f32, bind: &Pose) -> Out {
         let def = self.def.clone();
         let done = |pose| Out { pose, finished: false };
         match &def.poses[id] {
@@ -95,7 +112,19 @@ impl Instance {
                 Out { pose: a.pose.blend(&b.pose, w), finished: a.finished }
             }
             PoseNode::Blend1D { param, points } => self.blend1d(*param, points, dt, bind),
+            PoseNode::Blend2D { x, y, points, triangles } => self.blend2d((*x, *y), points, triangles, dt, bind),
             PoseNode::StateMachine { states, default } => self.machine(id, states, *default, dt, bind),
+            PoseNode::Selector { cases, fallback } => {
+                let p = self.chosen(id, |s| s.pick_case(cases, *fallback));
+                self.eval(p, dt, bind)
+            }
+            PoseNode::Variation { seed, options, weights } if !options.is_empty() => {
+                let p = self.chosen(id, |s| s.pick_variation(*seed, options, weights.as_deref()));
+                self.eval(p, dt, bind)
+            }
+            PoseNode::Variation { .. } => Out { pose: bind.clone(), finished: true },
+            PoseNode::TwoBoneIk(n) => self.two_bone_ik(n, dt, bind),
+            PoseNode::LookAt(n) => self.look_at(n, dt, bind),
         }
     }
 
@@ -176,18 +205,12 @@ impl Instance {
         Out { pose, finished: m.finished }
     }
 
-    /// Restart `id` and everything under it.
+    /// Restart `id` and everything under it (a state machine restarts its states on entry).
     fn reset(&mut self, id: PoseId) {
         let def = self.def.clone();
         self.nodes[id] = NodeState::Idle;
-        match &def.poses[id] {
-            PoseNode::SpeedScale { source, .. } => self.reset(*source),
-            PoseNode::Blend { base, layer, .. } => {
-                self.reset(*base);
-                self.reset(*layer);
-            }
-            PoseNode::Blend1D { points, .. } => points.iter().for_each(|&(_, p)| self.reset(p)),
-            PoseNode::StateMachine { .. } | PoseNode::Clip { .. } | PoseNode::Zero | PoseNode::Reference => {}
+        for input in def.poses[id].inputs() {
+            self.reset(input);
         }
     }
 }

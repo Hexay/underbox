@@ -168,6 +168,15 @@ impl Node {
         self.children.get(name).map_or(&[], |c| &c.floats)
     }
 
+    pub fn vec2(&self, name: &str) -> &[[f32; 2]] {
+        self.children.get(name).map_or(&[], |c| &c.vec2)
+    }
+
+    /// A vector/rotation field's components (`Floats` in the dump).
+    pub fn components(&self, name: &str) -> Vec<f32> {
+        self.field(name).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default()
+    }
+
     pub fn items(&self, name: &str) -> &[Node] {
         self.children.get(name).map_or(&[], |c| &c.items)
     }

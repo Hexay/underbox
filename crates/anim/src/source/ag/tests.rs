@@ -97,4 +97,11 @@ fn compiles_citizen_human_graph() {
     let c = compile(&src).unwrap();
     assert!(c.def.params.len() > 50 && c.def.param("move_x").is_some() && c.def.param("holdtype").is_some());
     assert!(c.def.root.is_some() && !c.def.slots.is_empty(), "root {:?}, {} poses, unsupported {:?}", c.def.root, c.def.poses.len(), c.unsupported);
+    let real = ["Blend2DNode", "LookAtNode", "TwoBoneIKNode", "FloatSpringNode", "FloatEaseNode", "SelectorNode", "ParameterizedSelectorNode", "ConstBoneTargetNode"];
+    assert!(real.iter().all(|k| !c.unsupported.iter().any(|u| u == k)), "{:?}", c.unsupported);
+    let count = |f: fn(&PoseNode) -> bool| c.def.poses.iter().filter(|p| f(p)).count();
+    assert!(count(|p| matches!(p, PoseNode::Blend2D { triangles, .. } if !triangles.is_empty())) > 0);
+    assert!(count(|p| matches!(p, PoseNode::LookAt(_))) > 0 && count(|p| matches!(p, PoseNode::TwoBoneIk(_))) > 0);
+    let lookat = c.def.poses.iter().find_map(|p| if let PoseNode::LookAt(l) = p { Some(l) } else { None }).unwrap();
+    assert!(!lookat.reference.is_empty() && lookat.bones.windows(2).all(|w| w[0].1 >= w[1].1), "{lookat:?}");
 }

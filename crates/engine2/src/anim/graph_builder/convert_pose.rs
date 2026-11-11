@@ -2,9 +2,9 @@
 //!
 //! Real: clip, zero and reference pose, blend1D (from its blend ranges), state machine (states,
 //! transitions with their transition node's duration, default state), speed scale, layer blend
-//! (overlay layers as weighted blends), passthrough. Stand-ins: effect nodes with a child
-//! (IK, warps, scale, root-motion override, duration scale...) pass their child through;
-//! selectors and other multi-input nodes play their first option; the rest is the reference pose.
+//! (overlay layers as weighted blends), passthrough, and `convert_more`'s. Stand-ins: other
+//! effect nodes with a child (warps, scale, root-motion override, duration scale...) pass their
+//! child through; other multi-input nodes play their first option; the rest is the reference pose.
 
 use super::convert::Conv;
 use super::snapshot::Node;
@@ -44,7 +44,7 @@ impl<'a> Conv<'a> {
             "CStateNode" | "CPassthroughNode" => return self.state_child(child),
             "CSpeedScaleNode" => PoseNode::SpeedScale { source: self.pose(child), speed: self.value(n.idx("m_inputValueNodeIdx")) },
             "CLayerBlendNode" => return self.layer_blend(n),
-            _ => return self.stand_in_pose(n),
+            c => return self.pose_more(c, n).unwrap_or_else(|| self.stand_in_pose(n)),
         };
         self.def.add_pose(node)
     }
