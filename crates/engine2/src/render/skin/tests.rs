@@ -17,6 +17,7 @@ fn mount() -> Option<()> {
         let dir = std::env::temp_dir().join(format!("underbox_skin_{}", std::process::id()));
         let mut files = fixture::crate_files();
         files.extend(fixture::rigged_files());
+        files.extend(fixture::puppet_files());
         for (path, bytes) in files {
             let file = dir.join(path);
             std::fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -25,6 +26,23 @@ fn mount() -> Option<()> {
         crate::fs::add_search_path("GAME", dir.to_str().unwrap(), true);
     });
     Some(())
+}
+
+/// corpus/skinned ships the fixture's compiled files; `UNDERBOX_BLESS=1` rewrites them after a
+/// fixture change.
+#[test]
+fn corpus_files_match_the_fixture() {
+    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/skinned/Assets");
+    let mut files = fixture::crate_files();
+    files.extend(fixture::puppet_files());
+    for (path, want) in files {
+        let file = assets.join(&path);
+        if std::env::var("UNDERBOX_BLESS").as_deref() == Ok("1") {
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(&file, &want).unwrap();
+        }
+        assert!(std::fs::read(&file).ok() == Some(want), "{} is stale; rerun with UNDERBOX_BLESS=1", file.display());
+    }
 }
 
 fn rigged() -> crate::model::Ref {
@@ -78,5 +96,26 @@ fn skinning_cs_poses_and_morphs_into_the_vertex_cache() {
         let bone = if i >= 20 { 2 } else { 1 };
         let want = bones[bone].transform_point3(Vec3::from(v.position) + Vec3::new(0.0, 0.0, lift));
         assert!((got[i] - want).length() < 1e-3, "vertex {i}: got {}, want {want}", got[i]);
+    }
+}
+
+#[test]
+fn two_weight_vertices_blend_their_bones() {
+    let Some(()) = mount() else { return eprintln!("skipped: no sbox-public checkout") };
+    let Some(gpu) = device::create() else { return eprintln!("skipped: no GPU") };
+    let r = crate::model::load(Some(&std::ffi::CString::new(format!("{}_c", fixture::PUPPET)).unwrap()), abi::Guid::default());
+    let model = crate::model::get(r).expect("puppet loads");
+    let skin = mesh_skin(&model, r, 0).unwrap();
+    assert_eq!(skin.weights, 2, "the sides' top edge blends root and spine");
+    let bones = [Mat4::IDENTITY, Mat4::from_translation(Vec3::new(0.0, 40.0, 0.0)), Mat4::IDENTITY];
+    let offset = cache::allocate(skin.vertices).unwrap();
+    let transforms = Arc::new(render::Buffer::with_data(gpu, "puppet transforms", render::BufferKind::Storage, &native::entries(&bones, [1.0; 4], offset, skin.weights, None)));
+    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], None).unwrap();
+    let got = cached_positions(gpu, offset, 24);
+    for (i, v) in model.content.meshes[0].mesh.vertices().iter().enumerate().take(20) {
+        // Weights are unorm bytes: 0.5 is 128/255 of the spine.
+        let shift = if v.position[2] > 0.0 { 40.0 * 128.0 / 255.0 } else { 0.0 };
+        let want = Vec3::from(v.position) + Vec3::new(0.0, shift, 0.0);
+        assert!((got[i] - want).length() < 0.1, "vertex {i}: got {}, want {want}", got[i]);
     }
 }

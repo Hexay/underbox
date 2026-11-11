@@ -124,9 +124,10 @@ fn skinning_bones(m: crate::model::Ref, mesh: i32, poses: RawPtr<c_void>, master
     }
     let n = n.max(0) as usize;
     // SAFETY: managed passes pinned Matrix3x4[n] and int[n] (RenderContext.ReadMeshSkin).
-    let (poses, masters) = unsafe { (poses.cast::<[Vec4; 3]>().as_mut_slice(n), masters.cast::<i32>().as_mut_slice(n)) };
+    // Gotcha: only 4-byte aligned, so plain floats rather than glam's 16-byte Vec4.
+    let (poses, masters) = unsafe { (poses.cast::<[[f32; 4]; 3]>().as_mut_slice(n), masters.cast::<i32>().as_mut_slice(n)) };
     for (b, (pose, master)) in poses.iter_mut().zip(masters.iter_mut()).enumerate() {
-        (*pose, *master) = (rows(inverse[b]), b as i32);
+        (*pose, *master) = (rows(inverse[b]).map(|r| r.to_array()), b as i32);
     }
     true
 }

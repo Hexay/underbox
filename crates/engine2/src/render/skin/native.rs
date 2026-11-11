@@ -74,8 +74,7 @@ pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::R
     let gpu = crate::render::device::gpu()?;
     let inverse = super::inverse_bind_poses(model);
     let bones: Vec<Mat4> = inverse.iter().enumerate().map(|(b, inv)| pose.0.get(b).copied().unwrap_or(Mat4::IDENTITY) * *inv).collect();
-    let offset = cache::allocate(skin.vertices)?;
-    let composite = morph.filter(|(w, m)| morphs::active(m, w)).map(|(w, m)| morphs::compose(&[(w, m)]));
+    let offset = cache::allocate(skin.vertices)?;    let composite = morph.filter(|(w, m)| morphs::active(m, w)).map(|(w, m)| morphs::compose(&[(w, m)]));
     let subrect = composite.as_ref().and_then(|(_, s)| s.first().copied());
     let morph_buffer = composite.and_then(|(data, _)| morphs::upload(&data));
     let transforms = Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &entries(&bones, tint, offset, skin.weights, subrect)));
