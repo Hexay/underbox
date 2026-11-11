@@ -23,6 +23,19 @@ fn sync_read_converts_and_strides() {
     assert!(!read_pixels(t, &mut whole, 0, 3, &mut dst, RawPtr::from_raw(out.as_mut_ptr().cast()), BGRA8888.into(), 0), "no mip 3");
 }
 
+/// Managed clears plain textures too (Sandbox's physgun graph); they aren't render attachments.
+#[test]
+fn clearing_a_plain_texture_uploads_the_colour() {
+    device::create().expect("a wgpu adapter (lavapipe on headless Linux)");
+    let mut config = abi::structs::TextureCreationConfig_t::default();
+    (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels, config.m_n_image_format) = (4, 1, 1, 1, RGBA8888.into());
+    let t = texture::create(None, true, config, &mut []);
+    texture::clear(t, Color32 { r: 5, g: 6, b: 7, a: 8 });
+    let mut out = vec![0u8; 16];
+    assert!(read_pixels(t, &mut NativeRect::default(), 0, 0, &mut NativeRect::default(), RawPtr::from_raw(out.as_mut_ptr().cast()), RGBA8888.into(), 16));
+    assert_eq!(out, [5, 6, 7, 8].repeat(4));
+}
+
 #[test]
 fn async_read_holds_bytes_until_done() {
     let t = target(4);

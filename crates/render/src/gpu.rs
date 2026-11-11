@@ -78,7 +78,12 @@ impl Gpu {
         };
         let (device, queue) = pollster::block_on(adapter.request_device(&desc)).map_err(GpuError::Device)?;
         // wgpu's default handler panics, which would take a managed client down over one bad draw.
-        device.on_uncaptured_error(std::sync::Arc::new(|e| eprintln!("wgpu error: {e}")));
+        // RUST_LIB_BACKTRACE=1 adds where the failing encoder or submit came from.
+        device.on_uncaptured_error(std::sync::Arc::new(|e| {
+            let at = std::backtrace::Backtrace::capture();
+            let at = if at.status() == std::backtrace::BacktraceStatus::Captured { format!("\n{at}") } else { String::new() };
+            eprintln!("wgpu error: {e}{at}");
+        }));
         Ok(Gpu { info: adapter.get_info(), device, queue, instance, adapter })
     }
 

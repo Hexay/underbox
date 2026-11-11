@@ -165,17 +165,21 @@ fn on<R: Default>(t: Ref, f: impl FnOnce(&Texture) -> R) -> R {
 /// CPU copy of 4-byte formats so reads without a device agree.
 pub fn clear(t: Ref, c: Color32) {
     on(t, |t| {
-        if let (Some(gpu), Some(tex)) = (device::gpu(), &t.gpu)
-            && !tex.desc.format.is_depth_stencil_format()
-        {
-            let unit = |v: u8| f64::from(v) / 255.0;
-            tex.clear(gpu, render::wgpu::Color { r: unit(c.r), g: unit(c.g), b: unit(c.b), a: unit(c.a) }, 1.0);
-        }
+        let rgba8 = t.config.m_n_image_format == 0;
         let mut d = t.data.lock().unwrap();
-        if t.config.m_n_image_format == 0 && d.len() % 4 == 0 {
+        if rgba8 && d.len() % 4 == 0 {
             for px in d.chunks_mut(4) {
                 px.copy_from_slice(&[c.r, c.g, c.b, c.a]);
             }
+        }
+        let (Some(gpu), Some(tex)) = (device::gpu(), &t.gpu) else { return };
+        if tex.desc.render_target && !tex.desc.format.is_depth_stencil_format() {
+            let unit = |v: u8| f64::from(v) / 255.0;
+            tex.clear(gpu, render::wgpu::Color { r: unit(c.r), g: unit(c.g), b: unit(c.b), a: unit(c.a) }, 1.0);
+        } else if !tex.desc.render_target && rgba8 {
+            // Not renderable (managed's Clear on a plain texture, e.g. Sandbox's physgun graph): upload the fill.
+            let fill: Vec<u8> = (0..tex.layer_size().unwrap_or(0) * tex.desc.layers.max(1) as usize / 4).flat_map(|_| [c.r, c.g, c.b, c.a]).collect();
+            tex.upload(gpu, &fill);
         }
     });
 }
