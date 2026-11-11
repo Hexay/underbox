@@ -39,6 +39,7 @@ jobs:
           submodules: true
           persist-credentials: false
       - uses: ./.github/actions/linux-deps
+        timeout-minutes: 10
       - uses: ./.github/actions/rust
         with:
           components: clippy
@@ -54,6 +55,7 @@ jobs:
           submodules: true
           persist-credentials: false
       - uses: ./.github/actions/linux-deps
+        timeout-minutes: 10
       - uses: ./.github/actions/dxc
       - uses: ./.github/actions/rust
       - run: cargo test --workspace --no-fail-fast
@@ -100,7 +102,8 @@ jobs:
       DIST_GLIBC_MAX: "2.35"
     steps:
       # git before checkout, or it downloads a tarball without submodules.
-      - env:
+      - timeout-minutes: 10
+        env:
           APT: -q -o Acquire::Retries=5 -o Acquire::http::Timeout=30
         run: |
           apt-get $APT update

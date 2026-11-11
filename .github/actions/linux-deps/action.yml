@@ -6,7 +6,7 @@ runs:
     # GNS: cmake, protobuf, OpenSSL. SDL3 (crates/window): X11 and its extensions, udev for gamepads,
     # D-Bus for portals and IME. lavapipe: software Vulkan for the wgpu tests on a GPU-less runner.
     # No libasound2-dev: libasound is dlopened (.cargo/config.toml, crates/audio/src/alsa_dl).
-    # Retries and a timeout: a stalled mirror otherwise hangs the job until timeout-minutes.
+    # Retries ride out a flaky mirror; the callers' step timeout bounds a dead one.
     - shell: bash
       env:
         APT: -q -o Acquire::Retries=5 -o Acquire::http::Timeout=30
