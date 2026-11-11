@@ -54,6 +54,9 @@ public sealed class RealGameWatch : Component
 	void DropController()
 	{
 		var down = Scene.Trace.Ray( new Vector3( 0, 0, 4000 ), new Vector3( 0, 0, -4000 ) ).Run();
+		// Not onto the head of a player the scene already has at the origin.
+		if ( down.GameObject?.Components.Get<PlayerController>().IsValid() == true )
+			down = Scene.Trace.Ray( new Vector3( 128, 128, 4000 ), new Vector3( 128, 128, -4000 ) ).Run();
 		Mark( $"TRACE origin hit={down.Hit} z={down.EndPosition.z:0} on={down.GameObject?.Name}" );
 		if ( !down.Hit ) return;
 		var go = Scene.CreateObject();
@@ -136,7 +139,9 @@ public sealed class RealGameWatch : Component
 		if ( ended || lastTick < 1 ) return;
 		lastTick = 0;
 
-		var bodies = Scene.GetAllComponents<Rigidbody>().Where( b => b.PhysicsBody.IsValid() ).ToList();
+		// A PlayerController keeps its own body awake, so a scene with a player in it would never settle.
+		var bodies = Scene.GetAllComponents<Rigidbody>()
+			.Where( b => b.PhysicsBody.IsValid() && !b.Components.Get<PlayerController>().IsValid() ).ToList();
 		var awake = bodies.Count( b => !b.PhysicsBody.Sleeping );
 		var below = bodies.Count( b => b.WorldPosition.z < -2000 );
 		var colliders = Scene.GetAllComponents<Collider>().ToList();

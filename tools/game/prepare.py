@@ -21,6 +21,9 @@ def project_file(root):
     candidates = sorted(root.glob("*.sbproj")) + sorted(root.glob(".sbproj"))
     if not candidates:
         sys.exit(f"prepare: no .sbproj under {root}")
+    # A project template's `$ident.sbproj` isn't found by its ident; a plain `.sbproj` is.
+    if "$" in candidates[0].name:
+        return candidates[0].rename(root / ".sbproj")
     return candidates[0]
 
 
@@ -33,6 +36,8 @@ def set_startup_scene(sbproj, scene):
     # A listed map is a package the launcher asks for; the run must never request one.
     meta["MapList"] = []
     project["PackageReferences"] = []
+    # Templates carry their folder name (game.minimal): a dot in the ident splits `org.ident` wrong.
+    project["Ident"] = project.get("Ident", "").replace(".", "_")
     sbproj.write_text(json.dumps(project, indent=2), encoding="utf-8")
 
 
