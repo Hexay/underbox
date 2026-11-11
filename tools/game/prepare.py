@@ -36,7 +36,7 @@ def set_startup_scene(sbproj, scene):
     sbproj.write_text(json.dumps(project, indent=2), encoding="utf-8")
 
 
-def add_watcher(scene_path, idle_seconds):
+def add_watcher(scene_path, idle_seconds, command):
     scene = load(scene_path)
     objects = [g for g in scene["GameObjects"] if g.get("Name") != WATCH_NAME]
     objects.append({
@@ -48,6 +48,7 @@ def add_watcher(scene_path, idle_seconds):
             "__type": WATCH_NAME,
             "__guid": str(uuid.uuid4()),
             "IdleSeconds": idle_seconds,
+            "StartCommand": command,
         }],
     })
     scene["GameObjects"] = objects
@@ -60,13 +61,14 @@ def main():
     args.add_argument("scene", help="relative to Assets, e.g. scenes/zoo.scene")
     args.add_argument("watch", type=pathlib.Path)
     args.add_argument("--idle", type=int, default=15, help="seconds the watcher idles past the settle")
+    args.add_argument("--command", default="", help="console command the host runs once things settle")
     a = args.parse_args()
     scene_path = a.root / "Assets" / a.scene
     if not scene_path.is_file():
         sys.exit(f"prepare: no such scene {scene_path}")
     sbproj = project_file(a.root)
     set_startup_scene(sbproj, a.scene)
-    add_watcher(scene_path, a.idle)
+    add_watcher(scene_path, a.idle, a.command)
     code = a.root / "Code"
     code.mkdir(exist_ok=True)
     (code / f"{WATCH_NAME}.cs").write_text(a.watch.read_text(encoding="utf-8"), encoding="utf-8")

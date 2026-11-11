@@ -4,7 +4,8 @@
 # usage: [UNTIL=regex] [STOP_FRAME=n] [GRACE=s] [FRAMES=log|dir] tools/boot-client.sh [max-s=90] [sbox-public] [-- client args]
 # Client args default to `-mcp +game corpus/orbmatch/.sbproj`. Stops GRACE (default 2) s after a
 # log line matches UNTIL (default: presented frame STOP_FRAME, 300), else at max-s. FRAMES=<dir>
-# also dumps PPMs (UNDERBOX_FRAMES_EVERY=n keeps every n-th). Runs in this worktree's game dir (tools/game-dir.sh).
+# also dumps PPMs (UNDERBOX_FRAMES_EVERY=n keeps every n-th). Runs in this worktree's game dir (tools/game-dir.sh);
+# SEED=<dir> overlays that dir's files for one boot.
 # Logs: $OUT/client.log (managed's logs/dotnet.log), $OUT/client.out (stdout/stderr), $OUT/frames.tsv
 # (frame, hash); OUT defaults to target/client. SHADOW_QUALITY=0..3 pins managed's stored shadow
 # quality (Low..Ultra, tools/video-setting.py).
@@ -27,7 +28,13 @@ lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
 sh "$ROOT/tools/submodules.sh"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
-trap 'rm -f "$GAME/.underbox-lease.$$"' EXIT
+# SEED=<dir>: files laid out like the game dir, copied in for this boot and removed after it.
+SEEDED=
+if [ -n "${SEED:-}" ]; then
+    SEEDED=$(cd "$SEED" && find . -type f)
+    cp -a "$SEED/." "$GAME/"
+fi
+trap 'rm -f "$GAME/.underbox-lease.$$"; for f in $SEEDED; do rm -f "$GAME/$f"; done' EXIT
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 sh "$ROOT/tools/install-engine2.sh" "$GAME"
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
