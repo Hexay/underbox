@@ -22,10 +22,15 @@ CUR=$BASE.current
 export UNDERBOX_LEASE=${UNDERBOX_LEASE:-$PPID}
 LEASE=$UNDERBOX_LEASE
 # A stamp, not the dll's mtime: an up-to-date build copies the dll back with its old mtime.
+# It holds the sbox-public commit built, so checking out another commit rebuilds.
 BUILT=$SBOX/game/.underbox-$LAUNCHER-built
 REFS=$SBOX/engine/Sandbox.Compiling/EmbeddedRefs
+HEAD=$(git -C "$SBOX" rev-parse HEAD)
 
-build_stale() { [ ! -f "$SBOX/game/$DLL" ] || [ ! -d "$REFS" ] || [ "$REFS" -nt "$BUILT" ]; }
+build_stale() {
+    [ ! -f "$SBOX/game/$DLL" ] || [ ! -d "$REFS" ] || [ "$REFS" -nt "$BUILT" ] ||
+        [ "$(cat "$BUILT" 2>/dev/null)" != "$HEAD" ]
+}
 # Managed dlls and the build/R2R stamps mark a changed build; natives are installed per copy anyway.
 copy_stale() {
     [ ! -f "$1/.underbox-synced" ] ||
@@ -40,7 +45,7 @@ if [ -n "$SYNC_TO" ]; then
         echo "== building $PROJ (~2 min)"
         # The icon isn't in the public repo; an empty property skips it without patching their csproj.
         dotnet build "$SBOX/engine/Launcher/$PROJ" -c Release -m:4 -nodeReuse:false -v q -nologo -clp:ErrorsOnly -p:ApplicationIcon=
-        touch "$BUILT"
+        echo "$HEAD" > "$BUILT"
     fi
     sh "$ROOT/tools/r2r-managed.sh" "$SBOX"
     echo "== copying sbox-public/game to $SYNC_TO"
