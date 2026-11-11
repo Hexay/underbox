@@ -85,7 +85,15 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::GET_LOCAL_VELOCITY, |r| with_state(r, |st| st.local_velocity));
     // TODO: surface properties (materials) once the surface-property controller exists.
     bind!(r, s::SET_MATERIAL_INDEX, |_, _| {});
-    bind!(r, s::SET_SURFACE_INDEX, |r, index, _triangle| with_state(r, |st| st.surface_index = index));
+    // Managed sets a mesh's per-slot surfaces (`PhysicsShape.Surfaces`); slot 0 is also the shape's own.
+    bind!(r, s::SET_SURFACE_INDEX, |r, index, slot| with_state(r, |st| {
+        if slot <= 0 {
+            st.surface_index = index;
+        }
+        if let Ok(slot) = usize::try_from(slot) {
+            st.set_slot_surface(slot, index);
+        }
+    }));
     bind!(r, s::GET_MATERIAL_NAME, |_| StrRet::from("default"));
 
     bind!(r, s::SET_TRIGGER, |r, v| with_sim(r, |sim, id| sim.set_trigger(id, v)));

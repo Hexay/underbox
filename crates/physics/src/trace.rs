@@ -3,7 +3,7 @@
 use crate::shape::{Shape, Surface};
 use crate::world::World;
 use rapier3d::math::{Pose, Rotation, Vector};
-use rapier3d::parry::query::{ShapeCastOptions, ShapeCastStatus};
+use rapier3d::parry::query::{PointQueryWithLocation, ShapeCastOptions, ShapeCastStatus};
 use rapier3d::prelude::{Collider, ColliderHandle, QueryFilter, Ray};
 
 /// A trace: `probe` (`None` for a ray) at `rotation`, swept from `start` to `end`.
@@ -49,6 +49,15 @@ impl World {
         let started_in_solid = hit.status == ShapeCastStatus::PenetratingOrWithinTargetDist && hit.time_of_impact == 0.0;
         let position = sweep.start + delta * hit.time_of_impact;
         Some(Hit { shape, fraction: hit.time_of_impact, position, point: hit.witness1, normal: hit.normal1, started_in_solid })
+    }
+
+    /// The triangle of mesh shape `shape` nearest world `point` (a hit's contact point); `None`
+    /// for other shapes.
+    pub fn triangle_at(&self, shape: ColliderHandle, point: Vector) -> Option<u32> {
+        let c = self.shape(shape)?;
+        let mesh = c.shape().as_trimesh()?;
+        let (_, (triangle, _)) = mesh.project_local_point_and_get_location(c.position().inverse_transform_point(point), false);
+        Some(triangle)
     }
 
     /// Every shape `keep` accepts along the sweep, nearest first.
@@ -113,6 +122,26 @@ mod tests {
         ]);
         let hit = world.trace(&sweep(Some(dumbbell)), &|_, _| true).unwrap();
         assert!((hit.position.x - 27.0).abs() < 0.05, "front ball (origin+10, r 2) meets the face at 39: {:?}", hit.position);
+    }
+
+    #[test]
+    fn mesh_hits_name_their_triangle() {
+        let mut world = World::default();
+        let body = world.add_body(BodyType::Static, Pose::from_translation(Vector::new(50.0, 0.0, 0.0)));
+        let wall = Shape::Mesh {
+            vertices: vec![Vector::new(0.0, -10.0, -10.0), Vector::new(0.0, 10.0, -10.0), Vector::new(0.0, 10.0, 10.0), Vector::new(0.0, -10.0, 10.0)],
+            triangles: vec![[0, 1, 2], [0, 2, 3]],
+        };
+        world.add_shape(body, &wall, Surface::default()).unwrap();
+        let slab = wall_at_x(&mut world, 200.0);
+        world.step(1.0 / 60.0, 1);
+        let at = |y: f32, z: f32| {
+            let s = Sweep { probe: None, rotation: Rotation::IDENTITY, start: Vector::new(0.0, y, z), end: Vector::new(100.0, y, z) };
+            let hit = world.trace(&s, &|_, _| true).unwrap();
+            world.triangle_at(hit.shape, hit.point)
+        };
+        assert_eq!((at(5.0, -5.0), at(-5.0, 5.0)), (Some(0), Some(1)));
+        assert_eq!(world.triangle_at(slab, Vector::ZERO), None, "not a mesh");
     }
 
     #[test]

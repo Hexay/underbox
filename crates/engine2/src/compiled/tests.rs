@@ -73,6 +73,24 @@ fn compiled_material_has_shader_params_and_textures() {
     assert!(!crate::resource::Resource::is_error(&*t), "made from the compiled texture");
 }
 
+#[test]
+fn compiled_ragdoll_spawns_jointed_bodies() {
+    crate::handles::fake_managed();
+    game_dir();
+    let r = crate::model::load(Some(&std::ffi::CString::new(fixture::RIGGED).unwrap()), abi::Guid::default());
+    let data = crate::model::get(r).and_then(|m| m.content.physics.clone()).expect("ragdoll");
+    let joints: Vec<_> = (0..data.joints.len()).filter_map(|i| data.joint(i)).collect();
+    assert_eq!(joints.iter().map(|j| (j.kind, j.body1, j.body2)).collect::<Vec<_>>(), [(4, 0, 1), (3, 1, 2)]);
+    assert!(joints[0].enable_swing_limit && joints[0].enable_twist_limit && joints[0].swing_limit == [0.0, 0.5]);
+    assert_eq!((joints[1].twist_limit, joints[1].angular_frequency), ([-0.75, 0.75], 4.0));
+    let w = new_world();
+    let doll = aggregate::spawn(w, data, identity(), 1).unwrap();
+    let a = aggregate::get(doll).unwrap();
+    assert_eq!((a.bodies.len(), a.joints.lock().unwrap().len()), (3, 2));
+    assert_eq!(a.bodies.iter().map(|(bone, _)| bone.as_str()).collect::<Vec<_>>(), ["root", "spine", "head"]);
+    aggregate::destroy(doll);
+}
+
 fn new_world() -> world::Ref {
     objects::create_shared(Arc::new(PhysicsWorld::default()))
 }

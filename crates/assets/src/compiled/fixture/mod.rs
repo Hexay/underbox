@@ -114,7 +114,7 @@ pub fn model() -> Model {
         lod_distances: vec![0.0, 400.0],
         material_groups: vec![MaterialGroup { name: "default".into(), materials: vec![MATERIAL.into()] }, MaterialGroup { name: "dark".into(), materials: vec![SKIN_MATERIAL.into()] }],
         bones: vec![Bone { name: "root".into(), parent: None, position: [0.0; 3], rotation: [0.0, 0.0, 0.0, 1.0] }],
-        physics: Some(Aggregate { parts: vec![part(hull, 20.0)], surfaces: vec![0], attributes: vec![vec!["solid".into()]] }),
+        physics: Some(Aggregate { parts: vec![part(hull, 20.0)], surfaces: vec![0], attributes: vec![vec!["solid".into()]], ..Aggregate::default() }),
         key_values: String::new(),
         ..Model::default()
     }
@@ -125,7 +125,8 @@ pub fn world_physics(ground: f32, boxes: &[([f32; 3], [f32; 3])]) -> Aggregate {
     let g = ground;
     let quad = TriMesh { vertices: vec![[-g, -g, 0.0], [g, -g, 0.0], [g, g, 0.0], [-g, g, 0.0]], triangles: vec![[0, 1, 2], [0, 2, 3]], materials: vec![], ids: Ids::default() };
     let hulls = boxes.iter().map(|(lo, hi)| (corners(*lo, *hi), Ids::default())).collect();
-    Aggregate { parts: vec![part(Shapes { meshes: vec![quad], hulls, ..Shapes::default() }, 0.0)], surfaces: vec![0], attributes: vec![vec!["solid".into(), "world".into()]] }
+    let attributes = vec![vec!["solid".into(), "world".into()]];
+    Aggregate { parts: vec![part(Shapes { meshes: vec![quad], hulls, ..Shapes::default() }, 0.0)], surfaces: vec![0], attributes, ..Aggregate::default() }
 }
 
 /// (compiled path, bytes) of the crate model, its materials and texture.

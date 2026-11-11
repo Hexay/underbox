@@ -20,6 +20,8 @@ pub mod shape;
 mod shape_slots;
 pub mod surfaces;
 mod trace;
+#[cfg(test)]
+mod trace_tests;
 mod triangulate;
 pub mod world;
 

@@ -5,6 +5,7 @@
 pub mod anim;
 pub mod fixture;
 pub mod flex;
+pub mod joint;
 pub mod kv;
 pub mod material;
 pub mod mesh;

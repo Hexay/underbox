@@ -1,9 +1,11 @@
 //! A rigged model with known contents: three bones, embedded animations plus an animation group
 //! whose animation is in a `.vanim_c`, two morph targets driven by flex rules, attachments,
-//! hitboxes and key values.
+//! hitboxes, key values and a jointed ragdoll.
 
 use super::super::anim::{Animation, Key, Rig, encode};
 use super::super::flex::{Controller, Op, Rule};
+use super::super::joint::{CONICAL, Frame, Joint, REVOLUTE};
+use super::super::physics::{Aggregate, Ids, Part, Shapes};
 use super::super::model::{Bone, Model, ModelMesh};
 use super::super::morph::{self, Target};
 use super::super::rig::{Attachment, Hitbox, HitboxSet, Influence};
@@ -108,6 +110,32 @@ pub fn hitbox_sets() -> Vec<HitboxSet> {
     vec![HitboxSet { name: "default".into(), hitboxes: vec![hb("chest", "spine", 0, [-4.0; 3], [4.0; 3], 0.0), hb("skull", "head", 2, [0.0; 3], [0.0, 0.0, 4.0], 3.0)] }]
 }
 
+/// A ragdoll over the rig: a capsule per bone, the spine swinging on the root (conical, swing
+/// and twist limited) and the head hinged on the spine (revolute, twist limited).
+pub fn ragdoll() -> Aggregate {
+    let part = |bone: &str, z: f32, shapes: Shapes| Part {
+        bone: Some(bone.into()),
+        bind: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, z]],
+        flags: 0,
+        mass: 5.0,
+        inertia_scale: 1.0,
+        linear_damping: 0.0,
+        angular_damping: 0.0,
+        shapes,
+    };
+    let capsule = |len: f32| Shapes { capsules: vec![([0.0; 3], [0.0, 0.0, len], 2.0, Ids::default())], ..Shapes::default() };
+    let frame = |z: f32| Frame { position: [0.0, 0.0, z], ..Frame::default() };
+    let joint = |kind, body1, body2, at: f32| Joint { kind, body1, body2, frame1: frame(at), frame2: Frame::default(), ..Joint::default() };
+    let spine = Joint { swing_limit: Some([0.0, 0.5]), twist_limit: Some([-0.25, 0.25]), ..joint(CONICAL, 0, 1, HALF) };
+    let head = Joint { twist_limit: Some([-0.75, 0.75]), angular_spring: [4.0, 0.5], ..joint(REVOLUTE, 1, 2, HALF * 0.5) };
+    Aggregate {
+        parts: vec![part("root", 0.0, capsule(HALF)), part("spine", HALF, capsule(HALF * 0.5)), part("head", HALF * 1.5, capsule(3.0))],
+        surfaces: vec![0],
+        attributes: vec![vec!["solid".into()]],
+        joints: vec![spine, head],
+    }
+}
+
 /// The rigged model as written; `missing`, the group's animation and targets come from reading.
 pub fn rigged_model() -> Model {
     let mut mesh = cube(HALF * 0.5);
@@ -127,6 +155,7 @@ pub fn rigged_model() -> Model {
         hitbox_sets: hitbox_sets(),
         anim_groups: vec![GROUP.into()],
         animations: animations(),
+        physics: Some(ragdoll()),
         ..Model::default()
     }
 }

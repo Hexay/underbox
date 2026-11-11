@@ -1,13 +1,15 @@
 //! Physics data from compiled aggregates: `.vphys_c` resources (`Glue.Resources.GetPhysics`, map
-//! `world_physics`) and a compiled model's PHYS block (see `assets::compiled::physics`).
+//! `world_physics`) and a compiled model's PHYS block (see `assets::compiled::physics`), with
+//! their joints.
 
-use super::data::{CapsuleDesc, HullDesc, Indices, MeshDesc, Part, PhysicsData, Shapes, SphereDesc};
+use super::data::{CapsuleDesc, HullDesc, Indices, JointDesc, MeshDesc, Part, PhysicsData, Shapes, SphereDesc};
 use super::data_slots;
 use super::hull::Hull;
 use crate::math::{from_v3, identity};
 use abi::slots::glue_resources as glue;
 use abi::structs::{Quaternion, Rotation, Transform};
 use abi::{Guid, Registry, bind};
+use assets::compiled::joint;
 use assets::compiled::physics::{self as c, Aggregate, Matrix};
 use glam::{Mat3, Vec3};
 use std::collections::HashMap;
@@ -46,6 +48,48 @@ fn shapes(s: &c::Shapes) -> Shapes {
     }
 }
 
+fn frame(f: &joint::Frame) -> Transform {
+    let mut t = identity();
+    t.position = from_v3(Vec3::from(f.position));
+    let [x, y, z, w] = f.rotation;
+    t.rotation = Rotation { quat: Quaternion { x, y, z, w } };
+    t
+}
+
+fn joint(j: &joint::Joint) -> JointDesc {
+    let motor = |m: &Option<joint::Motor>| m.as_ref().map_or((false, Vec3::ZERO, 0.0), |m| (true, Vec3::from(m.target_velocity), m.max));
+    let (linear_motor, linear_velocity, max_force) = motor(&j.linear_motor);
+    let (angular_motor, angular_velocity, max_torque) = motor(&j.angular_motor);
+    JointDesc {
+        kind: j.kind as u16,
+        body1: j.body1 as u16,
+        body2: j.body2 as u16,
+        flags: j.flags as u16,
+        enable_collision: j.collide,
+        enable_linear_limit: j.linear_limit.is_some(),
+        enable_linear_motor: linear_motor,
+        linear_target_velocity: from_v3(linear_velocity),
+        max_force,
+        enable_swing_limit: j.swing_limit.is_some(),
+        enable_twist_limit: j.twist_limit.is_some(),
+        enable_angular_motor: angular_motor,
+        angular_target_velocity: from_v3(angular_velocity),
+        max_torque,
+        linear_frequency: j.linear_spring[0],
+        linear_damping_ratio: j.linear_spring[1],
+        angular_frequency: j.angular_spring[0],
+        angular_damping_ratio: j.angular_spring[1],
+        override_friction: j.friction > 0.0,
+        friction: j.friction,
+        frame1: frame(&j.frame1),
+        frame2: frame(&j.frame2),
+        linear_limit: j.linear_limit.unwrap_or_default(),
+        swing_limit: j.swing_limit.unwrap_or_default(),
+        twist_limit: j.twist_limit.unwrap_or_default(),
+        ..JointDesc::default()
+    }
+}
+
 /// The engine's physics data for a compiled aggregate; surfaces resolve by name hash (unknown
 /// ones fall back to "default").
 pub fn data(name: &str, a: &Aggregate) -> Arc<PhysicsData> {
@@ -65,7 +109,7 @@ pub fn data(name: &str, a: &Aggregate) -> Arc<PhysicsData> {
         })
         .collect();
     let surfaces = a.surfaces.iter().map(|&h| crate::physics::surfaces::by_hash(h).unwrap_or(0)).collect();
-    let mut d = PhysicsData::new(name, parts, Vec::new(), surfaces);
+    let mut d = PhysicsData::new(name, parts, a.joints.iter().map(joint).collect(), surfaces);
     if !a.attributes.is_empty() {
         Arc::get_mut(&mut d).expect("fresh").attributes = a.attributes.clone();
     }
