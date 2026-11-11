@@ -95,6 +95,9 @@ orientations (`Tilt0`–`Tilt7`); and, at tick 5, seven traces (ray hit, miss an
 box sweeps, a ray onto a moving body, a ray starting inside the slab), `SKIN` sweeps of several
 sizes and heights, `SUBSTEP` free falls in a private `PhysicsWorld` stepped with 1–6 sub-steps,
 and `ERR*` markers for a static prop given a missing model (its shapes, and rays across its hull).
+`ProbeRest.cs` adds `SOLID` sweeps that start inside the slab, `GRAZE` rays along its faces,
+`DEPTH` (bodies set down on a slab in a private world) and `SLEEP` (free bodies at a range of
+linear and angular speeds, sizes and shapes, gravity off: the step each falls asleep at).
 
 `zoo` needs `SANDBOX=<Facepunch/sandbox checkout>`. Runs take 30 s to 3 min each.
 
@@ -108,7 +111,8 @@ Ranked by severity, with each one's state after the fixes (before → after):
    whenever both teams score in the same tick. `contacts.rs` iterated a `std` `HashMap`. Now pairs
    and events go in shape creation order (`contacts_tests::same_tick_events_follow_creation_order`).
    After: four runs give winner 0 and byte-identical `MATCH:` markers. Bots' final positions still
-   differ from real's by up to 18.5 units (physics, not order).
+   differ from real's by up to 18.5 units, unchanged by the sleep, depth and trace fixes below:
+   `Bot0_0` ends at x = −180 on ours, −161.5 on real (and `Bot1_0` mirrored), `Bot1_1` 8.9 apart.
 2. **Improved. A tilted box lands differently.** The probe box (pitch 20, yaw 30, roll 10) dropped
    onto the slab. Real settles 5.8 units from the drop point (194.4, 1.5, yaw 28.9) at 0.5 u/s by
    tick 50. Before: ours tumbled onto another face and ended 50 units away (151.2, −11.9, yaw 22.0),
@@ -118,8 +122,13 @@ Ranked by severity, with each one's state after the fixes (before → after):
    pitch 45 and roll 45 (balanced on an edge on both engines) 1.3 and 1.1 / 0.3; (30,45,15) 57 /
    53; (60,10,0) 7.9 / 6.7; (10,10,10) 3.3 / 0.3; pitch 89 0.4 / 0.03; (35,45,0) 8.3 / 10.3. The
    tumbling cases are chaotic on both engines; headless (`landing_tests`) the same drops land
-   differently again. Left: resting boxes sit 0.010 higher on ours (15.976 against 15.966: real
-   sinks 1/32 into the slab). Rejected: a 0.4 m speculative margin fitted headless landings better
+   differently again. Resting depth, fixed: real's sink doesn't depend on size or mass. A lone
+   body set on the slab in a private world sinks 0.0086 (boxes of 4, 32 and 128, a 1000 kg box, a
+   sphere); a three-box stack 0.0257, 0.1399, 0.2057 from the bottom. Before: 0.0060 and 0.0178,
+   0.1039, 0.1503, and 15.976 against 15.966 for every resting probe box. After (contact softness
+   50 Hz against static bodies, 25 Hz between dynamic ones, `world.rs`): 0.0086 and 0.0254, 0.1392,
+   0.2042 (`rest_tests`), and every resting probe box at 15.966. Stacking, landings and the zoo
+   tests still pass. Rejected: a 0.4 m speculative margin fitted headless landings better
    but kept props near an animated keyframed body awake forever (the zoo never settled), and
    turning warm-starting off collapsed an 8-box stack; both have tests.
 3. **Fixed. Integration substeps.** Real integrates `max(n, 4)` times per `StepSimulation(dt, n)`
@@ -143,8 +152,16 @@ Ranked by severity, with each one's state after the fixes (before → after):
    axes). Rays keep no skin. Before: ours ended at z = 10.000 (real 10.031), and a radius-1 sphere
    swept 600 units ended 0.1 inside the slab (parry overshoots long casts). After
    (`trace::SWEEP_SKIN`, plus a recast of the last 4 units): every `SKIN` and `TRACE` marker is
-   within 0.004 of real, fraction included. Left: a sweep that starts inside the slab reports
-   normal (0, 0, 1) on ours and a slanted one on real.
+   within 0.004 of real, fraction included.
+   Start-solid sweeps, fixed: real reports the normal the probe would have entered through,
+   taken 1/32 off the surface. A radius-10 sphere 5 into the slab top moving +x gets
+   (−0.8669, 0, 0.4984): the slab's far −x top edge, at distance 10.031 (z = 5/10.031); 1 into
+   gives (−0.4416, 0, 0.8972); centre at or below the top, (−1, 0, 0); moving down, (0, 0, 1).
+   A zero-length sweep reports the overlap, solid, normal (1, 0, 0). Before: (0, 0, 1) for all,
+   and no hit for zero length. After (`trace_rules.rs`: sweep in from outside the shape's bounds,
+   then step to the skin): all within 0.002. Left: a start-solid sweep moving out of the slab
+   (up, or up and sideways) is not solid on real and hits at fraction 0.8497 with normal
+   (0, 0, −1), which doesn't fit any geometry in the scene; ours reports solid at 0.
 
 Agreeing (within 0.15): ray traces, the head-on rebound (±10 u/s after contact, so the same default
 restitution), the dropped sphere's resting height, Sweeper's 72 cubes settling and the controller
@@ -166,21 +183,43 @@ same packages and miss the same package models. Differences:
    z = −3053). Real's error model has one 14-vertex hull: the outline of the "ERROR" sign, 10 deep
    (x ±5), 100 wide (y ±50), 25.08 tall, its right end bevelled. The probe's `ERRRAY` rays map it;
    `model/physics/error.rs` rebuilds it from those measurements as a 12-vertex hull. After:
-   `fallen=0`, and every probe ray across it agrees with real to 0.003, except that ours also hits
-   rays grazing the exact y = ±50 ends. Left: the error model's render bounds are our 16-unit
-   stand-in cube; real's are the sign's (`ERRMODEL bounds`).
+   `fallen=0`, and every probe ray across it agrees with real to 0.003. Grazing rays, fixed: real
+   misses a ray that only touches a hull's boundary, either running in a face's plane (`down` at
+   y = −50) or entering and leaving at one point (`up` at y = ±50, through the bottom face's
+   edges). Boxes don't follow that rule: a ray down the slab's side plane hits its top edge on both
+   engines. Before: ours hit all three; after (`trace_rules.rs`, hulls only): the `ERRRAY` set is
+   identical. Left: the error model's render bounds are our 16-unit stand-in cube; real's are the
+   sign's (`ERRMODEL bounds`). A diagonal ray onto the slab's exact top edge reports (1, 0, 0) on
+   real and the averaged (0.71, 0, 0.71) on ours.
 8. **Fixed. Physics totals.** `GAME:PHYSICS` was `bodies=32 shapes=44` on real and `bodies=31
    shapes=34` on ours; all of the gap was error models (7). After: `bodies=32 shapes=44`.
 9. **Fixed. Resource counts** followed (5): ours was `ammo=5 prefab=183 sound=123 surface=7`, now
    `ammo=6 decal=47 prefab=244 scene=6 sound=191 surface=20`, as real.
-10. **Low. Sleeping.** Real keeps the vehicle's bodies (`base`, wheels, `rear`) and `hoover_a`
-    awake for longer after the drop: 5 awake for ~15 s on real, while ours has all 16 asleep
-    within 4 s. Both settle (`GAME:SETTLED`).
+10. **Improved. Sleeping.** Real keeps the vehicle's bodies (`base`, wheels, `rear`) and
+    `hoover_a` awake for longer after the drop: 5 awake for ~15 s on real, while ours has all 16
+    asleep within 4 s. Both settle (`GAME:SETTLED`). The probe's `SLEEP` markers give real's rule:
+    a body is eligible while `|v| + max |ω × r|` over the corners `r` of its local bounding box
+    stays under its threshold (2 u/s by default, `SleepThreshold` honoured), and sleeps after
+    0.5 s eligible (step 25 at 50 Hz), velocities zeroed. A radius-8 sphere sleeps at
+    ω = 0.16 and not 0.18 (2/(8√2) = 0.177); a 32-unit box at 0.085, not 0.095; an 8×8×64 bar
+    at 0.2 about its long axis but not 0.07 about a short one; v = 1 with ω = 0.1 on the
+    radius-8 sphere stays awake (1 + 1.13 > 2), so the terms add. A parameterless
+    `PhysicsWorld.CreateBody()` has gravity and auto sleep at 2. Before: Rapier's rule
+    (`|v| + ω·bounding radius` under twice the threshold) and `CreateBody()` bodies with gravity
+    and sleep off, so no private-world body ever slept (30 of the 64 `SLEEP` markers differed).
+    After (`sleep.rs` decides eligibility each step, Rapier keeps islands and the timer): all 64
+    match. The zoo is unchanged, because the
+    gap isn't a threshold: on real the trike's bodies really move (wheels at z = 14 at
+    29–35 u/s, `base` 26 u/s, `hoover_a` 7 u/s) for ~15 s, while ours rests at z = 3, v = 0.
+    Its hinges have `TargetVelocity` motors at 0 (max torque 9.2 and 507) and
+    `EnableCollision`; that dynamics gap is open (joints).
 
 ## Follow-up lanes
 
-- **Contact depth (2):** real rests boxes and props 1/32 into the surface; ours 0.024. Try
-  matching Rapier's allowed linear error to it, then rerun the probe.
+- **Zoo trike (10):** real's motorised hinges keep the trike bouncing for ~15 s; ours rests at
+  once. Probe a hinge with a zero-velocity motor and joint collision in a private world.
+- **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
+- **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Coverage:** client-side differentials (frame hashes against `librendersystemvulkan`), net
   join, and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

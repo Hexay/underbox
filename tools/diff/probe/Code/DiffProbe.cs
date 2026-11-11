@@ -65,6 +65,9 @@ public sealed class DiffProbe : Component
 			ProbeExtras.Skin( Scene );
 			ProbeExtras.ErrorShapes( errorProp, Scene );
 			ProbeExtras.Substeps();
+			ProbeRest.Solid( Scene );
+			ProbeRest.Depth();
+			ProbeRest.Sleep();
 		}
 		if ( tick == Ticks[^1] ) Mark( "END" );
 	}
