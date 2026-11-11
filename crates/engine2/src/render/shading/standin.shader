@@ -200,10 +200,16 @@ PS
 	};
 	Texture2D g_tUnderboxLocalShadow < Attribute( "g_tUnderboxLocalShadow" ); >;
 
+	//@managed_shadows
+
 	float LocalVisibility( BinnedLight l, float3 vPositionWs, float3 vNormalWs )
 	{
+		if ( l.ShadowMapIndex == 0xFFFFFFFFu )
+			return 1.0;
+		if ( l.ShadowMapIndex < UNDERBOX_LOCAL_SHADOW_INDEX )
+			return ManagedLocalVisibility( l, vPositionWs, vNormalWs );
 		uint nTile = l.ShadowMapIndex - UNDERBOX_LOCAL_SHADOW_INDEX;
-		if ( l.ShadowMapIndex < UNDERBOX_LOCAL_SHADOW_INDEX || nTile >= UNDERBOX_LOCAL_SHADOW_TILES )
+		if ( nTile >= UNDERBOX_LOCAL_SHADOW_TILES )
 			return 1.0;
 		float3 vRay = vPositionWs - l.Position;
 		if ( l.Type == 1 )

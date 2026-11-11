@@ -69,11 +69,11 @@ impl Kind {
 /// The stand-in source cached under `path`, or `None` when `path` isn't a stand-in key.
 pub fn shader(path: &str, includes: &IncludePaths) -> Option<Result<VfxShader, String>> {
     let source = match path {
-        PATH => include_str!("standin.shader"),
-        SKY_PATH => include_str!("standin_sky.shader"),
+        PATH => include_str!("standin.shader").replace("\t//@managed_shadows\n", include_str!("standin_managed_shadows.hlsl")),
+        SKY_PATH => include_str!("standin_sky.shader").to_owned(),
         _ => return None,
     };
-    Some(VfxShader::parse(source, Path::new(path), includes))
+    Some(VfxShader::parse(&source, Path::new(path), includes))
 }
 
 #[cfg(test)]

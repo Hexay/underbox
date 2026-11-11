@@ -6,6 +6,7 @@
 use super::defaults;
 use super::layout::Value;
 use super::program::{self, Layouts, Shading};
+use super::shadow_slots;
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting, shadow};
 use crate::render::{attributes, bindless, buffers as gpu_buffers, texture};
@@ -78,7 +79,7 @@ fn uniform_value<P>(s: &Shading<P>,inputs: &Inputs, name: &str) -> Option<Value>
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let default = || s.attributes.get(name).and_then(|a| a.default);
-    from_attributes().or_else(given).or_else(default).map(Value::Vec)
+    from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(default).map(Value::Vec)
 }
 
 /// Managed's bytes for a whole block, sized to the block.
@@ -111,7 +112,7 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
     let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
     let from_managed = || (b.name == shadow::TEXTURE).then(|| inputs.constant_buffer("DirectionalLightCB")).flatten().and_then(|cb| shadow::managed_cascade(&cb));
-    let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
+    let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| shadow_slots::texture(&b.name)).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
     if inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {

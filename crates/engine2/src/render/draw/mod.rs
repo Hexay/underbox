@@ -39,6 +39,8 @@ pub struct Draw {
 pub struct Target {
     pub color: texture::Ref,
     pub depth: texture::Ref,
+    /// The depth target's array layer: a cube face for `BindDepthTarget`'s slice.
+    pub depth_slice: u32,
     pub viewport: RenderViewport,
     pub scissor: Option<NativeRect>,
 }
@@ -113,7 +115,7 @@ pub fn topology(prim: i64) -> PrimitiveTopology {
 pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw]) {
     let (Some(gpu), Some(placeholder)) = (device::gpu(), placeholder()) else { return };
     let (color, depth) = (texture::resolve(target.color), texture::resolve(target.depth));
-    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), ..Default::default() };
+    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), depth_layer: target.depth_slice, ..Default::default() };
     if let (Some(c), Some(d)) = (targets.color, targets.depth)
         && (c.desc.width, c.desc.height) != (d.desc.width, d.desc.height)
     {

@@ -88,7 +88,7 @@ fn target(view: &SceneView, l: layer::Ref, s: &layer::LayerState) -> Target {
     let (color, depth) = if s.output_set { (s.color, s.depth) } else { (view.color, view.depth) };
     let vp = layer::viewport(l);
     let viewport = if vp.m_n_width > 0 && vp.m_n_height > 0 { vp } else { view.viewport };
-    Target { color, depth, viewport, scissor: None }
+    Target { color, depth, viewport, ..Default::default() }
 }
 
 fn setup(ctx: context::Ref, v: view::Ref, l: layer::Ref, color: texture::Ref) -> ManagedRenderSetup_t {

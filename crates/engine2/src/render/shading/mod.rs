@@ -6,6 +6,7 @@
 
 pub mod bind;
 mod defaults;
+mod shadow_slots;
 pub mod layout;
 pub mod program;
 mod stages;

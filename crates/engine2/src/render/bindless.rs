@@ -46,6 +46,11 @@ pub fn len() -> u32 {
     TABLE.lock().unwrap().pairs.len() as u32 * 2 + 1
 }
 
+/// Every texture with its linear index, in the order indices were handed out.
+pub fn entries() -> Vec<(u32, texture::Ref)> {
+    TABLE.lock().unwrap().pairs.iter().enumerate().map(|(pair, t)| (pair as u32 * 2 + 1, *t)).collect()
+}
+
 /// The view for one element of a bindless array declared with `dimension` and `sample_type`: the
 /// texture `index` names when it is alive and has that shape, else `None` (the caller's default).
 pub fn view(index: u32, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Option<wgpu::TextureView> {

@@ -131,17 +131,24 @@ impl Texture {
     /// Clear mip 0 with an empty render pass: to `color` for a colour format, or to `depth` (and
     /// stencil 0) for a depth format. The value for the other kind is ignored.
     pub fn clear(&self, gpu: &Gpu, color: wgpu::Color, depth: f32) {
+        self.clear_layer(gpu, color, depth, 0);
+    }
+
+    /// [`Texture::clear`] of one array layer (a cube face).
+    pub fn clear_layer(&self, gpu: &Gpu, color: wgpu::Color, depth: f32, layer: u32) {
+        let view = (layer > 0).then(|| self.layer_target_view(layer));
+        let view = view.as_ref().unwrap_or(&self.target_view);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let format = self.desc.format;
         let color_attachment = [Some(wgpu::RenderPassColorAttachment {
-            view: &self.target_view,
+            view,
             depth_slice: None,
             resolve_target: None,
             ops: wgpu::Operations { load: wgpu::LoadOp::Clear(color), store: wgpu::StoreOp::Store },
         })];
         let store = wgpu::StoreOp::Store;
         let depth_attachment = wgpu::RenderPassDepthStencilAttachment {
-            view: &self.target_view,
+            view,
             depth_ops: format.has_depth_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(depth), store }),
             stencil_ops: format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store }),
         };
@@ -155,8 +162,8 @@ impl Texture {
         gpu.queue.submit([encoder.finish()]);
     }
 
-    /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`. False (nothing copied) when the
-    /// formats differ or the rect falls outside either texture.
+    /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`, in every array layer both have.
+    /// False (nothing copied) when the formats differ or the rect falls outside either texture.
     pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
         let fits = |t: &Texture, x: u32, y: u32| x + w <= t.desc.width && y + h <= t.desc.height;
         // Depth and stencil copies must cover whole subresources (wgpu validation).
@@ -171,7 +178,8 @@ impl Texture {
             wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All }
         }
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
-        encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), extent(w, h));
+        let layers = self.desc.layers.max(1).min(dst.desc.layers.max(1));
+        encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) });
         gpu.queue.submit([encoder.finish()]);
         true
     }
