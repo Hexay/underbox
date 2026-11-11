@@ -4,7 +4,7 @@ Part of the real-games runs (docs/real-games.md). Facepunch/sbox-walker (MIT, `9
 Facepunch's minimal multiplayer walking game: a `PlayerController` player with a Citizen body,
 inventory, HUD, chat and a few map entities (`FuncButton`, `FuncDoor`, `TriggerTeleport`,
 `TriggerHurt`, `CollectableItem`). It ships code, scenes, prefabs and three `.ogg` UI sounds, and no
-compiled assets. Read from `/srv/agents/work/sbox-walker`; nothing is copied into this repo.
+compiled assets. Run from a separate checkout (`../sbox-walker`); nothing is copied into this repo.
 
 ## How it starts
 
