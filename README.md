@@ -37,8 +37,8 @@ Full command list: `docs/dev-loop.md`.
 ## Status
 
 - Server and client boot and run the corpus on Linux; Windows builds and tests in CI.
-- Not yet checked against real s&box content or real engine2 (differential runs wait on the EULA
-  question in `docs/PLAN.md`). Steam online features need the manual checks in `docs/steam.md`.
+- Differential runs against real engine2 have started; divergences are in `docs/differential.md`.
+  Steam online features need the manual checks in `docs/steam.md`.
 - Deliberately unavailable: ray tracing, MSAA, the Steam HTML surface, editor build jobs.
   Open renderer work: `docs/renderer.md` "Next".
 

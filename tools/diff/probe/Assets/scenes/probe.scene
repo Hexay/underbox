@@ -1,0 +1,48 @@
+{
+  "__guid": "9c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f",
+  "GameObjects": [
+    {
+      "__guid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "Flags": 0,
+      "Name": "Network",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.NetworkHelper",
+          "__guid": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+          "PlayerPrefab": null,
+          "SpawnPoints": [],
+          "StartServer": true
+        }
+      ]
+    },
+    {
+      "__guid": "c3d4e5f6-a7b8-4c9d-8e1f-2a3b4c5d6e7f",
+      "Flags": 0,
+      "Name": "Probe",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "DiffProbe",
+          "__guid": "d4e5f6a7-b8c9-4d0e-9f2a-3b4c5d6e7f80"
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}
