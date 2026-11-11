@@ -10,6 +10,7 @@
 | Map loading | `tools/map.sh` (corpus/mapworld, stops at `MAP:END`); its frame: `CORPUS=mapworld tools/client-frame.sh` |
 | Net probe | `tools/net-probe.sh` |
 | Shared-build lock | `tools/boot-lock.sh <cmd...>` (only for scripts that write `sbox-public/game`) |
+| Release build | `tools/dist.sh` (portable libengine2 in `dist/`; see docs/release.md) |
 | Measure a loop | `tools/loop-bench.sh <runs> <file> <cmd...>` (median and spread) |
 
 ## Rules
@@ -53,3 +54,5 @@ manifest mode (GNS ships a `vcpkg.json`) rebuilt protobuf, openssl and abseil on
 (about 55 min). Windows runs tests only; Linux runs clippy for both. rust-cache saves on failure too.
 On Linux, clippy and test each run the workspace build scripts (clippy's wrapper changes their
 hash); sccache as the cmake compiler launcher makes the second GNS build mostly cache hits.
+Checkouts aren't recursive: GNS's nested submodules (webrtc, abseil) are only for ICE. The `dist`
+job runs in parallel, in an `ubuntu:22.04` container (docs/release.md).
