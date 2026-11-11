@@ -89,33 +89,46 @@ tolerance. **Low** means the same events in another order. Same-tick reorderings
 pairs whose numbers swap.
 
 The probe: a static slab; a sphere and a tilted box dropped from 200; two spheres meeting head-on
-at 200 u/s with gravity off; a box sliding at 300 u/s; and, at tick 5, seven traces (ray hit, miss
-and slant, sphere and box sweeps, a ray onto a moving body, a ray starting inside the slab).
+at 200 u/s with gravity off; a box sliding at 300 u/s; eight more boxes dropped at other
+orientations (`Tilt0`–`Tilt7`); and, at tick 5, seven traces (ray hit, miss and slant, sphere and
+box sweeps, a ray onto a moving body, a ray starting inside the slab), `SKIN` sweeps of several
+sizes and heights, `SUBSTEP` free falls in a private `PhysicsWorld` stepped with 1–6 sub-steps,
+and `ERR*` markers for a static prop given a missing model (its shapes, and rays across its hull).
 
 `zoo` needs `SANDBOX=<Facepunch/sandbox checkout>`. Runs take 30 s to 3 min each.
 
 ## First divergences (ours vs real engine2 with its compiled core)
 
-Real engine2 is deterministic: four orbmatch runs gave identical markers. Ours repeats its positions
-exactly but not its event order (1). Ranked by severity:
+Real engine2 is deterministic: four orbmatch runs gave identical markers. Ours now is too (1).
+Ranked by severity, with each one's state after the fixes (before → after):
 
-1. **High. Contact and trigger events come in random order.** The orbmatch winner on ours across
+1. **Fixed. Contact and trigger events came in random order.** The orbmatch winner on ours across
    four runs was 1, 1, 0, 1; real gave 0 every time, scoring in creation order (team 0 first)
-   whenever both teams score in the same tick. Cause: `crates/physics/src/contacts.rs` builds
-   begin/end events by iterating a `std` `HashMap`, whose seed is random per process.
-2. **High. A tilted box lands differently.** The probe box (pitch 20, yaw 30, roll 10) dropped onto
-   the slab. Real lands and settles about 6 units from the drop point (194.4, 1.5, 16.0, yaw 28.9);
-   at tick 50 it moves at under 1 u/s. Ours tumbles onto another face (pitch −90) and ends about 50
-   units from the drop point (151.2, −11.9, 16.0, yaw 22.0); at tick 50 it still moves at 90 u/s. A box-face landing in
-   any game goes the same way, so props come to rest in other places.
-3. **Medium. Integration substeps.** Velocities match exactly (gravity 850; −17, −68, −153, −408
-   at ticks 2, 5, 10, 25), but positions drift: z at tick 25 is 101.570 on ours and 101.060 on real.
-   The drop after n ticks fits semi-implicit Euler with k substeps, g·dt²·nk(nk+1)/(2k²), exactly:
-   k = 4 for real and k = 8 for ours. The same effect shifts orbmatch's first MOVE positions by
-   about 0.4.
-4. **Medium. Sliding friction.** The sliding box stops at x = 65.80 on ours and 65.05 on real
-   (1.1%). On contact, real shows a small vertical pop (vz +1.5, then −3.2) that ours doesn't. Partly
-   the same as (3).
+   whenever both teams score in the same tick. `contacts.rs` iterated a `std` `HashMap`. Now pairs
+   and events go in shape creation order (`contacts_tests::same_tick_events_follow_creation_order`).
+   After: four runs give winner 0 and byte-identical `MATCH:` markers. Bots' final positions still
+   differ from real's by up to 18.5 units (physics, not order).
+2. **Improved. A tilted box lands differently.** The probe box (pitch 20, yaw 30, roll 10) dropped
+   onto the slab. Real settles 5.8 units from the drop point (194.4, 1.5, yaw 28.9) at 0.5 u/s by
+   tick 50. Before: ours tumbled onto another face and ended 50 units away (151.2, −11.9, yaw 22.0),
+   still at 90 u/s at tick 50. After (with (3); 2 PGS and 3 stabilization iterations per
+   integration, `world.rs`): 1.0 units away (199.0, −0.3, yaw 28.3), 0.6 u/s at tick 50. Distance
+   from the drop point at tick 150 for the other orientations, real / ours: flat 0.14 / 0.06;
+   pitch 45 and roll 45 (balanced on an edge on both engines) 1.3 and 1.1 / 0.3; (30,45,15) 57 /
+   53; (60,10,0) 7.9 / 6.7; (10,10,10) 3.3 / 0.3; pitch 89 0.4 / 0.03; (35,45,0) 8.3 / 10.3. The
+   tumbling cases are chaotic on both engines; headless (`landing_tests`) the same drops land
+   differently again. Left: resting boxes sit 0.010 higher on ours (15.976 against 15.966: real
+   sinks 1/32 into the slab). Rejected: a 0.4 m speculative margin fitted headless landings better
+   but kept props near an animated keyframed body awake forever (the zoo never settled), and
+   turning warm-starting off collapsed an 8-box stack; both have tests.
+3. **Fixed. Integration substeps.** Real integrates `max(n, 4)` times per `StepSimulation(dt, n)`
+   (the private-world free fall is identical for n = 1–4 and fits k = 6 for n = 6); a scene step
+   passes n = 2, so k = 4. Ours did n Rapier steps of 4 solver iterations each (k = 8). Now one
+   Rapier step with `max(n, 4)` solver iterations. Before: z at tick 25 was 101.570 (real
+   101.060). After: 101.060, and every `SUBSTEP` marker matches real to four decimals.
+4. **Improved. Sliding friction.** The sliding box stops at x = 65.80 on ours before, 65.43 after,
+   65.05 on real (1.1% → 0.6%). On contact, real shows a small vertical pop (vz +1.5, then −3.2)
+   that ours doesn't.
 5. **Fixed. Core GameResources were absent on ours.** On Sweeper, real registers `ammo=1 decal=47
    prefab=61 scene=1 sound=70 surface=17`; ours registered only `scene=1`, because a real install
    ships core compiled and ours compiled only project resources at mount. Ours now compiles core's
@@ -123,9 +136,14 @@ exactly but not its event order (1). Ranked by severity:
    and registers the same counts; Sweeper shows 0 divergences. The compiled set equals real's
    (196 files, names compared case-blind: `UNDERBOX_REAL_CORE` in `fs/core_tests.rs`). Cost: about
    0.1 s on a fresh game-dir copy (196 compiled), 0.1–0.2 s for the stat walk when up to date.
-6. **Low. Shape sweeps stop on the surface.** Sphere and box sweeps onto the slab end at z = 10.000
-   on ours and 10.031 on real: real keeps about 0.03 units of skin. The fraction is the same to
-   three decimals. All seven traces agree on hit, start-solid, normal and object.
+6. **Fixed. Shape sweeps stopped on the surface.** Real stops every shape sweep 1/32 unit short of
+   the surface, measured along the normal: the same for spheres of radius 1, 10 and 50, boxes of
+   2, 20 and 100, sweeps from 20 or 300 above, and a 45° slant (which ends 1/32 back along both
+   axes). Rays keep no skin. Before: ours ended at z = 10.000 (real 10.031), and a radius-1 sphere
+   swept 600 units ended 0.1 inside the slab (parry overshoots long casts). After
+   (`trace::SWEEP_SKIN`, plus a recast of the last 4 units): every `SKIN` and `TRACE` marker is
+   within 0.004 of real, fraction included. Left: a sweep that starts inside the slab reports
+   normal (0, 0, 1) on ours and a slanted one on real.
 
 Agreeing (within 0.15): ray traces, the head-on rebound (±10 u/s after contact, so the same default
 restitution), the dropped sphere's resting height, Sweeper's 72 cubes settling and the controller
@@ -141,32 +159,27 @@ compiled core, the default.
 Both pass (`GAME:STANDING ... on=Block`, the origin trace hits `Block` at z = 0). Both refuse the
 same packages and miss the same package models. Differences:
 
-7. **High. Error models have no collision on ours.** `washing_machine`, `tv` and
+7. **Fixed. Error models had no collision on ours.** `washing_machine`, `tv` and
    `oil_drum_explosive` get the error model on both engines. On real they rest on the floor
-   (`fallen=0`, 16 bodies); on ours their ModelCollider has `shapes=0` and they fall forever
-   (`fallen=3`, z = −3053 by the end). Real's compiled `models/dev/error.vmdl_c` carries physics;
-   ours doesn't. This is the "Falling props" item in docs/real-games.md, now with a reference.
-8. **Medium. Physics totals.** `GAME:PHYSICS` is `bodies=32 shapes=44` on real and `bodies=31
-   shapes=34` on ours. Three shapes are (7); the other body and seven shapes are not yet attributed.
-   Run a per-body shape dump on both before guessing.
+   (`fallen=0`); on ours their ModelCollider had `shapes=0` and they fell forever (`fallen=3`,
+   z = −3053). Real's error model has one 14-vertex hull: the outline of the "ERROR" sign, 10 deep
+   (x ±5), 100 wide (y ±50), 25.08 tall, its right end bevelled. The probe's `ERRRAY` rays map it;
+   `model/physics/error.rs` rebuilds it from those measurements as a 12-vertex hull. After:
+   `fallen=0`, and every probe ray across it agrees with real to 0.003, except that ours also hits
+   rays grazing the exact y = ±50 ends. Left: the error model's render bounds are our 16-unit
+   stand-in cube; real's are the sign's (`ERRMODEL bounds`).
+8. **Fixed. Physics totals.** `GAME:PHYSICS` was `bodies=32 shapes=44` on real and `bodies=31
+   shapes=34` on ours; all of the gap was error models (7). After: `bodies=32 shapes=44`.
 9. **Fixed. Resource counts** followed (5): ours was `ammo=5 prefab=183 sound=123 surface=7`, now
    `ammo=6 decal=47 prefab=244 scene=6 sound=191 surface=20`, as real.
 10. **Low. Sleeping.** Real keeps the vehicle's bodies (`base`, wheels, `rear`) and `hoover_a`
-    awake for longer after the drop (5 or 6 awake against ours' 3, which are the falling props).
-    All sleep by the end on real.
+    awake for longer after the drop: 5 awake for ~15 s on real, while ours has all 16 asleep
+    within 4 s. Both settle (`GAME:SETTLED`).
 
 ## Follow-up lanes
 
-- **Deterministic physics events (1):** emit begin/end events in a stable order. Order by collider
-  creation, as real appears to, then add a test that a symmetric scene gives the same order every
-  run.
-- **Box contact response (2):** compare restitution, friction and angular response for box-on-box
-  and box-on-slab landings against the probe. Extend the probe with more drop orientations first.
-- **Substep count (3):** find where ours ends up with twice real's integration substeps
-  (managed's `subSteps * SubSteps`, Rapier's own solver iterations) and match real's.
-- **Error-model collision (7):** give our error model the collision real's has (measure it with
-  a probe trace against an error-model prop on real), then recount the zoo's bodies and shapes (8).
-- **Trace skin (6):** decide whether to copy real's ~0.03 skin; PlayerController's ground checks
-  are the consumer.
+- **Contact depth (2):** real rests boxes and props 1/32 into the surface; ours 0.024. Try
+  matching Rapier's allowed linear error to it, then rerun the probe.
+- **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Coverage:** client-side differentials (frame hashes against `librendersystemvulkan`), net
   join, and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

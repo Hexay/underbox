@@ -91,6 +91,7 @@ impl World {
         self.body(body)?;
         let id = self.raw_mut().insert_collider(collider, Some(body));
         self.meta.insert(id, ShapeMeta::default());
+        self.contacts.created(id);
         self.rebuild_mass(body);
         Some(id)
     }

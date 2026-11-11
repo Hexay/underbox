@@ -66,7 +66,11 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
             return Model { name: name.clone(), content: compiled::content(&m), error: false, guid };
         }
         let (meshes, error) = compile(&name).map_or_else(|| (vec![source::stand_in()], true), |m| (m, false));
-        Model { name: name.clone(), content: Content::from_meshes(&meshes), error, guid }
+        let mut content = Content::from_meshes(&meshes);
+        if error || source_path(&name) == "models/dev/error.vmdl" {
+            content.physics = physics::error::physics();
+        }
+        Model { name: name.clone(), content, error, guid }
     });
     resource::new_handle(model)
 }

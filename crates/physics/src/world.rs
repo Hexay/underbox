@@ -14,6 +14,8 @@ pub const INCHES_PER_METRE: f32 = 39.37;
 /// Native's world gravity until managed sets one (inches/s²).
 pub const DEFAULT_GRAVITY: Vector = Vector::new(0.0, 0.0, -800.0);
 
+const MIN_SUBSTEPS: u32 = 4;
+
 /// managed's `PhysicsBodyType`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BodyType {
@@ -69,6 +71,10 @@ impl Default for World {
     fn default() -> Self {
         let mut inner = PhysicsWorld::new();
         inner.integration_parameters.length_unit = INCHES_PER_METRE;
+        // Fitted to real engine2's box landings (docs/differential.md, divergence 2). A wider
+        // speculative margin fitted better but kept bodies near animated ones awake (zoo chairs).
+        inner.integration_parameters.num_internal_pgs_iterations = 2;
+        inner.integration_parameters.num_internal_stabilization_iterations = 3;
         inner.gravity = DEFAULT_GRAVITY;
         Self {
             inner,
@@ -120,17 +126,17 @@ impl World {
         self.rules = rules;
     }
 
-    /// Advance `dt` seconds in `substeps` equal steps, then collect contacts and activity.
+    /// Advance `dt` seconds, integrating `max(substeps, 4)` times as native does (measured in
+    /// docs/differential.md, divergence 3): one collision pass, one Rapier solver iteration per
+    /// integration. Then collect contacts and activity.
     pub fn step(&mut self, dt: f32, substeps: u32) {
-        let substeps = substeps.max(1);
-        self.inner.integration_parameters.dt = dt / substeps as f32;
+        self.inner.integration_parameters.dt = dt;
+        self.inner.integration_parameters.num_solver_iterations = substeps.max(MIN_SUBSTEPS) as usize;
         self.drive_joints();
-        for _ in 0..substeps {
-            let hooks = Hooks { rules: &self.rules, meta: &self.meta };
-            self.inner.step_with_events(&hooks, &());
-            self.clamp_speeds();
-            self.measure_joints(substeps);
-        }
+        let hooks = Hooks { rules: &self.rules, meta: &self.meta };
+        self.inner.step_with_events(&hooks, &());
+        self.clamp_speeds();
+        self.measure_joints(1);
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
         self.contacts.update(&self.inner, &hooks);
         self.collect_activity();

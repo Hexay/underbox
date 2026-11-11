@@ -134,3 +134,31 @@ fn touch_event_carries_contact_data() {
     assert!((begin.normal - top).length() < 1e-3, "normal from a to b: {:?}", begin.normal);
     assert!((begin.point.z - 10.0).abs() < 1.0, "contact on the ground's top: {:?}", begin.point);
 }
+
+/// Same-tick events come in shape creation order, not handle order: the dropped first ball's slot
+/// is reused by the last one.
+#[test]
+fn same_tick_events_follow_creation_order() {
+    for _ in 0..8 {
+        let mut world = World::default();
+        let ground = slab(&mut world, false, &[]);
+        let at = |world: &mut World, x: f32| {
+            let (body, id) = ball(world, 30.0, &[]);
+            world.body_mut(body).unwrap().set_translation(Vector::new(x, 0.0, 30.0), true);
+            (body, id)
+        };
+        let (gone, _) = at(&mut world, -80.0);
+        let mut want: Vec<_> = [40.0, -40.0, 0.0, 80.0].map(|x| at(&mut world, x).1).into();
+        world.remove_body(gone);
+        want.push(at(&mut world, -80.0).1);
+        let begins: Vec<_> = (0..120)
+            .flat_map(|_| {
+                world.step(1.0 / 60.0, 1);
+                world.take_contact_events()
+            })
+            .filter(|e| e.kind == EventKind::TouchBegin)
+            .collect();
+        assert!(begins.iter().all(|e| e.a == ground), "the older shape comes first in a pair");
+        assert_eq!(begins.iter().map(|e| e.b).collect::<Vec<_>>(), want);
+    }
+}

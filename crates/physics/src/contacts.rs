@@ -38,6 +38,9 @@ const TOUCH_DISTANCE: f32 = 0.1;
 #[derive(Default)]
 pub(crate) struct Contacts {
     touching: HashMap<(ColliderHandle, ColliderHandle), Contact>,
+    /// Shape creation order: pairs and events follow it, as native's do (orbmatch's tie-break).
+    created: HashMap<ColliderHandle, u64>,
+    next: u64,
     pub events: Vec<ContactEvent>,
 }
 
@@ -72,14 +75,14 @@ impl Contacts {
         for pair in world.narrow_phase.contact_pairs().filter(|p| touches(p)) {
             let kind = hooks.classify(pair.collider1, pair.collider2, false);
             if kind != Contact::None {
-                now.insert(ordered(pair.collider1, pair.collider2), kind);
+                now.insert(self.ordered(pair.collider1, pair.collider2), kind);
             }
         }
         for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2) {
-            now.insert(ordered(a, b), Contact::Trigger);
+            now.insert(self.ordered(a, b), Contact::Trigger);
         }
         let wants = |a, b, bit| [a, b].iter().any(|c| hooks.meta.get(c).is_some_and(|m: &ShapeMeta| m.functions & bit != 0));
-        for (&(a, b), &kind) in &now {
+        for ((a, b), kind) in self.sorted(&now) {
             let was = self.touching.get(&(a, b)).copied();
             let kind_event = match (kind, was) {
                 (Contact::Trigger, None) => Some(EventKind::TriggerBegin),
@@ -91,7 +94,7 @@ impl Contacts {
                 self.events.push(event(world, k, a, b));
             }
         }
-        for (&(a, b), &kind) in &self.touching {
+        for ((a, b), kind) in self.sorted(&self.touching) {
             if now.contains_key(&(a, b)) {
                 continue;
             }
@@ -107,15 +110,32 @@ impl Contacts {
     /// Whether `a` touches `b` (solidly, or as a trigger when `triggers`).
     pub fn touching(&self, a: ColliderHandle, b: ColliderHandle, triggers: bool) -> bool {
         let want = if triggers { Contact::Trigger } else { Contact::Solid };
-        self.touching.get(&ordered(a, b)) == Some(&want)
+        self.touching.get(&self.ordered(a, b)) == Some(&want)
+    }
+
+    pub fn created(&mut self, shape: ColliderHandle) {
+        self.created.insert(shape, self.next);
+        self.next += 1;
     }
 
     /// Forget pairs involving a removed shape without reporting them.
     pub fn forget(&mut self, shape: ColliderHandle) {
         self.touching.retain(|&(a, b), _| a != shape && b != shape);
+        self.created.remove(&shape);
     }
-}
 
-fn ordered(a: ColliderHandle, b: ColliderHandle) -> (ColliderHandle, ColliderHandle) {
-    if a.into_raw_parts() <= b.into_raw_parts() { (a, b) } else { (b, a) }
+    fn rank(&self, c: ColliderHandle) -> (u64, u32, u32) {
+        let (index, generation) = c.into_raw_parts();
+        (self.created.get(&c).copied().unwrap_or(u64::MAX), index, generation)
+    }
+
+    fn ordered(&self, a: ColliderHandle, b: ColliderHandle) -> (ColliderHandle, ColliderHandle) {
+        if self.rank(a) <= self.rank(b) { (a, b) } else { (b, a) }
+    }
+
+    fn sorted(&self, pairs: &HashMap<(ColliderHandle, ColliderHandle), Contact>) -> Vec<((ColliderHandle, ColliderHandle), Contact)> {
+        let mut v: Vec<_> = pairs.iter().map(|(&k, &c)| (k, c)).collect();
+        v.sort_by_key(|((a, b), _)| (self.rank(*a), self.rank(*b)));
+        v
+    }
 }
