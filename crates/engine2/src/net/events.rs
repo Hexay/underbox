@@ -6,6 +6,7 @@
 
 use abi::callbacks::sandbox_network_steam_network as managed;
 use abi::structs::{HSteamListenSocket, HSteamNetConnection};
+use super::transport::of;
 use gns::{Status, state};
 use std::ffi::CString;
 
@@ -23,9 +24,9 @@ pub fn dispatch(s: &Status) {
     match s.state {
         state::CONNECTING if incoming => {
             if managed::should_accept_connection(socket, conn) {
-                gns::accept(s.conn);
+                of(s.conn).accept(s.conn);
             } else {
-                gns::close(s.conn, END_APP, Some(c"rejected"), false);
+                of(s.conn).close(s.conn, END_APP, Some(c"rejected"), false);
             }
         }
         state::CONNECTED if incoming => managed::on_socket_connection(socket, conn),
@@ -37,7 +38,7 @@ pub fn dispatch(s: &Status) {
                 managed::on_socket_disconnection(socket, conn);
             }
             // The handle stays allocated until closed locally, whoever ended it.
-            gns::close(s.conn, 0, None, false);
+            of(s.conn).close(s.conn, 0, None, false);
         }
         _ => {}
     }

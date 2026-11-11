@@ -8,6 +8,7 @@ pub(crate) mod decode;
 mod ffi;
 mod inventory;
 mod lobby;
+mod peers;
 pub(crate) mod pump;
 mod servers;
 pub(crate) mod strings;
@@ -17,12 +18,13 @@ pub(crate) mod user;
 
 pub(crate) use inventory::SteamInventory;
 pub(crate) use lobby::SteamLobbies;
+pub(crate) use peers::SteamPeers;
 pub(crate) use pump::Calls;
 pub(crate) use servers::SteamServers;
 pub(crate) use ugc::SteamUgc;
 
 use crate::steam_client::SteamClient;
-use crate::{BeginAuth, Client, Event, Inventory, Offline, Platform, ServerInfo, SteamId, Ticket, Workshop};
+use crate::{BeginAuth, Client, Event, Inventory, Offline, PeerMessages, Platform, ServerInfo, SteamId, Ticket, Workshop};
 use std::ffi::c_void;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -37,6 +39,7 @@ pub struct Steam {
     calls: Arc<Calls>,
     workshop: SteamUgc,
     inventory: SteamInventory,
+    peers: SteamPeers,
     client: OnceLock<Option<SteamClient>>,
 }
 
@@ -50,6 +53,7 @@ impl Default for Steam {
             info: Mutex::default(),
             workshop: SteamUgc::server(calls.clone()),
             inventory: SteamInventory::server(calls.clone()),
+            peers: SteamPeers::server(),
             calls,
             client: OnceLock::new(),
         }
@@ -234,7 +238,12 @@ impl Platform for Steam {
         let pipe = unsafe { sys::SteamGameServer_GetHSteamPipe() };
         pump::pump(pipe, &self.calls, &mut |kind, b| match decode::server_event(kind, b) {
             Some(e) => event(e),
-            None => raw(kind, b),
+            None => {
+                if let Some(user) = decode::session_request(kind, b) {
+                    self.peers.requested(user);
+                }
+                raw(kind, b)
+            }
         });
     }
 
@@ -244,6 +253,10 @@ impl Platform for Steam {
 
     fn server_inventory(&self) -> Option<&dyn Inventory> {
         self.with(|_| &self.inventory as &dyn Inventory)
+    }
+
+    fn server_peers(&self) -> Option<&dyn PeerMessages> {
+        self.with(|_| &self.peers as &dyn PeerMessages)
     }
 
     fn start_client(&self, app_id: u32) {

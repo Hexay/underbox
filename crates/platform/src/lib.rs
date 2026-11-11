@@ -111,6 +111,10 @@ pub trait Platform: Send + Sync {
     fn server_inventory(&self) -> Option<&dyn Inventory> {
         None
     }
+    /// Peer messages to and from the game server's own Steam id.
+    fn server_peers(&self) -> Option<&dyn PeerMessages> {
+        None
+    }
 
     /// Start the local user's services now, for `app_id` (0: the backend's own default). A game client
     /// calls this at engine pre-init, before managed's own steam_api calls need the client up.
