@@ -181,3 +181,21 @@ Map collision is `maps/<name>/world_physics.vphys`, reached in two ways:
 - **Stream:** trails the container at its header's file size. PCM and ADPCM are bare samples (ADPCM's `fmt ` chunk is the
   v1–4 header), wrapped in RIFF to decode; MP3 is a whole file.
 - Managed never reads vsnd bytes: `PrecacheSound("x.vsnd")` resolves a source file first, then `x.vsnd_c`.
+
+## What real engine2 accepts
+
+Found by bisecting our fixture `.vmdl_c`/`.vmat_c` on real (docs/differential-render.md). The reference was the layout
+and member order of real's own compiled core and menu models.
+- **Container** `Version` 1. With 0 real reads the blocks as pre-KV3 introspected data ("Failed to convert
+  introspected block"). It rejects 2.
+- **KV3** binary v2. v4 and v5 fail with "Unable to determine buffer encoding".
+- **VBIB:** the element size carries no flag bits. Our old not-meshopt and zstd flags made real allocate a huge
+  vertex pool and run out of memory. Meshopt data with flags 0 loads.
+- **Blocks:** DATA, MDAT, PHYS, ANIM, ASEQ and AGRP follow real's member order. That covers the half-edge
+  `RnHull_t` with mass properties (`hull.rs`), and the decode key's bone array, element ids and element masks
+  (`anim/layout.rs`). The element ids put positions on even ids and angles on odd ids, then scales, then morphs.
+- **Animation:** a morph segment without a morph channel in the decode key makes real drop the animation
+  ("mismatched anim").
+- **Materials** bind every texture the complex shader samples. Real's compiler fills the unset ones from
+  `materials/default.vmat`'s defaults. Unbound, real samples its fallback checker, even for normals.
+- **Draw calls:** `m_nPrimitiveType` is an enum string ("RENDER_PRIM_TRIANGLES").

@@ -6,8 +6,8 @@
 # The copy lives while <owner-pid> does. It gets the artifact's compiled game/core too, as a real
 # install has, and any fetched compiled addons (REAL_CORE=0 keeps the source-only core and addons both
 # engines otherwise see).
-# A `+game <x>.sbproj` project gets its GameResources compiled first: real engine2 doesn't compile at
-# mount (the editor does), see docs/differential.md.
+# A `+game <x>.sbproj` project gets its GameResources and `.vmat` sources compiled first: real engine2
+# doesn't compile at mount (the editor does), see docs/differential-render.md.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 SRC=$1
@@ -19,7 +19,7 @@ RUNS=$REAL_ENGINE2_RUNS
 while [ $# -gt 1 ]; do
     if [ "$1" = +game ] && [ -d "$(dirname -- "$2")/Assets" ]; then
         env -u CARGO_INCREMENTAL cargo run -q --manifest-path "$ROOT/Cargo.toml" -p assets --bin assetc -j4 -- \
-            "$(dirname -- "$2")/Assets" >&2
+            --materials "$(dirname -- "$2")/Assets" >&2
     fi
     shift
 done

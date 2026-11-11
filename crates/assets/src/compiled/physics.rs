@@ -203,18 +203,16 @@ fn descriptor(name: &str, inner: Value, ids: Ids) -> Value {
 fn write_shapes(s: &Shapes) -> Value {
     let spheres = s.spheres.iter().map(|(c, r, i)| descriptor("m_Sphere", obj(vec![("m_vCenter", floats(c)), ("m_flRadius", Value::Double((*r).into()))]), *i));
     let capsules = s.capsules.iter().map(|(a, b, r, i)| descriptor("m_Capsule", obj(vec![("m_vCenter", list([floats(a), floats(b)])), ("m_flRadius", Value::Double((*r).into()))]), *i));
-    let hulls = s.hulls.iter().map(|(points, i)| {
-        let index: Vec<u8> = (0..points.len()).map(|v| v as u8).collect();
-        descriptor("m_Hull", obj(vec![("m_VertexPositions", blob_of(points, f32::to_le_bytes)), ("m_Vertices", Value::Binary(index))]), *i)
-    });
+    let hulls = s.hulls.iter().map(|(points, i)| descriptor("m_Hull", super::hull::write(points), *i));
     let meshes = s.meshes.iter().map(|m| {
         let materials = list(m.materials.iter().map(|&x| int_value(x)));
         descriptor("m_Mesh", obj(vec![("m_Vertices", blob_of(&m.vertices, f32::to_le_bytes)), ("m_Triangles", blob_of(&m.triangles, u32::to_le_bytes)), ("m_Materials", materials)]), m.ids)
     });
-    obj(vec![("m_spheres", list(spheres)), ("m_capsules", list(capsules)), ("m_hulls", list(hulls)), ("m_meshes", list(meshes))])
+    obj(vec![("m_spheres", list(spheres)), ("m_capsules", list(capsules)), ("m_hulls", list(hulls)), ("m_meshes", list(meshes)), ("m_CollisionAttributeIndices", list([]))])
 }
 
-/// The DATA/PHYS object for `a`.
+/// The DATA/PHYS object for `a`, with the members real's compiler writes (its schema conversion
+/// rejects a block without them). Bone-less aggregates get no bind poses or bone parents, as there.
 pub fn write_kv3(a: &Aggregate) -> Value {
     let mut bones: Vec<String> = Vec::new();
     let parents = a.parts.iter().map(|p| match &p.bone {
@@ -224,28 +222,41 @@ pub fn write_kv3(a: &Aggregate) -> Value {
         }) as i64),
         None => int_value(-1),
     });
-    let parents = list(parents.collect::<Vec<_>>());
+    let parents: Vec<Value> = parents.collect();
+    let boned = !bones.is_empty();
     let part = |p: &Part| {
         obj(vec![
             ("m_nFlags", int_value(p.flags)),
             ("m_flMass", Value::Double(p.mass.into())),
+            ("m_rnShape", write_shapes(&p.shapes)),
+            ("m_nCollisionAttributeIndex", int_value(0)),
+            ("m_nReserved", int_value(0)),
             ("m_flInertiaScale", Value::Double(p.inertia_scale.into())),
             ("m_flLinearDamping", Value::Double(p.linear_damping.into())),
             ("m_flAngularDamping", Value::Double(p.angular_damping.into())),
-            ("m_rnShape", write_shapes(&p.shapes)),
-            ("m_nCollisionAttributeIndex", int_value(0)),
+            ("m_bOverrideMassCenter", Value::Bool(false)),
+            ("m_vMassCenterOverride", floats(&[0.0; 3])),
+            ("m_flGravityScale", Value::Double(1.0)),
         ])
     };
-    let attributes = a.attributes.iter().map(|t| obj(vec![("m_CollisionGroupString", text("default")), ("m_InteractAsStrings", list(t.iter().map(|s| text(s))))]));
+    let attributes = a.attributes.iter().map(|t| obj(vec![("m_PhysicsTagStrings", list(t.iter().map(|s| text(s))))]));
+    let empty = || list([]);
     obj(vec![
         ("m_nFlags", int_value(0)),
-        ("m_bindPose", list(a.parts.iter().map(|p| list(p.bind.iter().map(|r| floats(r)))))),
-        ("m_parts", list(a.parts.iter().map(part))),
+        ("m_nRefCounter", int_value(0)),
+        ("m_bonesHash", empty()),
         ("m_boneNames", list(bones.iter().map(|b| text(b)))),
-        ("m_boneParents", parents),
+        ("m_indexNames", empty()),
+        ("m_indexHash", empty()),
+        ("m_bindPose", if boned { list(a.parts.iter().map(|p| list(p.bind.iter().map(|r| floats(r))))) } else { empty() }),
+        ("m_parts", list(a.parts.iter().map(part))),
+        ("m_constraints2", empty()),
+        ("m_joints", super::joint::write(&a.joints)),
+        ("m_boneParents", if boned { list(parents) } else { empty() }),
         ("m_surfacePropertyHashes", list(a.surfaces.iter().map(|&h| int_value(h)))),
         ("m_collisionAttributes", list(attributes)),
-        ("m_joints", super::joint::write(&a.joints)),
+        ("m_debugPartNames", empty()),
+        ("m_embeddedKeyvalues", text("")),
     ])
 }
 

@@ -52,7 +52,9 @@ fn material_round_trips_and_references_its_texture() {
     let want = fixture::material(MATERIAL, [1.0, 0.5, 0.25, 0.0]);
     let file = material::write(&want);
     assert_eq!(material::read(&file).unwrap(), want);
-    assert_eq!(references(&file).unwrap().into_iter().map(|(_, p)| p).collect::<Vec<_>>(), [TEXTURE]);
+    let refs: Vec<String> = references(&file).unwrap().into_iter().map(|(_, p)| p).collect();
+    assert_eq!(refs, want.textures.iter().map(|(_, t)| t.clone()).collect::<Vec<_>>());
+    assert_eq!(refs[0], TEXTURE);
 }
 
 #[test]

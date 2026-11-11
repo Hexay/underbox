@@ -27,7 +27,7 @@ fn sample() -> Value {
 
 #[test]
 fn round_trips_every_version_and_compression() {
-    for version in [4, 5] {
+    for version in [2, 4, 5] {
         for c in [Compression::None, Compression::Lz4, Compression::Zstd] {
             let bytes = write(&sample(), version, c);
             assert!(is_binary_kv3(&bytes));
@@ -39,7 +39,7 @@ fn round_trips_every_version_and_compression() {
 #[test]
 fn round_trips_without_blobs() {
     let v = obj(vec![("a", Value::Array(vec![obj(vec![("b", Value::String("c".into()))])]))]);
-    for version in [4, 5] {
+    for version in [2, 4, 5] {
         for c in [Compression::None, Compression::Lz4] {
             assert_eq!(read(&write(&v, version, c)), Ok(v.clone()));
         }

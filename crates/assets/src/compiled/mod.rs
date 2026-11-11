@@ -5,6 +5,7 @@
 pub mod anim;
 pub mod fixture;
 pub mod flex;
+mod hull;
 pub mod joint;
 pub mod kv;
 pub mod material;
@@ -135,7 +136,12 @@ pub fn write(version: u16, refs: &[&str], blocks: Vec<(FourCC, Vec<u8>)>) -> Vec
     Container { version, blocks: all }.write()
 }
 
-/// Binary KV3 as compiled resources store it (v5, LZ4).
+/// Container `Version` of real's compiled models and materials. With 0, real engine2 takes the
+/// blocks for pre-KV3 introspected data ("Failed to convert introspected block"); 2 it rejects.
+pub const RESOURCE_VERSION: u16 = 1;
+
+/// Binary KV3 as real's compiled resources store it (v2, LZ4): real engine2 can't read v4 or v5
+/// blocks ("Unable to determine buffer encoding").
 pub fn kv3(value: &Value) -> Vec<u8> {
-    kv3bin::write(value, 5, Compression::Lz4)
+    kv3bin::write(value, 2, Compression::Lz4)
 }

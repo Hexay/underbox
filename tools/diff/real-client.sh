@@ -3,7 +3,7 @@
 # usage: tools/diff/real-client.sh <corpus> <out-dir> [max-s=240] [artifact-root]
 # Waits for `game.load success`, then GRACE (default 20) s, then grabs Xvfb's framebuffer every
 # second until SETTLE (default 4) grabs in a row are identical; writes <out-dir>/frame.xwd plus
-# client.out and client.log. See docs/differential.md ("Rendering").
+# client.out and client.log. See docs/differential-render.md.
 # Real refuses lavapipe unless given its own -vulkan_allow_cpu (CPU device types are skipped), and
 # waits forever for a Steam client unless given -nosteam.
 set -eu

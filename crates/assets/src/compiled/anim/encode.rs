@@ -3,36 +3,45 @@
 //! positions as base + half deltas, moving rotations as 48-bit quaternions, scale and morphs
 //! as full floats, split into frame blocks of `block` frames.
 
+use super::layout::{self, ANGLE, MORPH, POSITION, SCALE};
 use super::segment::{Decoder, encode_quaternion, half3_bytes};
 use super::{Animation, Key, Rig};
-use crate::compiled::kv::{int_value, list, obj, resource, text};
+use crate::compiled::kv::{int_value, list, obj, text};
 use ::kv::Value;
 
-const POSITION: i64 = 0;
-const ANGLE: i64 = 1;
-const SCALE: i64 = 2;
-const MORPH: i64 = 3;
-const DECODERS: [Decoder; 5] = [Decoder::StaticFullVector3, Decoder::StaticQuaternion, Decoder::DeltaVector3, Decoder::AnimQuaternion, Decoder::FullFloat];
+pub use layout::sequences;
 
-fn container(decoder: Decoder, cardinality: i16, elements: &[usize], data: &[u8]) -> Vec<u8> {
-    let index = DECODERS.iter().position(|d| *d == decoder).expect("writer decoder") as i16;
-    let length = (8 + elements.len() * 2 + data.len()).min(i16::MAX as usize) as i16;
-    let mut out: Vec<u8> = [index, cardinality, elements.len() as i16, length].iter().flat_map(|v| v.to_le_bytes()).collect();
-    out.extend(elements.iter().flat_map(|&e| (e as i16).to_le_bytes()));
-    out.extend_from_slice(data);
-    out
-}
-
-fn segment(channel: i64, bytes: Vec<u8>) -> Value {
-    obj(vec![("m_nUniqueFrameIndex", int_value(0)), ("m_container", Value::Binary(bytes)), ("m_nLocalChannel", int_value(channel))])
-}
+const DECODERS: [(Decoder, i64); 5] = [(Decoder::StaticFullVector3, 3), (Decoder::StaticQuaternion, 4), (Decoder::DeltaVector3, 3), (Decoder::AnimQuaternion, 4), (Decoder::FullFloat, 1)];
 
 fn floats(v: &[f32]) -> impl Iterator<Item = u8> + '_ {
     v.iter().flat_map(|f| f.to_le_bytes())
 }
 
-/// The segments for frames `range` of `a`, appended to `out`; their indices.
-fn block_segments(a: &Animation, base: &[Key], range: std::ops::RangeInclusive<usize>, out: &mut Vec<Value>) -> Vec<i64> {
+/// Segments of one animation's frame blocks, appended to the shared `m_segmentArray`.
+struct Segments<'a> {
+    out: &'a mut Vec<Value>,
+    bones: usize,
+    controllers: usize,
+}
+
+impl Segments<'_> {
+    /// Pushes a segment keying `targets` (bone or controller indices) of `channel`; its index.
+    fn push(&mut self, channel: i64, decoder: Decoder, cardinality: i16, targets: &[usize], data: &[u8]) -> i64 {
+        let index = DECODERS.iter().position(|(d, _)| *d == decoder).expect("writer decoder") as i16;
+        let length = (8 + targets.len() * 2 + data.len()).min(i16::MAX as usize) as i16;
+        let mut bytes: Vec<u8> = [index, cardinality, targets.len() as i16, length].iter().flat_map(|v| v.to_le_bytes()).collect();
+        bytes.extend(targets.iter().flat_map(|&t| (layout::element(channel, t, self.bones) as i16).to_le_bytes()));
+        bytes.extend_from_slice(data);
+        let at = self.out.len() as i64;
+        let masks = targets.iter().fold(0, |m, &t| m | layout::mask(t));
+        let fields = [("m_nUniqueFrameIndex", int_value(at)), ("m_nLocalElementMasks", int_value(masks)), ("m_nLocalChannel", int_value(channel)), ("m_container", Value::Binary(bytes))];
+        self.out.push(obj(fields.into()));
+        at
+    }
+}
+
+/// The segments for frames `range` of `a`; their indices.
+fn block_segments(a: &Animation, base: &[Key], range: std::ops::RangeInclusive<usize>, out: &mut Segments) -> Vec<i64> {
     let frames = &a.frames[range.clone()];
     let bones = 0..base.len();
     let keyed = |f: &dyn Fn(&Key, &Key) -> bool| -> Vec<usize> { bones.clone().filter(|&b| a.frames.iter().any(|fr| f(&fr[b], &base[b]))).collect() };
@@ -40,39 +49,38 @@ fn block_segments(a: &Animation, base: &[Key], range: std::ops::RangeInclusive<u
     let pos_differs = |x: &Key, y: &Key| x.position != y.position;
     let rot_differs = |x: &Key, y: &Key| x.rotation != y.rotation;
     let mut segs = Vec::new();
-    let mut push = |channel, bytes| {
-        segs.push(out.len() as i64);
-        out.push(segment(channel, bytes));
-    };
     let (positions, rotations) = (keyed(&pos_differs), keyed(&rot_differs));
     let (still, moved): (Vec<usize>, Vec<usize>) = positions.iter().partition(|&&b| !moving(b, &pos_differs));
     if !still.is_empty() {
-        push(POSITION, container(Decoder::StaticFullVector3, 3, &still, &still.iter().flat_map(|&b| floats(&frames[0][b].position).collect::<Vec<_>>()).collect::<Vec<_>>()));
+        let data: Vec<u8> = still.iter().flat_map(|&b| floats(&frames[0][b].position).collect::<Vec<_>>()).collect();
+        segs.push(out.push(POSITION, Decoder::StaticFullVector3, 3, &still, &data));
     }
     if !moved.is_empty() {
         let mut data: Vec<u8> = moved.iter().flat_map(|&b| floats(&frames[0][b].position).collect::<Vec<_>>()).collect();
         for fr in frames {
             data.extend(moved.iter().flat_map(|&b| half3_bytes(std::array::from_fn(|i| fr[b].position[i] - frames[0][b].position[i]))));
         }
-        push(POSITION, container(Decoder::DeltaVector3, 3, &moved, &data));
+        segs.push(out.push(POSITION, Decoder::DeltaVector3, 3, &moved, &data));
     }
     let (still, moved): (Vec<usize>, Vec<usize>) = rotations.iter().partition(|&&b| !moving(b, &rot_differs));
     if !still.is_empty() {
-        push(ANGLE, container(Decoder::StaticQuaternion, 4, &still, &still.iter().flat_map(|&b| encode_quaternion(frames[0][b].rotation)).collect::<Vec<_>>()));
+        let data: Vec<u8> = still.iter().flat_map(|&b| encode_quaternion(frames[0][b].rotation)).collect();
+        segs.push(out.push(ANGLE, Decoder::StaticQuaternion, 4, &still, &data));
     }
     if !moved.is_empty() {
         let data: Vec<u8> = frames.iter().flat_map(|fr| moved.iter().flat_map(|&b| encode_quaternion(fr[b].rotation))).collect();
-        push(ANGLE, container(Decoder::AnimQuaternion, 4, &moved, &data));
+        segs.push(out.push(ANGLE, Decoder::AnimQuaternion, 4, &moved, &data));
     }
     let scaled = keyed(&|x: &Key, y: &Key| x.scale != y.scale);
     if !scaled.is_empty() {
         let data: Vec<u8> = frames.iter().flat_map(|fr| scaled.iter().flat_map(|&b| fr[b].scale.to_le_bytes())).collect();
-        push(SCALE, container(Decoder::FullFloat, 1, &scaled, &data));
+        segs.push(out.push(SCALE, Decoder::FullFloat, 1, &scaled, &data));
     }
-    if let Some(first) = a.morphs.first() {
+    // Without controllers the decode key has no morph channel, and real ignores the animation ("mismatched anim").
+    if let Some(first) = a.morphs.first().filter(|_| out.controllers > 0) {
         let all: Vec<usize> = (0..first.len()).collect();
         let data: Vec<u8> = a.morphs[range].iter().flat_map(|m| floats(m).collect::<Vec<_>>()).collect();
-        push(MORPH, container(Decoder::FullFloat, 1, &all, &data));
+        segs.push(out.push(MORPH, Decoder::FullFloat, 1, &all, &data));
     }
     segs
 }
@@ -80,48 +88,31 @@ fn block_segments(a: &Animation, base: &[Key], range: std::ops::RangeInclusive<u
 /// (`AnimationResourceData_t`, `m_decodeKey`) for `anims` over `rig`.
 pub fn write(anims: &[Animation], rig: &Rig, block: usize) -> (Value, Value) {
     let mut segments = Vec::new();
+    let mut out = Segments { out: &mut segments, bones: rig.bones.len(), controllers: rig.flex.len() };
     let descs: Vec<Value> = anims
         .iter()
         .map(|a| {
             let base: Vec<Key> = rig.bones.iter().map(|b| if a.delta { Key::IDENTITY } else { Key::bind(b) }).collect();
-            let starts = (0..a.frames.len()).step_by(block.max(1));
-            let blocks: Vec<Value> = starts
+            let blocks: Vec<Value> = (0..a.frames.len())
+                .step_by(block.max(1))
                 .map(|s| {
                     let end = (s + block.max(1) - 1).min(a.frames.len() - 1);
-                    let segs = block_segments(a, &base, s..=end, &mut segments);
+                    let segs = block_segments(a, &base, s..=end, &mut out);
                     obj(vec![("m_nStartFrame", int_value(s as i64)), ("m_nEndFrame", int_value(end as i64)), ("m_segmentIndexArray", list(segs.into_iter().map(int_value)))])
                 })
                 .collect();
-            let flags = obj(vec![("m_bLooping", Value::Bool(a.looping)), ("m_bDelta", Value::Bool(a.delta)), ("m_bHidden", Value::Bool(a.hidden))]);
-            let data = obj(vec![("m_nFrames", int_value(a.frames.len() as i64)), ("m_frameblockArray", list(blocks))]);
-            let events = a.events.iter().map(|e| {
-                let fields = [("m_nFrame", int_value(e.frame)), ("m_nEndFrame", int_value(e.end_frame)), ("m_flCycle", Value::Double(e.cycle.into())), ("m_sEventName", text(&e.name)), ("m_EventData", e.data.clone())];
-                obj(fields.into())
-            });
-            let fields = [("m_name", text(&a.name)), ("fps", Value::Double(a.fps.into())), ("m_flags", flags), ("m_pData", data), ("m_movementArray", list([])), ("m_eventArray", list(events))];
-            obj(fields.into())
+            layout::desc(a, blocks, rig.bones.len())
         })
         .collect();
-    let decoders = DECODERS.iter().map(|d| obj(vec![("m_szName", text(d.name())), ("m_nVersion", int_value(0)), ("m_nType", int_value(0))]));
-    let data = obj(vec![("m_name", text("")), ("m_animArray", list(descs)), ("m_decoderArray", list(decoders)), ("m_segmentArray", list(segments))]);
-    let bones: Vec<&str> = rig.bones.iter().map(|b| b.name.as_str()).collect();
-    let flex: Vec<&str> = rig.flex.iter().map(String::as_str).collect();
-    let ch = |class: &str, var: &str, names: &[&str]| {
-        obj(vec![
-            ("m_szChannelClass", text(class)),
-            ("m_szVariableName", text(var)),
-            ("m_szElementNameArray", list(names.iter().map(|n| text(n)))),
-            ("m_nElementIndexArray", list((0..names.len()).map(|i| int_value(i as i64)))),
-        ])
-    };
-    let channels = [ch("BoneChannel", "Position", &bones), ch("BoneChannel", "Angle", &bones), ch("BoneChannel", "Scale", &bones), ch("MorphChannel", "data", &flex)];
-    (data, obj(vec![("m_dataChannelArray", list(channels)), ("m_userArray", list([]))]))
+    let decoders = DECODERS.iter().map(|(d, ty)| obj(vec![("m_szName", text(d.name())), ("m_nVersion", int_value(0)), ("m_nType", int_value(*ty))]));
+    let count = segments.len() as i64;
+    let fields = [("m_name", text("")), ("m_animArray", list(descs)), ("m_decoderArray", list(decoders)), ("m_nMaxUniqueFrameIndex", int_value(count)), ("m_segmentArray", list(segments))];
+    (obj(fields.into()), layout::decode_key(rig))
 }
 
 /// An animation group: DATA with `key` and `anims` (`.vanim` resource paths), plus `anim` as its ANIM block.
 pub fn group_file(key: &Value, anim: Option<&Value>, anims: &[&str]) -> Vec<u8> {
-    let data = obj(vec![("m_name", text("")), ("m_localHAnimArray", list(anims.iter().map(|p| resource(p)))), ("m_decodeKey", key.clone())]);
-    let mut blocks = vec![(*b"DATA", crate::compiled::kv3(&data))];
+    let mut blocks = vec![(*b"DATA", crate::compiled::kv3(&layout::group(key.clone(), anims)))];
     blocks.extend(anim.map(|a| (*b"ANIM", crate::compiled::kv3(a))));
     crate::compiled::write(0, anims, blocks)
 }
@@ -129,21 +120,4 @@ pub fn group_file(key: &Value, anim: Option<&Value>, anims: &[&str]) -> Vec<u8> 
 /// A `.vanim_c`: `data` as its DATA.
 pub fn anim_file(data: &Value) -> Vec<u8> {
     crate::compiled::write(0, &[], vec![(*b"DATA", crate::compiled::kv3(data))])
-}
-
-/// A sequence group: each (name, animation it plays, looping, hidden).
-pub fn sequences(seqs: &[(&str, &str, bool, bool)]) -> Value {
-    let mut names: Vec<&str> = Vec::new();
-    let descs: Vec<Value> = seqs
-        .iter()
-        .map(|&(name, target, looping, hidden)| {
-            let i = names.iter().position(|n| *n == target).unwrap_or_else(|| {
-                names.push(target);
-                names.len() - 1
-            });
-            let fetch = obj(vec![("m_localReferenceArray", list([int_value(i as i64)]))]);
-            obj(vec![("m_sName", text(name)), ("m_flags", obj(vec![("m_bLooping", Value::Bool(looping)), ("m_bHidden", Value::Bool(hidden))])), ("m_fetch", fetch)])
-        })
-        .collect();
-    obj(vec![("m_localSequenceNameArray", list(names.iter().map(|n| text(n)))), ("m_localS1SeqDescArray", list(descs))])
 }
