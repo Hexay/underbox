@@ -17,6 +17,8 @@ pub mod function {
 #[derive(Debug, Clone)]
 pub struct ShapeMeta {
     pub tags: Vec<u32>,
+    /// A tag kept in `tags` whatever else the shape is given or loses (native's `DefaultSolidTag`).
+    pub base_tag: Option<u32>,
     pub functions: u8,
     /// kg per cubic inch.
     pub density: f32,
@@ -25,7 +27,17 @@ pub struct ShapeMeta {
 
 impl Default for ShapeMeta {
     fn default() -> Self {
-        Self { tags: Vec::new(), functions: function::DEFAULT, density: DEFAULT_DENSITY, massless: false }
+        Self { tags: Vec::new(), base_tag: None, functions: function::DEFAULT, density: DEFAULT_DENSITY, massless: false }
+    }
+}
+
+impl ShapeMeta {
+    pub fn keep_base_tag(&mut self) {
+        if let Some(t) = self.base_tag
+            && !self.tags.contains(&t)
+        {
+            self.tags.push(t);
+        }
     }
 }
 

@@ -121,11 +121,14 @@ pub fn slot_surfaces(settings: &PhysicsShapeSettings) -> Vec<i32> {
 }
 
 fn meta(settings: &PhysicsShapeSettings) -> ShapeMeta {
-    let mut tags: Vec<u32> = settings.tags.iter().copied().take_while(|t| *t != 0).collect();
-    if tags.is_empty() && settings.flags & DEFAULT_SOLID_TAG != 0 {
-        tags.push(StringToken::of("solid").0);
-    }
-    ShapeMeta { tags, functions: settings.collision_function_mask as u8, massless: settings.flags & NO_MASS != 0, ..Default::default() }
+    let tags: Vec<u32> = settings.tags.iter().copied().take_while(|t| *t != 0).collect();
+    // Native shapes keep "solid" alongside their GameObject's tags (managed relies on it, see
+    // PhysicsWorld2d.Trace.cs SolidTag): a `world`-tagged floor must still pass a trace's
+    // WithCollisionRules, which lists only tags the rules name.
+    let base_tag = (settings.flags & DEFAULT_SOLID_TAG != 0).then(|| StringToken::of("solid").0);
+    let mut m = ShapeMeta { tags, base_tag, functions: settings.collision_function_mask as u8, massless: settings.flags & NO_MASS != 0, ..Default::default() };
+    m.keep_base_tag();
+    m
 }
 
 pub fn add(body_ref: body::Ref, kind: Type, geometry: Geometry, settings: PhysicsShapeSettings) -> HandleId<class::IPhysicsShape> {

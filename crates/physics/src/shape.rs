@@ -104,6 +104,7 @@ impl World {
     pub fn update_shape_meta(&mut self, id: ColliderHandle, f: impl FnOnce(&mut ShapeMeta)) {
         let Some(meta) = self.meta.get_mut(&id) else { return };
         f(meta);
+        meta.keep_base_tag();
         if let Some(body) = self.shape(id).and_then(|c| c.parent()) {
             self.rebuild_mass(body);
         }

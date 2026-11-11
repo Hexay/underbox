@@ -35,6 +35,38 @@ fn mesh_traces_report_triangle_and_its_surface() {
     aggregate::destroy(ground);
 }
 
+/// Sandbox's zoo: floor blocks tagged `world`, traced by a PlayerController with
+/// `WithCollisionRules`, which only lists tags the rules name (`solid`, never `world`).
+#[test]
+fn default_solid_shapes_pass_collision_rule_traces_whatever_their_tags() {
+    crate::handles::fake_managed();
+    let w: world::Ref = objects::create_shared(Arc::new(PhysicsWorld::default()));
+    let (solid, world_tag) = (abi::StringToken::of("solid").0, abi::StringToken::of("world").0);
+    let floor = |x: f32, flags: u32| {
+        let body = super::body::spawn(w, physics::BodyType::Static, physics::Pose::from_translation(physics::Vector::new(x, 0.0, 0.0)), &Default::default()).unwrap();
+        let mut settings = abi::structs::PhysicsShapeSettings { friction: -1.0, elasticity: -1.0, surface_index: -1, flags, ..Default::default() };
+        settings.tags[0] = world_tag;
+        let slab = physics::Shape::Box { center: physics::Vector::ZERO, rotation: physics::Rotation::IDENTITY, half_extents: physics::Vector::new(10.0, 10.0, 1.0) };
+        shape::add(body, shape::Type::Hull, slab, settings);
+        crate::physics::body::get(body).unwrap().shapes.lock().unwrap()[0]
+    };
+    const TAGS: u32 = 1 << 3;
+    const DEFAULT_SOLID: u32 = 1 << 5;
+    let native = floor(0.0, TAGS | DEFAULT_SOLID);
+    floor(100.0, TAGS);
+    world::with_sim(w, |s| s.step(1.0 / 60.0, 1));
+    let hits = |x: f32| {
+        let mut req = Request::default();
+        (req.start_pos, req.end_pos, req.world.self_) = (vec3(x, 0.0, 10.0), vec3(x, 0.0, -10.0), w.addr());
+        req.tag_any[0] = solid;
+        trace(req).fraction < 1.0
+    };
+    assert!(hits(0.0), "a collider's shape carries solid beside world");
+    assert!(!hits(100.0), "without DefaultSolidTag only its own tags count");
+    shape::update_meta(native, |m| m.tags.clear());
+    assert!(hits(0.0), "clearing tags keeps solid");
+}
+
 #[test]
 fn mesh_shapes_take_slot_surfaces_from_their_settings() {
     crate::handles::fake_managed();
