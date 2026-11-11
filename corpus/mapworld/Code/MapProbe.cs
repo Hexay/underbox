@@ -35,7 +35,17 @@ public sealed class MapProbe : Component
 			foreach ( var so in models )
 				Mark( $"SCENEOBJECT {so.Model.ResourceName} @ {so.Position}" );
 			Mark( $"SCENEOBJECTS {models.Length}" );
+			Mark( $"MAPCOLLIDERS {Scene.GetAllComponents<MapCollider>().Count()}" );
+			Probe( "ground", new Vector3( 0, 0, 100 ) );
+			Probe( "crate", new Vector3( -40, -40, 100 ) );
 		}
 		Mark( "END" );
+	}
+
+	/// Trace straight down from `from` against the map's collision (world_physics).
+	void Probe( string what, Vector3 from )
+	{
+		var tr = Scene.Trace.Ray( from, from.WithZ( -100 ) ).Run();
+		Mark( $"TRACE {what} {(tr.Hit ? "hit" : "miss")} z={tr.EndPosition.z:0}" );
 	}
 }

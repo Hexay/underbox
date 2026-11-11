@@ -1,7 +1,8 @@
 #!/bin/sh
 # Map loading: host corpus/mapworld headless (a MapInstance on maps/tiny.vpk, the world crate's
 # fixture map) and assert MapProbe's MAP: markers: entities spawned from the KV3 lump and the
-# legacy-blob child lump, and the world nodes' scene objects.
+# legacy-blob child lump, the world nodes' scene objects (one a compiled .vmdl_c), and collision
+# from the map's compiled world_physics.
 # usage: tools/map.sh [seconds=90] [sbox-public]
 # Log: target/map/server.log. Exit 0 only when every marker is present.
 set -eu
@@ -30,7 +31,11 @@ check 'LIGHTS 1' 'PointLight component made'
 check 'SCENEOBJECT plane @ 0,0,0' 'world node plane'
 check 'SCENEOBJECT box @ 0,0,25' 'first world node box'
 check 'SCENEOBJECT box @ 60(\.0+)?,40' 'second world node box (rotated)'
-check 'SCENEOBJECTS [4-9]' 'world objects plus the prop'
+check 'SCENEOBJECT crate @ -40(\.0+)?,-40' 'compiled model (vmdl_c) world node'
+check 'SCENEOBJECTS [5-9]' 'world objects plus the prop'
+check 'MAPCOLLIDERS 1' 'world_physics.vphys_c loaded into a MapCollider'
+check 'TRACE ground hit z=0' 'trace hits the world_physics ground mesh'
+check 'TRACE crate hit z=32' 'trace hits the world_physics hull'
 check 'END' 'probe finished'
 
 echo "== markers"; grep -oE 'MAP:.*' "$LOG" | cut -c1-120 | head -n 20 || true

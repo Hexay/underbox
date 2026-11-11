@@ -1,6 +1,7 @@
 //! A tiny compiled map with known contents, for tests and the corpus (`corpus/mapworld`): two
-//! world nodes placing dev models, a KV3 entity lump and a legacy-blob child lump. Paths follow a
-//! Hammer compile: `maps/<name>/world.vwrld_c`, `worldnodes/node00N.vwnod_c`, `entities/*.vents_c`.
+//! world nodes placing dev models and a compiled crate, a KV3 entity lump, a legacy-blob child
+//! lump and `world_physics`. Paths follow a Hammer compile: `maps/<name>/world.vwrld_c`,
+//! `worldnodes/node00N.vwnod_c`, `entities/*.vents_c`, `world_physics.vphys_c`.
 
 use crate::node::Matrix;
 use crate::vpk::Builder;
@@ -18,7 +19,17 @@ pub fn objects() -> Vec<(&'static str, Matrix, [f32; 4])> {
         (BOX, [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 25.0]], [0.9, 0.2, 0.2, 1.0]),
         // Second node: rotated 45 degrees about Z.
         (BOX, [[c, -s, 0.0, 60.0], [s, c, 0.0, 40.0], [0.0, 0.0, 1.0, 25.0]], [0.2, 0.3, 0.9, 1.0]),
+        (COMPILED.0, [[1.0, 0.0, 0.0, COMPILED.1[0]], [0.0, 1.0, 0.0, COMPILED.1[1]], [0.0, 0.0, 1.0, 0.0]], [1.0; 4]),
     ]
+}
+
+/// The compiled crate model (with its compiled material and texture) and where it stands.
+pub const COMPILED: (&str, [f32; 2]) = (assets::compiled::fixture::MODEL, [-40.0, -40.0]);
+
+/// The map's `world_physics`: the ground plane plus a hull around the compiled crate.
+pub fn world_physics() -> assets::compiled::physics::Aggregate {
+    let (h, [x, y]) = (assets::compiled::fixture::HALF, COMPILED.1);
+    assets::compiled::fixture::world_physics(200.0, &[([x - h, y - h, 0.0], [x + h, y + h, 2.0 * h])])
 }
 
 /// Entities of `default_ents` (KV3), each as (key, value) text.
@@ -129,6 +140,10 @@ pub fn tiny_map(name: &str, token: fn(&str) -> u32) -> Builder {
         .add(&format!("{dir}/worldnodes/node000.vwnod_c"), crate::resource::write(&node(&objects[..2]), Compression::Lz4))
         .add(&format!("{dir}/worldnodes/node001.vwnod_c"), crate::resource::write(&node(&objects[2..]), Compression::Lz4))
         .add(&format!("{ents}.vents_c"), crate::resource::write(&lump, Compression::Zstd))
-        .add(&format!("{child}.vents_c"), crate::resource::write(&child_lump, Compression::None));
+        .add(&format!("{child}.vents_c"), crate::resource::write(&child_lump, Compression::None))
+        .add(&format!("{dir}/world_physics.vphys_c"), assets::compiled::physics::write(&world_physics()));
+    for (path, bytes) in assets::compiled::fixture::crate_files() {
+        b.add(&path, bytes);
+    }
     b
 }

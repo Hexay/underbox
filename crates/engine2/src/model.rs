@@ -1,7 +1,9 @@
-//! `CModel`: models compiled from `.vmdl` source on load (see `assets::model`), or built at
+//! `CModel`: models read from a compiled `.vmdl_c` ([`compiled`]) or else compiled from `.vmdl`
+//! source on load (see `assets::model`), or built at
 //! runtime by `CModelBuilder` ([`builder`]). Skeleton and animation queries live in `anim`.
 
 pub mod builder;
+pub mod compiled;
 pub mod content;
 mod draw;
 mod parts;
@@ -59,6 +61,9 @@ fn compile(path: &str) -> Option<Vec<source::Mesh>> {
 pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let model = LOADED.find_or_insert(&name, || {
+        if let Some(m) = compiled::read(&name) {
+            return Model { name: name.clone(), content: compiled::content(&m), error: false, guid };
+        }
         let (meshes, error) = compile(&name).map_or_else(|| (vec![source::stand_in()], true), |m| (m, false));
         Model { name: name.clone(), content: Content::from_meshes(&meshes), error, guid }
     });
