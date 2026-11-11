@@ -4,16 +4,10 @@
 //! when the module declares no `uint2`. This pass declares the 2- and 3-component vectors of
 //! every 32-bit integer type the module lacks.
 
-use crate::spirv::{HEADER_WORDS, instructions, op};
+use crate::spirv::{HEADER_WORDS, inst, instructions, op};
 
 const OP_TYPE_INT: u32 = 21;
 const OP_TYPE_VECTOR: u32 = 23;
-
-fn inst(opcode: u32, operands: &[u32]) -> Vec<u32> {
-    let mut v = vec![((operands.len() as u32 + 1) << 16) | opcode];
-    v.extend(operands);
-    v
-}
 
 pub fn declare_integer_vectors(words: &[u32]) -> Vec<u32> {
     if words.len() < HEADER_WORDS {

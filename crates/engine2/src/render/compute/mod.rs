@@ -81,6 +81,9 @@ impl Inputs {
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
 #[cfg(test)]
+#[path = "image_atomics_tests.rs"]
+mod image_atomics_tests;
+#[cfg(test)]
 #[path = "indirect_tests.rs"]
 mod indirect_tests;
 #[cfg(test)]

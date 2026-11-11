@@ -4,7 +4,7 @@
 //! into its own function taking the image as a parameter, which naga types correctly; the call
 //! passes the array element. Ids defined outside functions (constants, `ConstOffset`) stay direct.
 
-use crate::spirv::{HEADER_WORDS, instructions, op};
+use crate::spirv::{HEADER_WORDS, inst, instructions, op};
 use std::collections::{HashMap, HashSet};
 
 const OP_UNDEF: u32 = 1;
@@ -29,11 +29,6 @@ const OP_IMAGE_READ: u32 = 98;
 const OP_LABEL: u32 = 248;
 const OP_RETURN_VALUE: u32 = 254;
 
-fn inst(opcode: u32, operands: &[u32]) -> Vec<u32> {
-    let mut v = vec![((operands.len() as u32 + 1) << 16) | opcode];
-    v.extend(operands);
-    v
-}
 
 struct Module<'a> {
     /// Result id → result type, for value instructions (first definition wins).

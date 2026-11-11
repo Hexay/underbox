@@ -52,6 +52,13 @@ fn rebuild(words: &[u32], mut f: impl FnMut(&[u32]) -> Option<Vec<u32>>) -> Vec<
     out
 }
 
+/// One instruction: word count and opcode, then the operands.
+pub(crate) fn inst(opcode: u32, operands: &[u32]) -> Vec<u32> {
+    let mut v = vec![((operands.len() as u32 + 1) << 16) | opcode];
+    v.extend_from_slice(operands);
+    v
+}
+
 pub(crate) fn op(inst: &[u32]) -> u32 {
     inst[0] & 0xffff
 }
@@ -156,12 +163,6 @@ pub fn strip_compute_derivatives(words: &[u32]) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn inst(opcode: u32, operands: &[u32]) -> Vec<u32> {
-        let mut v = vec![((operands.len() as u32 + 1) << 16) | opcode];
-        v.extend(operands);
-        v
-    }
 
     fn words(s: &str) -> Vec<u32> {
         let mut b = s.as_bytes().to_vec();

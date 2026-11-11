@@ -102,12 +102,7 @@ pub fn access_chains(words: &[u32]) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn inst(opcode: u32, operands: &[u32]) -> Vec<u32> {
-        let mut v = vec![((operands.len() as u32 + 1) << 16) | opcode];
-        v.extend_from_slice(operands);
-        v
-    }
+    use crate::spirv::inst;
 
     #[test]
     fn chains_used_in_another_block_are_cloned_there() {

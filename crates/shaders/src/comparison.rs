@@ -4,7 +4,7 @@
 //! The clone binds at one past the highest binding of its set and is named `<name>_cmp`; image
 //! clones are typed depth up front because naga can't retype a binding array.
 
-use crate::spirv::{HEADER_WORDS, instructions, op, string};
+use crate::spirv::{HEADER_WORDS, inst, instructions, op, string};
 use std::collections::HashMap;
 
 const OP_NAME: u32 = 5;
@@ -25,11 +25,6 @@ const COMPARE: [u32; 5] = [89, 90, 93, 94, 97];
 const DECORATION_BINDING: u32 = 33;
 const DECORATION_DESCRIPTOR_SET: u32 = 34;
 
-fn inst(opcode: u32, operands: &[u32]) -> Vec<u32> {
-    let mut v = vec![((operands.len() as u32 + 1) << 16) | opcode];
-    v.extend_from_slice(operands);
-    v
-}
 
 fn encode(s: &str) -> Vec<u32> {
     let mut bytes = s.as_bytes().to_vec();
