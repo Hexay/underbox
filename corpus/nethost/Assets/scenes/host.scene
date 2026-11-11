@@ -5,6 +5,7 @@
       "__guid": "8a1c5e2f-3b4d-4f6a-9e7b-2c0d1f3a5b6c",
       "Flags": 0,
       "Name": "Network",
+      "Position": "0,0,16",
       "Enabled": true,
       "Components": [
         {
@@ -16,9 +17,28 @@
           "OnComponentFixedUpdate": null,
           "OnComponentStart": null,
           "OnComponentUpdate": null,
-          "PlayerPrefab": null,
+          "PlayerPrefab": {
+            "_type": "gameobject",
+            "prefab": "prefabs/player.prefab"
+          },
           "SpawnPoints": [],
           "StartServer": true
+        }
+      ]
+    },
+    {
+      "__guid": "e1a2b3c4-d5e6-4f70-8a91-b2c3d4e5f607",
+      "Flags": 0,
+      "Name": "Floor",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.BoxCollider",
+          "__guid": "f2b3c4d5-e6f7-4081-9ba2-c3d4e5f60718",
+          "Center": "0,0,-8",
+          "IsTrigger": false,
+          "Scale": "2048,2048,16",
+          "Static": true
         }
       ]
     }

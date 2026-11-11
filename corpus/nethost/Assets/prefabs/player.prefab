@@ -1,0 +1,96 @@
+{
+  "RootObject": {
+    "__guid": "6f3b1c2a-8d4e-4a1f-9b7c-0e2d4f6a8b10",
+    "Flags": 0,
+    "Name": "Player",
+    "Tags": "player",
+    "Enabled": true,
+    "NetworkMode": 1,
+    "Components": [
+      {
+        "__type": "Sandbox.PlayerController",
+        "__guid": "7a4c2d3b-9e5f-4b20-8c8d-1f3e5a7b9c21",
+        "Body": {
+          "_type": "component",
+          "component_id": "8b5d3e4c-af60-4c31-9d9e-2a4f6b8cad32",
+          "go": "6f3b1c2a-8d4e-4a1f-9b7c-0e2d4f6a8b10",
+          "component_type": "Rigidbody"
+        },
+        "BodyCollisionTags": "playercontroller",
+        "BodyHeight": 72,
+        "BodyMass": 500,
+        "BodyRadius": 16,
+        "ColliderObject": {
+          "_type": "gameobject",
+          "go": "9c6e4f5d-b071-4d42-8eaf-3b5a7c9dbe43"
+        },
+        "EnableFootstepSounds": false,
+        "UseCameraControls": false,
+        "UseInputControls": false,
+        "UseLookControls": false,
+        "UseAnimatorControls": false,
+        "WalkSpeed": 110,
+        "RunSpeed": 320
+      },
+      {
+        "__type": "Sandbox.Rigidbody",
+        "__guid": "8b5d3e4c-af60-4c31-9d9e-2a4f6b8cad32",
+        "Gravity": true,
+        "LinearDamping": 0.1,
+        "AngularDamping": 1,
+        "Locking": { "Pitch": true, "Yaw": true, "Roll": true },
+        "MassCenterOverride": "0,0,36",
+        "MassOverride": 500,
+        "MotionEnabled": true,
+        "OverrideMassCenter": true,
+        "RigidbodyFlags": "DisableCollisionSounds",
+        "StartAsleep": false
+      },
+      {
+        "__type": "Sandbox.Movement.MoveModeWalk",
+        "__guid": "ad7f5a6e-c182-4e53-9fb0-4c6b8daecf54",
+        "GroundAngle": 45,
+        "Priority": 0,
+        "StepDownHeight": 18,
+        "StepUpHeight": 18
+      }
+    ],
+    "Children": [
+      {
+        "__guid": "9c6e4f5d-b071-4d42-8eaf-3b5a7c9dbe43",
+        "Flags": 0,
+        "Name": "Colliders",
+        "Tags": "playercontroller",
+        "Enabled": true,
+        "Components": [
+          {
+            "__type": "Sandbox.CapsuleCollider",
+            "__guid": "be806b7f-d293-4f64-a0c1-5d7c9ebfd065",
+            "Start": "0,0,60",
+            "End": "0,0,45",
+            "Radius": 11.3,
+            "Friction": 0,
+            "IsTrigger": false,
+            "Static": false
+          },
+          {
+            "__type": "Sandbox.BoxCollider",
+            "__guid": "cf917c80-e3a4-4075-b1d2-6e8dafc0e176",
+            "Center": "0,0,18",
+            "Scale": "16,16,36",
+            "Friction": 0,
+            "IsTrigger": false,
+            "Static": false
+          }
+        ]
+      }
+    ]
+  },
+  "ShowInMenu": false,
+  "MenuPath": null,
+  "MenuIcon": null,
+  "DontBreakAsTemplate": false,
+  "ResourceVersion": 1,
+  "__references": [],
+  "__version": 1
+}

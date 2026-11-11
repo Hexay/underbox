@@ -3,6 +3,7 @@
 The third correctness check in docs/PLAN.md: run the same managed build and the same scripted
 scenario on Facepunch's closed engine2 and on ours, and compare what managed code observes. The
 user confirmed that the s&box EULA allows this.
+Mixed sessions (Facepunch's client on our server and the reverse): docs/interop.md.
 
 ## Rules
 

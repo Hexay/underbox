@@ -90,6 +90,21 @@ fn loopback_connect_send_receive() {
     assert!(close_listen(sock));
 }
 
+// gns_set_app_id writes through a mirror of an internal class: a wrong layout would read back wrong
+// or break the cert exchange, which names the app on both ends.
+#[test]
+fn app_id_reaches_certs_and_peers_still_connect() {
+    let _serial = serial();
+    init().unwrap();
+    let before = app_id();
+    set_app_id(590830);
+    assert_eq!(app_id(), 590830);
+    let (sock, client, _, _) = connected_pair();
+    assert_eq!(connection_state(client), state::CONNECTED);
+    assert!(close_listen(sock));
+    set_app_id(before);
+}
+
 // A joining client's handshake queues every string table at once (a game's code archive alone is
 // hundreds of KB); with GNS's 512 KB default send buffer the overflow is refused, not queued.
 #[test]

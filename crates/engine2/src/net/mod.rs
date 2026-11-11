@@ -22,6 +22,7 @@ fn ready() -> bool {
         Ok(()) => {
             // Without Steam there's no certificate authority to vouch for either end.
             gns::set_config_int(gns::config::IP_ALLOW_WITHOUT_AUTH, 1);
+            gns::set_app_id(app_id());
             apply_bootstrap_config();
             true
         }
@@ -30,6 +31,14 @@ fn ready() -> bool {
             false
         }
     })
+}
+
+/// The app our certs name and peers' certs must name; managed always sets it (s&box's when 0).
+fn app_id() -> u32 {
+    match crate::app::dict::current_config().steam_app_id {
+        0 => 590830,
+        id => id,
+    }
 }
 
 /// Managed's `Networking.Bootstrap` values. Its `SteamNetworkingUtils.SetConfig` calls reach Steam's

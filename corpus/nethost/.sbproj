@@ -1,7 +1,7 @@
 {
   "Title": "Net Host",
   "Type": "game",
-  "Org": "local",
+  "Org": "underbox",
   "Ident": "nethost",
   "Schema": 1,
   "IncludeSourceFiles": false,
