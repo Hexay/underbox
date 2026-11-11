@@ -6,9 +6,10 @@
 use super::defaults;
 use super::layout::Value;
 use super::program::{self, Layouts, Shading};
+use super::shadow_slots;
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting, shadow};
-use crate::render::{attributes, buffers as gpu_buffers, texture};
+use crate::render::{attributes, bindless, buffers as gpu_buffers, texture};
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
 use render::wgpu::{self, BindingType as B};
@@ -78,7 +79,7 @@ fn uniform_value<P>(s: &Shading<P>,inputs: &Inputs, name: &str) -> Option<Value>
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let default = || s.attributes.get(name).and_then(|a| a.default);
-    from_attributes().or_else(given).or_else(default).map(Value::Vec)
+    from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(default).map(Value::Vec)
 }
 
 /// Managed's bytes for a whole block, sized to the block.
@@ -106,25 +107,41 @@ enum Resource {
 /// The draw's texture for `b`: a render attribute's or the material's by name, managed's sun
 /// cascade or the lighting's (shadow maps), else a `BindTexture` slot at its binding.
 fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
-    let B::Texture { sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false } = b.ty else { return None };
+    let B::Texture { sample_type, view_dimension, multisampled: false } = b.ty else { return None };
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n)));
     let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
     let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
     // A map also read without comparison has a `_cmp` clone for the compares (shaders' comparison pass).
-    let cascade = shadow::cascade_of(b.name.strip_suffix("_cmp").unwrap_or(&b.name));
-    let from_managed = || cascade.and_then(|n| shadow::managed_cascade(&inputs.constant_buffer("DirectionalLightCB")?, n));
-    let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
+    let base = b.name.strip_suffix("_cmp").unwrap_or(&b.name);
+    let from_managed = || shadow::cascade_of(base).and_then(|n| shadow::managed_cascade(&inputs.constant_buffer("DirectionalLightCB")?, n));
+    let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| shadow_slots::texture(base)).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
     if inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {
         return None;
     }
     let gpu = t.gpu.as_ref()?;
-    let ok = match (gpu.desc.format.sample_type(None, None)?, sample_type) {
-        (wgpu::TextureSampleType::Float { filterable }, wgpu::TextureSampleType::Float { filterable: want }) => filterable || !want,
-        (have, want) => have == want,
-    };
-    ok.then(|| gpu.view.clone())
+    let srgb = s.attributes.get(&b.name).is_some_and(|a| a.srgb);
+    (gpu.dimension() == view_dimension && sample_type_fits(gpu.desc.format, sample_type)).then(|| gpu.sample_view(srgb).clone())
+}
+
+/// Whether a texture of `format` can bind where a shader declares `want`.
+pub fn sample_type_fits(format: wgpu::TextureFormat, want: wgpu::TextureSampleType) -> bool {
+    match (format.sample_type(None, None), want) {
+        (Some(wgpu::TextureSampleType::Float { filterable }), wgpu::TextureSampleType::Float { filterable: want }) => filterable || !want,
+        (have, want) => have == Some(want),
+    }
+}
+
+/// A bindless texture array: element `i` is the texture managed's index `i` names
+/// (render/bindless.rs) when it has the declared shape, else the default.
+fn bindless_views(gpu: &render::Gpu, b: &Binding, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Vec<wgpu::TextureView> {
+    let declared = program::array_len(b);
+    // Partially bound arrays may stop past the highest index handed out; others fill the declared length.
+    let partial = gpu.device.features().contains(wgpu::Features::PARTIALLY_BOUND_BINDING_ARRAY);
+    let len = if partial { declared.min(bindless::len()) } else { declared };
+    let fallback = defaults::texture(gpu, dimension, sample_type);
+    (0..len).map(|i| bindless::view(i, dimension, sample_type).unwrap_or_else(|| fallback.clone())).collect()
 }
 
 /// A `RWTexture2D`'s texture by name: the mip the attribute names (downsample_spd binds one per
@@ -158,17 +175,16 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
                 return Ok(Resource::Buffer(given));
             }
             let element = s.storage.get(&(b.group, b.binding));
-            let bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
+            let mut bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
                 Some(bytes) => bytes,
                 None if b.name == TRANSFORMS => transforms(inputs.instances),
                 None => vec![0; min_binding_size.map_or(256, |n| n.get().max(256)) as usize],
             };
+            // An empty light list is shorter than one element (clustered_light_culling_cs binds 176).
+            bytes.resize(bytes.len().max(min_binding_size.map_or(0, |n| n.get() as usize)), 0);
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
-        // TODO: managed's bindless indices name its global descriptor set; elements are defaults.
-        B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => {
-            Resource::Views(vec![defaults::texture(gpu, view_dimension, sample_type); program::array_len(b) as usize])
-        }
+        B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, b, view_dimension, sample_type)),
         B::Sampler(kind) if b.count.is_some() => Resource::Samplers(vec![defaults::sampler(gpu, kind, None); program::array_len(b) as usize]),
         B::Texture { sample_type, view_dimension, .. } => {
             Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))

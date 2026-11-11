@@ -51,10 +51,32 @@ fn clear_reads_back() {
 #[test]
 fn upload_round_trips() {
     let gpu = gpu();
-    let tex = Texture::new(gpu, TextureDesc { label: "upload".into(), width: 3, height: 2, format: RGBA, mips: 1, render_target: false });
+    let tex = Texture::new(gpu, TextureDesc { label: "upload".into(), width: 3, height: 2, format: RGBA, mips: 1, render_target: false, layers: 1, cube: false });
     let data: Vec<u8> = (0..24).collect();
     tex.upload(gpu, &data);
     assert_eq!(tex.read_back(gpu).pixels, data);
+}
+
+#[test]
+fn cubes_take_every_face_and_8_bit_formats_get_an_srgb_view() {
+    let gpu = gpu();
+    let desc = TextureDesc { label: "cube".into(), width: 2, height: 2, format: RGBA, mips: 1, render_target: false, layers: 6, cube: true };
+    let cube = Texture::new(gpu, desc);
+    assert_eq!(cube.dimension(), wgpu::TextureViewDimension::Cube);
+    assert!(cube.srgb_view.is_some());
+    let data: Vec<u8> = (0..6 * 16).map(|i| i as u8).collect();
+    cube.upload(gpu, &data);
+    assert_eq!(cube.read_back(gpu).pixels, data[..16]);
+    let hdr = Texture::new(gpu, TextureDesc::render_target("hdr", 1, 1, wgpu::TextureFormat::Rgba16Float));
+    assert!(hdr.srgb_view.is_none());
+}
+
+#[test]
+fn vulkan_reports_device_local_memory() {
+    let gpu = gpu();
+    let bytes = gpu.device_local_bytes();
+    assert_eq!(bytes.is_some(), gpu.info.backend == wgpu::Backend::Vulkan);
+    assert!(bytes.is_none_or(|b| b > 0));
 }
 
 #[test]

@@ -12,7 +12,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, system::CREATE_LIGHT_PROBE_VOLUME, |w| {
         object::create::<class::CSceneLightProbeVolumeObject, _>(w, Kind::SceneLightProbeVolumeObject, State::default())
     });
-    bind!(r, system::CREATE_SKY_BOX, |_material, w| object::create::<class::CSceneSkyBoxObject, _>(w, Kind::SceneSkyBoxObject, State::default()));
+    // The sky's material rides in `material_override` (render/scene/execute.rs draws it).
+    bind!(r, system::CREATE_SKY_BOX, |material, w| {
+        let state = State { material_override: crate::mesh::material_ref::MaterialRef::keep(material), ..State::default() };
+        object::create::<class::CSceneSkyBoxObject, _>(w, Kind::SceneSkyBoxObject, state)
+    });
     bind!(r, system::CREATE_DECAL, |w| object::create::<Decal, _>(w, Kind::DecalSceneObject, State::default()));
     bind!(r, managed::CREATE, |w| object::create::<class::CManagedSceneObject, _>(w, Kind::ManagedSceneObject, State::default()));
     bind!(r, dynamic::CREATE, |w| object::create::<class::CDynamicSceneObject, _>(w, Kind::SceneObject, State::default()));

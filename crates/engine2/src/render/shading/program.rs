@@ -16,6 +16,8 @@ pub struct Attr {
     pub default: Option<Vec4>,
     /// A comparison sampler's `ComparisonFunc( ... )`.
     pub compare: Option<wgpu::CompareFunction>,
+    /// A texture's `SrgbRead( true )`: sampled through its sRGB view.
+    pub srgb: bool,
 }
 
 fn compare_func(s: &str) -> Option<wgpu::CompareFunction> {
@@ -54,7 +56,7 @@ fn stage(compiler: &Compiler, shader: &VfxShader, stage: Stage, v: &Variant) -> 
 
 /// Bindings the per-draw binder can't fill: bindless arrays, storage images, external textures.
 /// Elements bound for a runtime-sized (bindless) array; every one is a default texture or sampler.
-pub const RUNTIME_ARRAY_LEN: u32 = 64;
+pub const RUNTIME_ARRAY_LEN: u32 = 1024;
 
 /// The element count bound for `b`: 1 for a plain binding.
 pub fn array_len(b: &Binding) -> u32 {
@@ -137,7 +139,8 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
         let attribute = a.get("Attribute").map(|s| s.trim().trim_matches('"').to_owned());
         let default = ["Default", "Default1", "Default2", "Default3", "Default4"].iter().find_map(|k| a.get(k).and_then(parse_default));
         let compare = a.get("ComparisonFunc").and_then(compare_func);
-        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare });
+        let srgb = a.get("SrgbRead").is_some_and(|v| matches!(v.trim(), "true" | "1"));
+        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, srgb });
     }
     out
 }

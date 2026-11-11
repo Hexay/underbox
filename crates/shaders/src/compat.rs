@@ -3,15 +3,27 @@
 //! - `T x = {};` → `T x = (T)0;` (empty brace initialiser).
 //! - `point` used as an identifier (water/waves.hlsl) → `point_`; as the geometry-shader input
 //!   modifier (`point VS_OUTPUT i[1]`) it stays.
+//! - material.hlsl's `#if defined( PixelInput )` also requires `!defined( CUSTOM_MATERIAL_INPUTS )`:
+//!   Slang resolves global names in any order, so terrain.shader's COMMON includes material.hlsl,
+//!   whose `Material::Init( PixelInput )` names a struct the shader declares after COMMON. With
+//!   custom inputs that overload only forwards to `Material::Init()`.
 
 use crate::scan::{ident_at, is_ident, is_ident_start, skip_trivia};
 
 pub fn rewrite(src: &str) -> String {
     src.lines()
-        .map(|l| if l.trim_start().starts_with('#') { l.to_string() } else { line(l) })
+        .map(|l| if l.trim_start().starts_with('#') { directive(l) } else { line(l) })
         .collect::<Vec<_>>()
         .join("\n")
         + "\n"
+}
+
+fn directive(l: &str) -> String {
+    let compact: String = l.split_whitespace().collect();
+    if compact == "#ifdefined(PixelInput)" {
+        return "#if defined( PixelInput ) && !defined( CUSTOM_MATERIAL_INPUTS )".into();
+    }
+    l.to_string()
 }
 
 fn line(l: &str) -> String {
@@ -69,5 +81,7 @@ mod tests {
         assert_eq!(line("float2 W( float2 point, out float3 o ) { return point.xy * 2; }"), "float2 W( float2 point_, out float3 o ) { return point_.xy * 2; }");
         assert_eq!(line("void MainGs( point VS_OUTPUT i[1] )"), "void MainGs( point VS_OUTPUT i[1] )");
         assert_eq!(line("int a[2] = { 1, 2 }; x == y;"), "int a[2] = { 1, 2 }; x == y;");
+        assert_eq!(directive("#if defined( PixelInput )"), "#if defined( PixelInput ) && !defined( CUSTOM_MATERIAL_INPUTS )");
+        assert_eq!(directive("#if defined( COMMON_PS_INPUT_DEFINED )"), "#if defined( COMMON_PS_INPUT_DEFINED )");
     }
 }

@@ -106,7 +106,10 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
         managed_camera_id: camera_id,
     };
     let v = view::create(desc);
-    let clear_color = attributes::vector4(attrs, StringToken::of("clearColor")).unwrap_or_else(|| crate::math::vec4(0.0, 0.0, 0.0, 1.0));
+    // Managed's `BackgroundColor` is gamma space; the view clears its linear target with it.
+    let gamma = attributes::vector4(attrs, StringToken::of("clearColor")).map_or(Vec4::new(0.0, 0.0, 0.0, 1.0), |c| Vec4::new(c.vec.x, c.vec.y, c.vec.z, c.vec.w));
+    let d = render::srgb::decode;
+    let clear_color = crate::math::vec4(d(gamma.x), d(gamma.y), d(gamma.z), gamma.w);
     let clear_flags = attributes::int(attrs, StringToken::of("clearFlags")).unwrap_or(setup::CLEAR_ALL);
     let tools_view = field!(get i64, c::GET_SCENE_VIEW_FLAGS, a) & 2 != 0;
     let s = setup::create(v, &setup::Desc { attributes: attrs, viewport, clear_flags, clear_color, tools_view });

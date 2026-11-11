@@ -117,6 +117,12 @@ fn params<R: Default>(h: Ref, f: impl FnOnce(&mut Params) -> R) -> R {
     on(h, |mat| f(&mut mat.params.lock().unwrap()))
 }
 
+/// `IMaterial2::Set( name, texture )`: the material keeps its own copy of the handle.
+pub(crate) fn set_texture(h: Ref, name: &str, t: Texture) {
+    let replaced = params(h, |p| p.textures.insert(name.to_owned(), copy(t)));
+    replaced.into_iter().for_each(resource::destroy_handle);
+}
+
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::i_material2, Material);
     bind!(r, system::CREATE_RAW_MATERIAL, create_raw);
@@ -150,10 +156,7 @@ pub fn register(r: &mut Registry) {
         p.vectors.insert(string(n), v);
     }));
     bind!(r, m::GET_VECTOR4, |h, n| params(h, |p| p.vectors.get(&string(n)).copied().unwrap_or_default()));
-    bind!(r, m::SET_2, |h, n, t| {
-        let replaced = params(h, |p| p.textures.insert(string(n), copy(t)));
-        replaced.into_iter().for_each(resource::destroy_handle);
-    });
+    bind!(r, m::SET_2, |h, n, t| set_texture(h, &string(n), t));
     bind!(r, m::GET_TEXTURE, |h, n| params(h, |p| p.textures.get(&string(n)).copied()).map_or(Texture::NULL, copy));
     bind!(r, m::GET_FIRST_TEXTURE_ATTRIBUTE, |h| params(h, |p| p.textures.values().next().copied()).map_or(Texture::NULL, copy));
     bind!(r, m::SET_EDITED, |h, e| params(h, |p| p.edited = e));

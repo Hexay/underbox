@@ -40,6 +40,8 @@ pub struct Draw {
 pub struct Target {
     pub color: texture::Ref,
     pub depth: texture::Ref,
+    /// The depth target's array layer: a cube face for `BindDepthTarget`'s slice.
+    pub depth_slice: u32,
     pub viewport: RenderViewport,
     pub scissor: Option<NativeRect>,
 }
@@ -63,6 +65,30 @@ pub fn viewport_rect(t: &render::Texture, v: &abi::structs::RenderViewport) -> [
         [x, y, v.m_n_width as u32, v.m_n_height as u32]
     } else {
         [x, y, t.desc.width.saturating_sub(x), t.desc.height.saturating_sub(y)]
+    }
+}
+
+/// Whether writing to `f` through an sRGB view would encode: an 8-bit format without its own
+/// sRGB format (we never create views that write sRGB, so blits apply the encode themselves).
+pub fn srgb_write_encodes(f: render::wgpu::TextureFormat) -> bool {
+    !f.is_srgb() && f.target_component_alignment() == Some(1)
+}
+
+/// The net transfer of a native blit: with `srgb_views` (`RENDER_SRGB`: source and target formats)
+/// an 8-bit source is read decoded and an 8-bit target written encoded, and the shader's
+/// `D_SRGB_TRANSFER` (1 encode, 2 decode) applies in between. Steps that cancel drop out.
+pub fn blit_transfer(srgb_views: Option<(render::wgpu::TextureFormat, render::wgpu::TextureFormat)>, combo: i32) -> render::Transfer {
+    let (read, write) = srgb_views.map_or((0, 0), |(src, dst)| (-i32::from(srgb_write_encodes(src)), i32::from(srgb_write_encodes(dst))));
+    let shader = match combo {
+        1 => 1,
+        2 => -1,
+        _ => 0,
+    };
+    match read + shader + write {
+        1 => render::Transfer::Encode,
+        -1 => render::Transfer::Decode,
+        // TODO: a double encode or decode (no pipeline asks for one).
+        _ => render::Transfer::None,
     }
 }
 
@@ -90,7 +116,7 @@ pub fn topology(prim: i64) -> PrimitiveTopology {
 pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw]) {
     let (Some(gpu), Some(placeholder)) = (device::gpu(), placeholder()) else { return };
     let (color, depth) = (texture::resolve(target.color), texture::resolve(target.depth));
-    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), ..Default::default() };
+    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), depth_layer: target.depth_slice, ..Default::default() };
     if let (Some(c), Some(d)) = (targets.color, targets.depth)
         && (c.desc.width, c.desc.height) != (d.desc.width, d.desc.height)
     {

@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 /// The naga wgpu 30 uses; bump with the dependency.
 pub const NAGA_VERSION: &str = "30.0.1";
 
+/// Bump whenever a SPIR-V pass's output changes: boots share one temp-dir cache across worktrees.
+pub const PASSES_VERSION: &str = "1";
+
 pub struct Cache {
     dir: PathBuf,
 }

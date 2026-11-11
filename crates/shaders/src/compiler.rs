@@ -62,6 +62,7 @@ impl Compiler {
         }
         let words = self.spirv(shader, program, v)?;
         let (words, semantics) = spirv::strip_reflection(&spirv::strip_compute_derivatives(&words));
+        let words = crate::rematerialize::access_chains(&words);
         let words = crate::bindings::unalias(&crate::row_major::transpose_members(&crate::comparison::split(&words)));
         let t = translate::spirv_to_wgsl(&words)?;
         let reflection = reflect::reflect(&t.module, &t.info, program.stage, &semantics)
@@ -79,6 +80,7 @@ impl Compiler {
         cache::key([
             concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION")).as_bytes(),
             cache::NAGA_VERSION.as_bytes(),
+            cache::PASSES_VERSION.as_bytes(),
             self.dxc.version.as_bytes().as_slice(),
             args.as_bytes(),
             program.stage.profile().as_bytes(),
