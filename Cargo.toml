@@ -11,3 +11,7 @@ rust-version = "1.99"
 abi-spec = { path = "crates/abi-spec" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Unoptimized naga stalled hud's first UI frame ~15 s (docs/renderer.md, Slow first frames).
+[profile.dev.package.naga]
+opt-level = 3
