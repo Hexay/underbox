@@ -18,7 +18,9 @@ const STAT_INSTANCES: u64 = 1;
 pub(super) fn keep(instances: &[u32], count: usize, sees: impl Fn(Vec3, Vec3) -> bool) -> Vec<u32> {
     let f = |w: u32| f32::from_bits(w);
     instances
-        .chunks_exact(WORDS)
+        .as_chunks::<WORDS>()
+        .0
+        .iter()
         .take(count)
         .filter(|i| {
             let (center, extents) = (Vec3::new(f(i[0]), f(i[1]), f(i[2])), Vec3::new(f(i[4]), f(i[5]), f(i[6])));

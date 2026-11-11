@@ -42,7 +42,6 @@ pub struct Frustum {
     pub near: f32,
     pub range: f32,
     pub view: wgpu::TextureView,
-    texture: wgpu::Texture,
 }
 
 impl PartialEq for Frustum {
@@ -172,7 +171,7 @@ pub fn render(worlds: &[world::Ref], view_proj: Mat4, lighting: &Lighting, param
         pass.dispatch_workgroups(width.div_ceil(WORKGROUP[0]), height.div_ceil(WORKGROUP[1]), 1);
     }
     gpu.queue.submit([encoder.finish()]);
-    Some(Arc::new(Frustum { world_to_clip: view_proj, near, range, view, texture }))
+    Some(Arc::new(Frustum { world_to_clip: view_proj, near, range, view }))
 }
 
 /// Froxel `(x, y, z)`'s in-scattering and transmittance, read back.
@@ -183,7 +182,7 @@ pub fn froxel(f: &Frustum, [x, y, z]: [u32; 3]) -> [f32; 4] {
     let mut encoder = gpu.device.create_command_encoder(&Default::default());
     let origin = wgpu::Origin3d { x, y, z };
     encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo { texture: &f.texture, mip_level: 0, origin, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyTextureInfo { texture: f.view.texture(), mip_level: 0, origin, aspect: wgpu::TextureAspect::All },
         wgpu::TexelCopyBufferInfo { buffer: &staging.buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: None, rows_per_image: None } },
         wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
     );

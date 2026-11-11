@@ -48,6 +48,6 @@ impl Vertex {
     /// The vertices in tightly packed `bytes`; a trailing partial vertex is dropped.
     pub fn from_bytes(bytes: &[u8]) -> Vec<Vertex> {
         // SAFETY: each chunk is one Vertex's bytes, and every bit pattern is a valid Vertex.
-        bytes.chunks_exact(size_of::<Vertex>()).map(|c| unsafe { c.as_ptr().cast::<Vertex>().read_unaligned() }).collect()
+        bytes.as_chunks::<{ size_of::<Vertex>() }>().0.iter().map(|c| unsafe { c.as_ptr().cast::<Vertex>().read_unaligned() }).collect()
     }
 }
