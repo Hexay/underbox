@@ -1,0 +1,127 @@
+{
+  "__guid": "3b6f1d20-8c4a-4e57-9f12-6a0b7c8d9e01",
+  "GameObjects": [
+    {
+      "__guid": "4c7a2e31-9d5b-4f68-8a23-7b1c8d9e0f12",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "5d8b3f42-0e6c-4079-9b34-8c2d9e0f1a23",
+          "FogMode": "Enabled",
+          "FogStrength": 1,
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": true,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "6e9c4053-1f7d-418a-8c45-9d3e0f1a2b34",
+      "Flags": 0,
+      "Name": "Floor",
+      "Scale": "2,2,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "7fad5164-2a8e-429b-9d56-ae4f1a2b3c45",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.4,0.5,0.3,1"
+        }
+      ]
+    },
+    {
+      "__guid": "80be6275-3b9f-43ac-8e67-bf5a2b3c4d56",
+      "Flags": 0,
+      "Name": "Bowing",
+      "Position": "0,-28,0",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.SkinnedModelRenderer",
+          "__guid": "91cf7386-4ca0-44bd-9f78-c06b3c4d5e67",
+          "BodyGroups": 18446744073709551615,
+          "CreateBoneObjects": false,
+          "Model": "models/compiled/puppet.vmdl",
+          "PlaybackRate": 1,
+          "RenderType": "On",
+          "Sequence": {
+            "Name": "bow",
+            "Looping": false
+          },
+          "Tint": "1,1,1,1",
+          "UseAnimGraph": false
+        }
+      ]
+    },
+    {
+      "__guid": "a2d08497-5db1-45ce-80a9-d17c4d5e6f78",
+      "Flags": 0,
+      "Name": "Bind Pose",
+      "Position": "0,28,0",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.SkinnedModelRenderer",
+          "__guid": "b3e195a8-6ec2-46df-91ba-e28d5e6f7089",
+          "BodyGroups": 18446744073709551615,
+          "CreateBoneObjects": false,
+          "Model": "models/compiled/puppet.vmdl",
+          "PlaybackRate": 1,
+          "RenderType": "On",
+          "Tint": "0.6,0.8,1,1",
+          "UseAnimGraph": false
+        }
+      ]
+    },
+    {
+      "__guid": "c4f2a6b9-7fd3-47e0-82cb-f39e6f708192",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-110,0,70",
+      "Rotation": "0,0.2215,0,0.9751",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "d503b7ca-80e4-48f1-93dc-04af708192a3",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

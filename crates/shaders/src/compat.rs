@@ -1,6 +1,8 @@
 //! Source rewrites for syntax the core shaders share with Slang but DXC rejects. Each is a
 //! token-level rewrite on comment-free text, so behaviour is unchanged:
 //! - `T x = {};` → `T x = (T)0;` (empty brace initialiser).
+//! - `isfinite( x )` → `( abs( x ) <= FLT_MAX )` (false for NaN and ±inf alike): DXC lowers it to
+//!   `OpIsInf`, which WGSL has no form of (screen_space_reflections_cs).
 //! - `point` used as an identifier (water/waves.hlsl) → `point_`; as the geometry-shader input
 //!   modifier (`point VS_OUTPUT i[1]`) it stays.
 //! - material.hlsl's `#if defined( PixelInput )` also requires `!defined( CUSTOM_MATERIAL_INPUTS )`:
@@ -49,6 +51,13 @@ fn line(l: &str) -> String {
         }
         let word = ident_at(l, i).unwrap_or_default();
         let next = ident_at(l, skip_trivia(l, i + word.len()));
+        if word == "isfinite"
+            && let Some((arg, end)) = call_argument(l, i + word.len())
+        {
+            out.push_str(&format!("( abs( {} ) <= 3.402823466e+38 )", line(arg)));
+            i = end;
+            continue;
+        }
         if word == "point" && next.is_none() {
             out.push_str("point_");
         } else {
@@ -58,6 +67,25 @@ fn line(l: &str) -> String {
         i += word.len();
     }
     out
+}
+
+/// The argument text of a call whose `(` follows `i`, and the end past its `)`; `None` when the
+/// parentheses don't close on this line.
+fn call_argument(l: &str, i: usize) -> Option<(&str, usize)> {
+    let open = skip_trivia(l, i);
+    (l.as_bytes().get(open) == Some(&b'(')).then_some(())?;
+    let mut depth = 0;
+    for (j, c) in l.bytes().enumerate().skip(open) {
+        depth += match c {
+            b'(' => 1,
+            b')' => -1,
+            _ => 0,
+        };
+        if depth == 0 {
+            return Some((&l[open + 1..j], j + 1));
+        }
+    }
+    None
 }
 
 /// End (past `;`) of `{ } ;` starting after `=` at `i`.
@@ -81,6 +109,8 @@ mod tests {
         assert_eq!(line("float2 W( float2 point, out float3 o ) { return point.xy * 2; }"), "float2 W( float2 point_, out float3 o ) { return point_.xy * 2; }");
         assert_eq!(line("void MainGs( point VS_OUTPUT i[1] )"), "void MainGs( point VS_OUTPUT i[1] )");
         assert_eq!(line("int a[2] = { 1, 2 }; x == y;"), "int a[2] = { 1, 2 }; x == y;");
+        assert_eq!(line("if ( !all( isfinite( d * f(2) ) ) )"), "if ( !all( ( abs(  d * f(2)  ) <= 3.402823466e+38 ) ) )");
+        assert_eq!(line("isfinite( a,"), "isfinite( a,");
         assert_eq!(directive("#if defined( PixelInput )"), "#if defined( PixelInput ) && !defined( CUSTOM_MATERIAL_INPUTS )");
         assert_eq!(directive("#if defined( COMMON_PS_INPUT_DEFINED )"), "#if defined( COMMON_PS_INPUT_DEFINED )");
     }

@@ -161,4 +161,29 @@ pub fn register(r: &mut Registry) {
     bind!(r, m::GET_FIRST_TEXTURE_ATTRIBUTE, |h| params(h, |p| p.textures.values().next().copied()).map_or(Texture::NULL, copy));
     bind!(r, m::SET_EDITED, |h, e| params(h, |p| p.edited = e));
     bind!(r, m::IS_EDITED, |h| params(h, |p| p.edited));
+
+    bind!(r, system::CREATE_RAW_MATERIAL_FROM_SHADER, |name, vfx, anonymous| {
+        let shader = crate::shader::name_of(vfx).and_then(|s| std::ffi::CString::new(s).ok());
+        create_raw(name, shader.as_deref(), anonymous)
+    });
+    // Draws batch by this: the same shader and params draw alike.
+    bind!(r, m::GET_SIMILARITY_KEY, |h| on(h, |mat| {
+        let p = mat.params.lock().unwrap();
+        let mut keys: Vec<String> = p.vectors.iter().map(|(k, v)| format!("{k}={:?}", v.vec)).chain(p.textures.iter().map(|(k, t)| format!("{k}={}", t.addr()))).collect();
+        keys.sort();
+        crate::engine_glue::murmur_hash64(format!("{}|{}", mat.shader, keys.join(";")).as_bytes(), 0)
+    }));
+    bind!(r, m::GET_BOOL_ATTRIBUTE_OR_DEFAULT, |h, t, d| value(h, t).map_or(d, |v| v != 0.0));
+    bind!(r, m::GET_INT_ATTRIBUTE_OR_DEFAULT, |h, t, d| value(h, t).map_or(d, |v| v as i32));
+    bind!(r, m::GET_FLOAT_ATTRIBUTE_OR_DEFAULT, |h, t, d| value(h, t).unwrap_or(d));
+    bind!(r, m::GET_TEXTURE_ATTRIBUTE_OR_DEFAULT, |h, t| {
+        let own = on(h, |mat| attributes::token_texture(mat.attributes, t).map(|(t, _)| t));
+        own.or_else(|| params(h, |p| p.textures.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, t)| *t))).map_or(Texture::NULL, copy)
+    });
+}
+
+/// Attribute `t` of a material: its render attributes, else a vector param of that name.
+fn value(h: Ref, t: abi::StringToken) -> Option<f32> {
+    let own = on(h, |mat| attributes::token_value(mat.attributes, t).map(|v| v.x));
+    own.or_else(|| params(h, |p| p.vectors.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, v)| v.vec.x)))
 }

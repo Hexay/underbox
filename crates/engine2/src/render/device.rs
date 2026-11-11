@@ -3,7 +3,7 @@
 //! every render slot reaches it through [`gpu`]. See docs/renderer.md, "Device ownership".
 
 use crate::app::dict;
-use abi::slots::g_p_render_device as device;
+use abi::slots::{g_p_render_device as device, glue_render_device_manager as glue};
 use abi::{Registry, bind};
 use std::sync::OnceLock;
 
@@ -88,6 +88,11 @@ pub fn register(r: &mut Registry) {
     // Markers name the scopes UNDERBOX_SUBMITS=log prints.
     bind!(r, device::ARE_DEBUG_MARKERS_ENABLED, crate::render::submits::enabled);
     bind!(r, device::SET_FORCE_PRELOAD_STREAMING_DATA, |_| {});
+    // No MSAA (targets are single-sampled), upscalers or async compute queue.
+    bind!(r, glue::GET_BEST_MULTISAMPLE_TYPE, |_wanted| 0);
+    bind!(r, glue::IS_UPSCALER_SUPPORTED, |_| false);
+    bind!(r, glue::SUPPORTS_ASYNC_COMPUTE, || false);
+    bind!(r, glue::GET_ADAPTER_NAME, || abi::StrRet::from(gpu().map(|g| g.info.name.clone())));
     // Budget only: wgpu reports no usage.
     bind!(r, device::GET_VIDEO_MEMORY_INFO, |a, b, c| {
         (*a, *b, *c) = (gpu().and_then(render::Gpu::device_local_bytes).unwrap_or(0), 0, 0);

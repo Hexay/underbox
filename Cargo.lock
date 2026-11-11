@@ -489,7 +489,6 @@ dependencies = [
  "box2d-sys",
  "glam 0.33.12",
  "gns",
- "half",
  "kv",
  "lz4_flex",
  "objects",

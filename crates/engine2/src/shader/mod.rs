@@ -63,6 +63,11 @@ impl Drop for Vfx {
     }
 }
 
+/// The name of shader handle `h` (its resource path, or the name it was compiled under).
+pub fn name_of(h: NativeRef<class::CVfx>) -> Option<String> {
+    resource::resolve::<_, Vfx>(h).map(|v| v.resource.clone().unwrap_or_else(|| v.name.clone()))
+}
+
 impl Resource for Vfx {
     fn is_error(&self) -> bool {
         self.shader.read().unwrap().is_none()

@@ -67,6 +67,11 @@ impl Gpu {
                 // downsample_spd writes seven mips.
                 max_storage_textures_per_shader_stage: limits.max_storage_textures_per_shader_stage,
                 max_uniform_buffers_per_shader_stage: limits.max_uniform_buffers_per_shader_stage,
+                // envmap_filtering_cs runs 8×8×6 (one layer per cube face); D3D11-class devices take 1024.
+                max_compute_invocations_per_workgroup: limits.max_compute_invocations_per_workgroup,
+                max_compute_workgroup_size_x: limits.max_compute_workgroup_size_x,
+                max_compute_workgroup_size_y: limits.max_compute_workgroup_size_y,
+                max_compute_workgroup_size_z: limits.max_compute_workgroup_size_z,
                 ..wgpu::Limits::default().using_resolution(limits)
             },
             ..Default::default()

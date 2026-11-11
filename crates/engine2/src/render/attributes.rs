@@ -120,7 +120,11 @@ pub fn combo(r: Ref, name: &str) -> Option<i64> {
 /// A numeric value named `name` (with parents) as a shader reads it: float, vector, int, bool or
 /// combo, widened to four components.
 pub fn shader_value(r: Ref, name: &str) -> Option<glam::Vec4> {
-    let t = StringToken::of(name);
+    token_value(r, StringToken::of(name))
+}
+
+/// [`shader_value`] by token.
+pub fn token_value(r: Ref, t: StringToken) -> Option<glam::Vec4> {
     on(r, |a| {
         [Kind::Vector4, Kind::Vector3, Kind::Vector2, Kind::Float, Kind::Int, Kind::Bool, Kind::Combo, Kind::IntVector4].iter().find_map(|k| match a.get(*k, t)? {
             Value::Vector4(v) => Some(glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, v.vec.w)),
@@ -134,6 +138,19 @@ pub fn shader_value(r: Ref, name: &str) -> Option<glam::Vec4> {
             _ => None,
         })
     })
+}
+
+/// Set `name` as native code would: an int, bool, combo, float or buffer value.
+pub fn set(r: Ref, name: &str, value: Value) {
+    let kind = match value {
+        Value::Int(_) => Kind::Int,
+        Value::Bool(_) => Kind::Bool,
+        Value::Combo(_) => Kind::Combo,
+        Value::Float(_) => Kind::Float,
+        Value::Buffer(_) => Kind::Buffer,
+        _ => return,
+    };
+    on(r, |a| a.set(kind, StringToken::of(name), value));
 }
 
 pub fn set_buffer(r: Ref, name: StringToken, handle: usize) {
@@ -160,7 +177,20 @@ pub fn texture(r: Ref, name: &str) -> Option<NativeRef<class::CTextureBase>> {
 
 /// [`texture`] with the mip managed set it for (0 when it asked for none).
 pub fn texture_mip(r: Ref, name: &str) -> Option<(NativeRef<class::CTextureBase>, u32)> {
-    on(r, |a| match a.get(Kind::Texture, StringToken::of(name)) {
+    token_texture(r, StringToken::of(name))
+}
+
+/// The sampler state named `name` (with parents).
+pub fn sampler(r: Ref, name: &str) -> Option<CSamplerStateDesc> {
+    on(r, |a| match a.get(Kind::Sampler, StringToken::of(name)) {
+        Some(Value::Sampler(s)) => Some(s),
+        _ => None,
+    })
+}
+
+/// [`texture_mip`] by token.
+pub fn token_texture(r: Ref, name: StringToken) -> Option<(NativeRef<class::CTextureBase>, u32)> {
+    on(r, |a| match a.get(Kind::Texture, name) {
         Some(Value::Texture(t, mip)) if !t.is_null() => Some((t, mip.max(0).unsigned_abs())),
         _ => None,
     })

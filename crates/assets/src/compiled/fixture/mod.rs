@@ -11,7 +11,9 @@ use super::vbib::Packing;
 use super::vertex::Vertex;
 use crate::bitmap::bc;
 
+mod puppet;
 mod rigged;
+pub use puppet::*;
 pub use rigged::*;
 
 pub const MODEL: &str = "models/compiled/crate.vmdl";

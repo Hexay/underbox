@@ -78,10 +78,10 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref], view_proj: Mat4) {
     let light = light_view_proj(sun.forward(), center, radius);
     let mut draws = Vec::new();
     for (r, obj) in object::refs_in_worlds(worlds) {
-        let morphs = draw::morph::of(r);
+        let deform = model_draw::Deform::of(r);
         let s = obj.state.lock().unwrap();
-        if s.rendering && obj.light.is_none() {
-            draws.extend(model_draw::object(&s, morphs.as_ref(), light).into_iter().map(|d| draw::Draw { shaded: None, ..d }));
+        if s.rendering && obj.light.is_none() && deform.casts_shadow() {
+            draws.extend(model_draw::object(&s, &deform, light).into_iter().map(model_draw::depth_only));
         }
     }
     let target = Target { depth: map(), ..Default::default() };

@@ -193,6 +193,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, device_slots::CLEAR_TEXTURE, clear);
     // Sequences are sprite-sheet animations, read from compiled textures (none load yet).
     bind!(r, device_slots::GET_SEQUENCE_COUNT, |_| 0);
+    bind!(r, abi::slots::sheet_sequence_t::FRAME_COUNT, |_| 0);
+    bind!(r, abi::slots::sheet_sequence_frame_t::IMAGE_COUNT, |_| 0);
+    bind!(r, abi::slots::sheet_sequence_frame_t::GET_IMAGE, |_, _| Default::default());
     bind!(r, device_slots::GET_TEXTURE_LAST_USED, |_| 0);
     bind!(r, device_slots::MARK_TEXTURE_USED, |_, _| {});
     bind!(r, device_slots::GET_NUM_TEXTURE_LOADS_IN_FLIGHT, || 0);

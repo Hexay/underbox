@@ -16,6 +16,8 @@ const OP_VARIABLE: u32 = 59;
 const OP_DECORATE: u32 = 71;
 const OP_DECORATE_STRING: u32 = 5632;
 const OP_MEMBER_DECORATE_STRING: u32 = 5633;
+/// Only `-fspv-reflect`'s `CounterBuffer` (an append/consume buffer's counter) uses it.
+const OP_DECORATE_ID: u32 = 332;
 const DECORATION_SPEC_ID: u32 = 1;
 const DECORATION_LOCATION: u32 = 30;
 const DECORATION_USER_SEMANTIC: u32 = 5635;
@@ -94,8 +96,9 @@ pub fn specialize(words: &[u32], values: &[(u32, u32)]) -> Vec<u32> {
     })
 }
 
-/// Drops `OpDecorateString`/`OpMemberDecorateString` and the GOOGLE extensions, returning the
-/// stage inputs' semantics from the `UserSemantic` decorations.
+/// Drops `OpDecorateString`/`OpMemberDecorateString`/`OpDecorateId` and the GOOGLE extensions
+/// (naga reads none of them), returning the stage inputs' semantics from the `UserSemantic`
+/// decorations.
 pub fn strip_reflection(words: &[u32]) -> (Vec<u32>, Vec<InputSemantic>) {
     let mut names = Vec::new();
     let mut locations = Vec::new();
@@ -124,7 +127,7 @@ pub fn strip_reflection(words: &[u32]) -> (Vec<u32>, Vec<InputSemantic>) {
         .collect();
     out.sort_by_key(|s| s.location);
     let stripped = rebuild(words, |inst| match op(inst) {
-        OP_DECORATE_STRING | OP_MEMBER_DECORATE_STRING => None,
+        OP_DECORATE_STRING | OP_MEMBER_DECORATE_STRING | OP_DECORATE_ID => None,
         OP_EXTENSION if string(&inst[1..]).starts_with("SPV_GOOGLE_") => None,
         _ => Some(inst.to_vec()),
     });
@@ -175,6 +178,7 @@ mod tests {
         m.extend(inst(OP_DECORATE, &[6, DECORATION_SPEC_ID, 4]));
         m.extend(inst(OP_DECORATE, &[7, DECORATION_LOCATION, 2]));
         m.extend(inst(OP_DECORATE_STRING, &[7, DECORATION_USER_SEMANTIC].into_iter().chain(words("POSITION")).collect::<Vec<_>>()));
+        m.extend(inst(OP_DECORATE_ID, &[7, 5634, 8]));
         m.extend(inst(OP_SPEC_CONSTANT, &[1, 5, 9]));
         m.extend(inst(OP_SPEC_CONSTANT_TRUE, &[2, 6]));
         m.extend(inst(OP_VARIABLE, &[3, 7, STORAGE_INPUT]));
@@ -187,7 +191,7 @@ mod tests {
 
         let (stripped, inputs) = strip_reflection(&s);
         assert_eq!(inputs, [InputSemantic { location: 2, semantic: "POSITION".into(), name: "in.var.POSITION".into() }]);
-        assert!(instructions(&stripped).all(|i| op(i) != OP_DECORATE_STRING && op(i) != OP_EXTENSION));
+        assert!(instructions(&stripped).all(|i| ![OP_DECORATE_STRING, OP_DECORATE_ID, OP_EXTENSION].contains(&op(i))));
     }
 
     #[test]

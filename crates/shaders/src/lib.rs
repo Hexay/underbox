@@ -13,6 +13,7 @@ pub mod compiler;
 pub mod decl;
 pub mod dxc;
 mod formats;
+mod image_coords;
 pub mod include;
 pub mod reflect;
 mod rematerialize;

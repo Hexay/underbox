@@ -112,20 +112,22 @@ native's vfx_vulkan. Decisions:
 dynamic 0) and writes `corpus.tsv`/`corpus-errors.txt` to CARGO_TARGET_TMPDIR. All 85 shaders
 parse. The test's `MIN_OK_STAGES` is the regression floor; `corpus.tsv` has the current count.
 
-Remaining failures, by class:
-- **DXC:** `ObjectHighlight` has a GS block without `MainGs`.
-- **naga can't express it (spv-in):**
-  - geometry shaders: `gizmo_line`, `gizmo_sprite`. Their VS then also fails validation, because it
-    outputs no position and feeds the GS.
-  - storage-image arrays such as `RWTexture2DArray<float>`: naga panics in `parse_type_image`
-    (`ddgi_depth_copy_cs`, `envmap_filtering_cs`).
-  - `SPV_KHR_compute_shader_derivatives` (`downsample_spd`).
-  - `OpDecorateId` (`clutter_cull_cs`).
-  - "invalid image" (`particle_lighting_cs`).
-- **naga validation:** `screen_space_reflections_cs`: `||` on `vec3<bool>`, from HLSL 2018's
-  per-component logic.
+Fixed by passes:
+- `OpDecorateId` (`-fspv-reflect`'s append-buffer `CounterBuffer`) is dropped with the other
+  reflection decorations (`clutter_cull_cs`).
+- Storage-image arrays addressed by `uint3` (`ddgi_depth_copy_cs`, `envmap_filtering_cs`): naga
+  only registers float coordinate vectors and panics looking up `vec2<u32>`; `image_coords.rs`
+  declares the integer vectors.
+- HLSL 2018's per-component `||`/`&&` on vectors becomes `|`/`&` on the naga IR
+  (`translate::lower_vector_logic`), and `isfinite(x)` becomes `abs(x) <= FLT_MAX` in compat,
+  because WGSL has no `isinf` (`screen_space_reflections_cs`).
+- `SPV_KHR_compute_shader_derivatives` is stripped (`downsample_spd`).
 
-Next: GS needs emulation (compute or instancing) or the wgpu SPIR-V passthrough on Vulkan; until
-then the renderer draws gizmo_line/gizmo_sprite with an unlit vertex-colour stand-in. Most of
-the naga cases are small upstream fixes or more SPIR-V passes. The `||` case could be rewritten to
-`or()` in compat for HLSL 2021-style code.
+Remaining failures (`UNDERBOX_CORPUS_ONLY=a,b` runs only matching shaders):
+- **DXC:** `ObjectHighlight` has a GS block without `MainGs`.
+- **Geometry shaders:** `gizmo_line`, `gizmo_sprite`. These stay failures here because the corpus
+  compiles their source; at runtime the renderer emulates them (docs/skinning.md).
+- **"invalid image [26]"** (`particle_lighting_cs`): an image op whose operand naga's
+  `get_image_expr_ty` doesn't resolve to an image type. Unconfirmed suspect: the bindless env-map
+  cube read through `EnvMapTexture(...)`, which only this compute shader uses unconditionally.
+  Next step: dump its SPIR-V and find what type 26 is.

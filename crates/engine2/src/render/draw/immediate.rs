@@ -46,12 +46,16 @@ pub struct DrawState {
     render_state: Option<(attributes::Ref, material_mode::Ref)>,
     /// `BindTexture` textures by slot.
     pub slots: Vec<(u32, texture::Ref)>,
+    /// A model draw call bound for the next `DrawIndexedInstanced` (draw_call.rs).
+    pub model_call: Option<super::draw_call::ModelCall>,
+    /// Stream 1: a GPU buffer of instance ids and its byte offset.
+    pub instance_stream: Option<(gpu_buffers::Handle, u32)>,
 }
 
 impl Default for DrawState {
     fn default() -> Self {
         let lighting = Arc::new(Lighting::fallback());
-        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting, render_state: None, slots: Vec::new() }
+        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting, render_state: None, slots: Vec::new(), model_call: None, instance_stream: None }
     }
 }
 
@@ -86,7 +90,7 @@ pub fn submit(c: Ctx, draws: &[Draw]) {
 }
 
 fn set_render_state(c: Ctx, attrs: attributes::Ref, mode: material_mode::Ref, l: layout::Ref) -> bool {
-    with(c, |s| (s.layout, s.render_state) = (layout::get(l), Some((attrs, mode))));
+    with(c, |s| (s.layout, s.render_state, s.model_call) = (layout::get(l), Some((attrs, mode)), None));
     device::gpu().is_some()
 }
 
@@ -152,11 +156,18 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
 
 fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {
     let ok = v.is_some();
-    // Only stream 0 feeds the placeholder; instance streams are ignored until real shaders.
+    // Stream 0 is the mesh; stream 1 instance ids only matter to bound model calls ([`bind_gpu_vertices`]).
     if slot == 0 {
-        with(c, |s| s.vertices = v.map(|v| (v, offset.max(0) as u64)));
+        with(c, |s| (s.vertices, s.model_call) = (v.map(|v| (v, offset.max(0) as u64)), None));
     }
     ok
+}
+
+fn bind_gpu_vertices(c: Ctx, slot: i32, h: gpu_buffers::Handle, offset: i32) -> bool {
+    if slot == 1 {
+        with(c, |s| s.instance_stream = gpu_buffers::get(h).map(|_| (h, offset.max(0).unsigned_abs())));
+    }
+    bind_vertices(c, slot, gpu_buffers::get(h).map(Vertices::Gpu), offset)
 }
 
 fn bind_indices(c: Ctx, i: Option<Indices>) -> bool {
@@ -199,14 +210,18 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::DRAW, |c, prim, first, count| draw_bound(c, prim, first..first + count, 1, 0, false));
     bind!(r, ctx::DRAW_INSTANCED, |c, prim, first, count, n| draw_bound(c, prim, first..first + count, n, 0, false));
     bind!(r, ctx::DRAW_INDEXED, |c, prim, first, count, _max, base| draw_bound(c, prim, first..first + count, 1, base, true));
-    bind!(r, ctx::DRAW_INDEXED_INSTANCED, |c, prim, first, count, n, _max, base| draw_bound(c, prim, first..first + count, n, base, true));
+    bind!(r, ctx::DRAW_INDEXED_INSTANCED, |c, prim, first, count, n, _max, base| {
+        if !super::draw_call::draw_bound_call(c, n) {
+            draw_bound(c, prim, first..first + count, n, base, true);
+        }
+    });
     // TODO: indirect draws need the args buffer read on the GPU (draw_indirect).
     bind!(r, ctx::DRAW_INSTANCED_INDIRECT, |_, _, _, _, _, _| {});
     bind!(r, ctx::DRAW_INDEXED_INSTANCED_INDIRECT, |_, _, _, _, _, _| {});
     bind!(r, ctx::BIND_VERTEX_BUFFER, |c, slot, h, off| bind_vertices(c, slot, buffers::vertex_buffer(h).map(Vertices::Mesh), off));
     bind!(r, ctx::BIND_VERTEX_BUFFER_1, |c, slot, h, off, _stride| bind_vertices(c, slot, buffers::vertex_buffer(h).map(Vertices::Mesh), off));
-    bind!(r, ctx::BIND_VERTEX_BUFFER_2, |c, slot, h, off| bind_vertices(c, slot, gpu_buffers::get(h).map(Vertices::Gpu), off));
-    bind!(r, ctx::BIND_VERTEX_BUFFER_3, |c, slot, h, off, _stride| bind_vertices(c, slot, gpu_buffers::get(h).map(Vertices::Gpu), off));
+    bind!(r, ctx::BIND_VERTEX_BUFFER_2, bind_gpu_vertices);
+    bind!(r, ctx::BIND_VERTEX_BUFFER_3, |c, slot, h, off, _stride| bind_gpu_vertices(c, slot, h, off));
     bind!(r, ctx::BIND_INDEX_BUFFER, |c, h, _off| bind_indices(c, buffers::index_buffer(h).map(Indices::Mesh)));
     bind!(r, ctx::BIND_INDEX_BUFFER_1, |c, h, size, _off| {
         let format = if size == 4 { IndexFormat::Uint32 } else { IndexFormat::Uint16 };

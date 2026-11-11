@@ -5,7 +5,7 @@
 pub mod builder;
 pub mod compiled;
 pub mod content;
-mod draw;
+pub(crate) mod draw;
 mod parts;
 pub mod physics;
 #[cfg(test)]

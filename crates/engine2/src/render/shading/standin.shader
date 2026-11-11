@@ -31,6 +31,8 @@ struct VS_INPUT
 	float4 vNormalOs : NORMAL < Semantic( OptionallyCompressedTangentFrame ); >;
 	float2 vTexCoord : TEXCOORD0 < Semantic( LowPrecisionUv ); >;
 	uint nInstanceTransformID : TEXCOORD13 < Semantic( InstanceTransformUv ); >;
+	uint4 vBlendIndices : BLENDINDICES < Semantic( BlendIndices ); >;
+	uint nVertexID : SV_VertexID;
 };
 
 struct PS_INPUT
@@ -53,18 +55,33 @@ VS
 	float4 g_vTexCoordScale < Attribute( "g_vTexCoordScale" ); Default4( 1.0, 1.0, 0.0, 0.0 ); >;
 	float4 g_vTexCoordOffset < Attribute( "g_vTexCoordOffset" ); Default4( 0.0, 0.0, 0.0, 0.0 ); >;
 
+	// A skinned entry (render/skin) with a vertex-cache block was skinned by skinning_cs; one
+	// without skins here by its first bone; a rigid entry's bone is ignored.
 	PS_INPUT MainVs( const VS_INPUT i )
 	{
 		PS_INPUT o;
-		float3x4 matObjectToWorld = GetTransformMatrix( i.nInstanceTransformID );
-		float3 vPositionWs = mul( matObjectToWorld, float4( i.vPositionOs.xyz, 1.0 ) );
+		ExtraShaderData_t extra = GetExtraPerInstanceShaderData( i.nInstanceTransformID );
+		float3 vPositionWs;
+		if ( g_TransformBuffer[ i.nInstanceTransformID ].BlendWeightCount != 0 && extra.nVertexCacheOffset != 0xFFFFFFFFu )
+		{
+			CachedAnimatedVertex_t v = FetchCachedVertex( extra.nVertexCacheOffset + i.nVertexID );
+			float3 vTangent;
+			float flSign;
+			DecodeCachedVertexTangentSpace( v, o.vNormalWs, vTangent, flSign );
+			vPositionWs = v.vPosWs;
+		}
+		else
+		{
+			float3x4 matObjectToWorld = GetTransformMatrix( i.nInstanceTransformID, i.vBlendIndices.x );
+			vPositionWs = mul( matObjectToWorld, float4( i.vPositionOs.xyz, 1.0 ) );
+			float3 vNormalOs;
+			DecompressNormal( i.vNormalOs, vNormalOs );
+			o.vNormalWs = mul( (float3x3)matObjectToWorld, vNormalOs );
+		}
 		o.vPositionPs = Position3WsToPs( vPositionWs );
 		o.vPositionWs = vPositionWs;
-		float3 vNormalOs;
-		DecompressNormal( i.vNormalOs, vNormalOs );
-		o.vNormalWs = mul( (float3x3)matObjectToWorld, vNormalOs );
 		o.vTexCoord = i.vTexCoord * g_vTexCoordScale.xy + g_vTexCoordOffset.xy;
-		o.vTint = GetExtraPerInstanceShaderData( i.nInstanceTransformID ).vTint;
+		o.vTint = extra.vTint;
 		return o;
 	}
 }

@@ -1,8 +1,19 @@
 use crate::render::shading::{program, tests::core_dir};
 
 /// The compute shaders managed's scene renderer dispatches, and whether they run on the GPU.
-const SHADERS: [(&str, bool); 5] =
-    [("clustered_light_culling_cs", true), ("depthresolve_cs", true), ("postprocess/cmaa2_cs", true), ("downsample_spd", true), ("occlusion_cull_cs", true)];
+const SHADERS: [(&str, bool); 10] = [
+    ("clustered_light_culling_cs", true),
+    ("depthresolve_cs", true),
+    ("postprocess/cmaa2_cs", true),
+    ("downsample_spd", true),
+    ("occlusion_cull_cs", true),
+    ("clutter_cull_cs", true),
+    ("common/DDGI/ddgi_depth_copy_cs", true),
+    ("envmap_filtering_cs", true),
+    ("screen_space_reflections_cs", true),
+    // naga's SPIR-V frontend: "invalid image" (research/shaders.md).
+    ("particle_lighting_cs", false),
+];
 
 #[test]
 fn compute_shaders_translate_where_naga_can() {

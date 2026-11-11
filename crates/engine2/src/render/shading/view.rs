@@ -31,6 +31,16 @@ impl View {
         p.truncate().extend(1.0)
     }
 
+    /// The camera's forward and up directions in world space: where clip-space +z and +y lead.
+    pub fn camera_axes(&self) -> (Vec4, Vec4) {
+        let inv = self.view_proj.inverse();
+        let at = |x: f32, y: f32, z: f32| inv.project_point3(glam::Vec3::new(x, y, z));
+        let forward = (at(0.0, 0.0, 1.0) - at(0.0, 0.0, 0.0)).normalize_or_zero();
+        let up = at(0.0, 1.0, 0.5) - at(0.0, 0.0, 0.5);
+        let up = (up - forward * up.dot(forward)).normalize_or_zero();
+        (forward.extend(0.0), up.extend(0.0))
+    }
+
     pub fn constant(&self, name: &str) -> Option<Value> {
         let [x, y, w, h] = self.viewport;
         let [tw, th] = self.target;
@@ -40,6 +50,8 @@ impl View {
             "g_matProjectionToWorld" => Some(Value::Mat(self.view_proj.inverse())),
             "g_matWorldToView" | "g_matViewToProjection" | "g_matProjectionToView" | "g_matViewToScreen" => Some(Value::Mat(Mat4::IDENTITY)),
             "g_vCameraPositionWs" | "g_vMiddleEyePositionWs" => Some(Value::Vec(self.camera_position())),
+            "g_vCameraDirWs" => Some(Value::Vec(self.camera_axes().0)),
+            "g_vCameraUpDirWs" => Some(Value::Vec(self.camera_axes().1)),
             "g_flToneMapScalarLinear" | "g_flLightMapScalar" | "g_flEnvMapScalar" | "g_flToneMapScalarGamma" | "g_flViewportMaxZ" => v(1.0, 0.0, 0.0, 0.0),
             "g_vInvViewportSize" => v(1.0 / w.max(1.0), 1.0 / h.max(1.0), 0.0, 0.0),
             "g_vViewportOffset" => v(x, y, 0.0, 0.0),
@@ -65,5 +77,8 @@ mod tests {
         let vp = glam::camera::rh::proj::directx::perspective(1.0, 1.5, 0.5, 100.0) * glam::camera::rh::view::look_at_mat4(eye, Vec3::ZERO, Vec3::Y);
         let view = View { view_proj: vp, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0] };
         assert!(view.camera_position().truncate().distance(eye) < 1e-3);
+        let (forward, up) = view.camera_axes();
+        assert!(forward.truncate().distance(-eye.normalize()) < 1e-3, "{forward}");
+        assert!(up.truncate().dot(forward.truncate()).abs() < 1e-4 && up.y > 0.5, "{up}");
     }
 }

@@ -126,6 +126,7 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, l::GET_LIGHT_TYPE, |r| with(r, |x| x.kind as i32));
     bind!(r, l::SET_WORLD_POSITION, |r, p| object::with(r.cast(), |st| st.transform.position = p));
+    bind!(r, l::GET_WORLD_POSITION, |r| object::with(r.cast(), |st| st.transform.position));
     bind!(r, l::SET_WORLD_DIRECTION, |r, q| with(r, |x| x.direction = q));
     bind!(r, l::GET_WORLD_DIRECTION, |r| with(r, |x| Some(toward_light(x.direction))).unwrap_or_default());
     field!(r, GET_COLOR, SET_COLOR, color);

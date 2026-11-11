@@ -19,7 +19,9 @@ struct Row {
 
 fn run(core: &std::path::Path, compiler: &Compiler) -> Vec<Row> {
     let includes = common::includes(core);
-    let files = common::shader_files(&core.join("shaders"));
+    // UNDERBOX_CORPUS_ONLY=a,b runs only shaders whose path contains one of them (no floor check).
+    let only: Vec<String> = std::env::var("UNDERBOX_CORPUS_ONLY").map(|v| v.split(',').map(str::to_owned).collect()).unwrap_or_default();
+    let files: Vec<_> = common::shader_files(&core.join("shaders")).into_iter().filter(|(rel, _)| only.is_empty() || only.iter().any(|o| rel.contains(o.as_str()))).collect();
     let next = Mutex::new(files.iter());
     let rows = Mutex::new(Vec::new());
     std::thread::scope(|s| {
@@ -82,8 +84,10 @@ fn core_shaders_default_combo() {
     eprintln!("{tsv}");
     eprintln!("stages: {} total, {past_dxc} through DXC, by result {by_phase:?}", rows.len());
     eprintln!("shaders with every stage through to WGSL: {full}/{}; table in {out}", shaders_ok.len());
-    assert!(by_phase.get("ok").copied().unwrap_or(0) >= MIN_OK_STAGES, "fewer stages translate than before");
+    if std::env::var_os("UNDERBOX_CORPUS_ONLY").is_none() {
+        assert!(by_phase.get("ok").copied().unwrap_or(0) >= MIN_OK_STAGES, "fewer stages translate than before");
+    }
 }
 
 /// Stages that reached validated WGSL when this floor was last raised.
-const MIN_OK_STAGES: usize = 130;
+const MIN_OK_STAGES: usize = 135;

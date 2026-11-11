@@ -3,8 +3,8 @@
 //! any other. standin.shader follows complex's conventions (`g_tColor`, `g_vColorTint`,
 //! `g_flModelTintAmount`), so typical `.vmat` files keep their colour and tint;
 //! standin_sky.shader samples a sky material's `SkyTexture` cube along the view ray.
-//! standin_gizmo.shader stands in for the gizmo shaders, which have source but whose geometry
-//! shaders don't translate ([`Kind::Gizmo`] maps even when the shader is found).
+//! The gizmo stand-ins replace shaders that have source but whose geometry shaders don't
+//! translate: they fold the GS into the VS over pre-expanded corners (render/draw/gizmo.rs).
 
 use shaders::{IncludePaths, VfxShader};
 use std::path::Path;
@@ -12,7 +12,9 @@ use std::path::Path;
 /// The keys the stand-in programs are cached under (never real resource paths).
 pub const PATH: &str = "shaders/underbox_standin.shader";
 pub const SKY_PATH: &str = "shaders/underbox_standin_sky.shader";
-pub const GIZMO_PATH: &str = "shaders/underbox_standin_gizmo.shader";
+pub const GIZMO_LINE_PATH: &str = "shaders/underbox_standin_gizmo_line.shader";
+pub const GIZMO_SPRITE_PATH: &str = "shaders/underbox_standin_gizmo_sprite.shader";
+pub const ALL_PATHS: [&str; 4] = [PATH, SKY_PATH, GIZMO_LINE_PATH, GIZMO_SPRITE_PATH];
 
 /// Which stand-in draws a closed shader.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,7 +22,8 @@ pub enum Kind {
     Lit,
     Unlit,
     Sky,
-    Gizmo,
+    GizmoLine,
+    GizmoSprite,
 }
 
 const MAPPED: &[(&str, Kind)] = &[
@@ -40,8 +43,8 @@ const MAPPED: &[(&str, Kind)] = &[
     ("tools_2d_generic", Kind::Unlit),
     ("ui", Kind::Unlit),
     ("sky", Kind::Sky),
-    ("gizmo_line", Kind::Gizmo),
-    ("gizmo_sprite", Kind::Gizmo),
+    ("gizmo_line", Kind::GizmoLine),
+    ("gizmo_sprite", Kind::GizmoSprite),
 ];
 
 fn stem(shader_path: &str) -> &str {
@@ -62,8 +65,14 @@ impl Kind {
         match self {
             Kind::Lit | Kind::Unlit => PATH,
             Kind::Sky => SKY_PATH,
-            Kind::Gizmo => GIZMO_PATH,
+            Kind::GizmoLine => GIZMO_LINE_PATH,
+            Kind::GizmoSprite => GIZMO_SPRITE_PATH,
         }
+    }
+
+    /// Whether the stand-in draws even when the shader's source is found (its GS won't translate).
+    pub fn replaces_source(self) -> bool {
+        matches!(self, Kind::GizmoLine | Kind::GizmoSprite)
     }
 
     /// Values a draw through the stand-in adds for the original shader (`StandinUnlit`), and the
@@ -73,7 +82,7 @@ impl Kind {
         match self {
             Kind::Lit => vec![("StandinUnlit", 0.0), ("StandinDebug", *DEBUG)],
             Kind::Unlit => vec![("StandinUnlit", 1.0), ("StandinDebug", *DEBUG)],
-            Kind::Sky | Kind::Gizmo => Vec::new(),
+            Kind::Sky | Kind::GizmoLine | Kind::GizmoSprite => Vec::new(),
         }
     }
 }
@@ -85,7 +94,8 @@ pub fn shader(path: &str, includes: &IncludePaths) -> Option<Result<VfxShader, S
             .replace("\t//@sun_shadows\n", include_str!("standin_sun_shadows.hlsl"))
             .replace("\t//@managed_shadows\n", include_str!("standin_managed_shadows.hlsl")),
         SKY_PATH => include_str!("standin_sky.shader").to_owned(),
-        GIZMO_PATH => include_str!("standin_gizmo.shader").to_owned(),
+        GIZMO_LINE_PATH => include_str!("standin_gizmo_line.shader").to_owned(),
+        GIZMO_SPRITE_PATH => include_str!("standin_gizmo_sprite.shader").to_owned(),
         _ => return None,
     };
     Some(VfxShader::parse(&source, Path::new(path), includes))
@@ -102,7 +112,7 @@ mod tests {
         assert_eq!(mapped("unlit.shader"), Some(Kind::Unlit));
         assert_eq!(mapped("complex.vfx"), Some(Kind::Lit));
         assert_eq!(mapped("shaders/sky.shader").map(Kind::path), Some(SKY_PATH));
-        assert_eq!(mapped("shaders/gizmo/gizmo_line.shader").map(Kind::path), Some(GIZMO_PATH));
+        assert_eq!(mapped("shaders/gizmo/gizmo_line.shader").map(Kind::path), Some(GIZMO_LINE_PATH));
         assert_eq!(mapped("shaders/scene_renderer_mesh.shader"), None);
     }
 }

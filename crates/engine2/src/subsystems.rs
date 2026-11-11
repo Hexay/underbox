@@ -34,10 +34,7 @@ pub fn register(r: &mut Registry) {
     crate::resource_compiler::register(r);
     crate::shader::register(r);
     crate::editor::register(r);
-    crate::image_convert::register(r);
     crate::resource_data::register(r);
-    crate::sheet::register(r);
-    crate::web_streaming::register(r);
     crate::video::register(r);
     crate::xr::register(r);
     crate::world::register(r);

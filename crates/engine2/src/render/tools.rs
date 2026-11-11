@@ -1,7 +1,7 @@
 //! The rest of `RenderTools`, `IRenderContext` and `g_pRenderDevice`: copies between targets, the
 //! sky, per-object draw lists managed's scene renderer reads (`Sandbox.SceneRenderer`), sampler
-//! and bindless ids, and the GPU features the placeholder renderer doesn't have (compute, ray
-//! tracing, skinning, morphs, lightmaps), which answer "none" so managed skips them.
+//! and bindless ids, and the GPU features the renderer doesn't have yet (indirect compute, ray
+//! tracing, lightmaps), which answer "none" so managed skips them. Skinning: render/skin.
 
 use crate::render::draw::{self, immediate, model as model_draw};
 use crate::render::{context, device, texture};
@@ -10,7 +10,6 @@ use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools
 use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
 use abi::{NativeRef, PtrHandle, RawPtr, Registry, bind, class};
 use std::ffi::c_void;
-use std::sync::Mutex;
 
 /// Copy `rect` of the context's colour (or depth) target into `dst` at its origin.
 fn copy_from_target(c: context::Ref, dst: texture::Ref, rect: Option<[u32; 4]>, depth: bool) -> bool {
@@ -109,19 +108,6 @@ fn material_bind_counts(bind: RawPtr<c_void>, full: RawPtr<c_void>, similar: Raw
     }
 }
 
-/// Distinct sampler descriptions get consecutive ids; the index is the id less one.
-fn sampler(desc: abi::structs::CSamplerStateDesc) -> PtrHandle<abi::handle::SamplerStateHandle_t> {
-    static SAMPLERS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
-    // SAFETY: CSamplerStateDesc is a plain repr(C) struct of scalars.
-    let bytes = unsafe { std::slice::from_raw_parts((&raw const desc).cast::<u8>(), size_of_val(&desc)) }.to_vec();
-    let mut s = SAMPLERS.lock().unwrap();
-    let i = s.iter().position(|d| *d == bytes).unwrap_or_else(|| {
-        s.push(bytes);
-        s.len() - 1
-    });
-    PtrHandle::new(i + 1)
-}
-
 fn light_probe_volume(mins: RawPtr<c_void>, maxs: RawPtr<c_void>, priority: RawPtr<c_void>) -> i32 {
     // SAFETY: managed passes two Vector3s and an int it hasn't initialised (ReadLightProbeVolume).
     unsafe {
@@ -172,23 +158,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::RESET_MATERIAL_BIND, |_| {});
     bind!(r, tools::GET_MATERIAL_BIND_COUNTS, material_bind_counts);
     bind!(r, tools::GET_MATERIAL_SIMILARITY_KEY, |m| m.addr() as u64);
-    // Model draw calls through managed's material system; without it these draw nothing.
-    bind!(r, tools::BIND_MODEL_DRAW_CALL, |_, _, _, _, _| false);
-    bind!(r, tools::BIND_MODEL_DRAW_CALL_VERTEX_IDS, |_, _, _, _, _| false);
-    bind!(r, tools::SET_RENDER_STATE_FOR_MODEL_DRAW_CALL, |_, _, _, _, _, _, _, _, _, _, _| false);
-    // No skinning, morphs, compute, ray tracing or auto exposure on the placeholder renderer.
-    bind!(r, tools::GET_MODEL_MESH_SKINNING, |_, _, _, _| -1);
-    bind!(r, tools::GET_MODEL_MESH_SKINNING_BONES, |_, _, _, _, _| false);
-    bind!(r, tools::ALLOCATE_VERTEX_CACHE, |_| -1);
-    bind!(r, tools::GET_VERTEX_CACHE_BUFFER, PtrHandle::default);
-    bind!(r, tools::DISPATCH_MODEL_MESH_SKINNING, |_, _, _, _, _, _, _, _, _, _, _, _, _, _, _| false);
     bind!(r, tools::MODEL_MESH_HAS_MORPHS, |m, mesh| {
         let model = crate::model::get(m);
         usize::try_from(mesh).ok().and_then(|i| model?.content.meshes.get(i).map(|e| !e.mesh.state().morphs.is_empty())).unwrap_or(false)
     });
-    bind!(r, tools::QUEUE_MODEL_MESH_MORPH, |_, _, _| -1);
-    bind!(r, tools::GENERATE_MORPHS, |_| {});
-    bind!(r, tools::GET_MORPH_SUBRECT, |_, _| {});
+    // No indirect compute, ray tracing or auto exposure yet.
     bind!(r, tools::COMPUTE_INDIRECT, |_, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS, |_, _, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS_INDIRECT, |_, _, _, _, _| {});
@@ -204,7 +178,7 @@ pub fn register(r: &mut Registry) {
     // TODO: mip generation and uint clears need compute or a blit pass.
     bind!(r, ctx::GENERATE_MIP_MAPS, |_, _| {});
     bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, _, _| {});
-    bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, sampler);
+    bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, |d| PtrHandle::<abi::handle::SamplerStateHandle_t>::new(crate::render::samplers::find_or_create(d)));
     bind!(r, dev::GET_SAMPLER_INDEX, |h| h.value as i32 - 1);
     bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));
     bind!(r, dev::GET_SHEET_META_DATA_TEXTURE, || NativeRef::NULL);
