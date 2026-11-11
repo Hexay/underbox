@@ -23,6 +23,7 @@ fn warn_once(shader: &str, what: &str) {
 fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, threads: [i32; 3]) {
     let (Some(material), Some(gpu)) = (material_mode::material(mode), device::gpu()) else { return };
     let shader = material.shader();
+    crate::render::submits::log_to(c, &format!("compute {shader}"), "-");
     let mut layers = vec![attrs];
     layers.extend(context::get(c).map(|c| c.attributes));
     let threads = threads.map(|n| n.max(1) as u32);

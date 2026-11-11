@@ -42,9 +42,11 @@ pub fn mapped(shader_path: &str) -> Option<bool> {
     MAPPED.iter().find(|(name, _)| stem.eq_ignore_ascii_case(name)).map(|(_, unlit)| *unlit)
 }
 
-/// Values a draw through the stand-in adds for the original shader (`StandinUnlit`).
-pub fn values(unlit: bool) -> [(&'static str, f32); 1] {
-    [("StandinUnlit", if unlit { 1.0 } else { 0.0 })]
+/// Values a draw through the stand-in adds for the original shader (`StandinUnlit`), and the
+/// debug view `UNDERBOX_STANDIN_DEBUG` picks (standin.shader).
+pub fn values(unlit: bool) -> [(&'static str, f32); 2] {
+    static DEBUG: std::sync::LazyLock<f32> = std::sync::LazyLock::new(|| std::env::var("UNDERBOX_STANDIN_DEBUG").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0));
+    [("StandinUnlit", if unlit { 1.0 } else { 0.0 }), ("StandinDebug", *DEBUG)]
 }
 
 pub fn shader(includes: &IncludePaths) -> Result<VfxShader, String> {

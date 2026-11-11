@@ -12,7 +12,7 @@ pub fn enabled() -> bool {
     *ENABLED
 }
 
-fn describe(t: texture::Ref) -> String {
+pub(crate) fn describe(t: texture::Ref) -> String {
     match texture::resolve(t) {
         Some(t) => match &t.gpu {
             Some(g) => format!("{}:{:?}:{}x{}", t.name, g.desc.format, g.desc.width, g.desc.height),

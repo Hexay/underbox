@@ -99,6 +99,7 @@ pub fn reverse_z(r: Ref) -> bool {
 pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
     let Some(gpu) = device::gpu() else { return };
     let (target, depth) = with(r, |b| (b.color, b.depth));
+    crate::render::submits::log(r, &format!("clear color {clear_color} depth {clear_depth} reverse_z {}", reverse_z(r)));
     let v = color.vec;
     let rgba = render::wgpu::Color { r: v.x.into(), g: v.y.into(), b: v.z.into(), a: v.w.into() };
     let gpu_of = |t: Option<texture::Ref>| t.and_then(texture::resolve);
@@ -129,14 +130,14 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::SET_VIEWPORT_2, set_viewport);
     bind!(r, ctx::GET_VIEWPORT, |r| with(r, |b| b.viewport));
     bind!(r, ctx::SET_SCISSOR_RECT, |r, rect| with(r, |b| b.scissor = Some(rect)));
-    bind!(r, ctx::SUBMIT, |_| {});
+    bind!(r, ctx::SUBMIT, |c| crate::render::submits::log(c, "Submit"));
     bind!(r, ctx::FORCE_FLUSH_GPU, |_| {
         if let Some(gpu) = device::gpu() {
             gpu.wait_idle();
         }
     });
-    bind!(r, ctx::BEGIN_PIX_EVENT, |_, _| {});
-    bind!(r, ctx::END_PIX_EVENT, |_| {});
+    bind!(r, ctx::BEGIN_PIX_EVENT, crate::render::submits::push_scope);
+    bind!(r, ctx::END_PIX_EVENT, crate::render::submits::pop_scope);
     bind!(r, ctx::PIX_SET_MARKER, |_, _| {});
     bind!(r, tools::BIND_COLOR_AND_DEPTH_TARGET, bind_targets_srgb);
     bind!(r, tools::BIND_DEPTH_TARGET, |r, depth, _slice| bind_targets(r, NativeRef::default(), depth));

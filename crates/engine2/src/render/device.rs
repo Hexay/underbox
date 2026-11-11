@@ -52,6 +52,17 @@ fn render_device_api() -> i64 {
     api as i64
 }
 
+/// `SystemInfo.SetGpu` at the tail of `SourceEngineInit`, as native does: managed's first-run
+/// graphics preset (`RenderSettings.DetectPreset`) reads it. Without a device, nothing is reported.
+// TODO: device-local memory; wgpu doesn't expose it, so 0 is reported and the preset detects Low.
+pub fn report_to_managed() {
+    let Some(gpu) = gpu() else { return };
+    let info = &gpu.info;
+    let integrated = matches!(info.device_type, render::wgpu::DeviceType::IntegratedGpu | render::wgpu::DeviceType::Cpu);
+    let (name, driver) = (std::ffi::CString::new(info.name.clone()).ok(), std::ffi::CString::new(info.driver_info.clone()).ok());
+    abi::callbacks::sandbox_engine_system_info::set_gpu(name.as_deref(), driver.as_deref(), 0, integrated);
+}
+
 fn wait_idle() {
     if let Some(gpu) = gpu() {
         gpu.wait_idle();
@@ -69,7 +80,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, device::SET_SUBMIT_TAG, |_| {});
     bind!(r, device::IS_USING32_BIT_DEPTH_BUFFER, || true);
     bind!(r, device::IS_RAY_TRACING_SUPPORTED, || false);
-    bind!(r, device::ARE_DEBUG_MARKERS_ENABLED, || false);
+    // Markers name the scopes UNDERBOX_SUBMITS=log prints.
+    bind!(r, device::ARE_DEBUG_MARKERS_ENABLED, crate::render::submits::enabled);
     bind!(r, device::SET_FORCE_PRELOAD_STREAMING_DATA, |_| {});
     bind!(r, device::GET_VIDEO_MEMORY_INFO, |a, b, c| {
         (*a, *b, *c) = (0, 0, 0);

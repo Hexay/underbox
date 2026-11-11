@@ -80,6 +80,7 @@ fn uniforms(c: Ctx, world: Mat4, tint: [f32; 4]) -> DrawUniforms {
 
 pub fn submit(c: Ctx, draws: &[Draw]) {
     if !draws.is_empty() {
+        crate::render::submits::log(c, &format!("draw x{}", draws.len()));
         super::execute(&context::target(c), &lighting(c), Load::default(), draws);
     }
 }

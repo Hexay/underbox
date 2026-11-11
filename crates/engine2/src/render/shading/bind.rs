@@ -110,7 +110,9 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n)));
     let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
     let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
-    let from_managed = || (b.name == shadow::TEXTURE).then(|| inputs.constant_buffer("DirectionalLightCB")).flatten().and_then(|cb| shadow::managed_cascade(&cb));
+    // A map also read without comparison has a `_cmp` clone for the compares (shaders' comparison pass).
+    let cascade = shadow::cascade_of(b.name.strip_suffix("_cmp").unwrap_or(&b.name));
+    let from_managed = || cascade.and_then(|n| shadow::managed_cascade(&inputs.constant_buffer("DirectionalLightCB")?, n));
     let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;

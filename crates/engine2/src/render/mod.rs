@@ -21,6 +21,7 @@ pub mod readback;
 pub mod scene;
 pub mod shading;
 pub mod stats;
+pub(crate) mod submits;
 pub mod swap_chain;
 pub mod texture;
 mod texture_generated;

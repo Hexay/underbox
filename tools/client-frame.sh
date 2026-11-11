@@ -7,7 +7,8 @@
 # CORPUS picks another corpus project with its own golden.tsv (mapworld: a loaded map).
 # MANAGED=1 draws through managed's scene renderer (+r_managed_scene 1), checked against
 # golden-managed.tsv, frame in target/client-frame-managed.
-# UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
+# Shadow quality is pinned to High (SHADOW_QUALITY, like managed's benchmark rung): this machine
+# would detect Low. UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
 # Don't wrap this in flock: boot-client.sh runs in this worktree's own game dir (docs/dev-loop.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -18,7 +19,7 @@ GOLDEN=$ROOT/corpus/$CORPUS/golden$SUFFIX.tsv
 SETTLE=5
 rm -rf "$OUT"; mkdir -p "$OUT/frames"
 SECS=$1 SBOX=$2; shift 2
-OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL='game.load success' GRACE=${GRACE:-6} \
+OUT="$OUT" FRAMES="$OUT/frames" SHADOW_QUALITY=${SHADOW_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL='game.load success' GRACE=${GRACE:-6} \
     sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$ROOT/corpus/$CORPUS/.sbproj" "$@" > "$OUT/boot.txt" 2>&1 || true
 ADAPTER=$(grep -ohE 'render device: .*' "$OUT/client.out" | head -n 1 | sed 's/^render device: //')
 [ -n "$ADAPTER" ] || { tail -n 20 "$OUT/boot.txt"; echo "RESULT: FAIL (no render device)"; exit 1; }

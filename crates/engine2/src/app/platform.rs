@@ -60,7 +60,10 @@ pub fn register(r: &mut Registry) {
         *COMMAND_LINE.write().unwrap() = string(cmd);
         true
     });
-    bind!(r, global::SOURCE_ENGINE_INIT, |_| true);
+    bind!(r, global::SOURCE_ENGINE_INIT, |_| {
+        crate::render::device::report_to_managed();
+        true
+    });
     // False asks managed's EngineLoop to quit. A client renders and presents its frame here.
     bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| {
         crate::render::game_window::frame();

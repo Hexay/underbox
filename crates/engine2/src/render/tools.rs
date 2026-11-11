@@ -164,8 +164,14 @@ pub fn register(r: &mut Registry) {
         copy_from_target(c, t, Some([x.max(0) as u32, y.max(0) as u32, w.max(0) as u32, h.max(0) as u32]), false);
     });
     // TODO: the sRGB transfer flag; the blit draw writes linear values as they are.
-    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, srgb| blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb));
-    bind!(r, tools::COPY_TEXTURE, |_, src, dst, r, dx, dy, _, _, _, _| copy_texture(src, dst, r, dx, dy));
+    bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, srgb| {
+        crate::render::submits::log(c, &format!("blit from {}", crate::render::scene::trace::describe(src)));
+        blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb)
+    });
+    bind!(r, tools::COPY_TEXTURE, |c, src, dst, r, dx, dy, _, _, _, _| {
+        crate::render::submits::log_texture(c, &format!("copy from {}", crate::render::scene::trace::describe(src)), dst);
+        copy_texture(src, dst, r, dx, dy)
+    });
     bind!(r, tools::DRAW_SKY_BOX, |c, _attrs, _mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
         let t = object::with(o, |s| Some(s.transform)).unwrap_or_else(crate::math::identity);
