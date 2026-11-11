@@ -1,8 +1,8 @@
-# Differential runs: joints, island sleep, orbmatch
+# Differential runs: joints, island sleep, contacts, orbmatch
 
-Joint and sleep findings from `tools/diff/probe/Code/ProbeJoint.cs`: private worlds stepped like a
-scene (0.02 s, 2 sub-steps), gravity off unless stated. Then the zoo hoover and orbmatch's bots.
-Harness and rules: docs/differential.md.
+Joint, sleep and contact findings from `tools/diff/probe/Code/ProbeJoint.cs` and `ProbePush.cs`:
+private worlds stepped like a scene (0.02 s, 2 sub-steps), gravity off unless stated. Then the zoo
+hoover and orbmatch's bots. Harness and rules: docs/differential.md.
 
 | Marker | What |
 | --- | --- |
@@ -13,6 +13,8 @@ Harness and rules: docs/differential.md.
 | `OVERLAP` | two 16-unit boxes overlapping by 4, hinged where they meet, joint collision on |
 | `CAR` | a box chassis (6 kg) on a slab with three sphere wheels sunk into its underside, hinged, motors at zero speed (max 9.23 and 506.5), joint collision on |
 | `STACKSLEEP` / `STACKV` | the step a resting three-box stack and a lone box fall asleep, and their early speeds |
+| `PUSHOUT` | two unjointed 16-unit boxes (or radius-16 balls) overlapping by `d`, at rest: their gap and speeds |
+| `REAIM` | orbmatch's push: balls at (−400, 0) and (−440, y) set toward the origin every step at 200 and `rear` u/s; `nofriction` zeroes friction |
 
 ## Findings (before → after)
 
@@ -44,6 +46,29 @@ Harness and rules: docs/differential.md.
     (`World::restart_sleep_on_new_contacts`, `rest_tests::a_stack_sleeps_a_step_after_a_lone_box`):
     26, 26, 26 and 25, and the `DEPTH` markers match. Real's stack still moves faster on step 1
     (vz −0.95 against −0.20) and slower later; the sinks agree.
+16. **Fixed. Contacts persist, and bounce every step.** `REAIM`: real solves each step with the
+    normal of the step the pair first touched and keeps it until the contact drifts. Without
+    friction the push stays at 13.95° from step 6 to 11, then jumps to the current 17.9° at step
+    12 and 22.0° at 17 (drift about 2 units); rolling with friction, it holds 14.03° through step
+    22. Ours took a fresh normal every step. Rapier's contact recycling does the same as real, but
+    it never recycles a pair with filter hooks, and every shape had them. Real also bounces every
+    approach faster than 40–42 u/s (`rear=240` doesn't bounce, `242` does), where Rapier bounces
+    only a new contact. Before: front y −4.088 at step 19 (real −3.103), the pair ending each step
+    still closing (243.2, 256.7; real 250.55, 249.34). After (`filter.rs`: hooks only on shapes
+    some rule can filter, one tag per uncolliding rule, and on jointed bodies; `bounce.rs`): −3.102,
+    250.55 and 249.34, positions within 0.04 of real to step 22 with or without friction
+    (`orb_tests`). Real refreshes the rolling pair at step 23 and ours at 26 (Rapier's bound: 1.97
+    units of relative drift and 11.5° of absolute turn); both then close the pair the same way.
+    Jointed bodies keep the hooks because recycled contacts freeze their normals in world space
+    and fight the soft joint locks (14): the `CAR` crept at 2 u/s and never slept.
+17. **Not changed. Push-out of unjointed overlaps.** `PUSHOUT`: the gap already follows real (box
+    d = 4: 12.552, 14.096, 15.789 at steps 1, 5, 20 against 12.525, 14.035, 15.978; balls
+    identical). Real leaves boxes separating at about 0.35 u/s per unit of overlap (d = 4: 1.40,
+    then 2.03 from step 5; d = 12: 6.40; balls 0), so they drift apart and d ≥ 4 never sleeps;
+    ours ends at rest. One stabilization (relax) iteration per substep reproduces this (1 PGS: d =
+    4 gaps within 0.02, speed 1.33 then 2.24) but breaks the landing, stack depth and sleep, and
+    car fits (`landing_tests`, `rest_tests`, `soft_tests`), and moves the zoo trike by under 5
+    units. Kept at 2 PGS and 3 stabilization iterations.
 
 ## The zoo hoover (differential.md, 10)
 
@@ -56,7 +81,15 @@ wheels, three motorised hinges with joint collision) starts inside that sign. `G
   tumbles about 50 units along −y and comes to rest on its side (`up=0.1`) after about 17 s.
 - Ours: the sign pushes the trike 9 units out; it stays upright and sleeps within 3 s.
 
-So the gap is how deep overlaps between unjointed bodies are pushed apart, not the motors (11). Real's tick-4 sample is
+Real's `RESTED`: `base` (583, 138, 8) `up=0.1`, `rear` (581, 132, 12), wheels at y = 138 and
+142, `hoover_a` (576, 199, 5). Ours: `base` (575, 183, 0) `up=1.0`, wheels at y = 178, `hoover_a`
+(574, 197, 5). Not the motors (11), and not the push-out of unjointed overlaps either: the
+`PUSHOUT` probe pushes unjointed boxes apart the way real does (17). Tried, none moving `base` more
+than 5 units or tipping it: one stabilization iteration per substep with 1 or 3 PGS iterations
+(real's residual push-out speed; 579, 185 and 574, 184), per-step restitution and contact
+persistence (16; 576, 184). The trike's bodies are jointed, so they keep fresh contacts (16).
+Next: probe a hinged pair inside a static or heavy dynamic hull, the trike's own geometry, rather
+than unjointed boxes. Real's tick-4 sample is
 not repeatable either: two runs gave `base` v = 41 and 8, `rear` 12 and 36, because the watcher
 samples on wall-clock seconds. Softer joints (Box2D's 60 Hz ζ 2, or 50 Hz ζ 2) kept 4–5 trike
 bodies awake for about 20 s, close to real's awake counts, but only because the trike creeps under
@@ -68,17 +101,14 @@ its own soft joints, which real's `CAR` doesn't do; rejected for that reason.
 until the trailing bots rear-end their teammates (tick 5–10). Then, every tick, each bot is
 re-aimed at the goal (200 and 300 u/s) and the solver resolves the push:
 
-- Real ends each tick with the pair separating at about 7 u/s along the normal (0.08 of the
-  approach), front 250.5 and rear 249.3 u/s at tick 20, and deflects them sideways slowly (front
-  y = −3.1 at tick 20).
-- Ours ends with the pair still closing (front 243.2, rear 256.7) and deflects them further (−4.1).
-  Rapier only bounces a contact on its first step (`is_bouncy`); real bounces every approach.
-  Nothing in our integration parameters moves this: contact softness, PGS and stabilisation
-  iterations, warm-starting, friction and restitution all leave tick 20 within 0.1.
+- Real holds the contact normal of first touch and bounces every approach (16): front 250.55 and
+  rear 249.34 u/s at tick 20, front y = −3.103.
+- Ours now: 250.55, 249.34, −3.102 (before: 243.2, 256.7, −4.088). Contact softness, PGS and
+  stabilization iterations, warm-starting, friction model and restitution alone left tick 20
+  within 0.1 of the old numbers; the normal is what moved it.
 
-Positions are what the scripts integrate, and they part by 0.5 by tick 20 and 11 by tick 75, so
-`Bot0_0` scores about four ticks later and, after respawning, misses the bump real gives it
-(real leaves home pushed sideways, ours runs straight down y = 0 to x = −180); that is the 18.5
-at `FINAL`. `orb_tests::rear_end_push_matches_real` (ignored) replays the push headless and
-reproduces ours' in-engine numbers exactly. Next: real's contact solve for a pair pushed together
-every step (Box2D applies restitution to any approach over its threshold, then relaxes).
+The bots part at tick 23 on real and 26 on ours, when each refreshes the rolling pair's contact
+(16): 0.23 apart by tick 25, 0.35 by tick 30. `FINAL`: `Bot0_0` ends at x = −138.6 on ours and
+−161.5 on real (before −180), `Bot1_1` 42.1 against 52.9. `orb_tests` replays the push headless
+(positions and velocities to step 19, the bounce threshold). Next: when real refreshes a
+persistent contact (the anchored points' drift, or the bodies' turn).

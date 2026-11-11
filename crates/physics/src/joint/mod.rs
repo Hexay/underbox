@@ -173,12 +173,19 @@ impl World {
         let data = build::rapier(&joint, self.bodies_pair(a, b));
         let id = self.raw_mut().insert_impulse_joint(a, b, data);
         self.joints.entries.insert(id, Entry { joint, linear_impulse: 0.0, angular_impulse: 0.0 });
+        self.refresh_body_hooks(a);
+        self.refresh_body_hooks(b);
         Some(id)
     }
 
     pub fn remove_joint(&mut self, id: JointId) {
+        let bodies = self.joint_bodies(id);
         self.joints.entries.remove(&id);
         self.raw_mut().remove_impulse_joint(id);
+        if let Some((a, b)) = bodies {
+            self.refresh_body_hooks(a);
+            self.refresh_body_hooks(b);
+        }
     }
 
     pub fn joint(&self, id: JointId) -> Option<&Joint> {

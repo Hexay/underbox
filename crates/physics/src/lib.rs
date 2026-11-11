@@ -2,6 +2,7 @@
 //! engine2's physics module binds slots onto [`World`]. Units are s&box's (inches).
 
 mod body_query;
+mod bounce;
 mod contacts;
 mod filter;
 mod heightfield;
@@ -24,6 +25,8 @@ mod landing_tests;
 mod orb_tests;
 #[cfg(test)]
 mod rest_tests;
+#[cfg(test)]
+mod world_tests;
 
 pub use contacts::{ContactEvent, EventKind};
 pub use filter::{DEFAULT_DENSITY, ShapeMeta, function};
