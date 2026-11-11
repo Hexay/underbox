@@ -24,14 +24,14 @@ pub(crate) fn core_dir() -> Option<PathBuf> {
 
 #[test]
 fn scene_renderer_mesh_builds_and_binds() {
-    let (Some(core), Ok(gpu)) = (core_dir(), render::Gpu::headless()) else {
+    let (Some(core), Some(gpu)) = (core_dir(), device::create()) else {
         eprintln!("skipped: no sbox-public checkout or GPU");
         return;
     };
     let includes = shaders::IncludePaths::new([core.clone()]);
     let shader = shaders::VfxShader::parse_file(&core.join("shaders/scene_renderer_mesh.shader"), &includes).unwrap();
     let compiler = shaders::Compiler::new().unwrap();
-    let s = program::build(&gpu, &compiler, &shader, "scene_renderer_mesh", &shaders::Variant::default()).unwrap();
+    let s = program::build(gpu, &compiler, &shader, "scene_renderer_mesh", &shaders::Variant::default()).unwrap();
 
     let inputs = vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).expect("mesh layout feeds the shader");
     assert!(!inputs.keys.is_empty());
@@ -41,7 +41,7 @@ fn scene_renderer_mesh_builds_and_binds() {
     let (textures, values) = (HashMap::new(), HashMap::new());
     let lighting = Lighting::fallback();
     let draw = bind::Inputs { view: &view, lighting: &lighting, instances: &instances, textures: &textures, values: &[&values], attributes: &[], slots: &[], targets: &[] };
-    let groups = gpu.checked(|| bind::bind_groups(&gpu, &s, &draw)).unwrap().unwrap();
+    let groups = gpu.checked(|| bind::bind_groups(gpu, &s, &draw)).unwrap().unwrap();
     assert_eq!(groups.len(), s.program.bind_group_layouts.len());
 }
 
