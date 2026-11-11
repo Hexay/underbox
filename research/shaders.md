@@ -63,7 +63,12 @@ WGSL, plus reflection and a disk cache. Decisions, each with its reason:
   - `row_major`: non-square row-major struct members get the transposed type, because naga sizes them
     wrong;
   - `bindings`: aliased bindings (the bindless arrays share set 1 binding 16) move past the set's
-    highest binding.
+    highest binding;
+  - `rematerialize`: access chains used outside their block are cloned into it, because naga
+    spills cross-block values into locals and a pointer can't be one (atmosphere_sky, terrain).
+- Source rewrites before DXC: `compat` (Slang-isms, line-preserving) and `word_buffers`
+  (`RWStructuredBuffer<S>` with `Interlocked*` on S's fields → a `uint` word buffer, since naga
+  can't make a struct member atomic; occlusion_cull_cs).
 
   Reflection reports the final (group, binding) of each name, and the renderer binds by name.
 - `isnan(x)` becomes `x != x` because WGSL has no `isnan` (`src/translate.rs`).
@@ -73,12 +78,10 @@ WGSL, plus reflection and a disk cache. Decisions, each with its reason:
 ## Corpus status
 `cargo test -p shaders --test corpus` runs each of the 85 core shaders' default combo (static 0,
 dynamic 0) and writes `corpus.tsv`/`corpus-errors.txt` to CARGO_TARGET_TMPDIR. All 85 shaders
-parse. Of 141 program stages, 139 compile through DXC and 127 come out as validated WGSL. The test's
-`MIN_OK_STAGES` is the regression floor.
+parse. The test's `MIN_OK_STAGES` is the regression floor; `corpus.tsv` has the current count.
 
 Remaining failures, by class:
-- **Missing consumer-supplied types (DXC):** `terrain` Ps needs `PS_INPUT` from material.hlsl's
-  includer; `ObjectHighlight` has a GS block without `MainGs`.
+- **DXC:** `ObjectHighlight` has a GS block without `MainGs`.
 - **naga can't express it (spv-in):**
   - geometry shaders: `gizmo_line`, `gizmo_sprite`. Their VS then also fails validation, because it
     outputs no position and feeds the GS.
@@ -87,11 +90,10 @@ Remaining failures, by class:
   - `SPV_KHR_compute_shader_derivatives` (`downsample_spd`).
   - `OpDecorateId` (`clutter_cull_cs`).
   - "invalid image" (`particle_lighting_cs`).
-- **naga validation:**
-  - `atmosphere_sky` Ps: a local of a non-storable type;
-  - `occlusion_cull_cs`: an atomic on a struct field, where the store type mismatches;
-  - `screen_space_reflections_cs`: `||` on `vec3<bool>`, from HLSL 2018's per-component logic.
+- **naga validation:** `screen_space_reflections_cs`: `||` on `vec3<bool>`, from HLSL 2018's
+  per-component logic.
 
-Next: GS needs emulation (compute or instancing) or the wgpu SPIR-V passthrough on Vulkan. Most of
+Next: GS needs emulation (compute or instancing) or the wgpu SPIR-V passthrough on Vulkan; until
+then the renderer draws gizmo_line/gizmo_sprite with an unlit vertex-colour stand-in. Most of
 the naga cases are small upstream fixes or more SPIR-V passes. The `||` case could be rewritten to
 `or()` in compat for HLSL 2021-style code.

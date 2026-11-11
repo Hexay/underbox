@@ -95,6 +95,21 @@ impl Gpu {
         }
     }
 
+    /// The largest device-local memory heap in bytes (what drivers report as VRAM; system RAM on
+    /// a software or unified-memory device). wgpu doesn't expose heaps, so it asks Vulkan through
+    /// wgpu-hal; `None` on other backends.
+    pub fn device_local_bytes(&self) -> Option<u64> {
+        // VK_MEMORY_HEAP_DEVICE_LOCAL_BIT.
+        const DEVICE_LOCAL: u32 = 0x1;
+        // SAFETY: the hal adapter is only read (no handle escapes the guard), and the physical
+        // device belongs to the instance it is queried on.
+        unsafe {
+            let adapter = self.adapter.as_hal::<wgpu::hal::api::Vulkan>()?;
+            let props = adapter.shared_instance().raw_instance().get_physical_device_memory_properties(adapter.raw_physical_device());
+            props.memory_heaps_as_slice().iter().filter(|h| h.flags.as_raw() & DEVICE_LOCAL != 0).map(|h| h.size).max()
+        }
+    }
+
     /// Block until every submitted command has finished (and map callbacks have run).
     pub fn wait_idle(&self) {
         self.device.poll(wgpu::PollType::wait_indefinitely()).expect("wgpu device lost while waiting");

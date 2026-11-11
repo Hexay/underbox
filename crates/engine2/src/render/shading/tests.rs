@@ -56,7 +56,7 @@ fn standin_cube(tint: [f32; 4], lighting: &Lighting) -> Option<render::Frame> {
         eprintln!("skipped: no GPU");
         return None;
     };
-    let shader = standin::shader(&shaders::IncludePaths::new([core])).unwrap();
+    let shader = standin::shader(standin::PATH, &shaders::IncludePaths::new([core])).unwrap().unwrap();
     let compiler = shaders::Compiler::new().unwrap();
     let s = Arc::new(program::build(gpu, &compiler, &shader, standin::PATH, &shaders::Variant::default()).unwrap());
     let inputs = vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).expect("mesh layout feeds the stand-in");

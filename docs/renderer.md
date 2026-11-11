@@ -86,7 +86,8 @@ native model one to one, so managed's pipeline code runs unchanged:
    when the renderer has a managed camera id. Afterwards it writes `RenderedProjectionToView`,
    `RenderedViewport` and `RenderedDepthRange`.
 2. No layers added (no managed pipeline, as in tests) → `execute::default_layers`: clear
-   (`clearColor`/`clearFlags` attributes), sky, opaque.
+   (`clearColor`/`clearFlags` attributes, the colour linearized like managed's `ToLinear`), sky,
+   opaque, all into an Rgba16Float HDR target per colour target, then `ResolveHDRToFinalSDR`.
 3. The view runs immediately (`execute::run`), layer by layer on one context: Clear → load ops;
    Render → the worlds' objects that pass tags, layer match id and required/excluded flags (a model
    counts as `IsOpaque`); depth prepass, light binner setup and translucent model draws are
@@ -107,9 +108,15 @@ native model one to one, so managed's pipeline code runs unchanged:
    (`draw/draw_call.rs`) draws one mesh draw call with managed's instance-id buffer as the
    instance stream and transforms from the `g_TransformBuffer` attribute; the indirect forms read
    their args back from the GPU buffer. Managed's culled draws only get an `InstanceCount` from
-   `occlusion_cull_cs`, which `render/compute/occlusion.rs` emulates on the CPU (nothing is
-   occluded). `BlitTexture` copies or draws through `draw::blit` (scales, converts formats,
-   applies `nSrgbTransfer`; swap-chain binds write sRGB like native).
+   `occlusion_cull_cs`, which runs on the GPU (`render/compute/occlusion.rs` is the CPU fallback
+   when it doesn't build). `BlitTexture` copies or draws through `draw::blit` (scales, converts
+   formats, applies `nSrgbTransfer`; swap-chain binds write sRGB like native).
+   `BindDepthTarget`'s slice selects the array layer (cube face) draws and clears go to.
+
+   Colour model (as native): textures declared `SrgbRead( true )` sample their sRGB view
+   (decoded to linear; `render::Texture::srgb_view`), lighting is linear, and the encode happens
+   once at output: Blit layers apply `RENDER_SRGB` (read decode, write encode) and the
+   `D_SRGB_TRANSFER` combo (`draw::blit_transfer`).
    `draw/draw_call_tests.rs` is the headless repro: one box with managed-shaped view constants.
 6. Scene objects own a copy of their model handle (`model::copy`): managed's `FromNative` wrappers
    destroy what they're handed, which used to empty the object.
@@ -144,28 +151,35 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
 - Core material shaders that ship without source (complex, generic, simple, skin, unlit,
   tools_sprite, ui, sky, ...) draw with a stand-in (`shading/standin.shader`, map in
   `standin.rs`): `g_tColor` × tint × vertex tint × the view's lighting (below), or unlit. Sky
-  draws flat until a cube-sampling stand-in exists. Pixel bindings that collide with a different
+  samples the sky material's `SkyTexture` cube along the view ray (`standin_sky.shader`); the
+  gizmo shaders, whose geometry shaders naga can't take, draw unlit in vertex colour
+  (`standin_gizmo.shader`, primitives as submitted). Pixel bindings that collide with a different
   vertex binding are moved apart after translation (`shading/stages.rs`).
 - Binder precedence per uniform block (`shading/bind.rs`): managed's `SetConstantBufferData` bytes
   by block name, the view block, the lighting blocks, then member-wise attributes → material →
   annotation defaults. Textures: attributes → material → managed's sun cascade (the bindless
-  index in its `DirectionalLightCB`, `shadow::managed_cascade`) → lighting (our shadow maps) → the
+  index in its `DirectionalLightCB`, `shadow::managed_cascade`) → managed's local shadow slots
+  (`shading/shadow_slots.rs`) → lighting (our shadow maps) → the
   context's `BindTexture` slot with that binding number. A texture that is the pass's own target
   is never bound (managed's shadow pass would sample the map it writes). `ComparisonFunc` and
   `RWTexture2D` (storage, mip 0, exact format) bind as declared.
 - `UNDERBOX_DUMP_CB=<block>` logs every `SetConstantBufferData` of that block as words
   (`render/bindings.rs`): compare managed's bytes with ours before changing a layout.
-- Bindless arrays (`g_bindless_*`) bind when the adapter has `TEXTURE_BINDING_ARRAY`: every
-  element is a default texture or sampler, runtime-sized ones get `program::RUNTIME_ARRAY_LEN`.
-  `render::Gpu` also takes `SUBGROUP` (wave ops in the lit shaders) and the adapter's per-stage
-  binding limits (they bind 14+ storage buffers). TODO: managed's global bindless descriptor set.
+- Bindless (`render/bindless.rs`): `GetTextureViewIndex` hands out linear/sRGB index pairs from
+  1 (`GetTexture2DSrgb` adds 1); `g_bindless_*` arrays (with `TEXTURE_BINDING_ARRAY`) hold the
+  real textures of each array's shape, the default elsewhere, partially bound up to the highest
+  index. Samplers are still defaults. naga can't compare-sample an array, so the stand-in reads
+  managed's shadow maps through slots (`shading/shadow_slots.rs`). `render::Gpu` also takes
+  `SUBGROUP` (wave ops in the lit shaders) and the adapter's per-stage binding limits.
+- `SystemInfo.SetGpu` and `GetVideoMemoryInfo` report the largest Vulkan device-local heap
+  (`Gpu::device_local_bytes`), which managed's quality preset detection reads.
 - Textures load from compiled `vtex_c` first (`crate::compiled::texture`), then the ones
   `texture_generated.rs` draws (e.g. the dev test grid behind `testgrid.vmat`), else native's
   error texture. Materials without a `.vmat` source load from `vmat_c` (`crate::compiled::material`).
 - Coverage over sbox-public's vmats: `sh tools/test.sh engine2 material_coverage -- --ignored`
   writes `target/material-coverage.tsv` (full wgpu error text per row). Main gaps: compute-only
-  shaders, tools shaders without source (selection, visualisers), atmosphere_sky, terrain and
-  gizmo_line/gizmo_sprite translation failures.
+  shaders and tools shaders without source (selection, visualisers). Translation status of the
+  core shaders: research/shaders.md "Corpus status".
 
 Compute, lighting and shadows (ours and managed's): docs/lighting.md.
 
@@ -271,14 +285,10 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 ## Next
 
-1. Managed sun shadows cast nothing in a boot (docs/lighting.md, "Managed sun shadows (open)"); then further
-   cascades (the stand-in reads cascade 0 only) and managed's local-light shadows
-   (`ProjectedShadows` buffers).
-2. Compute: `downsample_spd` (strip the derivatives extension, per-mip storage views),
-   `occlusion_cull_cs` on the GPU (naga type mismatch), compute combos beyond 0/0.
-3. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
+1. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
    CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
-4. Real bindless descriptor sets, a cube-sampling sky stand-in, the testgrid tone, and the
-   shaders that don't translate (atmosphere_sky, terrain, gizmo_line, gizmo_sprite).
-5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
+2. Managed's GPU skinning and morphs (`DispatchModelMeshSkinning`, `QueueModelMeshMorph`,
+   `GenerateMorphs`, vertex cache): all answer "none", so managed draws bind poses; bindless
+   samplers; geometry-shader emulation for the gizmos.
+3. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.

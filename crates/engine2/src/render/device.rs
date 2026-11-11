@@ -53,14 +53,19 @@ fn render_device_api() -> i64 {
 }
 
 /// `SystemInfo.SetGpu` at the tail of `SourceEngineInit`, as native does: managed's first-run
-/// graphics preset (`RenderSettings.DetectPreset`) reads it. Without a device, nothing is reported.
-// TODO: device-local memory; wgpu doesn't expose it, so 0 is reported and the preset detects Low.
+/// graphics preset (`RenderSettings.DetectPreset`) reads it. Reports the adapter name, driver,
+/// device-local memory, and whether that memory is system memory (an integrated or software
+/// device). Without a device, nothing is reported.
 pub fn report_to_managed() {
+    const SET_GPU: usize = 13;
     let Some(gpu) = gpu() else { return };
-    let info = &gpu.info;
-    let integrated = matches!(info.device_type, render::wgpu::DeviceType::IntegratedGpu | render::wgpu::DeviceType::Cpu);
-    let (name, driver) = (std::ffi::CString::new(info.name.clone()).ok(), std::ffi::CString::new(info.driver_info.clone()).ok());
-    abi::callbacks::sandbox_engine_system_info::set_gpu(name.as_deref(), driver.as_deref(), 0, integrated);
+    if !abi::rt::callbacks::is_set(SET_GPU) {
+        return;
+    }
+    let cstr = |s: &str| std::ffi::CString::new(s).unwrap_or_default();
+    let (name, driver) = (cstr(&gpu.info.name), cstr(&format!("{} {}", gpu.info.driver, gpu.info.driver_info)));
+    let integrated = matches!(gpu.info.device_type, render::wgpu::DeviceType::IntegratedGpu | render::wgpu::DeviceType::Cpu);
+    abi::callbacks::sandbox_engine_system_info::set_gpu(Some(&name), Some(&driver), gpu.device_local_bytes().unwrap_or(0), integrated);
 }
 
 fn wait_idle() {
@@ -83,7 +88,8 @@ pub fn register(r: &mut Registry) {
     // Markers name the scopes UNDERBOX_SUBMITS=log prints.
     bind!(r, device::ARE_DEBUG_MARKERS_ENABLED, crate::render::submits::enabled);
     bind!(r, device::SET_FORCE_PRELOAD_STREAMING_DATA, |_| {});
+    // Budget only: wgpu reports no usage.
     bind!(r, device::GET_VIDEO_MEMORY_INFO, |a, b, c| {
-        (*a, *b, *c) = (0, 0, 0);
+        (*a, *b, *c) = (gpu().and_then(render::Gpu::device_local_bytes).unwrap_or(0), 0, 0);
     });
 }

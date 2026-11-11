@@ -150,7 +150,7 @@ fn managed_sun_shadow_darkens_the_floor() {
     attributes::set_constant_buffer(s.attrs(), StringToken::of(crate::render::shading::view::BLOCK), &constants);
     s.shadow_pass(map, &light_constants);
 
-    let index = crate::render::tools::texture_view_index(map);
+    let index = crate::render::bindless::index(map, false);
     attributes::set_constant_buffer(s.frame, StringToken::of("DirectionalLightCB"), &sun_constants(&[Cascade { world_to_uv, index, sphere: Vec4::new(0.0, 0.0, 0.0, 1e9) }]));
     attributes::set_constant_buffer(s.attrs(), StringToken::of(crate::render::shading::view::BLOCK), &constants);
     let (color, depth) = (s.target("shadowed", SIZE, 0), s.target("shadowed depth", SIZE, 62));
@@ -177,7 +177,7 @@ fn managed_cascades_in_boot_order() {
     let maps = [s.target("cascade 0", 512, 62), s.target("cascade 1", 512, 62)];
     let views = [cascade_view(Vec3::ZERO, 20.0 * K), cascade_view(Vec3::ZERO, 2700.0)];
     let near_sphere = Vec4::new(0.0, 0.0, 0.0, (18.0 * K) * (18.0 * K));
-    let cascades: Vec<Cascade> = (0..2).map(|n| Cascade { world_to_uv: views[n].1, index: crate::render::tools::texture_view_index(maps[n]), sphere: if n == 0 { near_sphere } else { Vec4::new(0.0, 0.0, 0.0, 1e9) } }).collect();
+    let cascades: Vec<Cascade> = (0..2).map(|n| Cascade { world_to_uv: views[n].1, index: crate::render::bindless::index(maps[n], false), sphere: if n == 0 { near_sphere } else { Vec4::new(0.0, 0.0, 0.0, 1e9) } }).collect();
     attributes::set_constant_buffer(s.attrs(), StringToken::of("DirectionalLightCB"), &sun_constants(&cascades));
     attributes::set_constant_buffer(s.attrs(), block, &main_constants);
 

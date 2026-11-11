@@ -3,6 +3,7 @@
 //! docs/renderer.md.
 
 pub mod attributes;
+pub mod bindless;
 mod bindings;
 mod buffers;
 mod compute;

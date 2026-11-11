@@ -41,6 +41,14 @@ pub fn decode(t: &vtex::Texture) -> Option<Decoded> {
     let mut config = TextureCreationConfig_t::default();
     (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (width as i16, height as i16, layers as i16, 1);
     config.m_n_image_format = format;
+    // As managed's builders describe them: a cube's depth counts cubes, not faces.
+    if t.is_cube() && !t.format.is_image_file() {
+        config.m_n_depth = (layers / 6) as i16;
+        config.m_n_flags |= crate::render::texture::TSPEC_CUBE_TEXTURE;
+    }
+    if layers > 1 && !t.is_cube() && t.flags & vtex::flags::VOLUME == 0 {
+        config.m_n_flags |= crate::render::texture::TSPEC_TEXTURE_ARRAY;
+    }
     if let Some((w, h)) = t.display {
         (config.m_n_display_rect_width, config.m_n_display_rect_height) = (w as i16, h as i16);
     }

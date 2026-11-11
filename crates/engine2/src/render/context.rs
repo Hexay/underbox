@@ -17,6 +17,7 @@ pub type Ref = NativeRef<class::IRenderContext>;
 struct Bindings {
     color: Option<texture::Ref>,
     depth: Option<texture::Ref>,
+    depth_slice: u32,
     viewport: RenderViewport,
     scissor: Option<NativeRect>,
     srgb_write: bool,
@@ -38,13 +39,14 @@ pub fn get(r: Ref) -> Option<std::sync::Arc<RenderContext>> {
 
 /// The bound targets, viewport and scissor draws go to.
 pub fn target(r: Ref) -> Target {
-    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), viewport: b.viewport, scissor: b.scissor })
+    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor })
 }
 
 /// Bind `t`'s targets, viewport and scissor at once.
 pub fn bind_target(r: Ref, t: &Target) {
     bind_targets(r, t.color, t.depth);
     with(r, |b| {
+        b.depth_slice = t.depth_slice;
         if t.viewport.m_n_width > 0 && t.viewport.m_n_height > 0 {
             b.viewport = t.viewport;
         }
@@ -77,7 +79,7 @@ pub fn bind_targets(r: Ref, color: texture::Ref, depth: texture::Ref) {
 pub fn bind_targets_srgb(r: Ref, color: texture::Ref, depth: texture::Ref, srgb_write: bool) {
     let size = some(color).or(some(depth)).and_then(texture::resolve).and_then(|t| t.gpu.as_ref().map(|g| (g.desc.width, g.desc.height)));
     with(r, |b| {
-        (b.color, b.depth, b.scissor, b.srgb_write) = (some(color), some(depth), None, srgb_write);
+        (b.color, b.depth, b.depth_slice, b.scissor, b.srgb_write) = (some(color), some(depth), 0, None, srgb_write);
         if let Some((w, h)) = size {
             b.viewport = RenderViewport { m_n_width: w as i32, m_n_height: h as i32, max_z: 1.0, ..Default::default() };
         }
@@ -98,7 +100,7 @@ pub fn reverse_z(r: Ref) -> bool {
 /// TODO: clears cover the whole target; a viewport or scissor smaller than it needs a quad draw.
 pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
     let Some(gpu) = device::gpu() else { return };
-    let (target, depth) = with(r, |b| (b.color, b.depth));
+    let (target, depth, slice) = with(r, |b| (b.color, b.depth, b.depth_slice));
     crate::render::submits::log(r, &format!("clear color {clear_color} depth {clear_depth} reverse_z {}", reverse_z(r)));
     let v = color.vec;
     let rgba = render::wgpu::Color { r: v.x.into(), g: v.y.into(), b: v.z.into(), a: v.w.into() };
@@ -107,7 +109,7 @@ pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool
         tex.clear(gpu, rgba, 1.0);
     }
     if clear_depth && let Some(t) = gpu_of(depth) && let Some(tex) = &t.gpu {
-        tex.clear(gpu, rgba, if reverse_z(r) { 0.0 } else { 1.0 });
+        tex.clear_layer(gpu, rgba, if reverse_z(r) { 0.0 } else { 1.0 }, slice);
     }
 }
 
@@ -140,7 +142,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::END_PIX_EVENT, crate::render::submits::pop_scope);
     bind!(r, ctx::PIX_SET_MARKER, |_, _| {});
     bind!(r, tools::BIND_COLOR_AND_DEPTH_TARGET, bind_targets_srgb);
-    bind!(r, tools::BIND_DEPTH_TARGET, |r, depth, _slice| bind_targets(r, NativeRef::default(), depth));
+    bind!(r, tools::BIND_DEPTH_TARGET, |r, depth, slice| {
+        bind_targets(r, NativeRef::default(), depth);
+        with(r, |b| b.depth_slice = slice.max(0) as u32);
+    });
     bind!(r, tools::SUPPORTS_DRAW_INDIRECT_COUNT, || false);
 }
 

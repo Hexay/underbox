@@ -49,7 +49,7 @@ fn eye(c: context::Ref) -> String {
     let view = attributes::constant_buffer(attrs, crate::render::shading::view::BLOCK);
     let eye = view.map_or_else(|| "-".into(), |b| format!("({:.0},{:.0},{:.0})", f(&b, 304), f(&b, 308), f(&b, 312)));
     let sun = attributes::constant_buffer(attrs, "DirectionalLightCB").and_then(|b| b.get(288..292).map(|x| u32::from_le_bytes(x.try_into().unwrap())));
-    let map = |i: u32| crate::render::tools::texture_at_view_index(i).map_or_else(|| "none".into(), |t| format!("{}@{:#x}", describe(t), t.addr()));
+    let map = |i: u32| crate::render::bindless::at(i).map(|(t, _)| t).map_or_else(|| "none".into(), |t| format!("{}@{:#x}", describe(t), t.addr()));
     sun.map_or(eye.clone(), |i| format!("{eye} sun map {i} = {}", map(i)))
 }
 

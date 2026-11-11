@@ -33,7 +33,8 @@ pub enum Kind {
     Label,
     /// A managed `void(ManagedRenderSetup_t)` function pointer.
     Procedural(usize),
-    Blit { src: texture::Ref, src_viewport: RenderViewport },
+    /// `srgb`: `RENDER_SRGB`, the target stores sRGB (native writes through an sRGB view).
+    Blit { src: texture::Ref, src_viewport: RenderViewport, srgb: bool },
 }
 
 #[derive(Default)]

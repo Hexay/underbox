@@ -12,6 +12,8 @@ use std::ops::Range;
 pub struct Targets<'a> {
     pub color: Option<&'a Texture>,
     pub depth: Option<&'a Texture>,
+    /// The depth target's array layer (a cube face) drawn into.
+    pub depth_layer: u32,
     /// `x, y, w, h, min_z, max_z` in pixels; the whole target when `None`.
     pub viewport: Option<[f32; 6]>,
     pub scissor: Option<[u32; 4]>,
@@ -101,8 +103,9 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         resolve_target: None,
         ops: wgpu::Operations { load: load.color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store },
     });
+    let layer_view = targets.depth.filter(|_| targets.depth_layer > 0).map(|t| t.layer_target_view(targets.depth_layer));
     let depth = targets.depth.map(|t| wgpu::RenderPassDepthStencilAttachment {
-        view: &t.target_view,
+        view: layer_view.as_ref().unwrap_or(&t.target_view),
         depth_ops: Some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store }),
         stencil_ops: t.desc.format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Load, store }),
     });
