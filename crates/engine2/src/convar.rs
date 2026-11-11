@@ -1,6 +1,6 @@
 //! Native `ConVar`s: engine variables managed wraps as `NativeConVar` once native announces them
 //! (`ConVarSystem.RegisterNativeVar`), then reads and sets through these slots.
-//! TODO: no engine subsystem defines one yet; call [`define`] then [`announce_all`] when one does.
+//! Subsystems [`define`] theirs (render/convars.rs); `SourceEngineInit` calls [`announce_all`].
 
 use abi::callbacks::sandbox_con_var_system as managed;
 use abi::slots::con_var as cv;

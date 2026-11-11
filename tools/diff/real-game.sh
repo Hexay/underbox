@@ -7,7 +7,7 @@
 # install has, and any fetched compiled addons (REAL_CORE=0 keeps the source-only core and addons both
 # engines otherwise see).
 # A `+game <x>.sbproj` project gets its GameResources and `.vmat` sources compiled first: real engine2
-# doesn't compile at mount (the editor does), see docs/differential.md.
+# doesn't compile at mount (the editor does), see docs/differential-render.md.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 SRC=$1

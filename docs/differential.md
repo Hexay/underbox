@@ -219,72 +219,7 @@ same packages and miss the same package models. Differences:
 
 ## Rendering
 
-`run.sh frame` boots both clients on a corpus scene at 1024×768 on lavapipe. Real needs two of its
-own switches: `-nosteam` (else it waits forever for a Steam client) and `-vulkan_allow_cpu` (else
-"No usable Vulkan physical devices were found": it skips CPU device types). Its window sits at
-the origin of a screen-sized Xvfb; four identical grabs one second apart count as settled. Ours is
-seeded with real's compiled core textures and materials (`.vtex_c`, `.vmat_c`; shaders stay each
-engine's own), since sbox-public ships none of core's images. Both pin shadow quality High; the
-rest of the auto-detected Low preset applies to both. Never commit real's frames.
-
-Metrics (mean abs error R/G/B, SSIM) before → after the fixes (showroom before both, outdoor and
-fog before 2):
-
-| Scene | Before | After |
-| --- | --- | --- |
-| showroom | 18.9 / 19.0 / 19.9, 0.892 | 1.9 / 1.6 / 1.1, 0.995 |
-| outdoor | 8.2 / 7.2 / 5.3, 0.978 | 3.0 / 2.7 / 2.4, 0.998 |
-| fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 |
-| skinned | 12.2 / 11.5 / 14.7, 0.877 (real: error signs) | 2.7 / 1.8 / 0.9, 0.976 |
-| glass | no settled frame (real: error checker) | 4.8 / 5.8 / 5.1, 0.977 |
-| hud | 37.7 / 29.4 / 36.4, 0.851 | open, divergence 4 |
-
-Ranked divergences:
-
-1. **Fixed. Real's compiled textures didn't load on ours.** Real stores mips zstd-compressed
-   (method 2 in the compressed-mip entry, which declares only its 12-byte head; the size array
-   follows it). Ours read only LZ4 and failed with "mip 0 runs past the end". A source `.vmat`
-   naming `x.tga` now also finds the compiler's `x_tga_<hash>.generated.vtex_c` beside it
-   (`compiled/texture.rs`). All 689 core textures read (`real_core_textures_read`, with
-   `UNDERBOX_REAL_CORE`).
-2. **Fixed. The dev plane's texture was rotated 90°.** Real maps `RenderPrimitivePlane` U along +Y
-   and V along +X (`model/primitive.rs`). Ours' stand-in testgrid hid both 1 and 2.
-3. **Volumetric fog drawn though the settings turn it off.** The auto-detected preset stores
-   `volumetricfog.quality -1`, so `quality_profiles.json` sets `r_enable_volume_fog 0`; real draws
-   no volume, ours fogs the box behind it lavender. Ours announces no native convars yet
-   (`convar.rs` TODO), so the write is dropped. Fix: define the profile convars, announce them
-   before `ApplyAll`, and gate `render/fog_volume.rs` on them.
-4. **Open, harness: real draws no HUD.** Under `-nosteam` `SteamFriends()` is null, so
-   `SteamRichPresenceSystem.Poll` throws every frame (from `EngineLoop.FrameStart` via
-   `GameInstanceDll.Tick`); `RunFrame` catches it and skips the rest of `FrameStart`,
-   `SimulateUI()` included. Managed loads its own `libsteam_api.so` (`NativeDllPath`), so
-   `LD_PRELOAD` can't stub Steam; hot-patched Friends/Utils got past the throw, but the client
-   then called the sbox API (401) and never loaded the game.
-5. **Point light hotspot dimmer on ours.** Showroom lamp peak (209,112,94) against real's
-   (246,147,110); sun-lit and shadowed floor agree within 2. Guess: point light falloff or
-   specular in `render/lighting/`.
-6. **3D skybox through distance fog brighter on ours** (outdoor: +8 to +13 per channel) with a
-   vertical seam at x ≈ 375 that real lacks. Guess: skybox fog constants (`render/fog.rs`,
-   `render/scene/skybox.rs`).
-7. **Minification.** Grid lines are black on ours (0) and grey on real (18): ours uploads mip 0
-   only (`compiled/texture.rs`), real samples its mip chain.
-8. **Low. Banding.** Concentric rings in the diff around light pools: 8-bit quantisation differs
-   (real likely dithers).
-9. **Puppet pose** (skinned). Ours plays `bow` (top face lifted and twisted by bone and morph);
-   real holds the bind pose. Guess: ours autoplays the first sequence on a renderer without an
-   anim graph, and real doesn't.
-10. **Translucent glass lighter on ours** (glass): the whole pane and the box behind it are
-    lighter and more cyan on ours, and ours draws a specular edge real lacks. Guess:
-    translucent opacity (`g_flOpacityScale`, tint alpha) or translucent lighting.
-11. **Low. Crate tops lighter on ours** (skinned).
-
-Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
-and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
-bisecting them: research/resources.md "What real engine2 accepts". `real-game.sh` now runs
-`assetc --materials` because real only compiles `.vmat` sources in the editor.
-
-Agreeing: sky clear colour (exact), ACES auto-exposure on outdoor's floor (exact), sun shadows'
-placement and softness, box shading within 1–6.
+Client frames (`run.sh frame`), their metrics, divergences and lanes: docs/differential-render.md.
 
 ## Follow-up lanes
 
@@ -293,8 +228,5 @@ placement and softness, box shading within 1–6.
 - **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
 - **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
-- **Rendering (3–11):** native convars for the quality profiles; point light falloff; skybox
-  fog; mips; sequence autoplay; translucent opacity. Content: seed real's compiled `.vmdl_c` into
-  ours (`frame.sh`) now that primitive types read.
-- **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.
+- **Rendering:** docs/differential-render.md.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

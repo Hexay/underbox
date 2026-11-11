@@ -184,7 +184,7 @@ Map collision is `maps/<name>/world_physics.vphys`, reached in two ways:
 
 ## What real engine2 accepts
 
-Found by bisecting our fixture `.vmdl_c`/`.vmat_c` on real (docs/differential.md). The reference was the layout
+Found by bisecting our fixture `.vmdl_c`/`.vmat_c` on real (docs/differential-render.md). The reference was the layout
 and member order of real's own compiled core and menu models.
 - **Container** `Version` 1. With 0 real reads the blocks as pre-KV3 introspected data ("Failed to convert
   introspected block"). It rejects 2.

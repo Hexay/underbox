@@ -3,7 +3,7 @@
 # usage: tools/diff/real-client.sh <corpus> <out-dir> [max-s=240] [artifact-root]
 # Waits for `game.load success`, then GRACE (default 20) s, then grabs Xvfb's framebuffer every
 # second until SETTLE (default 4) grabs in a row are identical; writes <out-dir>/frame.xwd plus
-# client.out and client.log. See docs/differential.md ("Rendering").
+# client.out and client.log. See docs/differential-render.md.
 # Real refuses lavapipe unless given its own -vulkan_allow_cpu (CPU device types are skipped), and
 # waits forever for a Steam client unless given -nosteam.
 set -eu
@@ -25,6 +25,7 @@ LEASED=$GAME
 GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$ART" $$ +game "$PROJ")
 # As tools/client-frame.sh pins ours.
 python3 -I "$ROOT/tools/video-setting.py" "$GAME" shadow.quality "${SHADOW_QUALITY:-2}"
+python3 -I "$ROOT/tools/video-setting.py" "$GAME" volumetricfog.quality "${FOG_QUALITY:-2}"
 # The window sits at the root's origin only when the screen is the window's size (no WM).
 D=:$(( 200 + $$ % 700 ))
 Xvfb "$D" -screen 0 "${SIZE}x24" -fbdir "$OUT/fb" -nocursor -nolisten tcp > "$OUT/xvfb.log" 2>&1 &

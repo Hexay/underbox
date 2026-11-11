@@ -5,6 +5,9 @@
 //!
 //! A view with no lights and no ambient colour (a world without a light, unit tests) gets
 //! [`Lighting::fallback`], the fixed light the stand-in shader used to hard-code, rather than black.
+//! A 3D skybox's child view never does, and gets no ambient either: real lights it with its own
+//! world's lights alone, so a skybox world without one draws black under its fog (corpus/outdoor
+//! matches real within 0.2 per channel only so; the camera's ambient left a seam between faces).
 
 mod blocks;
 pub mod local_shadow;
@@ -78,8 +81,14 @@ impl Lighting {
         self.sun.is_none() && self.lights.is_empty() && self.ambient.truncate() == Vec3::ZERO
     }
 
-    /// The rendering lights of `worlds` and the camera's `ambient` (managed's `ambientColor`).
+    /// [`Lighting::of_worlds`], or [`Lighting::fallback`] when that leaves the view dark.
     pub fn collect(worlds: &[world::Ref], ambient: Vec4) -> Lighting {
+        let out = Lighting::of_worlds(worlds, ambient);
+        if out.is_dark() { Lighting::fallback() } else { out }
+    }
+
+    /// The rendering lights of `worlds` and the camera's `ambient` (managed's `ambientColor`).
+    pub fn of_worlds(worlds: &[world::Ref], ambient: Vec4) -> Lighting {
         let mut out = Lighting { ambient, ..Default::default() };
         for obj in object::in_worlds(worlds) {
             let (rendering, p) = {
@@ -93,7 +102,7 @@ impl Lighting {
                 _ => out.lights.push(l),
             }
         }
-        if out.is_dark() { Lighting::fallback() } else { out }
+        out
     }
 }
 
@@ -129,6 +138,7 @@ mod tests {
         assert_eq!(Lighting::collect(&[], Vec4::ZERO), Lighting::fallback());
         let ambient = Vec4::new(0.1, 0.2, 0.3, 1.0);
         assert_eq!(Lighting::collect(&[], ambient), Lighting { ambient, ..Default::default() });
+        assert_eq!(Lighting::of_worlds(&[], Vec4::ZERO), Lighting::default(), "a skybox stays unlit");
     }
 
     #[test]

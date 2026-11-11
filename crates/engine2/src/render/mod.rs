@@ -8,6 +8,7 @@ mod bindings;
 mod buffers;
 mod compute;
 pub mod context;
+pub mod convars;
 pub mod device;
 pub mod draw;
 pub mod fog;

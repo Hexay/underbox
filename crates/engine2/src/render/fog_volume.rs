@@ -161,9 +161,12 @@ pub struct Settings {
     pub scattering: f32,
 }
 
-/// March `worlds`' volumes for one view; `None` when nothing could show (see [`march`]).
-/// `history` keys the view's previous frame (its colour target), 0 for none.
+/// March `worlds`' volumes for one view; `None` when `r_enable_volume_fog` is off or nothing could
+/// show (see [`march`]). `history` keys the view's previous frame (its colour target), 0 for none.
 pub fn render(worlds: &[world::Ref], view_proj: Mat4, lighting: &Lighting, params: &SceneVolumetricFogParameters, history: usize) -> Option<Arc<Frustum>> {
+    if !crate::render::convars::volume_fog_enabled() {
+        return None;
+    }
     let volumes: Vec<Volume> = {
         let all = VOLUMES.lock().unwrap();
         worlds.iter().filter_map(|w| all.get(&w.addr())).flatten().map(Volume::native).collect()

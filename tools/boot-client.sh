@@ -10,7 +10,7 @@
 # Facepunch's natives instead, on Xvfb with the Steam stand-in (docs/interop.md).
 # Logs: $OUT/client.log (managed's logs/dotnet.log), $OUT/client.out (stdout/stderr), $OUT/frames.tsv
 # (frame, hash); OUT defaults to target/client. SHADOW_QUALITY=0..3 pins managed's stored shadow
-# quality (Low..Ultra, tools/video-setting.py).
+# quality (Low..Ultra, tools/video-setting.py), FOG_QUALITY=-1..2 its volumetric fog (Off..High).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 SECS=${1:-90}
@@ -60,6 +60,7 @@ if [ -n "${SEED:-}" ]; then
 fi
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
 [ -z "${SHADOW_QUALITY:-}" ] || python3 -I "$ROOT/tools/video-setting.py" "$GAME" shadow.quality "$SHADOW_QUALITY"
+[ -z "${FOG_QUALITY:-}" ] || python3 -I "$ROOT/tools/video-setting.py" "$GAME" volumetricfog.quality "$FOG_QUALITY"
 
 # NLog names the file after the process: dotnet.
 LOG=$GAME/logs/dotnet.log
