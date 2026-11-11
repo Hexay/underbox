@@ -36,7 +36,8 @@ static COMPILER: LazyLock<Option<shaders::Compiler>> = LazyLock::new(|| {
 
 type Key = (String, u64, u64);
 /// Programs by key, with the [`generation`] of the source they were built from.
-static PROGRAMS: LazyLock<Mutex<HashMap<Key, (Generation, Option<Arc<Shading>>)>>> = LazyLock::new(Default::default);
+type Cached = (Generation, Option<Arc<Shading>>);
+static PROGRAMS: LazyLock<Mutex<HashMap<Key, Cached>>> = LazyLock::new(Default::default);
 
 /// The loaded source a shader path has: `GetShader` reloading a changed `.shader_c` swaps the
 /// shader's source `Arc`, so a cached program built from another one is stale. Held (not its

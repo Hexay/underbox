@@ -32,7 +32,7 @@ fn tonemapped(exposure: f32) -> Option<[u8; 4]> {
 
     let mut config = TextureCreationConfig_t::default();
     (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (1, 1, 1, 1);
-    let src = texture::create(Some(c"tonemap source"), true, config, &mut vec![64, 64, 64, 255]);
+    let src = texture::create(Some(c"tonemap source"), true, config, &mut [64, 64, 64, 255]);
     let mat = material::create_raw(Some(c"tonemap test"), Some(c"shaders/tonemapping/tonemapping.shader"), true);
     material::set_texture(mat, "ColorBuffer", src);
     let instance = super::bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
