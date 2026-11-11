@@ -21,7 +21,6 @@ public sealed class RealGameWatch : Component
 	int settled;
 	int idle;
 	int standing;
-	int probes;
 	bool reportedSettled;
 	bool reportedStanding;
 	bool ended;
@@ -90,7 +89,6 @@ public sealed class RealGameWatch : Component
 
 		if ( dropped.IsValid() && !reportedStanding )
 		{
-			if ( probes++ < 3 ) ProbeDropped();
 			standing = dropped.IsOnGround && dropped.Velocity.Length < 5 ? standing + 1 : 0;
 			if ( standing >= StandingSeconds )
 			{
@@ -104,17 +102,6 @@ public sealed class RealGameWatch : Component
 			ended = true;
 			Mark( "END" );
 		}
-	}
-
-	void ProbeDropped()
-	{
-		var p = dropped.WorldPosition;
-		var feet = new BBox( new Vector3( -12, -12, -2 ), new Vector3( 12, 12, 2 ) );
-		var box = Scene.Trace.Box( feet, p + Vector3.Up * 6, p - Vector3.Up * 6 ).IgnoreGameObjectHierarchy( dropped.GameObject ).WithCollisionRules( dropped.Tags ).UseHitPosition().Run();
-		var ray = Scene.Trace.Ray( p + Vector3.Up * 2, p - Vector3.Up * 6 ).IgnoreGameObjectHierarchy( dropped.GameObject ).WithCollisionRules( dropped.Tags ).UseHitPosition().Run();
-		Mark( $"PROBE z={p.z:0.00} box hit={box.Hit} solid={box.StartedSolid} n={box.Normal} f={box.Fraction:0.00} hitz={box.HitPosition.z:0.00} body={box.Body?.BodyType} on={box.GameObject?.Name}"
-			+ $" | ray hit={ray.Hit} solid={ray.StartedSolid} n={ray.Normal} hitz={ray.HitPosition.z:0.00} on={ray.GameObject?.Name}"
-			+ $" | mode={dropped.Mode?.GetType().Name} ground={dropped.IsOnGround} tags=[{string.Join( " ", dropped.Tags )}] bodyv={dropped.Body?.Velocity} bodyz={dropped.Body?.WorldPosition.z:0.00} gravity={dropped.Body?.Gravity}" );
 	}
 
 	static string Describe( PlayerController p )
