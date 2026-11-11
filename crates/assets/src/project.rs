@@ -21,7 +21,7 @@ pub fn compile(root: &Path) -> Report {
 }
 
 /// Compile the stale `.vmat` sources under `root`. Not run at mount (our engine reads sources);
-/// for engines that only load compiled materials, such as real engine2 (docs/differential.md).
+/// for engines that only load compiled materials, such as real engine2 (docs/differential-render.md).
 pub fn compile_materials(root: &Path) -> Report {
     compile_matching(
         root,
@@ -55,7 +55,10 @@ fn compile_matching(root: &Path, wanted: impl Fn(&str) -> bool, compiler: impl F
     report
 }
 
-fn compile_one(root: &Path, src: &Path, out: &Path, compiler: &dyn Fn(&str, &str) -> Result<Vec<u8>, String>) -> Result<(), String> {
+/// (source text, path relative to the root) → compiled bytes.
+type Compiler<'a> = dyn Fn(&str, &str) -> Result<Vec<u8>, String> + 'a;
+
+fn compile_one(root: &Path, src: &Path, out: &Path, compiler: &Compiler) -> Result<(), String> {
     let text = std::fs::read_to_string(src).map_err(|e| e.to_string())?;
     let rel = src.strip_prefix(root).unwrap_or(src).to_string_lossy().replace('\\', "/");
     // Write then rename: another process sharing the content folder may be reading `out` right now.
