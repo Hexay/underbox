@@ -1,7 +1,6 @@
 //! Models from compiled `.vmdl_c` files (see `assets::compiled::model`): meshes with their draw
 //! calls, materials and morph targets, mesh groups, LOD masks and distances, skins, physics, key
 //! values (game data) and the skeleton.
-//! Per-draw tint (`m_vTintColor`) has nowhere to go in `DrawCall` and is dropped.
 
 use super::content::{Content, MaterialGroup, ModelMesh};
 use crate::mesh::material_ref::MaterialRef;
@@ -68,17 +67,8 @@ fn morph(t: &assets::compiled::morph::Target) -> Morph {
     Morph { name: t.name.clone(), deltas }
 }
 
-/// Bone indices and weights as unorm bytes summing to 255 (rounding error goes to the largest).
 fn skin(v: &assets::compiled::vertex::Vertex) -> ([u8; 4], [u8; 4]) {
-    let total: f32 = v.weights.iter().sum();
-    let scale = if total > 0.0 { 255.0 / total } else { 0.0 };
-    let mut w = v.weights.map(|x| (x * scale).round().clamp(0.0, 255.0) as u8);
-    let sum: i32 = w.iter().map(|x| i32::from(*x)).sum();
-    if sum > 0 {
-        let big = (0..4).max_by_key(|&i| w[i]).unwrap_or(0);
-        w[big] = (i32::from(w[big]) + 255 - sum).clamp(0, 255) as u8;
-    }
-    (v.bones, w)
+    (v.bones, mesh::unorm_weights(v.weights))
 }
 
 /// `skinned` (the model has a skeleton to pose) keeps each vertex's bones and weights.
@@ -101,6 +91,7 @@ fn render_mesh(name: &str, m: &mesh::Mesh, targets: &[assets::compiled::morph::T
                 index_count: d.index_count as i32,
                 start_vertex: 0,
                 vertex_count: vertices.len() as i32,
+                tint: (d.tint != [1.0; 4]).then_some(d.tint),
             })
             .collect();
         s.material = s.draw_calls.first().and_then(|d| d.material.clone());

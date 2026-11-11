@@ -195,7 +195,15 @@ and member order of real's own compiled core and menu models.
   `RnHull_t` with mass properties (`hull.rs`), and the decode key's bone array, element ids and element masks
   (`anim/layout.rs`). The element ids put positions on even ids and angles on odd ids, then scales, then morphs.
 - **Animation:** a morph segment without a morph channel in the decode key makes real drop the animation
-  ("mismatched anim").
+  ("mismatched anim"). Each segment's decoder index is into real's fixed 24-entry table (`anim/encode.rs`),
+  whatever the decoder array says. Real decodes `CCompressedStaticQuaternion` as NaN, so every rotation is an
+  `AnimQuaternion` segment. A frame block shares its last frame with the next block's first; past a block's end
+  real reads NaN.
+- **Skeleton:** each bone's `m_nFlag` needs 0x3FC40 (used by vertex at every LOD). With 0 the sequence advances
+  but the bones hold the bind pose.
+- **Skinned meshes** carry `m_skeleton.m_bones` with `m_invBindPose` (3×4 row-major inverse world bind),
+  `m_bbox` and `m_flSphereRadius`; without them real deforms the mesh arbitrarily. `BLENDWEIGHT` must be
+  `R8G8B8A8_UNORM` summing to 255: real ignores float weights.
 - **Materials** bind every texture the complex shader samples. Real's compiler fills the unset ones from
   `materials/default.vmat`'s defaults. Unbound, real samples its fallback checker, even for normals.
 - **Draw calls:** `m_nPrimitiveType` is an enum string ("RENDER_PRIM_TRIANGLES").

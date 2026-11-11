@@ -85,7 +85,10 @@ fn draw_model(c: context::Ref, attrs: attributes::Ref, material: Arc<Material>, 
             instance_ids: ids.clone().map(|b| (b, u64::from(sub.first) * 4)),
         };
         // The placeholder can't place instances without their transforms: no program, no draw.
-        let Some(shaded) = shaded::resolve(material.clone(), &layout, Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }, view_proj, bindings) else { return false };
+        let Some(mut shaded) = shaded::resolve(material.clone(), &layout, Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }, view_proj, bindings) else { return false };
+        if let Some(t) = dc.tint {
+            shaded.values.insert("StandinDrawTint".into(), t.into());
+        }
         if crate::render::scene::trace::enabled() {
             trace(c, &shaded.context, sub.count);
         }
@@ -94,9 +97,12 @@ fn draw_model(c: context::Ref, attrs: attributes::Ref, material: Arc<Material>, 
         if let Some((range, base)) = &sub.range {
             (draw.range, draw.base_vertex) = (range.clone(), *base);
         }
-        // Depth-only passes (shadow maps) keep depth writes: translucent casters still cast.
-        let colour = !context::target(c).color.is_null();
-        draws.push(if colour && model_draw::translucent(&draw) { model_draw::as_translucent(draw) } else { draw });
+        // Real's translucent materials cast no shadow: depth-only passes (shadow maps) skip them.
+        match (context::target(c).color.is_null(), model_draw::translucent(&draw)) {
+            (true, true) => {}
+            (false, true) => draws.push(model_draw::as_translucent(draw)),
+            _ => draws.push(draw),
+        }
     }
     immediate::submit(c, &draws);
     true

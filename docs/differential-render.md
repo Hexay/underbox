@@ -22,6 +22,13 @@ and glass: after their content fixes, below):
 | glass | no settled frame (real: error checker) | | 3.9 / 5.4 / 5.1, 0.980 |
 | hud | 37.7 / 29.4 / 36.4, 0.851 | | open, 4 |
 
+After 9–11 (`MANAGED=1` for managed):
+
+| Scene | Native | Managed |
+| --- | --- | --- |
+| skinned | 1.26 / 1.23 / 0.83, 0.983 | 1.32 / 1.29 / 0.56, 0.983 |
+| glass | 0.09 / 0.32 / 0.37, 0.9996 | 0.17 / 0.40 / 0.19, 0.9985 |
+
 Ranked divergences:
 
 1. **Fixed. Real's compiled textures didn't load on ours.** Real stores mips zstd-compressed
@@ -65,13 +72,20 @@ Ranked divergences:
 8. **Low. Banding.** Concentric rings in the diff around light pools are 1-LSB offsets: along a
    gradient both frames step through the same number of levels (no dithering on real), with
    boundaries a pixel or two apart. Shadow edges differ by a pixel too. Not pursued.
-9. **Puppet pose** (skinned). Ours plays `bow` (top face lifted and twisted by bone and morph);
-   real holds the bind pose. Guess: ours autoplays the first sequence on a renderer without an
-   anim graph, and real doesn't.
-10. **Translucent glass lighter on ours** (glass): the whole pane and the box behind it are
-    lighter and more cyan on ours, and ours draws a specular edge real lacks. Guess:
-    translucent opacity (`g_flOpacityScale`, tint alpha) or translucent lighting.
-11. **Low. Crate tops lighter on ours** (skinned).
+9. **Fixed. Puppet pose** (skinned). Real played `bow` too (the sequence advanced) but held the
+   bind pose: our `.vmdl_c` was the cause, not autoplay. Bone flags, decoder table, quaternion
+   segments, block overlap, mesh inverse binds and unorm8 weights: research/resources.md "What
+   real engine2 accepts". Left: a vertex weighted half spine, half root follows the spine fully
+   on real and blends linearly on ours (the puppet's sides). Cause unknown.
+10. **Fixed. Translucent glass lighter on ours** (glass). Three causes. `complex` takes
+    `g_vColorTint` in gamma space (`SrgbGammaToLinear`, `vr_shared_standard_vs_code.fxc`; the
+    stand-in used it as linear). Real's compiler binds `materials/default/default_color.tga`
+    (grey 187) for an unset colour, where ours had white (`material_source.rs`,
+    `texture_generated.rs`). Real's translucent materials cast no shadow, native or managed
+    (`draw/model.rs` `shadow_draws`, `draw/draw_call.rs`).
+11. **Fixed. Crate tops lighter on ours** (skinned): a compiled draw call's `m_vTintColor` and
+    `m_flAlpha` multiply the object's tint on real; ours dropped them (`DrawCall::tinted`; managed
+    draws pass it to the stand-in as `StandinDrawTint`).
 
 Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
 and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
@@ -83,9 +97,11 @@ placement and softness, box shading within 1–6.
 
 ## Follow-up lanes
 
-- **Rendering (9, 10):** sequence autoplay; translucent opacity. The texture quality group's
+- **Rendering:** the split-weight skinning left in 9. The texture quality group's
   convars (`r_texture_stream_*`, `r_max_anisotropy`) live in real's rendersystem and aren't
   defined yet; managed warns once and skips them. Define them, then read `r_max_anisotropy`
   instead of the fixed 4. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
-- **Content:** seed real's compiled `.vmdl_c` into ours (`frame.sh`) now that primitive types read.
+- **Content:** seed real's compiled `.vmdl_c` into ours (`frame.sh`). Blocked: real's core models
+  pack `NORMAL` as `R10G10B10A2` (format 24) compressed tangent frames, which `unpack_frame`
+  misdecodes (seeded, the scene goes dark). Decode those first.
 - **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.

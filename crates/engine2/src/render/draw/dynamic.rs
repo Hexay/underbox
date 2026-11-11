@@ -21,7 +21,7 @@ pub fn dynamic(r: object::Ref, s: &object::State, view_proj: Mat4) -> Option<Dra
     let world = matrix(&s.transform);
     let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) };
     let n = mesh.state().index_range.1;
-    let call = DrawCall { material: MaterialRef::keep(dynamic::material(r)), prim: prim as i32, start_index: 0, index_count: n, start_vertex: 0, vertex_count: n };
+    let call = DrawCall { material: MaterialRef::keep(dynamic::material(r)), prim: prim as i32, start_index: 0, index_count: n, start_vertex: 0, vertex_count: n, tint: None };
     model_draw::draw_call(&mesh, &call, uniforms, view_proj, RasterState::default())
 }
 

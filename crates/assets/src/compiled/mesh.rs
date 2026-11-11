@@ -100,8 +100,8 @@ pub fn build(data: &Object, buffers: &Buffers) -> Result<Mesh, Error> {
     Ok(mesh)
 }
 
-/// The layout [`write_buffers`] stores vertices in: floats except unorm colour and byte bone
-/// indices, nothing compressed, so meshes round-trip exactly.
+/// The layout [`write_buffers`] stores vertices in: floats except unorm colour, byte bone
+/// indices and unorm weights (real skins only with those), nothing compressed.
 fn layout() -> Vec<Attribute> {
     let field = |semantic: &str, index, format, offset| Attribute { semantic: semantic.into(), index, format, offset, slot: 0 };
     vec![
@@ -112,11 +112,24 @@ fn layout() -> Vec<Attribute> {
         field("TEXCOORD", 1, dxgi::R32G32_FLOAT, 48),
         field("COLOR", 0, dxgi::R8G8B8A8_UNORM, 56),
         field("BLENDINDICES", 0, dxgi::R8G8B8A8_UINT, 60),
-        field("BLENDWEIGHT", 0, dxgi::R32G32B32A32_FLOAT, 64),
+        field("BLENDWEIGHT", 0, dxgi::R8G8B8A8_UNORM, 64),
     ]
 }
 
-const STRIDE: usize = 80;
+const STRIDE: usize = 68;
+
+/// `w` as unorm bytes summing to 255, the rounding error on the largest, as real's compiler stores them.
+pub fn unorm_weights(w: [f32; 4]) -> [u8; 4] {
+    let total: f32 = w.iter().sum();
+    let scale = if total > 0.0 { 255.0 / total } else { 0.0 };
+    let mut out = w.map(|x| (x * scale).round().clamp(0.0, 255.0) as u8);
+    let sum: i32 = out.iter().map(|x| i32::from(*x)).sum();
+    if sum > 0 {
+        let big = (0..4).max_by_key(|&i| out[i]).unwrap_or(0);
+        out[big] = (i32::from(out[big]) + 255 - sum).clamp(0, 255) as u8;
+    }
+    out
+}
 
 /// One vertex buffer and one 32-bit index buffer holding `mesh`.
 pub fn write_buffers(mesh: &Mesh) -> Buffers {
@@ -126,7 +139,7 @@ pub fn write_buffers(mesh: &Mesh) -> Buffers {
         floats.for_each(|f| data.extend(f.to_le_bytes()));
         data.extend(v.color);
         data.extend(v.bones);
-        v.weights.iter().for_each(|f| data.extend(f.to_le_bytes()));
+        data.extend(unorm_weights(v.weights));
     }
     let vb = Buffer { count: mesh.vertices.len(), stride: STRIDE, attributes: layout(), data };
     let ib = Buffer { count: mesh.indices.len(), stride: 4, attributes: Vec::new(), data: mesh.indices.iter().flat_map(|i| i.to_le_bytes()).collect() };

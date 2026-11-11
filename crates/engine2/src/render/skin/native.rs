@@ -47,9 +47,19 @@ pub fn entries(bones: &[Mat4], tint: [f32; 4], offset: u32, weights: u32, subrec
     out
 }
 
+/// A mesh skinned into the vertex cache this frame, and what its transform buffers are made of.
+struct Skinned {
+    bones: Vec<Mat4>,
+    offset: u32,
+    weights: u32,
+    subrect: Option<[f32; 4]>,
+}
+
 #[derive(Default)]
 struct Frame {
-    drawn: HashMap<(usize, usize), attributes::Ref>,
+    skinned: HashMap<(usize, usize), Skinned>,
+    /// Keyed by tint too: a mesh's draw calls can carry their own (`DrawCall::tint`).
+    drawn: HashMap<(usize, usize, [u32; 4]), attributes::Ref>,
     handles: Vec<buffers::Handle>,
 }
 
@@ -68,23 +78,36 @@ pub fn begin_frame() {
 /// its draw binds. `None` when skinning fails; the draw then stays rigid.
 #[allow(clippy::too_many_arguments)]
 pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::Ref, pose: &Pose, tint: [f32; 4], morph: Option<(&Weights, &crate::mesh::render_mesh::RenderMesh)>) -> Option<attributes::Ref> {
-    if let Some(a) = FRAME.lock().unwrap().as_ref().and_then(|f| f.drawn.get(&(key, index)).copied()) {
-        return Some(a);
-    }
+    let drawn = (key, index, tint.map(f32::to_bits));
+    let earlier = {
+        let frame = FRAME.lock().unwrap();
+        if let Some(a) = frame.as_ref().and_then(|f| f.drawn.get(&drawn).copied()) {
+            return Some(a);
+        }
+        frame.as_ref().and_then(|f| f.skinned.get(&(key, index))).map(|s| entries(&s.bones, tint, s.offset, s.weights, s.subrect))
+    };
     let gpu = crate::render::device::gpu()?;
-    let inverse = super::inverse_bind_poses(model);
-    let bones: Vec<Mat4> = inverse.iter().enumerate().map(|(b, inv)| pose.0.get(b).copied().unwrap_or(Mat4::IDENTITY) * *inv).collect();
-    let offset = cache::allocate(skin.vertices)?;    let composite = morph.filter(|(w, m)| morphs::active(m, w)).map(|(w, m)| morphs::compose(&[(w, m)]));
-    let subrect = composite.as_ref().and_then(|(_, s)| s.first().copied());
-    let morph_buffer = composite.and_then(|(data, _)| morphs::upload(&data));
-    let transforms = Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &entries(&bones, tint, offset, skin.weights, subrect)));
-    dispatch::run(dispatch::SHADER, skin, &transforms, &[Job { slot: 0, offset }], morph_buffer.as_ref()).inspect_err(|e| crate::render::compute::warn_once(dispatch::SHADER, e)).ok()?;
+    let transforms = match earlier {
+        Some(data) => Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &data)),
+        None => {
+            let inverse = super::inverse_bind_poses(model);
+            let bones: Vec<Mat4> = inverse.iter().enumerate().map(|(b, inv)| pose.0.get(b).copied().unwrap_or(Mat4::IDENTITY) * *inv).collect();
+            let offset = cache::allocate(skin.vertices)?;
+            let composite = morph.filter(|(w, m)| morphs::active(m, w)).map(|(w, m)| morphs::compose(&[(w, m)]));
+            let subrect = composite.as_ref().and_then(|(_, s)| s.first().copied());
+            let morph_buffer = composite.and_then(|(data, _)| morphs::upload(&data));
+            let transforms = Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &entries(&bones, tint, offset, skin.weights, subrect)));
+            dispatch::run(dispatch::SHADER, skin, &transforms, &[Job { slot: 0, offset }], morph_buffer.as_ref()).inspect_err(|e| crate::render::compute::warn_once(dispatch::SHADER, e)).ok()?;
+            FRAME.lock().unwrap().get_or_insert_with(Frame::default).skinned.insert((key, index), Skinned { bones, offset, weights: skin.weights, subrect });
+            transforms
+        }
+    };
     let handle = buffers::insert(transforms);
     let a = attributes::create();
     attributes::set(a, "g_TransformBuffer", Value::Buffer(handle.value));
     let mut frame = FRAME.lock().unwrap();
     let f = frame.get_or_insert_with(Frame::default);
     f.handles.push(handle);
-    f.drawn.insert((key, index), a);
+    f.drawn.insert(drawn, a);
     Some(a)
 }

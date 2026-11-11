@@ -28,7 +28,7 @@ pub fn draw(c: context::Ref, mat: material::Ref, attrs: attributes::Ref, (x, y, 
     let (x0, y0, x1, y1) = (x as f32, y as f32, (x + w) as f32, (y + h) as f32);
     let quad = [corner(x0, y0, u0, v0), corner(x1, y0, u1, v0), corner(x1, y1, u1, v1), corner(x0, y1, u0, v1)];
     let mesh = RenderMesh::from_vertices("screen rectangle", &quad, &[0, 1, 2, 0, 2, 3]);
-    let call = DrawCall { material: None, prim: TRIANGLES, start_index: 0, index_count: 6, start_vertex: 0, vertex_count: 4 };
+    let call = DrawCall { material: None, prim: TRIANGLES, start_index: 0, index_count: 6, start_vertex: 0, vertex_count: 4, tint: None };
     let uniforms = DrawUniforms { mvp: projection, model: Mat4::IDENTITY, tint: [1.0; 4] };
     let raster = RasterState { depth_write: false, depth_compare: CompareFunction::Always, ..Default::default() };
     let Some(mut d) = model_draw::draw_call(&mesh, &call, uniforms, projection, raster) else { return };

@@ -7,13 +7,22 @@ const GLOW_SIZE: u32 = 64;
 
 /// `(width, height, rgba8)` for a texture we generate, by its resource path.
 pub fn texture(path: &str) -> Option<(u32, u32, Vec<u8>)> {
-    let stem = path.trim_end_matches("_c").trim_end_matches(".vtex").trim_end_matches(".tga").replace('\\', "/");
+    let stem = path.trim_end_matches("_c").trim_end_matches(".vtex").trim_end_matches(".generated").trim_end_matches(".tga").replace('\\', "/");
+    // The compiler's `x_tga_<hash>.generated.vtex` is image `x.tga`.
+    let stem = stem.rsplit_once("_tga_").map_or(stem.as_str(), |(s, _)| s);
     if stem.ends_with("dev/helper/testgrid_color") {
         return Some(testgrid());
     }
     // Real's compiled default normal map: a flat hemi-octahedral normal and roughness 0.5 in blue.
     if stem.ends_with("materials/default/default_normal") {
         return Some((1, 1, vec![128, 128, 128, 255]));
+    }
+    // Real's core images, which sbox-public leaves out: what the compiler binds for unset inputs.
+    if stem.ends_with("materials/default/default_color") {
+        return Some((1, 1, vec![187, 187, 187, 255]));
+    }
+    if stem.ends_with("materials/default/default_ao") {
+        return Some((1, 1, vec![255; 4]));
     }
     let flare = stem.contains("textures/particles/flares/") && !stem.contains("light_cone");
     (flare || stem.contains("textures/lightcookies/")).then(glow)
