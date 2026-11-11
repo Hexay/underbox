@@ -41,6 +41,9 @@ impl std::error::Error for GpuError {}
 impl Gpu {
     /// A device with no surface: everything renders to offscreen targets. Honours wgpu's env
     /// vars (`WGPU_BACKEND`, `WGPU_ADAPTER_NAME`, `WGPU_POWER_PREF`), so CI can pin a driver.
+    ///
+    /// Create one per process (tests share a static): the Vulkan loader frees a new instance's
+    /// device-less ICDs without a lock that other instances' device calls take, which segfaults.
     pub fn headless() -> Result<Gpu, GpuError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
         let options = wgpu::RequestAdapterOptions {
