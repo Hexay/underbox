@@ -22,7 +22,8 @@ if [ ! -f "$LIB" ]; then
   echo "$SHA  $TMP/$FILE" | sha256sum -c - >/dev/null
   mkdir -p "$DEST"
   case "$FILE" in
-    *.zip) unzip -q -o "$TMP/$FILE" -d "$DEST" ;;
+    # The zip's names use backslashes: unzip extracts them fine but exits 1 (warning).
+    *.zip) unzip -q -o "$TMP/$FILE" -d "$DEST" || [ $? -eq 1 ] ;;
     *) tar -xzf "$TMP/$FILE" -C "$DEST" ;;
   esac
   [ -f "$LIB" ] || { echo "fetch-dxc: $LIB missing after extract" >&2; exit 1; }
