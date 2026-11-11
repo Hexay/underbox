@@ -101,6 +101,9 @@ and `ERR*` markers for a static prop given a missing model (its shapes, and rays
 `ProbeRest.cs` adds `SOLID` sweeps that start inside the slab, `GRAZE` rays along its faces,
 `DEPTH` (bodies set down on a slab in a private world) and `SLEEP` (free bodies at a range of
 linear and angular speeds, sizes and shapes, gravity off: the step each falls asleep at).
+`ProbeJoint.cs` adds hinge motors, springs and friction, joints against their own contacts, and
+stack sleep timing (docs/differential-joints.md). Orbmatch's bots log `MATCH:POS` every 5 ticks;
+the game watcher logs `GAME:RESTED` for every body at `SETTLED` in scenes of 20 bodies or fewer.
 
 `zoo` needs `SANDBOX=<Facepunch/sandbox checkout>`. Runs take 30 s to 3 min each.
 
@@ -116,6 +119,8 @@ Ranked by severity, with each one's state after the fixes (before → after):
    After: four runs give winner 0 and byte-identical `MATCH:` markers. Bots' final positions still
    differ from real's by up to 18.5 units, unchanged by the sleep, depth and trace fixes below:
    `Bot0_0` ends at x = −180 on ours, −161.5 on real (and `Bot1_0` mirrored), `Bot1_1` 8.9 apart.
+   The first divergence is the trailing bots' sustained push from tick 5–10 on
+   (docs/differential-joints.md, orbmatch); open.
 2. **Improved. A tilted box lands differently.** The probe box (pitch 20, yaw 30, roll 10) dropped
    onto the slab. Real settles 5.8 units from the drop point (194.4, 1.5, yaw 28.9) at 0.5 u/s by
    tick 50. Before: ours tumbled onto another face and ended 50 units away (151.2, −11.9, yaw 22.0),
@@ -212,10 +217,10 @@ same packages and miss the same package models. Differences:
     and sleep off, so no private-world body ever slept (30 of the 64 `SLEEP` markers differed).
     After (`sleep.rs` decides eligibility each step, Rapier keeps islands and the timer): all 64
     match. The zoo is unchanged, because the
-    gap isn't a threshold: on real the trike's bodies really move (wheels at z = 14 at
-    29–35 u/s, `base` 26 u/s, `hoover_a` 7 u/s) for ~15 s, while ours rests at z = 3, v = 0.
-    Its hinges have `TargetVelocity` motors at 0 (max torque 9.2 and 507) and
-    `EnableCollision`; that dynamics gap is open (joints).
+    gap isn't a threshold: on real the trike's bodies really move for ~15 s, while ours rests.
+    Not the hinge motors, which match real exactly: real throws the trike out of the error sign
+    it starts inside, and it tumbles 50 units onto its side; ours pushes it 9 units out, upright
+    (docs/differential-joints.md, the zoo hoover). Open.
 
 ## Rendering
 
@@ -223,10 +228,11 @@ Client frames (`run.sh frame`), their metrics, divergences and lanes: docs/diffe
 
 ## Follow-up lanes
 
-- **Zoo trike (10):** real's motorised hinges keep the trike bouncing for ~15 s; ours rests at
-  once. Probe a hinge with a zero-velocity motor and joint collision in a private world.
-- **Orbmatch bots (1):** final positions up to 18.5 apart; not contacts, depth or sleep.
-- **Probe stack timing:** a three-box stack is still awake at tick 25 on real, asleep on ours.
+- **Joints and stack sleep (11–15):** docs/differential-joints.md.
+- **Zoo trike (10):** deep overlaps between unjointed bodies (the trike inside the error sign) are
+  pushed apart harder on real. Probe two overlapping boxes without a joint in a private world.
+- **Orbmatch bots (1):** a pair pushed together every tick parts differently from tick 5–10;
+  probe a re-aimed push in a private world (Box2D-style restitution on every approach?).
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Rendering:** docs/differential-render.md.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

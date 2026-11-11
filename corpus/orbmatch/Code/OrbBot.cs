@@ -11,12 +11,15 @@ public sealed class OrbBot : Component, Component.ICollisionListener
 
 	bool stopped;
 	bool collided;
+	int ticks;
 
 	Rigidbody Body => Components.Get<Rigidbody>();
 
 	protected override void OnFixedUpdate()
 	{
 		if ( IsProxy || stopped || Body is null ) return;
+		// Differential runs (tools/diff/run.sh orbmatch) find the first tick the engines part at.
+		if ( ++ticks % 5 == 0 ) MatchDirector.Mark( $"POS t={ticks} {GameObject.Name} pos={WorldPosition} vel={Body.Velocity}" );
 		var dir = (Vector3.Zero - WorldPosition).WithZ( 0 ).Normal;
 		Body.Velocity = dir * Speed;
 		if ( !Moved && WorldPosition.Distance( Home ) > 32f )

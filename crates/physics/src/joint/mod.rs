@@ -4,6 +4,8 @@
 
 mod build;
 #[cfg(test)]
+mod soft_tests;
+#[cfg(test)]
 mod tests;
 
 use crate::world::World;
