@@ -171,20 +171,46 @@ fn render_to_swap_chain(r: Ref, chain: swap_chain::Handle) {
 
 pub(crate) fn render_to_texture(r: Ref, color: texture::Ref, _parent: view::Ref, depth: texture::Ref) -> bool {
     let Some((w, h)) = target_size(color).or_else(|| target_size(depth)) else { return false };
-    let depth = if depth.is_null() { scratch_depth(w, h) } else { depth };
-    render(r, swap_chain::Handle::default(), color, depth, w, h)
+    if !depth.is_null() {
+        return render(r, swap_chain::Handle::default(), color, depth, w, h);
+    }
+    let scratch = ScratchDepth::lease(w, h);
+    render(r, swap_chain::Handle::default(), color, scratch.0, w, h)
 }
 
-/// A depth target per size for renders managed gives no depth for, reused across frames.
-fn scratch_depth(w: u32, h: u32) -> texture::Ref {
-    static DEPTHS: Mutex<Vec<((u32, u32), texture::Ref)>> = Mutex::new(Vec::new());
-    let mut d = DEPTHS.lock().unwrap();
-    if let Some((_, t)) = d.iter().find(|(s, _)| *s == (w, h)) {
-        return *t;
+static FREE_DEPTHS: Mutex<Vec<((u32, u32), texture::Ref)>> = Mutex::new(Vec::new());
+
+/// A depth target for a render managed gives none for, pooled by size across frames. Leased, not
+/// shared: concurrent renders of one size would otherwise draw into each other's depth between
+/// a clear and the sky.
+struct ScratchDepth(texture::Ref, (u32, u32));
+
+impl ScratchDepth {
+    fn lease(w: u32, h: u32) -> ScratchDepth {
+        let mut free = FREE_DEPTHS.lock().unwrap();
+        let t = match free.iter().position(|(s, _)| *s == (w, h)) {
+            Some(i) => free.swap_remove(i).1,
+            None => texture::create_target("camera depth", w, h, 62),
+        };
+        ScratchDepth(t, (w, h))
     }
-    let t = texture::create_target("camera depth", w, h, 62);
-    d.push(((w, h), t));
-    t
+}
+
+impl Drop for ScratchDepth {
+    fn drop(&mut self) {
+        FREE_DEPTHS.lock().unwrap().push((self.1, self.0));
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn concurrent_renders_never_share_a_scratch_depth() {
+    // An odd size no other test renders at, so the pool's state is this test's.
+    let (a, b) = (ScratchDepth::lease(37, 23), ScratchDepth::lease(37, 23));
+    assert_ne!(a.0, b.0, "a leased target isn't handed out twice");
+    let first = a.0;
+    drop(a);
+    assert_eq!(ScratchDepth::lease(37, 23).0, first, "a returned target is reused");
 }
 
 /// Render to a scratch RGBA8 target and copy it into managed's `w × h` bitmap.
@@ -193,7 +219,8 @@ pub(crate) fn render_to_bitmap(r: Ref, data: RawPtr<c_void>, w: i32, h: i32, bpp
         return;
     }
     let color = texture::create_target("bitmap", w as u32, h as u32, 0);
-    if render(r, swap_chain::Handle::default(), color, scratch_depth(w as u32, h as u32), w as u32, h as u32)
+    let depth = ScratchDepth::lease(w as u32, h as u32);
+    if render(r, swap_chain::Handle::default(), color, depth.0, w as u32, h as u32)
         && let Some((frame, _)) = crate::render::readback::read(color, NativeRect::default(), 0)
     {
         // SAFETY: managed passes a pinned w * h * bpp byte bitmap (SceneCamera.RenderToBitmap).
