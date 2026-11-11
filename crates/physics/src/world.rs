@@ -146,6 +146,7 @@ impl World {
         self.measure_joints(1);
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
         self.contacts.update(&self.inner, &hooks);
+        self.restart_sleep_on_new_contacts();
         self.collect_activity();
     }
 

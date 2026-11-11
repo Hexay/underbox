@@ -38,6 +38,24 @@ impl World {
             }
         }
     }
+
+    /// Two dynamic bodies that started touching join one island, whose sleep timer starts over:
+    /// real's resting three-box stack sleeps one step after a lone box (probe `STACKSLEEP`).
+    pub(crate) fn restart_sleep_on_new_contacts(&mut self) {
+        let raw = &mut self.inner;
+        for &(a, b) in &self.contacts.began {
+            let parents = [a, b].map(|c| raw.colliders.get(c).and_then(|c| c.parent()));
+            let [Some(pa), Some(pb)] = parents else { continue };
+            if !parents.iter().flatten().all(|&p| raw.bodies.get(p).is_some_and(|rb| rb.is_dynamic())) {
+                continue;
+            }
+            for p in [pa, pb] {
+                if let Some(rb) = raw.bodies.get_mut(p) {
+                    rb.activation_mut().time_since_can_sleep = 0.0;
+                }
+            }
+        }
+    }
 }
 
 fn set_eligible(rb: &mut RigidBody, eligible: bool) {

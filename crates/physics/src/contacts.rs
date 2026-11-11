@@ -42,6 +42,8 @@ pub(crate) struct Contacts {
     created: HashMap<ColliderHandle, u64>,
     next: u64,
     pub events: Vec<ContactEvent>,
+    /// Solid pairs that started touching in the last step.
+    pub began: Vec<(ColliderHandle, ColliderHandle)>,
 }
 
 fn touches(pair: &ContactPair) -> bool {
@@ -82,8 +84,12 @@ impl Contacts {
             now.insert(self.ordered(a, b), Contact::Trigger);
         }
         let wants = |a, b, bit| [a, b].iter().any(|c| hooks.meta.get(c).is_some_and(|m: &ShapeMeta| m.functions & bit != 0));
+        self.began.clear();
         for ((a, b), kind) in self.sorted(&now) {
             let was = self.touching.get(&(a, b)).copied();
+            if kind == Contact::Solid && was.is_none() {
+                self.began.push((a, b));
+            }
             let kind_event = match (kind, was) {
                 (Contact::Trigger, None) => Some(EventKind::TriggerBegin),
                 (Contact::Solid, None) if wants(a, b, function::TOUCH) => Some(EventKind::TouchBegin),

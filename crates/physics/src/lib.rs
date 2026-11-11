@@ -21,6 +21,8 @@ mod contacts_tests;
 #[cfg(test)]
 mod landing_tests;
 #[cfg(test)]
+mod orb_tests;
+#[cfg(test)]
 mod rest_tests;
 
 pub use contacts::{ContactEvent, EventKind};

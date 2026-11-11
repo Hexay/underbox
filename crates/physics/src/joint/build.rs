@@ -8,7 +8,7 @@
 
 use super::{Joint, JointKind, Motor};
 use rapier3d::math::{Pose, Rotation, Vector};
-use rapier3d::prelude::{GenericJoint, JointAxesMask, JointAxis, MotorModel};
+use rapier3d::prelude::{GenericJoint, JointAxesMask, JointAxis, MotorModel, SpringCoefficients};
 use std::f32::consts::TAU;
 
 /// World poses of the joint's two bodies (for springs that only push or only pull).
@@ -20,6 +20,12 @@ pub(crate) struct Bodies {
 /// Damping for velocity motors: high enough to track the target speed, within their max force.
 const VELOCITY_GAIN: f32 = 1.0e4;
 
+/// Softness of the locked axes. Real's joints give way to contacts between their own bodies:
+/// boxes overlapping by 4 rest 0.8 further apart, wheels sunk into a chassis lift it 0.75
+/// (`joint/soft_tests.rs`). Rapier's default (1 MHz) holds them rigid.
+const LOCK_HERTZ: f32 = 80.0;
+const LOCK_DAMPING: f32 = 40.0;
+
 fn axis_frame() -> Rotation {
     Rotation::from_rotation_arc(Vector::X, Vector::Z)
 }
@@ -27,9 +33,18 @@ fn axis_frame() -> Rotation {
 const LIN: [JointAxis; 3] = [JointAxis::LinX, JointAxis::LinY, JointAxis::LinZ];
 const ANG: [JointAxis; 3] = [JointAxis::AngX, JointAxis::AngY, JointAxis::AngZ];
 
+/// A scene step's substep: 0.02 s over `max(2, 4)` integrations (`world.rs`).
+const SUBSTEP: f32 = 0.005;
+
+/// Real solves a spring twice per substep (again after integrating positions), Rapier once. Extra
+/// damping of `SUBSTEP·ω/2` reproduces that within 1% up to 2 Hz and 10% at 5 Hz (probe `HINGE
+/// spring`); above about 10 Hz it overshoots, so stiffer springs keep their own damping.
+const RELAX_DAMPING_MAX_HERTZ: f32 = 10.0;
+
 /// (stiffness, damping) for a spring of `hertz` and damping ratio `zeta`.
 fn spring(hertz: f32, zeta: f32) -> (f32, f32) {
     let omega = TAU * hertz;
+    let zeta = if hertz <= RELAX_DAMPING_MAX_HERTZ { zeta + SUBSTEP * omega / 2.0 } else { zeta };
     (omega * omega, 2.0 * zeta * omega)
 }
 
@@ -61,6 +76,7 @@ pub(crate) fn rapier(j: &Joint, bodies: Bodies) -> GenericJoint {
     g.set_local_frame1(Pose::from_parts(j.frame1.translation, j.frame1.rotation * r));
     g.set_local_frame2(Pose::from_parts(j.frame2.translation, j.frame2.rotation * r));
     g.set_contacts_enabled(j.collide);
+    g.softness = SpringCoefficients::new(LOCK_HERTZ, LOCK_DAMPING);
     let friction = Motor { speed: 0.0, max: j.friction };
     match j.kind {
         JointKind::Filter => {}
@@ -83,11 +99,13 @@ pub(crate) fn rapier(j: &Joint, bodies: Bodies) -> GenericJoint {
             if j.twist_limit_enabled {
                 g.set_limits(JointAxis::AngX, j.twist_limits);
             }
+            // Real ignores hinge friction, up to 1e7 (probe `HINGE friction`); setting it only
+            // clears the motor and spring (`joint_slots.rs`).
             let [target, hertz, zeta] = j.angular_spring;
             if let Some(m) = j.angular_motor {
                 velocity_motor(&mut g, JointAxis::AngX, m);
-            } else if !spring_to(&mut g, JointAxis::AngX, target, hertz, zeta, f32::MAX) && j.friction > 0.0 {
-                velocity_motor(&mut g, JointAxis::AngX, friction);
+            } else {
+                spring_to(&mut g, JointAxis::AngX, target, hertz, zeta, f32::MAX);
             }
         }
         JointKind::Prismatic => {
