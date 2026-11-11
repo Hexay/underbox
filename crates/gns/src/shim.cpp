@@ -48,6 +48,17 @@ bool gns_init(char *err, size_t err_len) {
 
 void gns_kill() { GameNetworkingSockets_Kill(); }
 
+// Open GNS has no API for its app id (CSteamNetworkingUtils::SetAppID is internal and never called),
+// so certs carry app id 0 and any peer whose cert names an app is refused (docs/interop.md). Mirror of
+// that class's layout: an interface (vptr only) followed by AppId_t m_nAppID (csteamnetworkingsockets.h).
+struct UtilsLayout {
+    void *vptr;
+    AppId_t app_id;
+};
+
+void gns_set_app_id(uint32 app_id) { reinterpret_cast<UtilsLayout *>(SteamNetworkingUtils())->app_id = app_id; }
+uint32 gns_app_id() { return reinterpret_cast<UtilsLayout *>(SteamNetworkingUtils())->app_id; }
+
 void gns_run_callbacks(gns_status_fn sink) {
     g_status_sink = sink;
     SteamNetworkingSockets()->RunCallbacks();

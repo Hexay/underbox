@@ -7,7 +7,7 @@ without it.
 
 ## Running
 
-`[MODE=server|join|host|grubs|walker|render|play|sound] [MAP=..] tools/game.sh <checkout> [scene]`
+`[MODE=server|join|interop|host|grubs|walker|render|play|sound] [MAP=..] tools/game.sh <checkout> [scene]`
 (optional, not in verify.sh). `MAP` is passed as `+game <sbproj> <map>` for a MapInstance with
 `UseMapFromLaunch`. Each mode ends with PASS/FAIL lines quoting the log line that proves each check, then
 `RESULT:`. Without a scene it runs `scenes/zoo.scene` if the checkout has one, else the project's
@@ -17,6 +17,7 @@ without it.
 |---|---|---|---|
 | server | `tools/game.sh ../sandbox` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
 | join | `MODE=join tools/game.sh ../sandbox` | ~1.5 min | the server's player and the joined client's own player both stand |
+| interop | `MODE=interop tools/game.sh ../sandbox` | ~2 min | join with Facepunch's engine2 as the client; SKIP without its artifacts (docs/interop.md) |
 | host | `MODE=host [START_CMD=..] tools/game.sh <checkout>` | ~1.5 min | a headless client hosts the game to `GAME:END` |
 | grubs | `MODE=grubs tools/game.sh ../grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
 | walker | `MODE=walker tools/game.sh ../sbox-walker` | ~1.5 min | join on walker's map: both sides see the client's player stand on it |

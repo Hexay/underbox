@@ -20,6 +20,8 @@ pub type DebugFn = unsafe extern "C" fn(c_int, *const c_char);
 unsafe extern "C" {
     pub fn gns_init(err: *mut c_char, len: usize) -> bool;
     pub fn gns_kill();
+    pub fn gns_set_app_id(app_id: u32);
+    pub fn gns_app_id() -> u32;
     pub fn gns_run_callbacks(sink: StatusFn);
     pub fn gns_set_debug_output(level: c_int, f: Option<DebugFn>);
     pub fn gns_set_config_int(key: c_int, value: i32) -> bool;

@@ -4,7 +4,8 @@
 # install-engine2.sh keeps a real libsteam_api.so, so mixing would leak it into our boots.
 # usage: GAME=$(sh tools/diff/real-game.sh <game-dir> <artifact-root from tools/diff/fetch.sh> <owner-pid> [server args])
 # The copy lives while <owner-pid> does. It gets the artifact's compiled game/core too, as a real
-# install has (REAL_CORE=0 keeps the source-only core both engines otherwise see).
+# install has, and any fetched compiled addons (REAL_CORE=0 keeps the source-only core and addons both
+# engines otherwise see).
 # A `+game <x>.sbproj` project gets its GameResources compiled first: real engine2 doesn't compile at
 # mount (the editor does), see docs/differential.md.
 set -eu
@@ -34,7 +35,10 @@ find "$SRC" -mindepth 1 -maxdepth 1 ! -name logs ! -name '.underbox-lease.*' -ex
 mkdir -p "$G/logs"
 rm -rf "$G/bin/linuxsteamrt64"
 cp -a --reflink=auto "$ART/game/bin/linuxsteamrt64" "$G/bin/"
-[ "${REAL_CORE:-1}" = 1 ] && cp -a --reflink=auto "$ART/game/core/." "$G/core/"
+if [ "${REAL_CORE:-1}" = 1 ]; then
+    cp -a --reflink=auto "$ART/game/core/." "$G/core/"
+    [ ! -d "$ART/game/addons" ] || cp -a --reflink=auto "$ART/game/addons/." "$G/addons/"
+fi
 # bin/managed links point at ../linuxsteamrt64 (install-engine2.sh); steam_api64 needs one too.
 [ -d "$G/bin/managed" ] && ln -sfn ../linuxsteamrt64/libsteam_api.so "$G/bin/managed/libsteam_api64.so"
 echo "$G"

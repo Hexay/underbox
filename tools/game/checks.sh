@@ -14,6 +14,9 @@ case $MODE in
         check "server accepted the client" '[^]]+\] is connected' "$LOG"
         check "server sees the client's player standing" 'GAME:PLAYER_STANDING .*local=False.*' "$LOG"
         check "client's own player stands" 'GAME:PLAYER_STANDING .*local=True.*' "$CLIENT"
+        if [ "${INTEROP:-0}" = 1 ]; then
+            check "the client is Facepunch's engine2, on Steam's sockets" 'standin: Steam game-server context up' "$OUT/client.out"
+        fi
         if [ "${WALKER:-0}" = 1 ]; then
             check "the joined player stands on walker's map" 'GAME:PLAYER_STANDING .*local=False.* on=Box.*' "$LOG"
         fi

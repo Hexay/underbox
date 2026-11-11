@@ -97,6 +97,16 @@ pub fn run_callbacks() -> Vec<Status> {
     std::mem::take(&mut *PENDING.lock().unwrap())
 }
 
+/// The Steam app this process speaks for: it goes into our certs, and a peer's cert must name it.
+/// Steam's own sockets always name one (s&box: 590830), so 0 refuses every stock client.
+pub fn set_app_id(app_id: u32) {
+    unsafe { ffi::gns_set_app_id(app_id) }
+}
+
+pub fn app_id() -> u32 {
+    unsafe { ffi::gns_app_id() }
+}
+
 pub fn set_config_int(key: i32, value: i32) -> bool {
     unsafe { ffi::gns_set_config_int(key, value) }
 }
