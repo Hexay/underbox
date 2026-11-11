@@ -56,13 +56,16 @@ These values are our choice, since no source constrains them:
 - Light per froxel: ambient × `IndirectStrength`, the sun × `FogStrength`, and up to 16 local lights
   × `FogStrength` with a radial falloff; a spot also fades smoothly from its inner to its outer
   cone. `Scattering` scales the result.
+- The sun's term is shadowed: one tap of its shadow map (`lighting/shadow.rs`) per froxel, with a
+  1e-3 depth bias; points outside the map are lit. Only the native path has a map;
+  `fog_managed.rs` doesn't yet read managed's cascades (reverse-Z, matrices in `DirectionalLightCB`).
 - Temporal blend: each froxel's lighting (in-scattered rgb, density) is 0.3 this frame and 0.7
   the nearest froxel of last frame's grid at the same world point, reprojected through last
   frame's view. Points outside last frame's grid take this frame's alone. History is kept per
   target (the view's colour target, or managed's `OutScatteringTexture`) in `fog_march.rs`.
 
-Not done: shadowed in-scattering, the baked indirect texture (`SetParams`' second argument),
-and dithering (`g_vVolFogDitherScaleBias` stays zero).
+Not done: shadowed in-scattering on the managed path, the baked indirect texture (`SetParams`'
+second argument), local lights' shadows, and dithering (`g_vVolFogDitherScaleBias` stays zero).
 
 ## Outdoor frame's teal edges
 
@@ -75,4 +78,5 @@ and in the sky shader's `ApplySky`, never to a raw clear.
 
 `sh tools/test.sh engine2 fog` covers each family through the stand-in, `render::fog::tests`
 pins the gradient and cube constants to native's formulas, and `fog_managed_tests` reads managed's
-constants back. `corpus/fog` is the golden on both paths: a gradient ground fog and one volume with a box behind it and one beside it.
+constants back. `corpus/fog` is the golden on both paths: a gradient ground fog and one volume with a box behind it and one beside it, under a
+shadow-casting sun and an off-screen roof whose shadow crosses the volume.

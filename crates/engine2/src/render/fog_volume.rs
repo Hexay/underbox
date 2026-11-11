@@ -3,6 +3,7 @@
 //! density scale and phase are ours; `volumetric_fog.fxc` samples it. See docs/fog.md.
 
 use crate::render::lighting::Lighting;
+use crate::render::lighting::shadow::SunShadow;
 use crate::scene::world;
 use abi::structs::{SceneVolumetricFogParameters, SceneVolumetricFogVolume};
 use glam::{Mat4, Vec3};
@@ -107,11 +108,12 @@ impl Volume {
 }
 
 /// What lights the medium: ambient (already × `IndirectStrength`), the sun (direction toward it,
-/// colour × its fog strength) and local lights.
+/// colour × its fog strength), the sun's shadow map when it casts shadows, and local lights.
 #[derive(Default)]
 pub struct Sources {
     pub ambient: Vec3,
     pub sun: Option<(Vec3, Vec3)>,
+    pub shadow: Option<SunShadow>,
     pub lights: Vec<FogLight>,
 }
 
@@ -146,7 +148,8 @@ impl Sources {
             .filter(|l| l.radius > 0.0 && l.fog > 0.0)
             .map(|l| FogLight { position: l.position, radius: l.radius, color: l.color * l.fog, spot: l.cone.map(|c| { let (i, o) = cosines(c); (l.forward(), i, o) }) })
             .collect();
-        Sources { ambient: lighting.ambient.truncate() * indirect_strength, sun: lighting.sun.as_ref().map(|s| (-s.forward(), s.color * s.fog)), lights }
+        let sun = lighting.sun.as_ref().map(|s| (-s.forward(), s.color * s.fog));
+        Sources { ambient: lighting.ambient.truncate() * indirect_strength, sun, shadow: lighting.shadow.filter(|_| sun.is_some()), lights }
     }
 }
 

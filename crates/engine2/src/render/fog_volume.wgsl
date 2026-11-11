@@ -10,11 +10,13 @@ struct Params {
     ambient: vec4f,
     sun_direction: vec4f,
     sun_color: vec4f,
-    // Volumes, lights, whether there is history.
+    // Volumes, lights, whether there is history, whether the sun has a shadow map.
     counts: vec4u,
     previous_view_proj: mat4x4f,
     // This frame's weight, the history's near and range.
     history_blend: vec4f,
+    // World → sun shadow-map uv (y down) and depth (lighting/shadow.rs).
+    sun_shadow: mat4x4f,
 };
 
 struct Volume {
@@ -39,6 +41,21 @@ struct Light {
 // Per-froxel lighting (rgb in-scattered radiance, a density): last frame's, and this frame's.
 @group(0) @binding(4) var history: texture_3d<f32>;
 @group(0) @binding(5) var lighting: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(6) var sun_shadow_map: texture_depth_2d;
+
+// 1 where the sun reaches `world`; points outside the map count as lit. One tap per froxel: the
+// temporal blend and the slice integration soften the edge.
+fn sun_visibility(world: vec3f) -> f32 {
+    if p.counts.w == 0u {
+        return 1.0;
+    }
+    let s = p.sun_shadow * vec4f(world, 1.0);
+    if any(s.xy < vec2f(0.0)) || any(s.xy >= vec2f(1.0)) || s.z < 0.0 || s.z > 1.0 {
+        return 1.0;
+    }
+    let texel = vec2u(s.xy * vec2f(textureDimensions(sun_shadow_map)));
+    return select(0.0, 1.0, s.z <= textureLoad(sun_shadow_map, texel, 0) + 1e-3);
+}
 
 // `current` blended with the froxel last frame had at `world`, reprojected through its
 // world-to-clip (w is view depth). The nearest froxel, not a filtered one: a still camera
@@ -83,7 +100,7 @@ fn medium(world: vec3f) -> vec4f {
 }
 
 fn incoming(world: vec3f, direction: vec3f) -> vec3f {
-    var light = p.ambient.rgb + p.sun_color.rgb * phase(dot(direction, p.sun_direction.xyz));
+    var light = p.ambient.rgb + p.sun_color.rgb * phase(dot(direction, p.sun_direction.xyz)) * sun_visibility(world);
     for (var i = 0u; i < p.counts.y; i++) {
         let l = lights[i];
         let to_light = l.position_radius.xyz - world;
