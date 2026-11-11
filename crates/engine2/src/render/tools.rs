@@ -183,7 +183,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));
     bind!(r, dev::GET_SHEET_META_DATA_TEXTURE, || NativeRef::NULL);
     bind!(r, dev::GET_SHEET_INFO, |_| Vector4::default());
-    bind!(r, dev::GET_SEQUENCE, |_, _| NativeRef::NULL);
     bind!(r, dev::GET_TEXTURE_RESIDENCY_INFO, |_, _, _| {});
     // Native API objects (VkImage, ID3D12Resource) aren't exposed through wgpu.
     bind!(r, dev::GET_DEVICE_SPECIFIC_INFO, |_| RawPtr::NULL);

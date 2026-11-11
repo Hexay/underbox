@@ -5,6 +5,7 @@
 
 mod decode;
 mod format;
+pub mod sheet;
 
 pub use decode::{Image, Pixels, decode};
 pub use format::{Format, mip_size};
@@ -23,6 +24,7 @@ pub mod flags {
 }
 
 const HEADER: usize = 40;
+const SHEET: u32 = 2;
 const METADATA: u32 = 3;
 const COMPRESSED_MIP_SIZE: u32 = 4;
 const LZ4: u32 = 1;
@@ -41,6 +43,8 @@ pub struct Texture {
     /// Each mip's bytes, largest (mip 0) first, decompressed. Image-file formats hold the file
     /// as their only level.
     pub levels: Vec<Vec<u8>>,
+    /// Sprite-sheet sequences (the SHEET extra data).
+    pub sheet: Vec<sheet::Sequence>,
 }
 
 impl Texture {
@@ -133,6 +137,7 @@ pub fn read(file: &[u8]) -> Result<Texture, Error> {
                 t.display = (w > 0 && h > 0 && w <= t.width && h <= t.height).then_some((w, h));
             }
             COMPRESSED_MIP_SIZE => sizes = compressed_sizes(payload)?,
+            SHEET => t.sheet = sheet::read(payload)?,
             _ => {}
         }
     }
@@ -170,6 +175,9 @@ pub fn write(t: &Texture, compress: bool) -> Vec<u8> {
         m[2..4].copy_from_slice(&w.to_le_bytes());
         m[4..6].copy_from_slice(&h.to_le_bytes());
         extra.push((METADATA, m));
+    }
+    if !t.sheet.is_empty() {
+        extra.push((SHEET, sheet::write(&t.sheet)));
     }
     if compress && !t.format.is_image_file() {
         let mut m: Vec<u8> = [LZ4, 8, stored.len() as u32].iter().flat_map(|v| v.to_le_bytes()).collect();

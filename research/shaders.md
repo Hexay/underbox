@@ -101,9 +101,15 @@ native's vfx_vulkan. Decisions:
   `GetShader` reloads a shader whose `.shader_c` mtime changed, standing in for
   `mat_reloadshaders` (no native commands are announced yet). The renderer's program cache
   (render/shading/mod.rs) still keeps the old program until restart.
-- Not native's: `IsUiVariableActive` checks the feature value and that the variable is declared,
-  not feature-dependent visibility (TODO in schema.rs); `GetPropertiesJson` lists features and
-  annotated/`CreateInput*` variables only.
+- `IsUiVariableActive` (hshader.def: the given feature at `value`, the others at their minimum)
+  replays each program's `#if`/`#define` skeleton (`shaders::directives`) with a compile's defines
+  and evaluates `ActiveIf( expr )`, also through a macro (`BENT_NORMAL_ACTIVE_IF`); inputs show
+  only while a shown texture's `Channel` reads them (rules in shader/active.rs). Native's own
+  traversal is closed: complex/skin (ShaderActiveIfTest) aren't in sbox-public, so their
+  `BENT_NORMAL_ACTIVE_IF` definition is a guess. `.shader_c` FEATURE bodies older than this have
+  no skeleton or lines and show everything declared.
+- Not native's: `GetPropertiesJson` lists features, `CreateInput*` inputs and globals annotated
+  with `Attribute`, `UiType` or `UiGroup` only.
 - `IVfx.Init`/`ClearShaderCache`/`CreateSharedContext` stay in render/vfx.rs (render lane); its
   "compiles nothing" TODO is stale.
 

@@ -129,6 +129,9 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         for (i, d) in draws.iter().enumerate() {
             let key = PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: d.vertex.clone(), state: d.state };
             pass.set_vertex_buffer(0, d.vertices.0.slice(d.vertices.1..));
+            if let Some(s) = d.state.stencil {
+                pass.set_stencil_reference(s.reference);
+            }
             match &d.shaded {
                 Some(s) => {
                     pass.set_pipeline(&s.program.pipeline_for(gpu, &key));

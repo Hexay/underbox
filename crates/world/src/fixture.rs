@@ -101,13 +101,42 @@ pub fn aggregate_node(model: &str) -> Value {
     obj(vec![("m_sceneObjects", Value::Array(vec![forced])), ("m_aggregateSceneObjects", Value::Array(vec![aggregate]))])
 }
 
+/// [`lod_aggregate_node`]'s one LOD setup: (origin, max object scale, switch distances).
+pub const LOD_SETUP: ([f32; 3], f32, [f32; 2]) = ([1.0, 2.0, 3.0], 2.0, [0.0, 300.0]);
+
+/// A node with an aggregate of `model`'s two draw calls under [`LOD_SETUP`]: draw 0 in LOD
+/// group 0 only (mask 0b01), draw 1 in group 1 only (mask 0b10).
+pub fn lod_aggregate_node(model: &str) -> Value {
+    let (origin, scale, switch) = LOD_SETUP;
+    let mesh = |draw: i64, mask: i64| {
+        obj(vec![("m_nDrawCallIndex", Value::Int(draw)), ("m_bHasTransform", Value::Bool(false)), ("m_vTintColor", floats(&[255.0; 3])), ("m_nLODSetupIndex", Value::Int(0)), ("m_nLODGroupMask", Value::Int(mask))])
+    };
+    let setup = obj(vec![("m_vLODOrigin", floats(&origin)), ("m_fMaxObjectScale", Value::Double(scale.into())), ("m_fSwitchDistances", floats(&switch))]);
+    let aggregate = obj(vec![
+        ("m_renderableModel", Value::Flagged("resource".into(), Box::new(Value::String(model.into())))),
+        ("m_aggregateMeshes", Value::Array(vec![mesh(0, 0b01), mesh(1, 0b10)])),
+        ("m_lodSetups", Value::Array(vec![setup])),
+        ("m_fragmentTransforms", Value::Array(vec![])),
+    ]);
+    obj(vec![("m_sceneObjects", Value::Array(vec![])), ("m_aggregateSceneObjects", Value::Array(vec![aggregate]))])
+}
+
 /// `maps/<name>`: one [`aggregate_node`] over the compiled fixture crate (two draw calls).
 pub fn aggregate_map(name: &str) -> Builder {
+    single_node_map(name, aggregate_node)
+}
+
+/// `maps/<name>`: one [`lod_aggregate_node`] over the compiled fixture crate.
+pub fn lod_aggregate_map(name: &str) -> Builder {
+    single_node_map(name, lod_aggregate_node)
+}
+
+fn single_node_map(name: &str, node: fn(&str) -> Value) -> Builder {
     let dir = format!("maps/{name}");
     let world = obj(vec![("m_worldNodes", Value::Array(vec![obj(vec![("m_worldNodePrefix", Value::String(format!("{dir}/worldnodes/node000")))])])), ("m_entityLumps", Value::Array(vec![]))]);
     let mut b = Builder::new();
     b.add(&format!("{dir}/world.vwrld_c"), crate::resource::write(&world, Compression::None))
-        .add(&format!("{dir}/worldnodes/node000.vwnod_c"), crate::resource::write(&aggregate_node(assets::compiled::fixture::MODEL), Compression::None));
+        .add(&format!("{dir}/worldnodes/node000.vwnod_c"), crate::resource::write(&node(assets::compiled::fixture::MODEL), Compression::None));
     for (path, bytes) in assets::compiled::fixture::crate_files() {
         b.add(&path, bytes);
     }

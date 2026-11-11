@@ -4,9 +4,11 @@
 //! slots (load.rs) and ShaderTools (tools.rs). Combo ids are the mixed-radix ids
 //! `shaders::ComboSet` documents, so iterators, `DescribeCombo` and the renderer agree.
 
+mod active;
 mod combos;
 mod compile;
 mod compiled;
+mod expr;
 mod load;
 mod native_features;
 mod schema;
@@ -181,6 +183,8 @@ fn load(v: &Vfx, path: &str) -> bool {
     false
 }
 
+#[cfg(test)]
+mod active_tests;
 #[cfg(test)]
 mod compiled_tests;
 #[cfg(test)]

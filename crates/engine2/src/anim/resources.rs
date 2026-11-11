@@ -81,8 +81,21 @@ pub fn clip(name: &str) -> Option<ClipResource> {
         }
     };
     let (model_name, model, clip_name) = found?;
-    let clip = model.anim.clip(&clip_name)?.clone();
+    let clip = with_sync_track(name, model.anim.clip(&clip_name)?);
     Some(ClipResource::new(SkeletonResource { name: model_name, model }, clip))
+}
+
+/// `clip` with the sync track of the `.anim` document `name` names, when there is one.
+fn with_sync_track(name: &str, clip: &Arc<Clip>) -> Arc<Clip> {
+    let is_doc = name.to_ascii_lowercase().trim_end_matches("_c").ends_with(".anim");
+    let last_frame = clip.frames.len().saturating_sub(1) as f32;
+    let sync = is_doc.then(|| super::graph::source(name)).flatten().and_then(|src| {
+        anim::source::clip_doc::sync_track(&src, last_frame).inspect_err(|e| abi::rt::log::warn(&format!("{name}: {e:?}"))).ok()
+    });
+    match sync {
+        Some(sync) if !sync.is_empty() => Arc::new(Clip { sync, ..(**clip).clone() }),
+        _ => clip.clone(),
+    }
 }
 
 fn with_skeleton<R: Default>(h: SkeletonRef, f: impl FnOnce(&SkeletonResource) -> R) -> R {
@@ -134,8 +147,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, c::GET_FPS, |h| with_clip(h, |c| c.clip.fps));
     bind!(r, c::IS_ADDITIVE, |h| with_clip(h, |c| c.clip.delta));
     bind!(r, c::GET_NUM_TRACKS, |h| with_clip(h, |c| c.skeleton.model.anim.skeleton.len() as i32));
-    // TODO: sync events (no source format carries them yet).
-    bind!(r, c::GET_NUM_SYNC_EVENTS, |_| 0);
+    bind!(r, c::GET_NUM_SYNC_EVENTS, |h| with_clip(h, |c| c.clip.sync_track().len() as i32));
     bind!(r, c::GET_NUM_EVENTS, |h| with_clip(h, |c| c.clip.events.len() as i32));
     bind!(r, c::GET_EVENT_NAME, |h, i| StrRet::from(with_clip(h, |c| c.event(i).map(|(e, _)| e.name.clone()))));
     bind!(r, c::GET_EVENT_DATA, event_data);
@@ -192,5 +204,29 @@ mod tests {
         let half = c.clip.sample(0.05, &Pose::bind(&c.skeleton.model.anim.skeleton));
         assert!((bone_at(&half.0, 0).position.vec.x - 2.0).abs() < 1e-5);
         assert!((c.clip.root_motion(0.0, 0.1).pos.x - 4.0).abs() < 1e-5);
+    }
+
+    /// A 21-frame clip whose `.anim` sync track marks frames 0 (`left`) and 10 (`right`).
+    #[test]
+    fn anim_document_sync_track_reaches_the_clip_resource() {
+        let mut skeleton = Skeleton::default();
+        skeleton.push_local("root", None, Xform::IDENTITY);
+        let mut stride = Clip::new("res_sync_stride", 10.0);
+        stride.frames = vec![vec![Xform::IDENTITY]; 21];
+        data::insert("models/test/res_sync.vmdl", ModelAnim { skeleton, clips: vec![Arc::new(stride)], ..Default::default() });
+        let dir = std::env::temp_dir().join(format!("underbox_anim_sync_{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("clips")).unwrap();
+        let doc = r#"{ _class = "CClipDocument" m_eventTracks = [ { m_eventClassName = "CIDEvent" m_bIsSyncTrack = true m_events = [
+            { m_startTime = 10.0 m_ID = "right" }, { m_startTime = 0.0 m_ID = "left" } ] } ] }"#;
+        std::fs::write(dir.join("clips/res_sync_stride.anim"), doc).unwrap();
+        crate::fs::add_search_path("GAME", dir.to_str().unwrap(), true);
+        let c = clip("clips/res_sync_stride.anim").unwrap();
+        let track: Vec<_> = c.clip.sync_track().iter().map(|e| (e.id.as_str(), e.start, e.duration)).collect();
+        assert_eq!(track, [("left", 0.0, 0.5), ("right", 0.5, 0.5)]);
+        let plain = clip("models/test/res_sync.vmdl/res_sync_stride").unwrap();
+        let whole: Vec<_> = plain.clip.sync_track().iter().map(|e| (e.id.as_str(), e.start, e.duration)).collect();
+        assert_eq!(whole, [("", 0.0, 1.0)], "no document: the default whole-clip event");
+        crate::fs::remove_search_path("GAME", dir.to_str().unwrap());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

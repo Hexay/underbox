@@ -11,7 +11,7 @@ use crate::render::draw::{self, Draw, Target, immediate, model as model_draw};
 use crate::render::material::Material;
 use crate::render::shading::bind::Instance;
 use crate::render::lighting::{Lighting, local_shadow, shadow};
-use crate::render::{context, device, texture};
+use crate::render::{context, device, fog_volume, texture};
 use crate::scene::object;
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
 use abi::structs::{ISceneLayer, ISceneView, IRenderContext, ManagedRenderSetup_t, SceneSystemPerFrameStats_t};
@@ -85,11 +85,13 @@ pub fn run(v: view::Ref) {
         (s.layers.clone(), s.worlds.clone(), !s.parent.is_null())
     };
     let mut lighting = Lighting::collect(&worlds, view.ambient);
-    (lighting.tone_map, lighting.fog) = (view.environment.tone_map, view.environment.fog.clone());
-    // Child views (the 3D skybox) are lit without shadow maps, as native's.
+    (lighting.tone_map, lighting.fog, lighting.view_fog) = (view.environment.tone_map, view.environment.fog.clone(), view.environment.view_fog.clone());
+    // Child views (the 3D skybox) are lit without shadow maps or froxels, as native's.
     if !child {
         shadow::render(&mut lighting, &worlds, view.view_proj);
         local_shadow::render(&mut lighting, &worlds);
+        let volumetric = lighting.view_fog.as_ref().and_then(|f| f.volumetric);
+        lighting.fog_volume = volumetric.and_then(|p| fog_volume::render(&worlds, view.view_proj, &lighting, &p));
     }
     immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {

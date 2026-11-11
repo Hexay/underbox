@@ -39,7 +39,8 @@ pub fn get(r: Ref) -> Option<std::sync::Arc<RenderContext>> {
 
 /// The bound targets, viewport and scissor draws go to.
 pub fn target(r: Ref) -> Target {
-    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor })
+    let reverse_z = reverse_z(r);
+    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor, reverse_z })
 }
 
 /// Bind `t`'s targets, viewport and scissor at once.

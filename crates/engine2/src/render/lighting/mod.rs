@@ -59,6 +59,10 @@ pub struct Lighting {
     pub tone_map: Option<f32>,
     /// The view's analytic fog (`FogConstants`, render/fog.rs), when managed set one.
     pub fog: Option<std::sync::Arc<[u8]>>,
+    /// The view's gradient, cubemap and volumetric settings (render/fog.rs).
+    pub view_fog: Option<std::sync::Arc<crate::render::fog::ViewFog>>,
+    /// The view's rendered froxels, when any volume shows (render/fog_volume.rs).
+    pub fog_volume: Option<std::sync::Arc<crate::render::fog_volume::Frustum>>,
 }
 
 impl Lighting {

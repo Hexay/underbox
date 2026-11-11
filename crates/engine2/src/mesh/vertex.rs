@@ -44,4 +44,10 @@ impl Vertex {
         // SAFETY: Vertex is repr(C) plain data with no padding (76 = 12 + 4 + 12 + 3 * 16).
         unsafe { std::slice::from_raw_parts(vertices.as_ptr().cast(), std::mem::size_of_val(vertices)) }
     }
+
+    /// The vertices in tightly packed `bytes`; a trailing partial vertex is dropped.
+    pub fn from_bytes(bytes: &[u8]) -> Vec<Vertex> {
+        // SAFETY: each chunk is one Vertex's bytes, and every bit pattern is a valid Vertex.
+        bytes.as_chunks::<{ size_of::<Vertex>() }>().0.iter().map(|c| unsafe { c.as_ptr().cast::<Vertex>().read_unaligned() }).collect()
+    }
 }

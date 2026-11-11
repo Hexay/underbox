@@ -57,6 +57,8 @@ PS
 	float4 g_vSkyTint < Attribute( "g_vSkyTint" ); Default4( 1.0, 1.0, 1.0, 1.0 ); >;
 	float g_flBrightnessExposureBias < Attribute( "g_flBrightnessExposureBias" ); Default( 0.0 ); >;
 
+	#include "common/classes/Fog.hlsl"
+
 	struct PS_OUTPUT
 	{
 		float4 vColor : SV_Target0;
@@ -68,8 +70,10 @@ PS
 		// Halfway in depth is finite for forward, reverse and infinite-far projections alike.
 		float4 vWorld = mul( g_matProjectionToWorld, i.vRayPs );
 		float3 vRay = vWorld.xyz / vWorld.w - g_vCameraPositionWs.xyz;
-		float3 vSky = g_tSkyTexture.Sample( g_sSky, normalize( vRay ) ).rgb;
-		o.vColor = float4( vSky * g_vSkyTint.rgb * exp2( g_flBrightnessExposureBias ), 1.0 );
+		float3 vDirection = normalize( vRay );
+		float3 vSky = g_tSkyTexture.Sample( g_sSky, vDirection ).rgb * g_vSkyTint.rgb * exp2( g_flBrightnessExposureBias );
+		// Far past the froxel grid and any fog range: Fog.hlsl only reads the sky ray's direction.
+		o.vColor = float4( Fog::ApplySky( g_vCameraPositionWs.xyz + vDirection * 1000000.0, float2( 0.0, 0.0 ), vSky ), 1.0 );
 		return o;
 	}
 }

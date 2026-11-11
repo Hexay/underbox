@@ -1,7 +1,8 @@
 //! Readers for the source formats that describe animation: ModelDoc `.vmdl` lists, AnimGraph1
-//! `.vanmgrph` parameters, and AnimGraph2 `.ag` graphs.
+//! `.vanmgrph` parameters and tag spans, AnimGraph2 `.ag` graphs, and `.anim` sync tracks.
 
 pub mod ag;
+pub mod clip_doc;
 pub mod vanmgrph;
 pub mod vmdl;
 

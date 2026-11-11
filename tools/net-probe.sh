@@ -7,7 +7,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 HOLD=${1:-5}
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 OUT=$ROOT/target/net-probe
-PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" 1)}
+PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" $$)}
 mkdir -p "$OUT"
 # see docs/dev-loop.md (incremental)
 env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p gns --example probe -j4

@@ -17,6 +17,7 @@ mean "not available"; managed checks them.
 | Publish / update (`CUgcUpdate`) | create fails, submit fails `NotLoggedOn` | real; all 17 edits, progress |
 | Lobbies (`ISteamMatchmaking` slots + LobbyManager callbacks) | null | real; managed calls Create/Join/List/Chat itself via DllImport |
 | Peer messages, networking utils | null | real (`ISteamNetworkingMessages`, relay init, ping) |
+| Steam-id connects and listen sockets (`Glue.Networking`) | fail, logged | underbox peers only, over peer messages (below) |
 | Server list (internet, LAN) | starts and finishes empty | real (`ISteamMatchmakingServers`) |
 | Inventory, prices, checkout | empty | real (client); `Deserialize`/owner checks on a game server |
 | Screenshots | false | real (`ISteamScreenshots::WriteScreenshot`) |
@@ -36,10 +37,28 @@ mean "not available"; managed checks them.
 
 ## Joining a server
 
-`connect <ip>` needs only `ISteamNetworkingSockets` (our GameNetworkingSockets). `connect <steamid>` goes
-through `Glue.ConnectToSteamId`, which `net` can't serve (open-source GNS has no Steam relay), so it fails
-on either backend. Lobby games instead carry traffic over `ISteamNetworkingMessages`, which the Steam
-backend provides. Matchmaking, peer messages and FakeIP are not on the dedicated-server join path.
+`connect <ip>` needs only `ISteamNetworkingSockets` (our GameNetworkingSockets). `connect <steamid>`
+(`Glue.ConnectToSteamId`, virtual port 77) and Steam-id listen sockets (`CreateSocket`, the dedicated
+server's `IdListenSocket`) need Steam's relay, which open-source GNS lacks, so `net` serves them with its
+second transport (`net/p2p`) over `ISteamNetworkingMessages`: the game server's own on a dedicated
+server, the user's on a client.
+
+- One messages channel (`0x55425850`, "UBXP"); frames `'U', 1, kind, dst handle, ...`: connect,
+  accept, close (reason + debug), unreliable, reliable segment, ack, ping (`p2p/frame.rs`).
+- Reliable messages: 1100-byte segments, a 512-segment selective-repeat window, cumulative acks
+  with a 64-bit bitmap, backed-off retransmits; sends use `AutoRestartBrokenSession`, so a Steam
+  session that drops and reopens loses nothing (`p2p/reliable.rs`).
+- Connections behave as Steam's: connect retried every 250 ms, 10 s connect and idle timeouts,
+  1 s keepalives, linger on close, `ShouldAcceptConnection` before accepting (`p2p/conn.rs`).
+- A listening side accepts every pending Steam session request; a client accepts lobby members'
+  as before. Handles: P2P connections are 1..=0xFFFF (GNS's always have a nonzero high half),
+  listen sockets set the top bit; poll groups are GNS's and can hold both.
+- Only underbox peers speak this protocol. A stock s&box client connecting by Steam id uses
+  Steam's own SDR P2P (`ConnectP2P`), which this can't answer; it can still join by IP.
+- Offline (or a build without `steam`) `ConnectToSteamId` logs an error naming what's missing and
+  returns the invalid handle; `CreateSocket` falls back to GNS's (unreachable) P2P listener.
+
+Matchmaking and FakeIP are not on the dedicated-server join path.
 
 Auth is: the client sends `ISteamUser::GetAuthSessionTicket`'s ticket (an empty one makes it drop itself,
 "Invalid Authentication Ticket"); the server runs `BeginAuthSession` and waits up to 30 s for
@@ -71,3 +90,11 @@ decoding, dispatch layout and offline behaviour. With `--features steam` and Ste
 9. Inventory: items load, definitions and prices appear, a checkout opens the overlay and reports.
 10. Screenshot (F12 path) lands in the Steam screenshot library.
 11. Web ticket: with `UNDERBOX_WEB_API_IDENTITY` set, `GetWebAuthTicket` returns hex after a few frames.
+12. Steam-id join: a `--features steam` dedicated server (`UNDERBOX_PLATFORM=steam`, GSLT) logs
+    `SteamIdSocket - steamid:<server id>`; an underbox client on another network runs
+    `connect <server id>`, reaches the game, and the server's auth completes `OK`. With packet loss
+    on the client host (`tc qdisc add dev <if> root netem loss 10%`, needs root) the session stays up
+    and chat arrives in order. Quitting the server shows the client "ClosedByPeer"; pulling the
+    cable times out both ends after about 10 s.
+13. Offline: `connect 90071992549575139` logs "can't connect to Steam id 90071992549575139:
+    Steam-id connections need the Steam platform ..." and the attempt fails without a hang.

@@ -29,6 +29,19 @@ pub struct SceneObject {
     pub lod_override: i32,
     /// An aggregate's draw calls placed one by one (`m_aggregateMeshes`); empty draws it whole.
     pub fragments: Vec<Fragment>,
+    /// An aggregate's `m_lodSetups`, which fragments name by [`Fragment::lod_setup`].
+    pub lod_setups: Vec<LodSetup>,
+}
+
+/// One `m_lodSetups` entry: the LOD groups a fragment's [`Fragment::lod_mask`] picks from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LodSetup {
+    /// `m_vLODOrigin`: where distances are measured from.
+    pub origin: [f32; 3],
+    /// `m_fMaxObjectScale`.
+    pub max_object_scale: f32,
+    /// `m_fSwitchDistances`: where each LOD group starts, as a model's `m_lodGroupSwitchDistances`.
+    pub switch_distances: Vec<f32>,
 }
 
 /// One `m_aggregateMeshes` entry: a draw call of the aggregate's model, with its own transform
@@ -42,6 +55,8 @@ pub struct Fragment {
     pub flags: u64,
     /// LOD levels it belongs to, one bit each; 0 for all.
     pub lod_mask: u32,
+    /// `m_nLODSetupIndex` into [`SceneObject::lod_setups`], -1 for none.
+    pub lod_setup: i32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -87,6 +102,7 @@ fn scene_object(o: &Object, layer: i32) -> Option<SceneObject> {
         aggregate: false,
         lod_override: int_or(o, "m_nLODOverride", -1) as i32,
         fragments: Vec::new(),
+        lod_setups: Vec::new(),
     })
 }
 
@@ -108,8 +124,18 @@ fn fragments(o: &Object) -> Vec<Fragment> {
         tint: field_floats::<3>(m, "m_vTintColor").map_or([1.0; 3], |c| c.map(|x| x / 255.0)),
         flags: int_or(m, "m_objectFlags", 0) as u64,
         lod_mask: int_or(m, "m_nLODGroupMask", 0) as u32,
+        lod_setup: int_or(m, "m_nLODSetupIndex", -1) as i32,
     };
     meshes.iter().filter_map(Value::as_object).map(|m| fragment(m, &mut transforms)).collect()
+}
+
+fn lod_setups(o: &Object) -> Vec<LodSetup> {
+    let setup = |s: &Object| LodSetup {
+        origin: field_floats::<3>(s, "m_vLODOrigin").unwrap_or([0.0; 3]),
+        max_object_scale: field_f32(s, "m_fMaxObjectScale").unwrap_or(1.0),
+        switch_distances: s.get("m_fSwitchDistances").and_then(floats).unwrap_or_default(),
+    };
+    array(o, "m_lodSetups").iter().filter_map(Value::as_object).map(setup).collect()
 }
 
 fn aggregate(o: &Object) -> Option<SceneObject> {
@@ -125,6 +151,7 @@ fn aggregate(o: &Object) -> Option<SceneObject> {
         aggregate: true,
         lod_override: -1,
         fragments: fragments(o),
+        lod_setups: lod_setups(o),
     })
 }
 

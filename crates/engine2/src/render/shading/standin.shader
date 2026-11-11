@@ -191,7 +191,7 @@ PS
 	Texture2D g_tUnderboxLocalShadow < Attribute( "g_tUnderboxLocalShadow" ); >;
 
 	//@managed_shadows
-	//@fog
+	#include "common/classes/Fog.hlsl"
 
 	float LocalVisibility( BinnedLight l, float3 vPositionWs, float3 vNormalWs )
 	{
@@ -254,7 +254,7 @@ PS
 
 		float3 vNormalWs = normalize( i.vNormalWs );
 		float3 vLight = Irradiance( i.vPositionWs, vNormalWs );
-		o.vColor = float4( ApplyFog( i.vPositionWs, vColor * lerp( vLight, 1.0, g_flStandinUnlit ) ), vAlbedo.a * i.vTint.a );
+		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), vColor * lerp( vLight, 1.0, g_flStandinUnlit ) ), vAlbedo.a * i.vTint.a );
 		if ( g_flStandinDebug == 1.0 )
 			o.vColor = float4( SunVisibility( i.vPositionWs, vNormalWs ).xxx, 1.0 );
 		else if ( g_flStandinDebug == 2.0 )

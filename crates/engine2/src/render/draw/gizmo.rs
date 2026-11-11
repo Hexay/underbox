@@ -8,8 +8,13 @@
 //!   the segment's first endpoint (dash patterns) and 1 on it, 0 on the second;
 //! - sprite: `tex1.xy` = the corner (±1, ±1); `tex0` is the point's own size, space and rotation.
 
+use super::Draw;
+use crate::mesh::render_mesh::TRIANGLES;
 use crate::mesh::vertex::Vertex;
 use crate::render::shading::standin::Kind;
+use render::BufferKind;
+use render::wgpu::IndexFormat;
+use std::sync::Arc;
 
 /// Two triangles over corners laid out as the GS's strip (0 1 2 3).
 const QUAD: [u32; 6] = [0, 1, 2, 2, 1, 3];
@@ -51,6 +56,35 @@ pub fn expand(kind: Kind, prim: i64, vertices: &[Vertex]) -> Option<(Vec<Vertex>
         _ => return None,
     };
     Some(quads(corners))
+}
+
+/// The vertices a bound draw reads, in draw order, copied back from its GPU buffers.
+fn bound_vertices(gpu: &render::Gpu, d: &Draw) -> Option<Vec<Vertex>> {
+    let stride = size_of::<Vertex>() as u64;
+    let (first, count) = (u64::from(d.range.start), u64::from(d.range.end.saturating_sub(d.range.start)));
+    let order: Vec<i64> = match &d.indices {
+        Some((b, IndexFormat::Uint16)) => b.read(gpu, first * 2, count * 2).as_chunks::<2>().0.iter().map(|i| i64::from(u16::from_le_bytes(*i))).collect(),
+        Some((b, IndexFormat::Uint32)) => b.read(gpu, first * 4, count * 4).as_chunks::<4>().0.iter().map(|i| i64::from(u32::from_le_bytes(*i))).collect(),
+        None => (first as i64..(first + count) as i64).collect(),
+    };
+    let order: Vec<i64> = order.into_iter().map(|i| i + i64::from(d.base_vertex)).collect();
+    let (lo, hi) = (*order.iter().min()?, *order.iter().max()?);
+    let lo = u64::try_from(lo).ok()?;
+    let read = Vertex::from_bytes(&d.vertices.read(gpu, d.vertex_offset + lo * stride, (hi as u64 - lo + 1) * stride));
+    order.iter().map(|i| read.get((*i as u64 - lo) as usize).copied()).collect()
+}
+
+/// Rewrite a line or point draw from bound `Sandbox.Vertex` buffers as `kind`'s corner quads.
+/// False leaves it as submitted (not a gizmo stand-in's primitive). Reads the buffers back, so
+/// only gizmo materials pay for the wait.
+pub fn expand_bound(gpu: &render::Gpu, d: &mut Draw, prim: i64, kind: Kind) -> bool {
+    let Some((corners, indices)) = bound_vertices(gpu, d).and_then(|v| expand(kind, prim, &v)) else { return false };
+    let index_bytes: Vec<u8> = indices.iter().flat_map(|i| i.to_le_bytes()).collect();
+    d.vertices = Arc::new(render::Buffer::with_data(gpu, "gizmo corners", BufferKind::Vertex, Vertex::as_bytes(&corners)));
+    d.indices = Some((Arc::new(render::Buffer::with_data(gpu, "gizmo corner indices", BufferKind::Index, &index_bytes)), IndexFormat::Uint32));
+    (d.vertex_offset, d.base_vertex, d.range) = (0, 0, 0..indices.len() as u32);
+    d.state.topology = super::topology(i64::from(TRIANGLES));
+    true
 }
 
 #[cfg(test)]

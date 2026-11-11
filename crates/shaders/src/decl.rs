@@ -57,9 +57,15 @@ pub struct Decls {
     pub dynamic_rules: Vec<RuleDecl>,
     /// `RenderState( Name, expr )` in declaration order; later ones override earlier ones.
     pub render_states: Vec<(String, String)>,
+    /// Per render state, the `#if` conditions it sits under (`expr::Guards`; empty: none).
+    #[serde(default)]
+    pub render_state_guards: Vec<String>,
     pub attributes: Vec<AttributeDecl>,
     /// `CreateInputTexture2D( ... )` and friends: macro name, then its arguments.
     pub inputs: Vec<Vec<String>>,
+    /// The 1-based line of each `inputs` entry.
+    #[serde(default)]
+    pub input_lines: Vec<u32>,
     /// `ExternalDescriptorSet name Slot n;`
     pub descriptor_sets: Vec<(String, u32)>,
 }
@@ -70,6 +76,7 @@ pub fn extract(text: &str, decls: &mut Decls) -> Result<String, String> {
     let s = blank_comments(text);
     let mut out = s.clone().into_bytes();
     let b = s.as_bytes();
+    let guards = crate::expr::Guards::new(&s);
     let mut i = 0;
     while i < b.len() {
         let at_word = is_ident_start(b[i]) && (i == 0 || !is_ident(b[i - 1]));
@@ -106,6 +113,13 @@ pub fn extract(text: &str, decls: &mut Decls) -> Result<String, String> {
         let semi = skip_trivia(&s, close + 1);
         let end = if b.get(semi) == Some(&b';') { semi } else { close };
         record(word, &s[open + 1..close], decls).map_err(err)?;
+        if word == "RenderState" {
+            decls.render_state_guards.resize(decls.render_states.len() - 1, String::new());
+            decls.render_state_guards.push(guards.at(i).to_owned());
+        }
+        if word.starts_with("CreateInputTexture") {
+            decls.input_lines.push(line_of(&s, i));
+        }
         blank_bytes(&mut out[i..=end]);
         i = end + 1;
     }

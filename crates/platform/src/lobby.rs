@@ -52,6 +52,12 @@ pub trait PeerMessages: Send + Sync {
     /// Fill `out` with messages, each a `SteamNetworkingMessage_t*` that managed reads directly and hands
     /// back to [`PeerMessages::release`]. Returns how many.
     fn receive(&self, channel: i32, out: &mut [*mut c_void]) -> i32;
+    /// Up to `max` messages on `channel` as (sender, bytes); each is released once copied.
+    fn receive_copied(&self, channel: i32, max: usize) -> Vec<(SteamId, Vec<u8>)>;
+    /// Users who asked to open a session since the last call and that nothing else accepted.
+    fn session_requests(&self) -> Vec<SteamId> {
+        Vec::new()
+    }
     fn accept(&self, user: SteamId) -> bool;
     fn close(&self, user: SteamId, channel: i32) -> bool;
     /// # Safety

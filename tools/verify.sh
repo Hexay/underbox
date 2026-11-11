@@ -16,5 +16,7 @@ step frame-skinned env CORPUS=skinned sh "$ROOT/tools/client-frame.sh"
 step frame-skinned-managed env CORPUS=skinned MANAGED=1 sh "$ROOT/tools/client-frame.sh"
 step frame-outdoor env CORPUS=outdoor sh "$ROOT/tools/client-frame.sh"
 step frame-outdoor-managed env CORPUS=outdoor MANAGED=1 sh "$ROOT/tools/client-frame.sh"
+step frame-fog env CORPUS=fog sh "$ROOT/tools/client-frame.sh"
+step frame-fog-managed env CORPUS=fog MANAGED=1 sh "$ROOT/tools/client-frame.sh"
 step coverage cargo run -q --manifest-path "$ROOT/Cargo.toml" -p engine2 --bin coverage -j4
 echo "RESULT: PASS"

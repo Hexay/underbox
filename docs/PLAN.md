@@ -41,7 +41,7 @@ as the code behind those slots:
 | steamaudio | FFI to the Steam Audio SDK (Apache-2.0) |
 | ovrlipsync (Oculus SDK, closed) | our own viseme estimator |
 | steam_api64 | `platform` |
-| schemacompiler | build-time only; needed only if a runtime slot exposes schema data (to check) |
+| schemacompiler | **not needed**: build-time only, no runtime slot exposes schema data (see "Answered") |
 | lightinglib, vrad3, embree | **out of scope**: Hammer baking; runtime reads baked results |
 | hammer, met, modeldoc_editor, animgraph_editor, toolframework2, assetsystem | **out of scope**: editor tables |
 
@@ -131,8 +131,15 @@ added, removed or retyped, and the interop hash. Generated code is never edited 
 - s&box EULA: does it allow differential testing against engine2? (user to confirm)
 - Content licences: Facepunch's Citizen models and sbox.game packages are under Facepunch's
   terms; each corpus game needs its creator's terms checked.
-- Do compiled `.shader_c` files hold SPIR-V (`ShaderCompile.cs` targets `SM_6_0_VULKAN`)? If so,
-  runtime can translate shipped bytecode with naga directly, and the HLSL path is only for
-  compiling from source.
-- Does any runtime slot need schemacompiler's output?
 - Project name ("underbox" is the working name; never use "s&box" as ours).
+
+## Answered
+
+- `.shader_c` holds SPIR-V: every combo is a `CVfxShaderFileVulkan` blob (version, size, raw
+  SPIR-V, reflection, v5 spec constants; `SpirvDump.cs`), compiled for `SM_6_0_VULKAN`. Shipped
+  bytecode can go straight to naga; the HLSL path is for source. Native's program-body framing and
+  any compression are still unread (no real file to check); research/shaders.md.
+- No runtime slot needs schemacompiler output: no `igen_engine` slot takes or returns schema or
+  introspection data (the only `.def` mention, `hsound.def`'s `soundschema.h` include, is for
+  `VSound_t`'s plain accessors). Resources carry data as KV3; only legacy NTRO-typed DATA embeds
+  schemas (research/resource-container.md).

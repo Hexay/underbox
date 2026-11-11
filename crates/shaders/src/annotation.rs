@@ -5,7 +5,7 @@
 //! An annotation is told apart from templates and comparisons by shape: `<` follows a name (or
 //! semantic / array size), the content is a run of `Name( ... );` items, and `>` is followed by `;`.
 
-use crate::scan::{blank_bytes, is_ident, match_close, skip_trivia};
+use crate::scan::{blank_bytes, is_ident, line_of, match_close, skip_trivia};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +18,9 @@ pub struct Annotated {
     pub items: Vec<(String, String)>,
     /// For `SpecializedConstant()` globals: the index of the `UB_SPEC_<n>` define holding its value.
     pub spec_id: Option<u32>,
+    /// 1-based line in the program's expanded text, matching `Program::directives`.
+    #[serde(default)]
+    pub line: u32,
 }
 
 impl Annotated {
@@ -36,6 +39,12 @@ impl Annotated {
 /// variant compiles with its value defined, so no `OpSpecConstant` (and no `OpSpecConstantOp`,
 /// which naga rejects) reaches SPIR-V.
 pub fn strip(text: &str, out: &mut Vec<Annotated>) -> String {
+    strip_keeping_macros(text, out, &mut Vec::new())
+}
+
+/// [`strip`], also recording into `kept` the annotations whose last item is a bare macro name
+/// (`SrgbRead( false ); BENT_NORMAL_ACTIVE_IF >`); those stay in the text for DXC to expand.
+pub fn strip_keeping_macros(text: &str, out: &mut Vec<Annotated>, kept: &mut Vec<Annotated>) -> String {
     let b = text.as_bytes();
     let mut res = b.to_vec();
     let mut i = 0;
@@ -43,13 +52,24 @@ pub fn strip(text: &str, out: &mut Vec<Annotated>) -> String {
     while let Some(n) = text[i..].find('<') {
         let lt = i + n;
         i = lt + 1;
-        let Some((gt, items)) = parse_items(text, lt + 1) else { continue };
+        let (strict, (gt, items)) = match parse_items(text, lt + 1, false) {
+            Some(found) => (true, found),
+            None => match parse_items(text, lt + 1, true) {
+                Some(found) => (false, found),
+                None => continue,
+            },
+        };
         let semi = skip_trivia(text, gt + 1);
         if b.get(semi) != Some(&b';') {
             continue;
         }
         let Some((name, decl, start)) = declared(text, lt) else { continue };
-        let mut a = Annotated { name, decl, items, spec_id: None };
+        let mut a = Annotated { name, decl, items, spec_id: None, line: line_of(text, lt) };
+        if !strict {
+            kept.push(a);
+            i = gt + 1;
+            continue;
+        }
         blank_bytes(&mut res[lt..=gt]);
         if a.get("SpecializedConstant").is_some() {
             let new = format!("static const {} = UB_SPEC_{next_spec};", a.decl);
@@ -66,8 +86,9 @@ pub fn strip(text: &str, out: &mut Vec<Annotated>) -> String {
     String::from_utf8(res).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
 }
 
-/// The `Name( args );` items from `start` up to the closing `>`, and that `>`'s index.
-fn parse_items(s: &str, start: usize) -> Option<(usize, Vec<(String, String)>)> {
+/// The `Name( args );` items from `start` up to the closing `>`, and that `>`'s index. `bare`
+/// also accepts an argument-less name right before `>` without its `;`.
+fn parse_items(s: &str, start: usize, bare: bool) -> Option<(usize, Vec<(String, String)>)> {
     let b = s.as_bytes();
     let mut items = Vec::new();
     let mut i = skip_trivia(s, start);
@@ -85,6 +106,11 @@ fn parse_items(s: &str, start: usize) -> Option<(usize, Vec<(String, String)>)> 
                     (String::new(), open)
                 };
                 let semi = skip_trivia(s, after);
+                if bare && args.is_empty() && after == open && b.get(semi) == Some(&b'>') {
+                    items.push((key, args));
+                    i = semi;
+                    continue;
+                }
                 if b.get(semi) != Some(&b';') || args.contains('{') {
                     return None;
                 }
@@ -137,6 +163,17 @@ mod tests {
         let kept: Vec<_> = out.lines().map(str::trim).collect();
         assert_eq!(kept[0].split_whitespace().collect::<Vec<_>>(), ["Texture2D<float4>", "t", ";"]);
         assert!(kept[4].contains("i < n") && kept[5].contains("p < q") && kept[6] == "RWTexture2D<float4> u;");
+    }
+
+    #[test]
+    fn annotations_ending_in_a_macro_are_kept_in_the_text() {
+        let src = "float a < Default( 1 ); >;\nTexture2D g_tBentNormal < SrgbRead( false ); BENT_NORMAL_ACTIVE_IF >;\n";
+        let (mut found, mut kept) = (Vec::new(), Vec::new());
+        let out = strip_keeping_macros(src, &mut found, &mut kept);
+        assert_eq!((found.len(), found[0].line), (1, 1));
+        assert_eq!((kept[0].name.as_str(), kept[0].line), ("g_tBentNormal", 2));
+        assert_eq!(kept[0].get("BENT_NORMAL_ACTIVE_IF"), Some(""));
+        assert_eq!(out.lines().nth(1), src.lines().nth(1), "left for DXC");
     }
 
     #[test]

@@ -88,8 +88,8 @@ impl Program {
     fn build(&self, gpu: &Gpu, key: &PipelineKey) -> wgpu::RenderPipeline {
         let s = &key.state;
         let buffers: Vec<_> = key.vertex.iter().map(|b| Some(b.as_layout())).collect();
-        let writes = if s.color_writes { wgpu::ColorWrites::ALL } else { wgpu::ColorWrites::empty() };
-        let targets = [key.color.map(|format| wgpu::ColorTargetState { format, blend: s.blend, write_mask: writes })];
+        let blend = s.blend.filter(|_| key.color.is_some_and(|f| f.guaranteed_format_features(gpu.device.features()).flags.contains(wgpu::TextureFormatFeatureFlags::BLENDABLE)));
+        let targets = [key.color.map(|format| wgpu::ColorTargetState { format, blend, write_mask: s.write_mask })];
         gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(&self.label),
             layout: Some(&self.layout),
@@ -99,7 +99,7 @@ impl Program {
                 format,
                 depth_write_enabled: Some(s.depth_write),
                 depth_compare: Some(s.depth_compare),
-                stencil: Default::default(),
+                stencil: s.stencil_state(format),
                 bias: s.bias_state(),
             }),
             multisample: Default::default(),

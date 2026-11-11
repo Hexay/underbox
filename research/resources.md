@@ -27,7 +27,7 @@ atlas, animation group and `.vanim`, a sound); `world::fixture::tiny_map` packs 
   editor's ContentCompilerHost worker (editor tables are out of scope): a job fails, game data is null.
 - `IAsyncResourceDataRequest` and `IRD_RegisterResourceDataUtils` (resource_data.rs) are plain
   state objects; no managed code calls them and no callback of ours hands one out yet.
-- Sprite sheets (render/texture.rs) answer none. For whoever reads them, the vtex SHEET extra
+- Sprite sheets are parsed by compiled/texture/sheet.rs and served by render/sheet.rs. The vtex SHEET extra
   data per VRF `Texture.GetSpriteSheetData`: i32 sequences offset, u32 count; a 32-byte sequence record
   (u32 id, 4 bools, i32 frames offset relative to its field, u32 frame count, f32 total time,
   name offset, i32 float-params offset, u32 count); 12-byte frames (f32 display time, i32 images

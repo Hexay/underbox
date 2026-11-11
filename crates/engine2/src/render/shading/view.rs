@@ -37,10 +37,21 @@ impl View {
     pub fn camera_axes(&self) -> (Vec4, Vec4) {
         let inv = self.view_proj.inverse();
         let at = |x: f32, y: f32, z: f32| inv.project_point3(glam::Vec3::new(x, y, z));
-        let forward = (at(0.0, 0.0, 1.0) - at(0.0, 0.0, 0.0)).normalize_or_zero();
+        // An infinite projection's far plane is at infinity: aim a perspective view from its eye.
+        let perspective = self.view_proj.row(3).truncate() != glam::Vec3::ZERO;
+        let from = if perspective { self.camera_position().truncate() } else { at(0.0, 0.0, 0.0) };
+        let forward = (at(0.0, 0.0, if perspective { 0.5 } else { 1.0 }) - from).normalize_or_zero();
         let up = at(0.0, 1.0, 0.5) - at(0.0, 0.0, 0.5);
         let up = (up - forward * up.dot(forward)).normalize_or_zero();
         (forward.extend(0.0), up.extend(0.0))
+    }
+
+    /// Only `[3].w` is real: Fog.hlsl's test for an orthographic view (0 for a perspective one).
+    fn view_to_projection(&self) -> Mat4 {
+        let perspective = self.view_proj.row(3).truncate() != glam::Vec3::ZERO;
+        let mut m = Mat4::IDENTITY;
+        m.w_axis.w = if perspective { 0.0 } else { 1.0 };
+        m
     }
 
     pub fn constant(&self, name: &str) -> Option<Value> {
@@ -50,7 +61,8 @@ impl View {
         match name {
             "g_matWorldToProjection" => Some(Value::Mat(self.view_proj)),
             "g_matProjectionToWorld" => Some(Value::Mat(self.view_proj.inverse())),
-            "g_matWorldToView" | "g_matViewToProjection" | "g_matProjectionToView" | "g_matViewToScreen" => Some(Value::Mat(Mat4::IDENTITY)),
+            "g_matViewToProjection" => Some(Value::Mat(self.view_to_projection())),
+            "g_matWorldToView" | "g_matProjectionToView" | "g_matViewToScreen" => Some(Value::Mat(Mat4::IDENTITY)),
             "g_vCameraPositionWs" | "g_vMiddleEyePositionWs" => Some(Value::Vec(self.camera_position())),
             "g_vCameraDirWs" => Some(Value::Vec(self.camera_axes().0)),
             "g_vCameraUpDirWs" => Some(Value::Vec(self.camera_axes().1)),
@@ -83,5 +95,7 @@ mod tests {
         let (forward, up) = view.camera_axes();
         assert!(forward.truncate().distance(-eye.normalize()) < 1e-3, "{forward}");
         assert!(up.truncate().dot(forward.truncate()).abs() < 1e-4 && up.y > 0.5, "{up}");
+        let infinite = View { view_proj: render::Camera::perspective(1.0, 1.0, 1.0, eye, Vec3::ZERO).view_proj, ..view };
+        assert!(infinite.camera_axes().0.truncate().distance(-eye.normalize()) < 1e-3, "infinite far plane");
     }
 }

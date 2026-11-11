@@ -109,6 +109,7 @@ impl Lighting {
         match name {
             shadow::TEXTURE => self.shadow.as_ref().map(|s| s.map),
             local_shadow::TEXTURE => self.local.as_ref().map(|l| l.map),
+            "g_fogCubemapTexture" => crate::render::fog::cube_texture(self),
             _ => None,
         }
     }

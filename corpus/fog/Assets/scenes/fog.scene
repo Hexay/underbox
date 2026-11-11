@@ -1,0 +1,157 @@
+{
+  "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a30",
+  "GameObjects": [
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a31",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a32",
+          "FogMode": "Enabled",
+          "FogStrength": 1,
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": false,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a33",
+      "Flags": 0,
+      "Name": "Ground",
+      "Scale": "30,30,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a34",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.4,0.5,0.3,1"
+        }
+      ]
+    },
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a35",
+      "Flags": 0,
+      "Name": "Box Behind The Volume",
+      "Position": "400,-60,75",
+      "Scale": "3,3,3",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a36",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.9,0.15,0.1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a37",
+      "Flags": 0,
+      "Name": "Box Beside The Volume",
+      "Position": "400,420,75",
+      "Scale": "3,3,3",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a38",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.9,0.15,0.1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a39",
+      "Flags": 0,
+      "Name": "Volume",
+      "Position": "200,-60,100",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.VolumetricFogVolume",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a3a",
+          "Bounds": {
+            "Mins": "-150,-200,-100",
+            "Maxs": "150,200,100"
+          },
+          "Strength": 1,
+          "FalloffExponent": 0.25,
+          "Color": "0.6,0.8,1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a3b",
+      "Flags": 0,
+      "Name": "Ground Fog",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.GradientFog",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a3c",
+          "Color": "0.9,0.75,0.5,1",
+          "Height": 60,
+          "VerticalFalloffExponent": 1,
+          "StartDistance": 300,
+          "EndDistance": 2000,
+          "FalloffExponent": 1
+        }
+      ]
+    },
+    {
+      "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a3d",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,110",
+      "Rotation": "0,0.0872,0,0.9962",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "3a9e6c32-7d4f-4e0a-9b53-2c8d9e0f1a3e",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

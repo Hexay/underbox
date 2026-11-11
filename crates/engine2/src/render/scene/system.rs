@@ -14,6 +14,11 @@ static RENDER_TIME: AtomicU32 = AtomicU32::new(0);
 static PROFILER_MODE: AtomicU64 = AtomicU64::new(0);
 static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 
+/// The time managed set for this frame (`SetNextRenderTime`), in seconds.
+pub fn render_time() -> f32 {
+    f32::from_bits(RENDER_TIME.load(Ordering::Relaxed))
+}
+
 fn finish() {
     RENDERING.store(false, Ordering::Release);
     draw::gpu_mesh::prune();
@@ -39,7 +44,7 @@ fn well_known_texture() -> texture::Ref {
     NativeRef::from_raw(addr as *mut _)
 }
 
-/// Opaque ids for culling boxes and fog volumes, which nothing draws yet.
+/// Opaque ids for culling boxes, which nothing draws yet, and fog volumes (render/fog_volume.rs).
 fn next_id() -> u32 {
     NEXT_ID.fetch_add(1, Ordering::Relaxed)
 }
@@ -64,8 +69,12 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::SETUP_PER_OBJECT_LIGHTING, |_, _, _| {});
     bind!(r, s::ADD_CULLING_BOX, |_, _, _, _, _| next_id());
     bind!(r, s::REMOVE_CULLING_BOX, |_, _| {});
-    bind!(r, s::ADD_VOLUMETRIC_FOG_VOLUME, |_, _| next_id());
-    bind!(r, s::REMOVE_VOLUMETRIC_FOG_VOLUME, |_, _| {});
+    bind!(r, s::ADD_VOLUMETRIC_FOG_VOLUME, |w, v| {
+        let id = next_id();
+        crate::render::fog_volume::add(w.addr(), id, v);
+        id
+    });
+    bind!(r, s::REMOVE_VOLUMETRIC_FOG_VOLUME, |w, id| crate::render::fog_volume::remove(w.addr(), id));
     bind!(r, s::DOWNSAMPLE_TEXTURE, |_, _, _| {});
     bind!(r, s::BIND_TRANSFORM_SLOT, |_, _, _| {});
     bind!(r, s::SET_PIPELINE_TEXTURE_INDEX, |_, _| {});
@@ -91,5 +100,5 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::BEGIN_MANAGED_PERF_MARKER, |_, _, _, _| RawPtr::NULL);
     bind!(r, s::END_MANAGED_PERF_MARKER, |_, _| {});
     bind!(r, s::SET_NEXT_RENDER_TIME, |t: f32| RENDER_TIME.store(t.to_bits(), Ordering::Relaxed));
-    bind!(r, s::GET_CURRENT_RENDER_TIME, || f32::from_bits(RENDER_TIME.load(Ordering::Relaxed)));
+    bind!(r, s::GET_CURRENT_RENDER_TIME, render_time);
 }

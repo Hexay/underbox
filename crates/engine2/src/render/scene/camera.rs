@@ -35,7 +35,7 @@ pub(crate) fn create(_name: Option<&CStr>, camera_id: i32) -> Ref {
 }
 
 /// `numerics` holds a row-major (column-vector) matrix; see frustum/mod.rs.
-fn mat4(m: Matrix) -> Mat4 {
+pub(crate) fn mat4(m: Matrix) -> Mat4 {
     let n = m.numerics;
     Mat4::from_cols(Vec4::new(n.m11, n.m21, n.m31, n.m41), Vec4::new(n.m12, n.m22, n.m32, n.m42), Vec4::new(n.m13, n.m23, n.m33, n.m43), Vec4::new(n.m14, n.m24, n.m34, n.m44))
 }
@@ -90,6 +90,7 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
     };
     let (cam, proj, viewport) = camera(r, width, height);
     let a = r.addr();
+    let _pvs = super::pvs::enter(cam.origin, &worlds);
     let desc = view::Desc {
         camera: cam,
         proj,
@@ -137,6 +138,7 @@ fn environment(attrs: attributes::Ref) -> view::Environment {
         tone_map: tonemap.map(|t| crate::render::exposure::frame_update(NativeRef::from_raw(t as *mut _), true)),
         fog: attributes::constant_buffer(attrs, "FogConstants"),
         skybox_fog: attributes::constant_buffer(attrs, "SkyboxFogConstants"),
+        view_fog: Some(std::sync::Arc::new(crate::render::fog::gather(attrs))),
     }
 }
 

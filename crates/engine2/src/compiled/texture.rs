@@ -12,6 +12,7 @@ const RGBA16161616F: i32 = 24;
 pub struct Decoded {
     pub config: TextureCreationConfig_t,
     pub data: Vec<u8>,
+    pub sheet: Vec<vtex::sheet::Sequence>,
 }
 
 /// The `.vtex_c` resource path for `path` (`materials/x.vtex`, `_c` optional).
@@ -52,7 +53,7 @@ pub fn decode(t: &vtex::Texture) -> Option<Decoded> {
     if let Some((w, h)) = t.display {
         (config.m_n_display_rect_width, config.m_n_display_rect_height) = (w as i16, h as i16);
     }
-    Some(Decoded { config, data })
+    Some(Decoded { config, data, sheet: t.sheet.clone() })
 }
 
 /// The compiled texture at `path`, decoded; `None` without a readable `.vtex_c`.

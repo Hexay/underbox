@@ -9,8 +9,9 @@ use crate::render::draw::{self, Target, gizmo, model, shaded::Shaded};
 use crate::render::lighting::Lighting;
 use crate::render::{device, material, texture};
 use glam::{Mat4, Vec3, Vec4};
-use render::RasterState;
 use render::pass::{DrawUniforms, Load};
+use render::wgpu::IndexFormat;
+use render::{BufferKind, RasterState};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -18,6 +19,11 @@ const SIZE: u32 = 32;
 
 /// Pixels `vertices` of `prim` cover when drawn through `kind`'s stand-in with `values`.
 fn covered(kind: standin::Kind, prim: i64, vertices: &[Vertex], values: &[(&str, f32)]) -> Option<usize> {
+    render_covered(kind, prim, vertices, values, |_, _| {})
+}
+
+/// [`covered`], with the draw's buffers swapped by `rebind` just before it renders.
+fn render_covered(kind: standin::Kind, prim: i64, vertices: &[Vertex], values: &[(&str, f32)], rebind: impl FnOnce(&render::Gpu, &mut draw::Draw)) -> Option<usize> {
     let (core, gpu) = (core_dir()?, device::create()?);
     let shader = standin::shader(kind.path(), &shaders::IncludePaths::new([core])).unwrap().unwrap();
     let s = Arc::new(program::build(gpu, &shaders::Compiler::new().unwrap(), &shader, kind.path(), &shaders::Variant::default()).unwrap());
@@ -32,6 +38,7 @@ fn covered(kind: standin::Kind, prim: i64, vertices: &[Vertex], values: &[(&str,
     let values = values.iter().map(|(k, v)| (k.to_string(), Vec4::splat(*v))).collect::<HashMap<_, _>>();
     let instance = super::bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
     d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default() });
+    rebind(gpu, &mut d);
     let color = texture::create_target("gizmo", SIZE, SIZE, 0);
     draw::execute(&Target { color, ..Default::default() }, &Lighting::fallback(), Load { color: Some(render::wgpu::Color::BLACK), depth: None }, &[d]);
     let frame = texture::resolve(color).unwrap().gpu.as_ref().unwrap().read_back(gpu);
@@ -53,6 +60,36 @@ fn lines_are_as_wide_as_their_thickness() {
     };
     let thick = covered(standin::Kind::GizmoLine, 1, &line, &[("LineThickness", 6.0)]).unwrap();
     assert!(thin > 8 && (5 * thin..=7 * thin).contains(&thick), "1 px: {thin}, 6 px: {thick}");
+}
+
+/// A line draw straight from GPU buffers, as `IRenderContext.Draw` sees one: 1 px without the
+/// expansion, as wide as the corner path with it, indexed or not and past a base vertex.
+#[test]
+fn lines_in_gpu_buffers_are_as_wide_as_their_thickness() {
+    let line = [at(-3.0, 0.0, [0.0; 4]), at(3.0, 0.0, [0.0; 4])];
+    let thick = [("LineThickness", 6.0)];
+    let Some(expected) = covered(standin::Kind::GizmoLine, 1, &line, &thick) else {
+        eprintln!("skipped: no sbox-public checkout or GPU");
+        return;
+    };
+    let mut padded = vec![Vertex::default()];
+    padded.extend(line);
+    let drawn = |indexed: bool| {
+        render_covered(standin::Kind::GizmoLine, 1, &line, &thick, |gpu, d| {
+            d.vertices = Arc::new(render::Buffer::with_data(gpu, "lines", BufferKind::Vertex, Vertex::as_bytes(&padded)));
+            d.vertex_offset = 0;
+            (d.indices, d.range, d.base_vertex) = if indexed {
+                (Some((Arc::new(render::Buffer::with_data(gpu, "line indices", BufferKind::Index, &[0, 0, 1, 0])), IndexFormat::Uint16)), 0..2, 1)
+            } else {
+                (None, 1..3, 0)
+            };
+            d.state.topology = draw::topology(1);
+            assert!(gizmo::expand_bound(gpu, d, 1, standin::Kind::GizmoLine));
+        })
+        .unwrap()
+    };
+    assert_eq!(drawn(false), expected, "plain");
+    assert_eq!(drawn(true), expected, "indexed");
 }
 
 #[test]

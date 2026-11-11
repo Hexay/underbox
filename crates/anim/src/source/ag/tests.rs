@@ -32,7 +32,7 @@ const GRAPH: &str = r#"{
               { "_class": "AnimationClipNode", "Identifier": "idle", "Loop": true, "DefaultVariationData": { "AnimationName": "clips/idle.anim" } } ] } } ] } ] } },
         { "Name": "Jump", "Type": "BlendTree",
           "Events": [ { "Id": "takeoff" }, { "Id": "landing", "IsEntry": false, "IsExit": true }, { "Id": " " } ],
-          "TimedEvents": [ { "Id": "airborne", "Type": "TimeElapsed", "Operator": "GreaterThanEqual", "Time": 0.1 }, { "Id": "late", "Type": "TimeRemaining", "Time": 0.1 } ],
+          "TimedEvents": [ { "Id": "airborne", "Type": "TimeElapsed", "Operator": "GreaterThanEqual", "Time": 0.1 }, { "Id": "late", "Type": "TimeRemaining", "Operator": "LessThanEqual", "Time": 0.25 } ],
           "Graph": { "nodes": [
           { "_class": "PoseResultNode", "Pose": { "Identifier": "jump", "Output": "Result" }, "Identifier": "j_out" },
           { "_class": "AnimationClipNode", "Identifier": "jump", "Loop": false, "DefaultVariationData": { "AnimationName": "clips/jump.anim" } } ] } }
@@ -76,12 +76,16 @@ fn compiles_and_runs_a_state_machine_graph() {
     assert!((g.update(0.1, &bind).0[0].pos.x - 5.0).abs() < 1e-4);
     g.params.set_by_name("b_jump", Value::Bool(true));
     assert_eq!(g.update(0.1, &bind).0[0].pos.x, 50.0, "zero-duration transition cuts straight to Jump");
-    assert_eq!(g.active_tags(), ["takeoff"], "entry events default on; blank IDs and remaining-time events skipped");
+    assert_eq!(g.active_tags(), ["takeoff"], "entry events default on; blank IDs skipped; 0.5 s left");
     g.update(0.1, &bind);
     assert_eq!(g.active_tags(), ["airborne"], "0.1 s into Jump");
+    g.update(0.1, &bind);
+    assert_eq!(g.active_tags(), ["airborne"], "0.3 s left");
+    g.update(0.1, &bind);
+    assert_eq!(g.active_tags(), ["airborne", "late"], "0.2 s left");
     g.params.set_by_name("b_jump", Value::Bool(false));
     let back = (0..10).position(|_| g.update(0.1, &bind).0[0].pos.x != 50.0);
-    assert_eq!(back, Some(3), "the 0.5 s jump completes, then Grounded resumes");
+    assert_eq!(back, Some(1), "the 0.5 s jump completes, then Grounded resumes");
     assert_eq!(g.active_tags(), ["landing"], "Jump's exit event on the update that leaves it");
 }
 

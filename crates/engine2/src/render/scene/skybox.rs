@@ -57,7 +57,7 @@ fn child_view(parent: view::Ref, p: &view::SceneView, sky: &Skybox, color: textu
         exclude_tags: Vec::new(),
         post_process: false,
         ambient: p.ambient,
-        environment: view::Environment { tone_map: p.environment.tone_map, fog: p.environment.skybox_fog.clone(), skybox_fog: None },
+        environment: view::Environment { tone_map: p.environment.tone_map, fog: p.environment.skybox_fog.clone(), skybox_fog: None, view_fog: p.environment.view_fog.clone() },
         unique_id: field!(get i32, v::GET_M_VIEW_UNIQUE_ID, parent.addr()),
         managed_camera_id: field!(get i32, v::GET_M_MANAGED_CAMERA_ID, parent.addr()),
     };
