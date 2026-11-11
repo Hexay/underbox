@@ -23,7 +23,7 @@ fn parse(ps: &str) -> VfxShader {
 }
 
 fn applied(ps: &str, statics: u64, dynamics: u64, reverse_z: bool) -> RasterState {
-    of(&parse(ps), &Variant::new(statics, dynamics)).apply(RasterState::default(), reverse_z)
+    of(&parse(ps), &|_| Variant::new(statics, dynamics)).apply(RasterState::default(), reverse_z)
 }
 
 #[test]

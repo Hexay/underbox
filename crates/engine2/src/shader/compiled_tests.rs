@@ -257,7 +257,7 @@ fn a_source_that_fails_to_compile_draws_with_its_shipped_file() {
 
     let resource = format!("shaders/{name}.shader");
     assert!(find(&resource).is_some(), "the broken source still parses");
-    assert!(crate::render::shading::program(gpu, &resource).is_some(), "built from the shipped file's HLSL");
+    assert!(crate::render::shading::program(gpu, &resource, &[]).is_some(), "built from the shipped file's HLSL");
     crate::fs::remove_search_path("GAME", &root);
     std::fs::remove_dir_all(&root).unwrap();
 }

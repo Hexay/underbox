@@ -14,11 +14,11 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Overrides(HashMap<String, Value>);
 
-/// Every stage's declarations whose guard holds at `v`, later ones winning.
-pub fn of(shader: &VfxShader, v: &Variant) -> Overrides {
+/// Every stage's declarations whose guard holds at its variant, later ones winning.
+pub fn of(shader: &VfxShader, variant: &dyn Fn(&shaders::Program) -> Variant) -> Overrides {
     let mut out = HashMap::new();
     for p in &shader.programs {
-        let defines: HashMap<String, i64> = shaders::compiler::defines(shader, p, v).into_iter().filter_map(|(k, v)| Some((k, v.parse().ok()?))).collect();
+        let defines: HashMap<String, i64> = shaders::compiler::defines(shader, p, &variant(p)).into_iter().filter_map(|(k, v)| Some((k, v.parse().ok()?))).collect();
         let lookup = |n: &str| defines.get(n).copied();
         for (i, (name, value)) in p.decls.render_states.iter().enumerate() {
             let guard = p.decls.render_state_guards.get(i).map_or("", String::as_str);

@@ -41,7 +41,7 @@ pub struct ContextBindings {
 /// mesh's vertex inputs don't work out.
 pub fn resolve(material: Arc<Material>, layout: &Layout, instance: binding::Instance, view_proj: Mat4, context: ContextBindings) -> Option<Shaded> {
     let gpu = device::gpu()?;
-    let (shading, extra) = shading::for_shader(gpu, material.shader())?;
+    let (shading, extra) = shading::for_shader(gpu, material.shader(), &context.attributes)?;
     let Some(inputs) = vertex::inputs(&shading.vertex_inputs, layout) else {
         warn_once(&shading.label, &format!("mesh layout '{}' can't feed its vertex inputs", layout.name));
         return None;

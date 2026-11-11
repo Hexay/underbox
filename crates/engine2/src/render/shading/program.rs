@@ -164,8 +164,15 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
 }
 
 pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, v: &Variant) -> Result<Shading, String> {
-    let vs = stage(compiler, shader, Stage::Vs, v)?;
-    let mut ps = stage(compiler, shader, Stage::Ps, v)?;
+    build_with(gpu, compiler, shader, label, &|_| v.clone())
+}
+
+/// [`build`] with each program at its own variant: stages declare their own combos, so one id
+/// pair decodes differently per stage.
+pub fn build_with(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, variant: &dyn Fn(&shaders::Program) -> Variant) -> Result<Shading, String> {
+    let at = |s: Stage| shader.program_for(s).map_or_else(Variant::default, variant);
+    let vs = stage(compiler, shader, Stage::Vs, &at(Stage::Vs))?;
+    let mut ps = stage(compiler, shader, Stage::Ps, &at(Stage::Ps))?;
     super::stages::separate(&vs, &mut ps)?;
     let bindings = merged(gpu, &[&vs, &ps])?;
     let program = gpu.checked(|| {
@@ -177,7 +184,7 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     blocks.extend(layout::uniform_blocks(&ps.wgsl));
     let mut storage = layout::storage_elements(&vs.wgsl);
     storage.extend(layout::storage_elements(&ps.wgsl));
-    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader, v) })
+    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader, variant) })
 }
 
 /// The batched UI shaders place quads through `g_vViewport < Source( Viewport ) >`; left zero,
