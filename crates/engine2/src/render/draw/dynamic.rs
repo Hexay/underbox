@@ -1,8 +1,10 @@
 //! Draws of objects whose geometry isn't a model: dynamic objects' vertices (scene/dynamic.rs)
 //! and aggregates' fragments (scene/aggregate.rs).
 
-use super::Draw;
 use super::model::{self as model_draw, matrix, tint};
+use super::{Draw, gizmo};
+use crate::render::material;
+use crate::render::shading::standin;
 use crate::mesh::material_ref::MaterialRef;
 use crate::mesh::render_mesh::DrawCall;
 use crate::scene::{aggregate, dynamic, object};
@@ -10,9 +12,12 @@ use glam::Mat4;
 use render::RasterState;
 use render::pass::DrawUniforms;
 
-/// A dynamic object's one draw: all its vertices as its primitive type, in its material.
+/// A dynamic object's one draw: all its vertices as its primitive type, in its material; a gizmo
+/// material's lines and points as the quads its geometry shader would emit (gizmo.rs).
 pub fn dynamic(r: object::Ref, s: &object::State, view_proj: Mat4) -> Option<Draw> {
-    let (mesh, prim) = dynamic::mesh(r)?;
+    let gizmo = material::resolve(dynamic::material(r)).and_then(|m| standin::mapped(m.shader())).filter(|k| k.replaces_source());
+    let expand = |prim, vertices: &[_]| gizmo.and_then(|k| gizmo::expand(k, prim, vertices));
+    let (mesh, prim) = dynamic::mesh(r, gizmo.map_or(0, |k| k as u32 + 1), &expand)?;
     let world = matrix(&s.transform);
     let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) };
     let n = mesh.state().index_range.1;

@@ -3,7 +3,7 @@
 //! its `Material` field (render/draw/dynamic.rs).
 
 use super::object::{self, SceneObject};
-use crate::mesh::render_mesh::RenderMesh;
+use crate::mesh::render_mesh::{RenderMesh, TRIANGLES};
 use crate::mesh::vertex::Vertex;
 use abi::slots::c_dynamic_scene_object as dynamic;
 use abi::{NativeRef, RawPtr, Registry, bind, class};
@@ -17,8 +17,8 @@ type Ref = NativeRef<class::CDynamicSceneObject>;
 struct Dynamic {
     prim: i64,
     vertices: Vec<Vertex>,
-    /// Built on first draw after a change.
-    mesh: Option<Arc<RenderMesh>>,
+    /// Built on first draw after a change: the expand key, the mesh and its primitive type.
+    mesh: Option<(u32, Arc<RenderMesh>, i64)>,
 }
 
 struct Entry {
@@ -46,16 +46,34 @@ fn edit(r: Ref, f: impl FnOnce(&mut Dynamic)) {
     d.mesh = None;
 }
 
-/// Object `r`'s vertices as a mesh, with its managed primitive type; `None` when it has none.
-pub fn mesh(r: object::Ref) -> Option<(Arc<RenderMesh>, i64)> {
+/// Whether `r` is a dynamic object with vertices to draw.
+pub fn has_vertices(r: object::Ref) -> bool {
+    TABLE.lock().unwrap().as_ref().and_then(|t| t.get(&r.addr())).is_some_and(|e| !e.data.vertices.is_empty())
+}
+
+/// Turns an object's primitives into the triangles its material draws (render/draw/gizmo.rs);
+/// `None` keeps them as submitted.
+pub type Expand<'a> = &'a dyn Fn(i64, &[Vertex]) -> Option<(Vec<Vertex>, Vec<u32>)>;
+
+/// Object `r`'s vertices as a mesh and the primitive type it draws as; `None` when it has none.
+/// The mesh is cached until the vertices change or a different `expand_key` asks for it.
+pub fn mesh(r: object::Ref, expand_key: u32, expand: Expand) -> Option<(Arc<RenderMesh>, i64)> {
     let mut table = TABLE.lock().unwrap();
     let d = &mut table.as_mut()?.get_mut(&r.addr())?.data;
     if d.vertices.is_empty() {
         return None;
     }
-    let n = d.vertices.len() as u32;
-    let mesh = d.mesh.get_or_insert_with(|| RenderMesh::from_vertices("dynamic", &d.vertices, &(0..n).collect::<Vec<_>>()));
-    Some((mesh.clone(), d.prim))
+    if let Some((key, mesh, prim)) = &d.mesh
+        && *key == expand_key
+    {
+        return Some((mesh.clone(), *prim));
+    }
+    let (mesh, prim) = match expand(d.prim, &d.vertices) {
+        Some((vertices, indices)) => (RenderMesh::from_vertices("dynamic", &vertices, &indices), i64::from(TRIANGLES)),
+        None => (RenderMesh::from_vertices("dynamic", &d.vertices, &(0..d.vertices.len() as u32).collect::<Vec<_>>()), d.prim),
+    };
+    d.mesh = Some((expand_key, mesh.clone(), prim));
+    Some((mesh, prim))
 }
 
 /// The object's `Material` field.

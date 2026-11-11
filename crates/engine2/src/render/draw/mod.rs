@@ -8,6 +8,7 @@ pub mod dynamic;
 pub mod gpu_mesh;
 pub mod immediate;
 pub mod model;
+pub mod gizmo;
 pub mod morph;
 pub mod screen_rect;
 pub mod shaded;

@@ -30,7 +30,7 @@ fn every_standin_builds() {
         return;
     };
     let compiler = shaders::Compiler::new().unwrap();
-    for path in [standin::PATH, standin::SKY_PATH, standin::GIZMO_PATH] {
+    for path in standin::ALL_PATHS {
         let shader = standin::shader(path, &shaders::IncludePaths::new([core.clone()])).unwrap().unwrap();
         program::build(gpu, &compiler, &shader, path, &shaders::Variant::default()).unwrap_or_else(|e| panic!("{path}: {e}"));
     }

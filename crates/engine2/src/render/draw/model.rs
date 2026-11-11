@@ -72,7 +72,7 @@ pub struct Deform {
 impl Deform {
     /// Locks the object's state: call it before taking that lock.
     pub fn of(r: crate::scene::object::Ref) -> Deform {
-        let dynamic = crate::scene::dynamic::mesh(r).map(|_| r);
+        let dynamic = crate::scene::dynamic::has_vertices(r).then_some(r);
         Deform { key: r.addr(), morphs: morph::of(r), pose: skin::native::pose(r), fragments: crate::scene::aggregate::fragments(r), dynamic }
     }
 

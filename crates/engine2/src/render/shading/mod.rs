@@ -16,6 +16,8 @@ pub mod view;
 #[cfg(test)]
 mod coverage;
 #[cfg(test)]
+mod gizmo_tests;
+#[cfg(test)]
 mod sky_tests;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -39,7 +41,7 @@ pub type Extra = Vec<(&'static str, f32)>;
 /// shader nor a stand-in builds.
 pub fn for_shader(gpu: &render::Gpu, shader_path: &str) -> Option<(Arc<Shading>, Extra)> {
     if let Some(kind) = standin::mapped(shader_path)
-        && (kind == standin::Kind::Gizmo || crate::shader::find(shader_path).is_none())
+        && (kind.replaces_source() || crate::shader::find(shader_path).is_none())
     {
         return Some((program(gpu, kind.path())?, kind.values()));
     }

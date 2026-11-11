@@ -32,10 +32,11 @@ fn shader_of(vmat: &Path) -> Option<String> {
 fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &str) -> String {
     let includes = shaders::IncludePaths::new([core.to_path_buf()]);
     let file = core.join("shaders").join(format!("{stem}.shader"));
-    let (shader, kind) = if file.is_file() {
-        (shaders::VfxShader::parse_file(&file, &includes), "program")
-    } else if let Some(kind) = standin::mapped(stem) {
+    let standin = standin::mapped(stem).filter(|k| k.replaces_source() || !file.is_file());
+    let (shader, kind) = if let Some(kind) = standin {
         (standin::shader(kind.path(), &includes).expect("a stand-in key"), "stand-in")
+    } else if file.is_file() {
+        (shaders::VfxShader::parse_file(&file, &includes), "program")
     } else {
         return "placeholder: no source, not mapped".into();
     };
