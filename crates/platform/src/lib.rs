@@ -2,20 +2,31 @@
 //! The engine core talks only to [`Platform`]; native's Steam slots are a view over it.
 
 mod client;
+mod events;
+mod inventory;
+mod lobby;
 mod offline;
 mod offline_client;
+mod servers;
 #[cfg(feature = "steam")]
 mod steam;
 #[cfg(feature = "steam")]
 mod steam_client;
 mod steam_id;
+pub mod workshop;
+mod workshop_query;
 
 pub use client::{Apps, Client, CloudStorage, Friends, TextFilter, Ticket};
+pub use events::{Event, InventoryEvent, LobbyEvent};
+pub use inventory::{Inventory, ItemInstance, PENDING, ResultHandle};
+pub use lobby::{Lobbies, NetUtils, PeerMessages, RealTimeStatus, SessionState};
 pub use offline::Offline;
 pub use offline_client::OfflineClient;
+pub use servers::{ServerBrowser, ServerListEvent, ServerQuery};
 #[cfg(feature = "steam")]
 pub use steam::Steam;
 pub use steam_id::SteamId;
+pub use workshop::Workshop;
 
 use std::sync::{Arc, OnceLock};
 
@@ -66,16 +77,6 @@ pub enum AuthResponse {
 /// Steam's `EResult` as a raw code (1 is OK).
 pub type SteamResult = i32;
 
-/// Something the platform reports back asynchronously, drained by [`Platform::poll`].
-#[derive(Debug, Clone, PartialEq)]
-pub enum Event {
-    ServerConnected,
-    ServerConnectFailure { result: SteamResult, retrying: bool },
-    ServersDisconnected { result: SteamResult },
-    /// The verdict on a [`Platform::begin_auth`] ticket.
-    AuthResult { user: SteamId, owner: SteamId, response: AuthResponse },
-}
-
 pub trait Platform: Send + Sync {
     fn name(&self) -> &'static str;
 
@@ -94,8 +95,28 @@ pub trait Platform: Send + Sync {
     /// Start validating a connecting user's auth ticket; the verdict arrives as an [`Event`].
     fn begin_auth(&self, user: SteamId, ticket: &[u8]) -> BeginAuth;
     fn end_auth(&self, user: SteamId);
+    /// The game server's own ticket, for server-to-server auth; empty when it has no identity.
+    fn server_ticket(&self, _target: SteamId) -> Ticket {
+        Ticket::default()
+    }
+    fn cancel_server_ticket(&self, _handle: u32) {}
 
-    fn poll(&self) -> Vec<Event>;
+    /// The game server's events, then any backend-native callbacks verbatim, as [`Client::run_callbacks`].
+    fn run_callbacks(&self, event: &mut dyn FnMut(Event), raw: &mut dyn FnMut(i32, &[u8]));
+
+    /// The game server's workshop (its items download through it) and inventory checks.
+    fn server_workshop(&self) -> Option<&dyn Workshop> {
+        None
+    }
+    fn server_inventory(&self) -> Option<&dyn Inventory> {
+        None
+    }
+
+    /// Start the local user's services now, for `app_id` (0: the backend's own default). A game client
+    /// calls this at engine pre-init, before managed's own steam_api calls need the client up.
+    fn start_client(&self, _app_id: u32) {
+        self.client();
+    }
 
     /// The local user's services, started on first call. Only a game client asks; a dedicated
     /// server never does, so it never claims a user identity.
@@ -125,6 +146,13 @@ pub fn select(name: Option<&str>) -> Arc<dyn Platform> {
             Arc::new(Offline::default())
         }
     }
+}
+
+/// Drain `run_callbacks` into a list (tests, and callers with nothing raw to handle).
+pub fn events(run: impl FnOnce(&mut dyn FnMut(Event), &mut dyn FnMut(i32, &[u8]))) -> Vec<Event> {
+    let mut out = vec![];
+    run(&mut |e| out.push(e), &mut |_, _| {});
+    out
 }
 
 #[cfg(test)]

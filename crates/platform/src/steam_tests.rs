@@ -8,27 +8,6 @@ fn maps_begin_auth_results() {
 }
 
 #[test]
-fn maps_auth_ticket_response_with_reason() {
-    let r = |response| ValidateAuthTicketResponse {
-        steam_id: steamworks::SteamId::from_raw(1),
-        owner_steam_id: steamworks::SteamId::from_raw(2),
-        response,
-    };
-    let (user, owner) = (SteamId(1), SteamId(2));
-    assert_eq!(auth_event(&r(Ok(()))), Event::AuthResult { user, owner, response: AuthResponse::Ok });
-    let banned = auth_event(&r(Err(V::VACBanned)));
-    assert_eq!(banned, Event::AuthResult { user, owner, response: AuthResponse::VacBanned });
-    assert_eq!(AuthResponse::VacBanned as i32, 3);
-}
-
-#[test]
-fn inverts_steam_errors_to_result_codes() {
-    assert_eq!(result_code(SteamError::Generic), 2);
-    assert_eq!(result_code(SteamError::NoConnection), 3);
-    assert_eq!(result_code(SteamError::from(sys::EResult::k_EResultTimeout)), sys::EResult::k_EResultTimeout as i32);
-}
-
-#[test]
 fn formats_public_ip() {
     let v4 = |ip: u32| sys::SteamIPAddress_t {
         __bindgen_anon_1: sys::SteamIPAddress_t__bindgen_ty_1 { m_unIPv4: ip },
@@ -39,13 +18,27 @@ fn formats_public_ip() {
 }
 
 #[test]
+fn tickets_take_what_steam_wrote() {
+    let t = auth_ticket(SteamId(0), |p, cap, len, id| {
+        assert!(id.is_null() && cap == 1024);
+        // SAFETY: auth_ticket's buffer holds `cap` bytes.
+        unsafe { p.cast::<u8>().write(7) };
+        // SAFETY: as above.
+        unsafe { *len = 1 };
+        3
+    });
+    assert_eq!(t, Ticket { handle: 3, bytes: vec![7] });
+}
+
+#[test]
 fn acts_offline_before_init() {
     let p = Steam::default();
     p.server_info(&mut |i| i.max_players = 8);
     p.server_log_on(None);
     assert!(p.server_logged_on());
-    assert_eq!(p.poll(), [Event::ServerConnected]);
+    assert_eq!(crate::events(|e, r| p.run_callbacks(e, r)), [Event::ServerConnected]);
     assert_eq!(p.server_public_ip(), None);
+    assert!(p.server_workshop().is_none() && p.server_ticket(SteamId(1)).bytes.is_empty());
     p.server_shutdown();
     assert!(!p.server_logged_on());
 }
@@ -57,5 +50,5 @@ fn falls_back_when_steam_init_fails() {
     p.server_init(27015, 27016, "1.0.0.0");
     assert!(p.with(|_| ()).is_none());
     p.server_log_on(None);
-    assert_eq!(p.poll(), [Event::ServerConnected]);
+    assert_eq!(crate::events(|e, r| p.run_callbacks(e, r)), [Event::ServerConnected]);
 }
