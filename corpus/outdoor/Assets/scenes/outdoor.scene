@@ -1,0 +1,164 @@
+{
+  "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e10",
+  "GameObjects": [
+    {
+      "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e11",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e12",
+          "FogMode": "Enabled",
+          "FogStrength": 1,
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": true,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e13",
+      "Flags": 0,
+      "Name": "Ground",
+      "Scale": "30,30,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e14",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.4,0.5,0.3,1"
+        }
+      ]
+    },
+    {
+      "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e15",
+      "Flags": 0,
+      "Name": "Near Box",
+      "Position": "0,-40,25",
+      "Rotation": "0,0,0.2588,0.9659",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e16",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.9,0.15,0.1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e17",
+      "Flags": 0,
+      "Name": "Far Box",
+      "Position": "900,250,75",
+      "Scale": "3,3,3",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e18",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "1,1,1,1"
+        }
+      ]
+    },
+    {
+      "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e19",
+      "Flags": 0,
+      "Name": "Skybox",
+      "Scale": "16,16,16",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.Skybox3D",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e1a",
+          "SkyboxScene": "scenes/outdoor_sky.scene"
+        }
+      ]
+    },
+    {
+      "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e1b",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,110",
+      "Rotation": "0,0.0872,0,0.9962",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e1c",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        },
+        {
+          "__type": "Sandbox.Tonemapping",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e1d",
+          "__version": 3,
+          "Mode": "ACES",
+          "ExposureMethod": "RGB",
+          "AutoExposureEnabled": true,
+          "ExposureCompensation": 0.5,
+          "MinimumExposure": 1,
+          "MaximumExposure": 3,
+          "Rate": 1
+        },
+        {
+          "__type": "Sandbox.Fog",
+          "__guid": "1e7c4a10-5b2d-4c8e-9f31-0a6b7c8d9e1e",
+          "FogEnabled": true,
+          "DistanceEnabled": true,
+          "Mode": "Distance",
+          "DistanceRange": "150,2500",
+          "FalloffExponent": 1,
+          "MaximumOpacity": 0.6,
+          "HeightEnabled": true,
+          "HeightOffset": 0,
+          "HeightGradientLength": 60,
+          "HeightExponent": 1,
+          "HeightColorSource": "Constant",
+          "HeightColor": "0.85,0.85,0.9,0.35",
+          "ColorSource": "Constant",
+          "Color": "0.62,0.7,0.8,1",
+          "SunLightingEnabled": false
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}
