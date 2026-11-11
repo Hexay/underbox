@@ -84,6 +84,11 @@ pub fn physical(index: i32) -> Option<Physical> {
     SURFACES.read().unwrap().get(usize::try_from(index).ok()?).map(|e| e.physical)
 }
 
+/// The index of the surface whose name hashes (StringToken) to `hash`, as compiled physics names them.
+pub fn by_hash(hash: u32) -> Option<i32> {
+    SURFACES.read().unwrap().iter().position(|e| StringToken::of(&e.name).0 == hash).map(|i| i as i32)
+}
+
 /// The object for surface `index`, null for none.
 pub fn object(index: i32) -> Props {
     usize::try_from(index).ok().and_then(|i| SURFACES.read().unwrap().get(i).map(|e| e.object)).unwrap_or(NativeRef::NULL)

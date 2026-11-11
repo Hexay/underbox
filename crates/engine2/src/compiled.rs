@@ -1,4 +1,10 @@
-//! Reading compiled resource files for managed (`EngineGlue.ReadCompiledResourceFile*`).
+//! Reading compiled resource files for managed (`EngineGlue.ReadCompiledResourceFile*`), and the
+//! compiled texture and material loaders the render path can call ([`texture`], [`material`]).
+
+pub mod material;
+#[cfg(test)]
+mod tests;
+pub mod texture;
 
 use abi::slots::engine_glue as glue;
 use abi::{RawPtr, Registry, StrRet, bind};

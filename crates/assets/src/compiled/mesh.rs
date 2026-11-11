@@ -1,0 +1,144 @@
+//! A compiled mesh (`CRenderMesh` data: a `.vmesh_c` DATA or a model's MDAT block) with its
+//! buffers, flattened to one vertex list and one index list. Draw calls keep their material and
+//! index range; base vertices and multi-stream bindings are resolved here.
+
+use super::kv::{self, float_or, floats, int, int_value, list, obj, objects, resource, vec3};
+use super::vbib::{self, Attribute, Buffer, Buffers};
+use super::vertex::{self, Vertex, dxgi};
+use super::{Error, format};
+use ::kv::{Object, Value};
+use std::collections::HashMap;
+
+/// `RENDER_PRIM_TRIANGLES`.
+pub const TRIANGLES: i32 = 5;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DrawCall {
+    /// Material resource path (`materials/x.vmat`).
+    pub material: String,
+    pub primitive: i32,
+    /// Range in [`Mesh::indices`].
+    pub start_index: u32,
+    pub index_count: u32,
+    pub tint: [f32; 4],
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Mesh {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
+    pub draws: Vec<DrawCall>,
+    pub bounds: Option<([f32; 3], [f32; 3])>,
+}
+
+fn handle(o: &Object) -> i64 {
+    int(o, "m_hBuffer")
+}
+
+/// The mesh in `data` (its `m_sceneObjects`), drawing from `buffers`.
+pub fn build(data: &Object, buffers: &Buffers) -> Result<Mesh, Error> {
+    let mut mesh = Mesh::default();
+    // Vertex buffer sets already flattened, and where they start in `mesh.vertices`.
+    let mut placed: HashMap<Vec<i64>, u32> = HashMap::new();
+    for so in objects(data, "m_sceneObjects") {
+        let (lo, hi) = (vec3(so, "m_vMinBounds"), vec3(so, "m_vMaxBounds"));
+        mesh.bounds = Some(mesh.bounds.map_or((lo, hi), |(a, b)| (std::array::from_fn(|i| a[i].min(lo[i])), std::array::from_fn(|i| b[i].max(hi[i])))));
+        for dc in objects(so, "m_drawCalls") {
+            let streams: Vec<i64> = objects(dc, "m_vertexBuffers").map(handle).collect();
+            let base_set = match placed.get(&streams) {
+                Some(&b) => b,
+                None => {
+                    let bound = streams.iter().map(|&h| buffers.vertex.get(h as usize)).collect::<Option<Vec<&Buffer>>>().ok_or_else(|| format("draw call names a missing vertex buffer"))?;
+                    let b = mesh.vertices.len() as u32;
+                    mesh.vertices.extend(vertex::decode(&bound));
+                    placed.insert(streams, b);
+                    b
+                }
+            };
+            let base = base_set + int(dc, "m_nBaseVertex") as u32;
+            let (start, count) = (int(dc, "m_nStartIndex") as usize, int(dc, "m_nIndexCount") as usize);
+            let indices: Vec<u32> = match buffers.index.get(handle(kv::object(dc, "m_indexBuffer")) as usize) {
+                Some(ib) if count > 0 => vbib::indices_of(ib).get(start..start + count).ok_or_else(|| format("draw call indices out of range"))?.iter().map(|i| i + base).collect(),
+                _ => (0..int(dc, "m_nVertexCount") as u32).map(|i| i + base).collect(),
+            };
+            let material = dc.get("m_material").or_else(|| dc.get("m_pMaterial")).and_then(Value::as_str).unwrap_or_default().to_owned();
+            let [r, g, b] = dc.get("m_vTintColor").map_or([1.0; 3], |v| kv::floats_of(Some(v)));
+            let start_index = mesh.indices.len() as u32;
+            mesh.indices.extend(&indices);
+            let primitive = int(dc, "m_nPrimitiveType") as i32;
+            mesh.draws.push(DrawCall { material, primitive, start_index, index_count: indices.len() as u32, tint: [r, g, b, float_or(dc, "m_flAlpha", 1.0)] });
+        }
+    }
+    Ok(mesh)
+}
+
+/// The layout [`write_buffers`] stores vertices in: floats except unorm colour and byte bone
+/// indices, nothing compressed, so meshes round-trip exactly.
+fn layout() -> Vec<Attribute> {
+    let field = |semantic: &str, index, format, offset| Attribute { semantic: semantic.into(), index, format, offset, slot: 0 };
+    vec![
+        field("POSITION", 0, dxgi::R32G32B32_FLOAT, 0),
+        field("NORMAL", 0, dxgi::R32G32B32_FLOAT, 12),
+        field("TANGENT", 0, dxgi::R32G32B32A32_FLOAT, 24),
+        field("TEXCOORD", 0, dxgi::R32G32_FLOAT, 40),
+        field("TEXCOORD", 1, dxgi::R32G32_FLOAT, 48),
+        field("COLOR", 0, dxgi::R8G8B8A8_UNORM, 56),
+        field("BLENDINDICES", 0, dxgi::R8G8B8A8_UINT, 60),
+        field("BLENDWEIGHT", 0, dxgi::R32G32B32A32_FLOAT, 64),
+    ]
+}
+
+const STRIDE: usize = 80;
+
+/// One vertex buffer and one 32-bit index buffer holding `mesh`.
+pub fn write_buffers(mesh: &Mesh) -> Buffers {
+    let mut data = Vec::with_capacity(mesh.vertices.len() * STRIDE);
+    for v in &mesh.vertices {
+        let floats = v.position.iter().chain(&v.normal).chain(&v.tangent).chain(v.uv.iter().flatten());
+        floats.for_each(|f| data.extend(f.to_le_bytes()));
+        data.extend(v.color);
+        data.extend(v.bones);
+        v.weights.iter().for_each(|f| data.extend(f.to_le_bytes()));
+    }
+    let vb = Buffer { count: mesh.vertices.len(), stride: STRIDE, attributes: layout(), data };
+    let ib = Buffer { count: mesh.indices.len(), stride: 4, attributes: Vec::new(), data: mesh.indices.iter().flat_map(|i| i.to_le_bytes()).collect() };
+    Buffers { vertex: vec![vb], index: vec![ib] }
+}
+
+/// The DATA object for `mesh` over [`write_buffers`]: one scene object, a draw call per draw.
+pub fn write_data(mesh: &Mesh) -> Value {
+    let (lo, hi) = mesh.bounds.unwrap_or_default();
+    let draw = |d: &DrawCall| {
+        obj(vec![
+            ("m_nPrimitiveType", int_value(d.primitive)),
+            ("m_nBaseVertex", int_value(0)),
+            ("m_nVertexCount", int_value(mesh.vertices.len() as i64)),
+            ("m_nStartIndex", int_value(d.start_index)),
+            ("m_nIndexCount", int_value(d.index_count)),
+            ("m_material", resource(&d.material)),
+            ("m_vTintColor", floats(&d.tint[..3])),
+            ("m_flAlpha", Value::Double(d.tint[3].into())),
+            ("m_vertexBuffers", list([obj(vec![("m_hBuffer", int_value(0)), ("m_nBindOffsetBytes", int_value(0))])])),
+            ("m_indexBuffer", obj(vec![("m_hBuffer", int_value(0)), ("m_nBindOffsetBytes", int_value(0))])),
+        ])
+    };
+    let scene_object = obj(vec![("m_vMinBounds", floats(&lo)), ("m_vMaxBounds", floats(&hi)), ("m_drawCalls", list(mesh.draws.iter().map(draw)))]);
+    obj(vec![("m_sceneObjects", list([scene_object])), ("m_name", Value::String(String::new()))])
+}
+
+/// A standalone `.vmesh_c`: DATA and a VBIB block.
+pub fn write(mesh: &Mesh, packing: vbib::Packing) -> Vec<u8> {
+    let refs: Vec<&str> = mesh.draws.iter().map(|d| d.material.as_str()).collect();
+    super::write(0, &refs, vec![(*b"DATA", super::kv3(&write_data(mesh))), (*b"VBIB", vbib::write(&write_buffers(mesh), packing))])
+}
+
+/// A standalone `.vmesh_c`: buffers from its VBIB block, else KV3 buffers in DATA.
+pub fn read(file: &[u8]) -> Result<Mesh, Error> {
+    let data = super::kv3_block(file, b"DATA", "DATA")?;
+    let data = data.as_object().ok_or_else(|| format("mesh DATA isn't an object"))?;
+    let buffers = match crate::container::block(file, b"VBIB")? {
+        Some(b) => vbib::read(b)?,
+        None => vbib::from_kv3(data, file)?,
+    };
+    build(data, &buffers)
+}

@@ -2,15 +2,17 @@
 //! builds it from, and the views managed reads it through. Aggregates that simulate it live in
 //! `crate::physics::aggregate`.
 
+pub mod compiled;
 pub mod data;
 pub mod data_slots;
 pub mod desc;
 pub mod hull;
 mod joint_fields;
-mod part_slots;
+pub(crate) mod part_slots;
 pub(crate) mod views;
 
 pub fn register(r: &mut abi::Registry) {
+    compiled::register(r);
     data_slots::register(r);
     desc::register(r);
     joint_fields::register(r);

@@ -56,8 +56,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, w::CREATE_AGGREGATE_INSTANCE_1, |world, m, start, _, motion| {
         model::get(m).and_then(|m| m.content.physics.clone()).map_or(HandleId::new(-1), |d| aggregate::create(world, d, start, motion))
     });
-    // TODO: named `.vphys` resources (map world physics) need a compiled physics loader.
-    bind!(r, w::CREATE_AGGREGATE_INSTANCE, |_, _, _, _, _| HandleId::new(-1));
+    bind!(r, w::CREATE_AGGREGATE_INSTANCE, |world, name: Option<&CStr>, start, _, motion| {
+        name.and_then(|n| model::physics::compiled::load(&n.to_string_lossy())).map_or(HandleId::new(-1), |d| aggregate::create(world, d, start, motion))
+    });
     bind!(r, w::DESTROY_AGGREGATE_INSTANCE, |_, g| aggregate::destroy(g));
     bind!(r, pb::GET_AGGREGATE, |b| aggregate::of_body(b).and_then(get).map_or(HandleId::new(-1), |g| g.handle.id()));
 

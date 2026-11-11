@@ -25,11 +25,11 @@ fn capsule_of(s: &ShapeView) -> Option<&CapsuleDesc> {
     (s.kind == Kind::Capsule).then(|| s.part.shapes.capsules.get(s.index)).flatten()
 }
 
-fn hull_of<R: Default>(p: *mut std::ffi::c_void, f: impl FnOnce(&Hull) -> R) -> R {
+pub(crate) fn hull_of<R: Default>(p: *mut std::ffi::c_void, f: impl FnOnce(&Hull) -> R) -> R {
     shape(p, |s| (s.kind == Kind::Hull).then(|| s.part.shapes.hulls.get(s.index).map(|x| f(&x.hull))).flatten().unwrap_or_default())
 }
 
-fn mesh_of<R: Default>(p: *mut std::ffi::c_void, f: impl FnOnce(&MeshDesc) -> R) -> R {
+pub(crate) fn mesh_of<R: Default>(p: *mut std::ffi::c_void, f: impl FnOnce(&MeshDesc) -> R) -> R {
     shape(p, |s| (s.kind == Kind::Mesh).then(|| s.part.shapes.meshes.get(s.index).map(f)).flatten().unwrap_or_default())
 }
 
