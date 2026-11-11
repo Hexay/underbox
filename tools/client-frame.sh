@@ -11,6 +11,7 @@
 # golden-managed.tsv, frame in target/client-frame-managed.
 # Shadow quality is pinned to High (SHADOW_QUALITY, like managed's benchmark rung): this machine
 # would detect Low. UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
+# An adapter may list several hashes: fog's temporal volume settles on one of two frames 1 LSB apart.
 # Don't wrap this in flock: boot-client.sh runs in this worktree's own game dir (docs/dev-loop.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -38,7 +39,7 @@ if [ "${UNDERBOX_BLESS:-}" = 1 ]; then
     echo "RESULT: BLESSED"
 elif [ -z "$WANT" ]; then
     echo "RESULT: SKIP (no golden hash for $ADAPTER; UNDERBOX_BLESS=1 records it)"
-elif [ "$WANT" = "$HASH" ]; then
+elif printf '%s\n' "$WANT" | grep -qxF "$HASH"; then
     echo "RESULT: PASS"
 else
     echo "want $WANT"; echo "RESULT: FAIL (frame hash changed; look at $OUT/frame.png, bless if intended)"; exit 1
