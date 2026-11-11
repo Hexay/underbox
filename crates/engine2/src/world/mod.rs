@@ -4,6 +4,7 @@
 //! reads the map's visibility (see [`pvs`]).
 
 mod entity;
+mod placement;
 pub mod pvs;
 pub mod reference;
 #[cfg(test)]

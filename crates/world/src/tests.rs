@@ -65,5 +65,16 @@ fn aggregates_draw_in_world_space_and_zero_alpha_tints_are_white() {
     assert_eq!(n.objects[0].transform, node::IDENTITY);
     let agg = &n.objects[1];
     assert!(agg.aggregate && agg.model == "world.vmdl" && agg.layer == 2 && agg.flags == 4);
+    assert!(agg.fragments.is_empty() && n.objects[0].lod_override == -1, "no meshes: drawn whole; no override: auto");
     assert_eq!(n.skipped, 1);
+}
+
+#[test]
+fn aggregate_fragments_take_transforms_in_order_and_lod_overrides_read() {
+    let n = node::parse(&fixture::aggregate_node("crate.vmdl")).unwrap();
+    assert_eq!(n.objects[0].lod_override, 1);
+    let f = &n.objects[1].fragments;
+    let moved = [[1.0, 0.0, 0.0, 100.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
+    assert_eq!(f.iter().map(|f| (f.draw_call, f.transform)).collect::<Vec<_>>(), [(0, Some(moved)), (1, None)]);
+    assert!((f[0].tint[1] - 128.0 / 255.0).abs() < 1e-6 && f[0].tint[2] == 0.0 && f[1].tint == [1.0; 3], "tints are 0..255");
 }

@@ -84,6 +84,36 @@ fn node(objects: &[(&str, Matrix, [f32; 4])]) -> Value {
     ])
 }
 
+/// A node with an aggregate of `model`'s two draw calls (the first moved +100 x and tinted
+/// orange, the second in place) and one `model` placement forced to LOD 1.
+pub fn aggregate_node(model: &str) -> Value {
+    let resource = || Value::Flagged("resource".into(), Box::new(Value::String(model.into())));
+    let moved: Matrix = [[1.0, 0.0, 0.0, 100.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
+    let mesh = |draw: i64, moved: bool, tint: [f32; 3]| {
+        obj(vec![("m_nDrawCallIndex", Value::Int(draw)), ("m_bHasTransform", Value::Bool(moved)), ("m_vTintColor", floats(&tint)), ("m_objectFlags", Value::Int(0)), ("m_nLODGroupMask", Value::Int(0))])
+    };
+    let aggregate = obj(vec![
+        ("m_renderableModel", resource()),
+        ("m_aggregateMeshes", Value::Array(vec![mesh(0, true, [255.0, 128.0, 0.0]), mesh(1, false, [255.0; 3])])),
+        ("m_fragmentTransforms", Value::Array(vec![Value::Array(moved.iter().map(|r| floats(r)).collect())])),
+    ]);
+    let forced = obj(vec![("m_renderableModel", resource()), ("m_vTransform", Value::Array(crate::node::IDENTITY.iter().map(|r| floats(r)).collect())), ("m_nLODOverride", Value::Int(1))]);
+    obj(vec![("m_sceneObjects", Value::Array(vec![forced])), ("m_aggregateSceneObjects", Value::Array(vec![aggregate]))])
+}
+
+/// `maps/<name>`: one [`aggregate_node`] over the compiled fixture crate (two draw calls).
+pub fn aggregate_map(name: &str) -> Builder {
+    let dir = format!("maps/{name}");
+    let world = obj(vec![("m_worldNodes", Value::Array(vec![obj(vec![("m_worldNodePrefix", Value::String(format!("{dir}/worldnodes/node000")))])])), ("m_entityLumps", Value::Array(vec![]))]);
+    let mut b = Builder::new();
+    b.add(&format!("{dir}/world.vwrld_c"), crate::resource::write(&world, Compression::None))
+        .add(&format!("{dir}/worldnodes/node000.vwnod_c"), crate::resource::write(&aggregate_node(assets::compiled::fixture::MODEL), Compression::None));
+    for (path, bytes) in assets::compiled::fixture::crate_files() {
+        b.add(&path, bytes);
+    }
+    b
+}
+
 /// The legacy entity blob: version, counts, then (hash, type, value); strings are type 0x1E,
 /// vectors 0x03.
 fn blob(token: fn(&str) -> u32, values: &[(&str, &str)]) -> Vec<u8> {
@@ -128,6 +158,9 @@ pub fn visibility() -> crate::vis::Visibility {
     }
 }
 
+/// `world.scene_c`: the map's own scene, whose game objects `MapInstance` spawns under the map.
+pub const SCENE: &str = r#"{"__guid":"3c0a4f1e-5b6d-4e7f-8a9b-0c1d2e3f4a5b","GameObjects":[{"__guid":"4d1b5a2f-6c7e-4f80-9bac-1d2e3f4a5b6c","Flags":0,"Name":"scene_marker","Position":"5,6,7","Enabled":true,"Components":[]}]}"#;
+
 pub fn tiny_map(name: &str, token: fn(&str) -> u32) -> Builder {
     let dir = format!("maps/{name}");
     let ents = format!("{dir}/entities/default_ents");
@@ -163,7 +196,8 @@ pub fn tiny_map(name: &str, token: fn(&str) -> u32) -> Builder {
         .add(&format!("{ents}.vents_c"), crate::resource::write(&lump, Compression::Zstd))
         .add(&format!("{child}.vents_c"), crate::resource::write(&child_lump, Compression::None))
         .add(&format!("{dir}/world_physics.vphys_c"), assets::compiled::physics::write(&world_physics()))
-        .add(&format!("{dir}/world_visibility.vvis_c"), crate::vis::write(&visibility()));
+        .add(&format!("{dir}/world_visibility.vvis_c"), crate::vis::write(&visibility()))
+        .add(&format!("{dir}/world.scene_c"), assets::game_resource::compile(SCENE, &format!("{dir}/world.scene"), 1));
     for (path, bytes) in assets::compiled::fixture::crate_files() {
         b.add(&path, bytes);
     }

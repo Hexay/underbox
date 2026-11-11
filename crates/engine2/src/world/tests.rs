@@ -63,6 +63,8 @@ fn loads_moves_and_releases_a_map() {
     }
     assert_eq!(world.entities("default_ents"), ents, "made once");
     assert!(crate::fs::read("maps/tinyload/world.vwrld_c", "GAME").is_some(), "the pak is mounted");
+    let abi::StrRet::Owned(scene) = crate::compiled::json_from_filesystem("maps/tinyload/world.scene_c") else { panic!("world.scene_c from the pak") };
+    assert_eq!(scene.to_str().unwrap(), world::fixture::SCENE, "MapInstance's map scene, read through the pak");
 
     let mut moved = crate::math::identity();
     moved.position.vec.z = 100.0;
@@ -131,6 +133,34 @@ fn pvs_culls_from_the_map_visibility() {
     objects::destroy(p);
     reference::release(r);
     reference::service();
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// `world::fixture::aggregate_map`: a placement forced to LOD 1, then the aggregate's two
+/// fragments as their own objects, the first moved and tinted.
+#[test]
+fn aggregate_fragments_and_lod_overrides_place() {
+    let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!("underbox_mapworld_agg_{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("maps")).unwrap();
+    std::fs::write(dir.join("maps/aggmap.vpk"), world::fixture::aggregate_map("aggmap").single()).unwrap();
+    crate::fs::add_search_path("GAME", dir.to_str().unwrap(), true);
+    let w = scene();
+    let r = create_world("maps/aggmap.vpk", w, crate::math::identity());
+    assert!(reference::get(r).is_some());
+    let objects = placed(w);
+    let state = |o| object::with(o, |s| (crate::model::name(s.model).unwrap_or_default(), s.transform.position.vec.x, s.tint.vec.y, s.lod));
+    let crate_model = assets::compiled::fixture::MODEL;
+    assert_eq!(objects.iter().map(|&o| state(o)).collect::<Vec<_>>(), [
+        (crate_model.to_string(), 0.0, 1.0, Some(1)),
+        (format!("{crate_model}#draw0"), 100.0, 128.0 / 255.0, None),
+        (format!("{crate_model}#draw1"), 0.0, 1.0, None),
+    ]);
+    let draws = |o| object::with(o, |s| crate::model::get(s.model).map(|m| m.content.meshes.len()));
+    assert_eq!((draws(objects[1]), draws(objects[2])), (Some(1), Some(1)), "one mesh each, one draw call");
+    reference::release(r);
+    reference::service();
+    crate::fs::remove_search_path("GAME", dir.to_str().unwrap());
     std::fs::remove_dir_all(dir).unwrap();
 }
 

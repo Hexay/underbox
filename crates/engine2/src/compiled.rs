@@ -44,9 +44,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, glue::READ_COMPILED_RESOURCE_FILE_BLOCK, block);
     bind!(r, glue::READ_COMPILED_RESOURCE_FILE_JSON_FROM_FILESYSTEM, |name| {
         let name = name.map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        match crate::fs::resolve(&name, "GAME").and_then(|p| std::fs::read(p).ok()) {
-            Some(file) => json(&file),
-            None => StrRet::Null,
-        }
+        json_from_filesystem(&name)
     });
+}
+
+/// A compiled game resource's JSON, from disk or a mounted pak (a map's `world.scene_c`).
+pub fn json_from_filesystem(name: &str) -> StrRet {
+    crate::fs::read(name, "GAME").map_or(StrRet::Null, |file| json(&file))
 }

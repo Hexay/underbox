@@ -26,6 +26,7 @@ check 'ENTITY info_player_start <spawn_a> @ 0(\.0+)?,-100' 'spawn point placed f
 check 'ENTITY light_omni <lamp>' 'light entity'
 check 'ENTITY prop_dynamic <crate>' 'prop entity'
 check 'ENTITY info_target <child_target> @ 10(\.0+)?,20(\.0+)?,30' 'child lump entity (hashed keys)'
+check 'ENTITY scene_marker @ 5(\.0+)?,6(\.0+)?,7' 'world.scene_c game object, read through the pak'
 check 'SPAWNPOINTS 1' 'SpawnPoint component made'
 check 'LIGHTS 1' 'PointLight component made'
 check 'SCENEOBJECT plane @ 0,0,0' 'world node plane'

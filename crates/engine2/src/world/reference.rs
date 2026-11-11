@@ -8,7 +8,7 @@ use crate::handles::Kind;
 use crate::scene::{object, world as scene_world};
 use abi::structs::{BBox, Quaternion, Rotation, Transform, Vector3};
 use abi::{NativeRef, class};
-use glam::{Affine3A, Mat3, Vec3};
+use glam::{Affine3A, Vec3};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,10 +54,6 @@ fn transform(a: Affine3A) -> Transform {
     Transform { position: crate::math::from_v3(p), scale: crate::math::from_v3(s), rotation: Rotation { quat: Quaternion { x: q.x, y: q.y, z: q.z, w: q.w } } }
 }
 
-fn local(m: &world::node::Matrix) -> Affine3A {
-    let col = |j: usize| Vec3::new(m[0][j], m[1][j], m[2][j]);
-    Affine3A::from_mat3_translation(Mat3::from_cols(col(0), col(1), col(2)), col(3))
-}
 
 /// `b` moved by `a`: the box around its eight transformed corners.
 fn moved(a: Affine3A, b: BBox) -> (Vec3, Vec3) {
@@ -87,17 +83,13 @@ pub fn load(name: &str, pak: Option<PathBuf>, scene: scene_world::Ref, root: &Tr
     let root = affine(root);
     let mut placed = Vec::new();
     let (mut lo, mut hi) = (Vec3::MAX, Vec3::MIN);
-    for so in map.objects() {
-        let model_name = std::ffi::CString::new(so.model.as_str()).unwrap_or_default();
-        let model = crate::model::load(Some(&model_name), abi::Guid::default());
-        let at = local(&so.transform);
-        let bounds = crate::model::bounds(model);
-        let (l, h) = moved(root * at, bounds);
+    for p in map.objects().flat_map(super::placement::of) {
+        let bounds = crate::model::bounds(p.model);
+        let (l, h) = moved(root * p.at, bounds);
         (lo, hi) = (lo.min(l), hi.max(h));
-        let tint = crate::math::vec4(so.tint[0], so.tint[1], so.tint[2], so.tint[3]);
-        let state = object::State { model, transform: transform(root * at), bounds, tint, cull_distance: so.fade[1], ..object::State::default() };
+        let state = object::State { model: p.model, transform: transform(root * p.at), bounds, tint: p.tint, cull_distance: p.fade_end, lod: p.lod, ..object::State::default() };
         let (r, _) = object::create_native::<class::CSceneObject, class::CSceneObject>(scene, Kind::SceneObject, state, None);
-        placed.push((r, at));
+        placed.push((r, p.at));
     }
     if placed.is_empty() {
         (lo, hi) = (Vec3::ZERO, Vec3::ZERO);
