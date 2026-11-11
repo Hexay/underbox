@@ -32,6 +32,18 @@ pub struct Hit {
 /// Bounds `trace_all`'s re-casting; a sweep through more shapes than this is truncated.
 const MAX_HITS: usize = 256;
 
+/// Native shape sweeps stop this far short of the surface, measured along its normal; rays don't.
+pub const SWEEP_SKIN: f32 = 1.0 / 32.0;
+
+/// Pull a shape sweep's time of impact back so it ends [`SWEEP_SKIN`] off the hit surface.
+fn skinned(toi: f32, delta: Vector, normal: Vector) -> f32 {
+    let approach = -delta.dot(normal);
+    if toi <= 0.0 || approach <= f32::EPSILON {
+        return toi;
+    }
+    (toi - SWEEP_SKIN / approach).max(0.0)
+}
+
 impl World {
     /// The first shape `keep` accepts along the sweep.
     pub fn trace(&self, sweep: &Sweep, keep: &dyn Fn(ColliderHandle, &Collider) -> bool) -> Option<Hit> {
@@ -47,8 +59,9 @@ impl World {
         let options = ShapeCastOptions { max_time_of_impact: 1.0, compute_impact_geometry_on_penetration: true, ..Default::default() };
         let (shape, hit) = pipeline.cast_shape(&pose, delta, collider.shape(), options)?;
         let started_in_solid = hit.status == ShapeCastStatus::PenetratingOrWithinTargetDist && hit.time_of_impact == 0.0;
-        let position = sweep.start + delta * hit.time_of_impact;
-        Some(Hit { shape, fraction: hit.time_of_impact, position, point: hit.witness1, normal: hit.normal1, started_in_solid })
+        let fraction = skinned(hit.time_of_impact, delta, hit.normal1);
+        let position = sweep.start + delta * fraction;
+        Some(Hit { shape, fraction, position, point: hit.witness1, normal: hit.normal1, started_in_solid })
     }
 
     /// The triangle of mesh shape `shape` nearest world `point` (a hit's contact point). For a
@@ -169,6 +182,20 @@ mod tests {
         assert_eq!(cell(1.5, 0.5), Some(1), "x steps by one");
         assert_eq!(cell(0.5, 2.5), Some(6), "y steps by size_x");
         assert_eq!(world.triangle_at(field, Vector::new(500.0, 0.0, 0.0)), None, "off the grid");
+    }
+
+    #[test]
+    fn shape_sweeps_keep_a_skin_along_the_normal_and_rays_do_not() {
+        let mut world = World::default();
+        wall_at_x(&mut world, 40.0);
+        world.step(1.0 / 60.0, 1);
+        let ball = Some(Shape::Sphere { center: Vector::ZERO, radius: 4.0 });
+        let straight = world.trace(&sweep(ball.clone()), &|_, _| true).unwrap();
+        assert!((straight.position.x - (35.0 - SWEEP_SKIN)).abs() < 1e-3, "{:?}", straight.position);
+        let slant = Sweep { probe: ball, rotation: Rotation::IDENTITY, start: Vector::new(0.0, -20.0, 0.0), end: Vector::new(100.0, 80.0, 0.0) };
+        let hit = world.trace(&slant, &|_, _| true).unwrap();
+        assert!((hit.position.x - (35.0 - SWEEP_SKIN)).abs() < 1e-3, "skin is normal distance: {:?}", hit.position);
+        assert!((world.trace(&sweep(None), &|_, _| true).unwrap().position.x - 39.0).abs() < 1e-4);
     }
 
     #[test]
