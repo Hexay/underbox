@@ -1,4 +1,4 @@
-//! Builder nodes beyond `convert`/`convert_pose`: eases, springs and const targets; blend2D,
+//! Builder nodes beyond `convert`/`convert_pose`: eases, springs, random floats and const targets; blend2D,
 //! the selectors, and the IK nodes (foot IK as a two-bone IK per foot).
 
 use super::convert::Conv;
@@ -31,6 +31,7 @@ impl<'a> Conv<'a> {
                 ValueNode::Ease { input: self.value(input), time: n.float("m_easeTime"), easing, start: start(n) }
             }
             "CFloatSpringNode" => ValueNode::Spring { input: self.value(input), hertz: n.float("m_hertz"), damping: n.float("m_dampingRatio"), start: start(n) },
+            "CFloatRandomNode" => ValueNode::Random { min: n.float("m_min"), max: n.float("m_max") },
             "CConstTargetNode" => {
                 let bone = n.bool("m_isBoneTarget").then(|| self.id_name(n.setter("BoneID")));
                 let t = n.components("m_translation");
@@ -104,12 +105,13 @@ impl<'a> Conv<'a> {
             return source;
         }
         let ik = TwoBoneIk {
-            source,
-            effector: self.id_name(n.setter(bone)),
-            target: self.value(target),
             enabled: self.optional(n.idx("m_enableNodeIdx")),
             weight: self.optional(n.idx("m_weightNodeIdx")),
-            world: n.bool("m_isTargetInWorldSpace"),
+            blend_time: n.float("m_blendTime").max(0.0),
+            // IKBlendMode: Effector (0), Pose (1).
+            blend_target: n.setter("BlendMode") != 1,
+            twist: n.float("m_chainRotationWeight").clamp(0.0, 1.0),
+            ..TwoBoneIk::new(source, &self.id_name(n.setter(bone)), self.value(target), n.bool("m_isTargetInWorldSpace"))
         };
         self.def.add_pose(PoseNode::TwoBoneIk(Box::new(ik)))
     }

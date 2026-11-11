@@ -50,6 +50,8 @@ pub struct Animation {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Event {
     pub frame: i64,
+    /// `m_nEndFrame`, the last frame of an event with a duration; `frame` when absent.
+    pub end_frame: i64,
     pub cycle: f32,
     pub name: String,
     pub data: Value,
@@ -58,6 +60,7 @@ pub struct Event {
 fn events(desc: &Object) -> Vec<Event> {
     let event = |e: &Object| Event {
         frame: int(e, "m_nFrame"),
+        end_frame: e.get("m_nEndFrame").map_or_else(|| int(e, "m_nFrame"), |_| int(e, "m_nEndFrame")),
         cycle: kv::float(e, "m_flCycle"),
         name: string(e, "m_sEventName"),
         data: e.get("m_EventData").cloned().unwrap_or(Value::Null),

@@ -17,6 +17,7 @@ use abi::structs::{BBox, Vector3};
 use abi::{Guid, NativeRef, Registry, StrRet, bind, class};
 use assets::model as source;
 use content::Content;
+pub use draw::trace;
 use std::ffi::CStr;
 use std::sync::Arc;
 

@@ -49,10 +49,31 @@ Not read: `m_builderParams`, `m_worldLightingInfo` (lightmaps).
 
 Read: `m_sceneObjects[]` (`m_renderableModel` or `m_renderable`, `m_vTransform` = 3 rows of 4 floats, row i
 = (rotation-scale row, translation i), `m_vTintColor` (alpha 0 means white), `m_nObjectTypeFlags`,
-`m_flFade{Start,End}Distance`, `m_skin`), `m_sceneObjectLayerIndices`, `m_layerNames`,
-`m_aggregateSceneObjects[]` (model only, placed at identity: fragments are world space).
-Skipped (counted): `m_clutterSceneObjects`, `m_infoOverlays`. Not read: vis clusters, extra vertex streams
-(baked vertex lighting), material overrides, lighting origins, LOD overrides.
+`m_flFade{Start,End}Distance`, `m_skin`, `m_nLODOverride` (-1 automatic)), `m_sceneObjectLayerIndices`,
+`m_layerNames`, `m_aggregateSceneObjects[]` (`m_renderableModel`, `m_nLayer`, `m_anyFlags`, and
+`m_aggregateMeshes[]` in the CS2 layout (VRF `SceneAggregate.cs`): `m_nDrawCallIndex`, `m_bHasTransform`,
+`m_vTintColor` 0..255, `m_objectFlags`, `m_nLODGroupMask`; `m_fragmentTransforms[]` (3×4 like
+`m_vTransform`) are taken in order by the meshes with a transform, the rest sit at identity: fragments are
+world space). The older layout (meshes without `m_nDrawCallIndex`, draw call → mesh) draws the model whole.
+Skipped (counted): `m_clutterSceneObjects`, `m_infoOverlays`. Not read: vis cluster membership, extra vertex
+streams (baked vertex lighting), material overrides, lighting origins, aggregate `m_lodSetups`.
+
+## World visibility (`world_visibility.vvis_c`: DATA + VXVS)
+
+After VRF `VoxelVisibility.cs`. DATA: `m_nBaseClusterCount`, `m_nPVSBytesPerCluster`, `m_vMinBounds`,
+`m_vMaxBounds`, `m_flGridSize`, `m_nSky/SunVisibilityCluster`, and six `{m_nOffset (from the VXVS block
+start), m_nElementCount}` sub-blocks in order: `m_NodeBlock` (u32 pairs: leaf = first & 1, child/region
+offset = first >> 1, region count = second & 0xFF, enclosed list = second >> 8, 0xFFFFFF none),
+`m_RegionBlock` (u64: cluster = bits 0..15, bit 15 intersects geometry, leaf 16..40, mask index 40..),
+`m_EnclosedClusterListBlock` (i32 offset, count), `m_EnclosedClustersBlock` (u16), `m_MasksBlock` (u64: a
+leaf's 4×4×4 cells, bit x + 4y + 16z), `m_nVisBlocks` (PVS rows, `PVSBytesPerCluster` each, bit c LSB
+first; the sky and sun rows sit at their cluster indices past the real clusters).
+Octant order x = 1, y = 2, z = 4 (set when the point is past the middle). A point's cell mask is two more
+halvings: `1 << (L1[o1] + L2[o2])`, L1 = [0,2,8,10,32,34,40,42], L2 = [0,1,4,5,16,17,20,21]. A point's PVS ORs
+the rows of the matching regions; one in no region sees everything. Boxes walk the octree (grown by 1/32;
+a box over the whole bounds is cluster 0; above 1024 on two axes, enclosed nodes give their cluster list).
+DATA with `m_clusters` (region-box layout) or `m_visDataDwords` (BSP), and octrees of two clusters or fewer,
+cull nothing: we treat them as no vis.
 
 ## Entity lump (`.vents_c`, DATA)
 
@@ -69,6 +90,14 @@ u32 type, value)` and `attributeCount × (u32 hash, cstring name, u32 type, valu
 
 `CreateWorld` opens the pak (a `MountWorldVPK` mount for the stem, else the path on the GAME search paths,
 else loose files), mounts it into the native filesystem (`fs::read`), loads the map, and creates one
-`CSceneObject` per world-node object through `model::load` (source `.vmdl` models; compiled `.vmdl_c`
-inside a pak become the stand-in until a compiled-model reader exists). Bounds are the union of the placed
-model bounds. `SetWorldTransform` re-places objects. `BuildPvs` returns null (no vis): everything draws.
+`CSceneObject` per world-node object through `model::load` (`m_nLODOverride` sets the object's LOD), or per
+aggregate fragment over a runtime one-draw copy of the compiled model (fragment LOD masks aren't applied).
+Bounds are the union of the placed model bounds. `SetWorldTransform` re-places objects.
+`BuildPvs` reads `world_visibility.vvis_c` and always returns a valid `IPVS`: without usable vis it is empty
+(`IsEmptyPVS`; managed's network culling then skips it) and every query answers visible. `IsInPVS` /
+`IsAbsBoxInPVS` take managed's `Vector3*` sources: visible when any source's PVS holds the point's cluster
+(a point in no cluster counts as visible) or any of the box's. Sky/sun queries test the point's cluster in
+those rows. `ISceneWorld` keeps `SetPVS`'s PVS and the 3D skybox (`Get3DSkyboxOriginAndScale` is zero
+until `Add3DSkyboxWorld`; `Remove3DSkyboxWorld` clears it whichever world is named). Nothing draws with
+the PVS yet. `world.scene_c` reaches `MapInstance` through `ReadCompiledResourceFileJsonFromFilesystem`,
+which reads mounted paks.

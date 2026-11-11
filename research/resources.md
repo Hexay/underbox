@@ -83,8 +83,11 @@ m_nGroupSize, m_nLocalPose, m_poseKeyArray0/1}}`, `m_localPoseParamArray[] {m_sN
 each pose parameter's 0 (nothing sets them; see `crates/assets/src/compiled/anim/blend.rs`). Field names past
 `m_localReferenceArray` follow VRF and are unchecked against a shipped model.
 
-**Events:** an animation desc's `m_eventArray[] {m_nFrame, m_flCycle, m_sEventName, m_EventData}`; managed reads the payload
-in `SceneModel.OnAnimationEvent`.
+**Events:** an animation desc's `m_eventArray[] {m_nFrame, m_nEndFrame, m_flCycle, m_sEventName, m_EventData}`; managed reads the payload
+in `SceneModel.OnAnimationEvent`. An event spans `(m_nEndFrame - m_nFrame) / fps` seconds (`m_nEndFrame` absent: a
+point event; the field name is our guess at native's `CAnimEventDefinition`, unchecked against a shipped model).
+`CAnimClipResource.GetEventData(i, out start, out duration)` returns the payload as a `KeyValues3` that the clip
+resource owns and frees with itself: managed's `Clip.ReadEvents` reads `Type`/`Data` from it and never deletes it.
 
 ## Morphs (MRPH, `.vmorf_c`)
 
