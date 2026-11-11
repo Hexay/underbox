@@ -170,7 +170,7 @@ pub fn render(worlds: &[world::Ref], view_proj: Mat4, lighting: &Lighting, param
         pass.set_bind_group(0, &group, &[]);
         pass.dispatch_workgroups(width.div_ceil(WORKGROUP[0]), height.div_ceil(WORKGROUP[1]), 1);
     }
-    gpu.queue.submit([encoder.finish()]);
+    gpu.submit(encoder.finish());
     Some(Arc::new(Frustum { world_to_clip: view_proj, near, range, view }))
 }
 
@@ -186,7 +186,7 @@ pub fn froxel(f: &Frustum, [x, y, z]: [u32; 3]) -> [f32; 4] {
         wgpu::TexelCopyBufferInfo { buffer: &staging.buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: None, rows_per_image: None } },
         wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
     );
-    gpu.queue.submit([encoder.finish()]);
+    gpu.submit(encoder.finish());
     let bytes = staging.read(gpu, 0, 8);
     std::array::from_fn(|i| half::f16::from_le_bytes([bytes[i * 2], bytes[i * 2 + 1]]).to_f32())
 }

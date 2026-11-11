@@ -106,7 +106,7 @@ impl Surface {
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let (w, h) = (self.config.width.min(frame.desc.width), self.config.height.min(frame.desc.height));
         encoder.copy_texture_to_texture(frame.texture.as_image_copy(), image.texture.as_image_copy(), crate::texture::extent(w, h));
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
         gpu.queue.present(image);
         true
     }

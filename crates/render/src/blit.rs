@@ -67,7 +67,7 @@ impl Blitter {
             pass.set_bind_group(0, &bind_group, &[]);
             pass.draw(0..3, 0..1);
         }
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
         true
     }
 }

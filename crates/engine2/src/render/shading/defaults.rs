@@ -55,7 +55,7 @@ fn clear_depth(gpu: &render::Gpu, texture: &wgpu::Texture, layers: u32) {
         let depth = wgpu::RenderPassDepthStencilAttachment { view: &view, depth_ops: Some(ops), stencil_ops: None };
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor { label: Some("default depth"), depth_stencil_attachment: Some(depth), ..Default::default() });
     }
-    gpu.queue.submit([encoder.finish()]);
+    gpu.submit(encoder.finish());
 }
 
 pub fn texture(gpu: &render::Gpu, dim: D, sample: TextureSampleType) -> wgpu::TextureView {

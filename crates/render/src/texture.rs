@@ -159,7 +159,7 @@ impl Texture {
             depth_stencil_attachment: is_depth.then_some(depth_attachment),
             ..Default::default()
         });
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
     }
 
     /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`, in every array layer both have.
@@ -180,7 +180,7 @@ impl Texture {
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let layers = self.desc.layers.max(1).min(dst.desc.layers.max(1));
         encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) });
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
         true
     }
 
@@ -220,7 +220,7 @@ impl Texture {
             },
             extent(w, h),
         );
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
         let bytes = crate::buffer::map_read(gpu, &staging);
         let mut pixels = Vec::with_capacity((row * h) as usize);
         for y in 0..h as usize {

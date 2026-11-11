@@ -1,6 +1,8 @@
 //! The wgpu instance, adapter, device and queue.
 
 use std::fmt;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 
 /// What s&box's lit shaders need (bindless texture and sampler arrays, wave ops), taken when the
 /// adapter has it.
@@ -19,6 +21,8 @@ pub struct Gpu {
     pub info: wgpu::AdapterInfo,
     pub(crate) instance: wgpu::Instance,
     pub(crate) adapter: wgpu::Adapter,
+    hung: AtomicBool,
+    wait_timeout_ms: AtomicU64,
 }
 
 #[derive(Debug)]
@@ -84,7 +88,17 @@ impl Gpu {
             let at = if at.status() == std::backtrace::BacktraceStatus::Captured { format!("\n{at}") } else { String::new() };
             eprintln!("wgpu error: {e}{at}");
         }));
-        Ok(Gpu { info: adapter.get_info(), device, queue, instance, adapter })
+        // A real driver's watchdog ends a hang this way; lavapipe has none (see wait_idle).
+        device.set_device_lost_callback(|reason, message| eprintln!("wgpu error: device lost ({reason:?}): {message}"));
+        Ok(Gpu {
+            info: adapter.get_info(),
+            device,
+            queue,
+            instance,
+            adapter,
+            hung: AtomicBool::new(false),
+            wait_timeout_ms: AtomicU64::new(default_wait_timeout_ms()),
+        })
     }
 
     /// `backend/adapter name`, e.g. `vulkan/llvmpipe (LLVM 20.1.2, 256 bits)`.
@@ -120,8 +134,52 @@ impl Gpu {
         }
     }
 
-    /// Block until every submitted command has finished (and map callbacks have run).
-    pub fn wait_idle(&self) {
-        self.device.poll(wgpu::PollType::wait_indefinitely()).expect("wgpu device lost while waiting");
+    /// Block until every submitted command has finished (and map callbacks have run), for at most
+    /// [`Gpu::set_wait_timeout`]. A wait that times out marks the GPU hung (a runaway shader:
+    /// lavapipe has no watchdog, so it never ends in device loss) and logs once; while hung,
+    /// waits only poll and return false, until the queue drains. See docs/renderer.md.
+    pub fn wait_idle(&self) -> bool {
+        if self.hung.load(Ordering::Relaxed) {
+            let drained = self.device.poll(wgpu::PollType::Poll).is_ok_and(|s| s.is_queue_empty());
+            if drained {
+                self.hung.store(false, Ordering::Relaxed);
+                eprintln!("wgpu: the GPU caught up after a hang");
+            }
+            return drained;
+        }
+        let timeout = Duration::from_millis(self.wait_timeout_ms.load(Ordering::Relaxed));
+        match self.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: Some(timeout) }) {
+            Ok(_) => true,
+            Err(e) => {
+                self.hung.store(true, Ordering::Relaxed);
+                eprintln!("wgpu error: GPU hang: submitted work didn't finish within {timeout:?} ({e}); waits stop blocking and read-backs return zeros until it does");
+                false
+            }
+        }
     }
+
+    /// Submit `commands`, or drop them while the GPU is hung: on lavapipe a submit behind a
+    /// running shader blocks until it ends, which would wedge the caller after all.
+    pub fn submit(&self, commands: wgpu::CommandBuffer) {
+        if self.is_hung() && !self.wait_idle() {
+            return;
+        }
+        self.queue.submit([commands]);
+    }
+
+    /// Whether the last wait timed out and the queue hasn't drained since.
+    pub fn is_hung(&self) -> bool {
+        self.hung.load(Ordering::Relaxed)
+    }
+
+    /// How long [`Gpu::wait_idle`] blocks before calling the GPU hung. Starts at
+    /// `UNDERBOX_GPU_TIMEOUT` seconds, else 30.
+    pub fn set_wait_timeout(&self, timeout: Duration) {
+        self.wait_timeout_ms.store(timeout.as_millis().max(1) as u64, Ordering::Relaxed);
+    }
+}
+
+fn default_wait_timeout_ms() -> u64 {
+    let secs = std::env::var("UNDERBOX_GPU_TIMEOUT").ok().and_then(|v| v.parse::<f64>().ok()).filter(|s| *s > 0.0).unwrap_or(30.0);
+    (secs * 1000.0) as u64
 }

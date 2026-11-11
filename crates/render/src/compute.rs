@@ -42,6 +42,6 @@ impl ComputeProgram {
             let [x, y, z] = self.groups(threads);
             pass.dispatch_workgroups(x, y, z);
         }
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
     }
 }

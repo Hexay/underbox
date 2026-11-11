@@ -74,6 +74,15 @@ One `render::Gpu` per process, in a `OnceLock` in `engine2/src/render/device.rs`
   offscreen driver, no window) it is two offscreen targets. Views always render into the swap
   chain's colour/depth textures; `Present` copies colour into the surface image.
 
+### GPU hangs
+
+A runaway shader on lavapipe never ends in device loss (no watchdog), and wgpu chains each
+submission on the last, so every later `queue.submit` blocks behind it too. `Gpu::wait_idle`
+therefore waits at most `UNDERBOX_GPU_TIMEOUT` seconds (30), then logs `wgpu error: GPU hang` once
+and marks the GPU hung. While hung, waits only poll, read-backs return zeros and `Gpu::submit`
+(every submit goes through it) drops its commands, so the client keeps ticking; the first poll that
+finds the queue drained clears the mark. `crates/render/tests/hang.rs` is the repro.
+
 ## From scene objects to draw calls
 
 The scene system already keeps worlds and objects (`engine2/src/scene`). Drawing follows the

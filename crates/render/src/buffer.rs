@@ -72,7 +72,7 @@ impl Buffer {
     pub fn copy_to(&self, gpu: &Gpu, dst: &Buffer, src_offset: u64, dst_offset: u64, len: u64) {
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_buffer_to_buffer(&self.buffer, src_offset, &dst.buffer, dst_offset, len);
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
     }
 
     /// Copy `len` bytes at `offset` back to the CPU. Blocks until the GPU is done.
@@ -88,7 +88,7 @@ impl Buffer {
         });
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_buffer_to_buffer(&self.buffer, start, &staging, 0, end - start);
-        gpu.queue.submit([encoder.finish()]);
+        gpu.submit(encoder.finish());
         let bytes = map_read(gpu, &staging);
         let skip = (offset - start) as usize;
         bytes[skip..(skip + len as usize).min(bytes.len())].to_vec()
@@ -102,10 +102,19 @@ pub(crate) fn map_read(gpu: &Gpu, staging: &wgpu::Buffer) -> Vec<u8> {
         let _ = tx.send(r);
     });
     gpu.wait_idle();
-    rx.recv().expect("map callback dropped").expect("buffer map failed");
-    let bytes = staging.get_mapped_range(..).expect("mapped range").to_vec();
-    staging.unmap();
-    bytes
+    // Not mapped yet means a hung GPU (Gpu::wait_idle logged it): zeros rather than a wait forever.
+    match rx.try_recv() {
+        Ok(Ok(())) => {
+            let bytes = staging.get_mapped_range(..).expect("mapped range").to_vec();
+            staging.unmap();
+            bytes
+        }
+        Ok(Err(e)) => {
+            eprintln!("wgpu error: read-back failed: {e}");
+            vec![0; staging.size() as usize]
+        }
+        Err(_) => vec![0; staging.size() as usize],
+    }
 }
 
 fn align4(n: u64) -> u64 {

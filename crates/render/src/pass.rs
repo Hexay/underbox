@@ -157,5 +157,5 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
             }
         }
     }
-    gpu.queue.submit([encoder.finish()]);
+    gpu.submit(encoder.finish());
 }
