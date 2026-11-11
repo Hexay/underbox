@@ -107,6 +107,27 @@ fn blob(token: fn(&str) -> u32, values: &[(&str, &str)]) -> Vec<u8> {
 
 /// The pak of map `name` (to be written as `maps/<name>.vpk`). `token` hashes legacy entity keys
 /// as `StringToken` does.
+/// One leaf over ±512 split into three clusters by x quarter: 0 is x < -256, 1 is -256..256, 2 is
+/// x ≥ 256. Each sees itself and its neighbours (0 and 2 can't see each other); the sky reaches
+/// only cluster 2 and the sun clusters 1 and 2.
+pub fn visibility() -> crate::vis::Visibility {
+    let x_cells = |cells: &[u64]| (0..64u64).filter(|b| cells.contains(&(b % 4))).fold(0, |m, b| m | 1 << b);
+    crate::vis::Visibility {
+        clusters: 3,
+        row_bytes: 1,
+        min: [-512.0; 3],
+        max: [512.0; 3],
+        grid: 64.0,
+        sky: 3,
+        sun: 4,
+        nodes: vec![(1, 3 | 0xFF_FFFF << 8)],
+        regions: (0..3u64).map(|c| c | c << 40).collect(),
+        masks: vec![x_cells(&[0]), x_cells(&[1, 2]), x_cells(&[3])],
+        rows: vec![0b011, 0b111, 0b110, 0b100, 0b110],
+        ..Default::default()
+    }
+}
+
 pub fn tiny_map(name: &str, token: fn(&str) -> u32) -> Builder {
     let dir = format!("maps/{name}");
     let ents = format!("{dir}/entities/default_ents");
@@ -141,7 +162,8 @@ pub fn tiny_map(name: &str, token: fn(&str) -> u32) -> Builder {
         .add(&format!("{dir}/worldnodes/node001.vwnod_c"), crate::resource::write(&node(&objects[2..]), Compression::Lz4))
         .add(&format!("{ents}.vents_c"), crate::resource::write(&lump, Compression::Zstd))
         .add(&format!("{child}.vents_c"), crate::resource::write(&child_lump, Compression::None))
-        .add(&format!("{dir}/world_physics.vphys_c"), assets::compiled::physics::write(&world_physics()));
+        .add(&format!("{dir}/world_physics.vphys_c"), assets::compiled::physics::write(&world_physics()))
+        .add(&format!("{dir}/world_visibility.vvis_c"), crate::vis::write(&visibility()));
     for (path, bytes) in assets::compiled::fixture::crate_files() {
         b.add(&path, bytes);
     }

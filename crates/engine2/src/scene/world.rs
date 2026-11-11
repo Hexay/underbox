@@ -15,6 +15,19 @@ pub struct SceneWorld {
     /// Object addresses, in creation order.
     pub objects: Mutex<Vec<usize>>,
     delete_at_end_of_frame: AtomicBool,
+    /// `SetPVS`'s IPVS address (0: none); see `crate::world::pvs`.
+    pub pvs: Mutex<usize>,
+    pub skybox: Mutex<Skybox>,
+}
+
+/// The 3D skybox world drawn behind this one (`Add3DSkyboxWorld`) and its placement.
+#[derive(Default, Clone, Copy)]
+pub struct Skybox {
+    /// The skybox world's address, 0 when none.
+    pub world: usize,
+    pub origin: abi::structs::Vector3,
+    pub angles: abi::structs::Angles,
+    pub scale: f32,
 }
 
 pub fn get(r: Ref) -> Option<std::sync::Arc<SceneWorld>> {

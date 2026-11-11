@@ -8,7 +8,10 @@ pub mod node;
 pub mod resource;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_vis;
 mod values;
+pub mod vis;
 pub mod vpk;
 
 pub use map::Map;

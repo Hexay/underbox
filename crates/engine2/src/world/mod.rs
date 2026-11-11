@@ -1,14 +1,15 @@
 //! Compiled map worlds (`g_pWorldRendererMgr`, `IWorldReference`, `CEntityKeyValues`). Managed's
 //! `SceneMap` asks for `maps/foo.vpk`; we open that pak (or one `MountWorldVPK` registered under
-//! `foo`), parse it with the `world` crate and hand back a [`reference::WorldRef`]. There's no
-//! vis data, so `BuildPvs` gives none and everything is drawn.
+//! `foo`), parse it with the `world` crate and hand back a [`reference::WorldRef`]. `BuildPvs`
+//! reads the map's visibility (see [`pvs`]).
 
 mod entity;
+pub mod pvs;
 pub mod reference;
 #[cfg(test)]
 mod tests;
 
-use abi::slots::{g_p_engine_pvs_manager as pvs, g_p_world_renderer_mgr as mgr, i_world_reference as world};
+use abi::slots::{g_p_world_renderer_mgr as mgr, i_world_reference as world};
 use abi::structs::{Transform, Vector3};
 use abi::{HandleId, NativeRef, Registry, StrRet, bind};
 use reference::get;
@@ -90,7 +91,5 @@ pub fn register(r: &mut Registry) {
         }
     });
     entity::register(r);
-
-    bind!(r, pvs::BUILD_PVS, |_| NativeRef::null());
-    bind!(r, pvs::DESTROY_PVS, |_| {});
+    pvs::register(r);
 }

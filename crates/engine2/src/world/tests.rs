@@ -97,6 +97,43 @@ fn mounted_paks_load_by_world_name_and_missing_maps_give_null() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
+/// The map's PVS answers from its vis data (see `world::fixture::visibility`); a world-less one
+/// is empty and sees everything. Scene worlds keep the PVS and 3D skybox managed hands them.
+#[test]
+fn pvs_culls_from_the_map_visibility() {
+    use super::pvs;
+    use crate::math::vec3;
+    let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = game_dir("pvs", "tinypvs");
+    crate::fs::add_search_path("GAME", dir.to_str().unwrap(), true);
+    let w = scene();
+    let r = create_world("maps/tinypvs.vpk", w, crate::math::identity());
+    let p = pvs::build(&reference::get(r).unwrap().folder);
+    let mut west = [vec3(-400.0, 0.0, 0.0)];
+    let at = abi::RawPtr::from_raw(west.as_mut_ptr().cast());
+    assert!(!pvs::is_empty(p));
+    assert!(!pvs::in_pvs(p, 1, at, vec3(400.0, 0.0, 0.0)) && pvs::in_pvs(p, 1, at, vec3(0.0, 0.0, 0.0)));
+    assert!(pvs::box_in_pvs(p, 1, at, vec3(200.0, 0.0, 0.0), vec3(300.0, 1.0, 1.0)) && !pvs::box_in_pvs(p, 1, at, vec3(300.0, 0.0, 0.0), vec3(320.0, 1.0, 1.0)));
+    let none = pvs::build("maps/nothing");
+    assert!(pvs::is_empty(none) && pvs::in_pvs(none, 1, at, vec3(400.0, 0.0, 0.0)));
+
+    let sky = scene();
+    let world = scene_world::get(w).unwrap();
+    *world.pvs.lock().unwrap() = p.addr();
+    world.skybox.lock().unwrap().world = sky.addr();
+    world.skybox.lock().unwrap().origin = vec3(1.0, 2.0, 3.0);
+    world.skybox.lock().unwrap().scale = 16.0;
+    let v = pvs::skybox_origin_and_scale(w).vec;
+    assert_eq!((v.x, v.y, v.z, v.w), (1.0, 2.0, 3.0, 16.0));
+    world.skybox.lock().unwrap().world = 0;
+    assert_eq!(pvs::skybox_origin_and_scale(w).vec.w, 0.0, "no skybox world, no skybox");
+    objects::destroy(none);
+    objects::destroy(p);
+    reference::release(r);
+    reference::service();
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 /// corpus/mapworld ships the fixture pak; `UNDERBOX_BLESS=1` rewrites it after a fixture change.
 #[test]
 fn corpus_pak_matches_the_fixture() {
