@@ -193,5 +193,10 @@ pub unsafe fn send_messages(msgs: &mut [*mut c_void]) {
         }
     }
     // SAFETY: the rest are GNS's own allocated messages.
-    unsafe { gns::send_messages(&mut native) }
+    let results = unsafe { gns::send_messages(&mut native) };
+    let failed: Vec<_> = results.iter().filter(|&&r| r < 0).collect();
+    static LOGGED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    if !failed.is_empty() && LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 20 {
+        super::log_error(&format!("networking: {} of {} sends refused (EResult {:?})", failed.len(), results.len(), failed));
+    }
 }

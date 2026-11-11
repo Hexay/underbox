@@ -27,7 +27,14 @@ pub mod send {
 
 /// `ESteamNetworkingConfigValue` keys we set.
 pub mod config {
+    pub const SEND_BUFFER_SIZE: i32 = 9;
+    pub const SEND_RATE_MIN: i32 = 10;
+    pub const SEND_RATE_MAX: i32 = 11;
     pub const IP_ALLOW_WITHOUT_AUTH: i32 = 23;
+    pub const TIMEOUT_CONNECTED: i32 = 25;
+    pub const RECV_BUFFER_SIZE: i32 = 47;
+    pub const RECV_BUFFER_MESSAGES: i32 = 48;
+    pub const RECV_MAX_MESSAGE_SIZE: i32 = 49;
 }
 
 /// A connection's state change (`SteamNetConnectionStatusChangedCallback_t`, flattened).
@@ -187,10 +194,15 @@ pub unsafe fn release(msg: *mut c_void) {
     unsafe { ffi::gns_release_message(msg) }
 }
 
+/// Each message's number, or the negated `EResult` it failed with (e.g. -25, `LimitExceeded`, when
+/// reliable data outgrows the send buffer).
+///
 /// # Safety
 /// Every pointer must be an allocated, unsent message; all are consumed, sent or not.
-pub unsafe fn send_messages(msgs: &mut [*mut c_void]) {
-    unsafe { ffi::gns_send_messages(msgs.as_mut_ptr(), msgs.len() as i32, std::ptr::null_mut()) }
+pub unsafe fn send_messages(msgs: &mut [*mut c_void]) -> Vec<i64> {
+    let mut results = vec![0i64; msgs.len()];
+    unsafe { ffi::gns_send_messages(msgs.as_mut_ptr(), msgs.len() as i32, results.as_mut_ptr()) };
+    results
 }
 
 /// Send one copy of `data`; Steam's `EResult` (1 is OK).
