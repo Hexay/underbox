@@ -186,9 +186,10 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// Gotcha: Windows' filesystem is case-blind, so the exact spelling already exists there and is kept.
+    /// Gotcha: Windows' filesystem is case-blind, so the exact spelling already exists there and is
+    /// kept, with either separator.
     fn spelling(p: &std::path::Path) -> String {
         let s = p.to_string_lossy().into_owned();
-        if cfg!(windows) { s.to_lowercase() } else { s }
+        if cfg!(windows) { s.to_lowercase().replace('\\', "/") } else { s }
     }
 }
