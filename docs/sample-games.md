@@ -22,8 +22,8 @@ Commands: `tools/game.sh <sbox-public>/game/samples/sweeper` (likewise
 `MODE=play PLAY_VIA=host`.
 
 What these runs show:
-- Every client logs `OnEnabled on Sandbox.EnvmapProbe failed ... ITexture was null when calling
-  IsStrongHandleValid`. `SceneCubemap.Texture` wraps a null native texture when the envmap
-  (`textures/cubemaps/default2.vtex`) has no compiled file. Handed to the renderer lane.
+- Clients used to log `OnEnabled on Sandbox.EnvmapProbe failed ... ITexture was null when calling
+  IsStrongHandleValid`. Env maps now start on a default cubemap (`scene/create.rs`), and texture
+  getters never return null (`resource::empty_handle`); `game.minimal` renders without it.
 - The menu logs `LoadFromFile: Couldn't find scenes/menu-main.scene`, though the source is in
   `addons/menu/Assets/scenes`. Not triaged. It doesn't block `+game` runs.
