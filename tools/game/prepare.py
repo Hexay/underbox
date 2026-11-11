@@ -58,16 +58,17 @@ def add_watcher(scene_path, idle_seconds, command):
 def main():
     args = argparse.ArgumentParser()
     args.add_argument("root", type=pathlib.Path)
-    args.add_argument("scene", help="relative to Assets, e.g. scenes/zoo.scene")
+    args.add_argument("scene", help="relative to Assets, e.g. scenes/zoo.scene; empty for the project's StartupScene")
     args.add_argument("watch", type=pathlib.Path)
     args.add_argument("--idle", type=int, default=15, help="seconds the watcher idles past the settle")
     args.add_argument("--command", default="", help="console command the host runs once things settle")
     a = args.parse_args()
-    scene_path = a.root / "Assets" / a.scene
-    if not scene_path.is_file():
-        sys.exit(f"prepare: no such scene {scene_path}")
     sbproj = project_file(a.root)
-    set_startup_scene(sbproj, a.scene)
+    scene = a.scene or load(sbproj).get("Metadata", {}).get("StartupScene") or ""
+    scene_path = a.root / "Assets" / scene
+    if not scene or not scene_path.is_file():
+        sys.exit(f"prepare: no such scene {scene_path}")
+    set_startup_scene(sbproj, scene)
     add_watcher(scene_path, a.idle, a.command)
     code = a.root / "Code"
     code.mkdir(exist_ok=True)

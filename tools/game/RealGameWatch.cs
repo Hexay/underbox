@@ -1,4 +1,5 @@
 using Sandbox;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -59,7 +60,10 @@ public sealed class RealGameWatch : Component
 		go.Name = "RealGameWatchController";
 		go.WorldPosition = down.EndPosition + Vector3.Up * DropHeight;
 		dropped = go.Components.Create<PlayerController>();
+		// A probe only: on a host client it must not take over the scene camera or the mouse look.
 		dropped.UseInputControls = false;
+		dropped.UseCameraControls = false;
+		dropped.UseLookControls = false;
 		Mark( $"DROP at z={go.WorldPosition.z:0}" );
 	}
 
@@ -88,7 +92,43 @@ public sealed class RealGameWatch : Component
 			if ( ownedStanding[p] < StandingSeconds ) continue;
 			ownedReported.Add( p );
 			Mark( $"PLAYER_STANDING owner={p.Network.Owner.DisplayName} local={!p.IsProxy} {Describe( p )}" );
+			poses[p.GameObject] = (p.WorldPosition, p.EyeAngles.yaw);
 		}
+		foreach ( var p in players.Where( p => ownedReported.Contains( p ) ) )
+			ReportMotion( "PLAYER", $"owner={p.Network.Owner?.DisplayName} local={!p.IsProxy}", p.GameObject, p.WorldPosition, p.EyeAngles.yaw );
+	}
+
+	// Input evidence for tools/game.sh MODE=play: a pawn or camera that moved or turned since its rest pose.
+	const float MovedUnits = 32f;
+	const float TurnedDegrees = 10f;
+	readonly Dictionary<GameObject, (Vector3 Pos, float Yaw)> poses = new();
+	readonly HashSet<string> motionReported = new();
+
+	void ReportMotion( string kind, string who, GameObject key, Vector3 pos, float yaw )
+	{
+		if ( !poses.TryGetValue( key, out var rest ) ) { poses[key] = (pos, yaw); return; }
+		var moved = (pos - rest.Pos).WithZ( 0 ).Length;
+		var turned = MathF.Abs( Angles.NormalizeAngle( yaw - rest.Yaw ) );
+		if ( moved >= MovedUnits && motionReported.Add( $"{kind}_MOVED {who}" ) )
+			Mark( $"{kind}_MOVED {who} dist={moved:0} from={rest.Pos.x:0},{rest.Pos.y:0} to={pos.x:0},{pos.y:0}" );
+		if ( turned >= TurnedDegrees && motionReported.Add( $"{kind}_TURNED {who}" ) )
+			Mark( $"{kind}_TURNED {who} yaw={rest.Yaw:0}->{yaw:0}" );
+	}
+
+	bool inputSeen;
+
+	// The camera's rest pose is where it was when input first arrived, so spawning can't count as moving.
+	protected override void OnUpdate()
+	{
+		if ( Application.IsDedicatedServer || ended || !Scene.Camera.IsValid() ) return;
+		var cam = Scene.Camera;
+		if ( !inputSeen && (!Input.AnalogMove.IsNearlyZero() || !Input.AnalogLook.IsNearlyZero()) )
+		{
+			inputSeen = true;
+			Mark( $"INPUT move={Input.AnalogMove} look={Input.AnalogLook} mouse_visible={Mouse.Visible}" );
+			poses[cam.GameObject] = (cam.WorldPosition, cam.WorldRotation.Yaw());
+		}
+		if ( inputSeen ) ReportMotion( "CAMERA", "view", cam.GameObject, cam.WorldPosition, cam.WorldRotation.Yaw() );
 	}
 
 	protected override void OnFixedUpdate()
@@ -107,7 +147,7 @@ public sealed class RealGameWatch : Component
 
 		Mark( $"TICK bodies={bodies.Count} awake={awake} fallen={below} colliders={colliders.Count} meshes={meshes}"
 			+ $" renderers={renderers.Count} error_models={noModel} objects={Scene.Directory.GameObjectCount} players={players.Count}"
-			+ $" connections={Connection.All.Count} " + string.Join( "; ", players.Select( Describe ) ) );
+			+ $" connections={Connection.All.Count} {DescribeCamera()}" + string.Join( "; ", players.Select( Describe ) ) );
 
 		if ( ++ticks == 4 ) ReportBodies( bodies );
 		TrackOwnedPlayers( players );
@@ -150,9 +190,16 @@ public sealed class RealGameWatch : Component
 		}
 	}
 
+	string DescribeCamera()
+	{
+		var cam = Scene.Camera;
+		if ( Application.IsDedicatedServer || !cam.IsValid() ) return "";
+		return $"camera@{cam.WorldPosition.x:0},{cam.WorldPosition.y:0},{cam.WorldPosition.z:0} yaw={cam.WorldRotation.Yaw():0} ";
+	}
+
 	static string Describe( PlayerController p )
 	{
 		var ground = p.GroundObject?.Name ?? "nothing";
-		return $"{p.GameObject.Name}@{p.WorldPosition.x:0},{p.WorldPosition.y:0},{p.WorldPosition.z:0} on={ground} v={p.Velocity.Length:0}";
+		return $"{p.GameObject.Name}@{p.WorldPosition.x:0},{p.WorldPosition.y:0},{p.WorldPosition.z:0} on={ground} v={p.Velocity.Length:0} yaw={p.EyeAngles.yaw:0}";
 	}
 }

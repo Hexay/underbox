@@ -43,8 +43,13 @@ T_CARGO=$(lap cargo); t0=$(date +%s.%N)
 # NLog names the file after the process: dotnet.
 LOG=$GAME/logs/dotnet.log
 rm -f "$LOG"
-# No sound card here: a null default PCM, or libasound logs eight lines per device probe.
+# For watchers that act on the live log (tools/game/play.sh); client.log is only copied at exit.
+echo "$LOG" > "$OUT/client.logpath"
+# No sound card here: a null default PCM, or libasound logs eight lines per device probe. Audio goes
+# to engine2's null device, which drains in real time: ALSA's null PCM takes samples as fast as they
+# come, so cpal's callback had managed mix about 15x faster than real time, burning the client's CPU.
 printf 'pcm.!default { type null }\n' > "$OUT/asound.conf"
+export UNDERBOX_AUDIO=${UNDERBOX_AUDIO:-null}
 cd "$GAME"
 # No display here: SDL falls back to its offscreen driver; force it so a stray DISPLAY can't win.
 SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES:-log} ALSA_CONFIG_PATH="$OUT/asound.conf" \
