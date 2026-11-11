@@ -4,6 +4,7 @@
 
 pub(crate) mod gpu;
 mod occlusion;
+mod pvs_cull;
 
 pub(crate) use occlusion::words;
 
@@ -24,16 +25,23 @@ fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, t
     let (Some(material), Some(gpu)) = (material_mode::material(mode), device::gpu()) else { return };
     let shader = material.shader();
     crate::render::submits::log_to(c, &format!("compute {shader}"), "-");
+    let occlusion = shader.ends_with(occlusion::SHADER);
+    let given = attrs;
+    let attrs = if occlusion { pvs_cull::filter(attrs) } else { attrs };
     let mut layers = vec![attrs];
     layers.extend(context::get(c).map(|c| c.attributes));
     let threads = threads.map(|n| n.max(1) as u32);
-    let Err(e) = gpu::dispatch(gpu, shader, &layers, threads) else { return };
-    if shader.ends_with(occlusion::SHADER) {
-        warn_once(shader, &format!("on the CPU ({e})"));
-        occlusion::cull(&Inputs(attrs));
-        return;
+    match gpu::dispatch(gpu, shader, &layers, threads) {
+        Ok(()) => {}
+        Err(e) if occlusion => {
+            warn_once(shader, &format!("on the CPU ({e})"));
+            occlusion::cull(&Inputs(attrs));
+        }
+        Err(e) => warn_once(shader, &format!("compute dispatch skipped ({e})")),
     }
-    warn_once(shader, &format!("compute dispatch skipped ({e})"));
+    if occlusion {
+        pvs_cull::release(attrs, given);
+    }
 }
 
 /// A dispatch's attributes, read the way the shader reads them.

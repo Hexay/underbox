@@ -90,6 +90,7 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
     };
     let (cam, proj, viewport) = camera(r, width, height);
     let a = r.addr();
+    let _pvs = super::pvs::enter(cam.origin, &worlds);
     let desc = view::Desc {
         camera: cam,
         proj,
