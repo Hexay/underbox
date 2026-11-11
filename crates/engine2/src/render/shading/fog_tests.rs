@@ -202,7 +202,8 @@ fn froxels_blend_with_their_history() {
 }
 
 /// Every point maps to the shadow map's centre at depth 0.5: a map cleared to 0.2 (an occluder
-/// in front) shadows the sun's in-scattering, one cleared to 1 scatters as no map does.
+/// in front) shadows the sun's in-scattering, one cleared to 1 scatters as no map does; a
+/// reverse-Z map (managed's) the other way round.
 #[test]
 fn sun_shadow_map_gates_in_scattering() {
     let Some(_) = middle(&with_view_fog(ViewFog::default())) else { return };
@@ -216,15 +217,17 @@ fn sun_shadow_map_gates_in_scattering() {
         let sources = fog_volume::Sources { sun: Some(((eye - Vec3::ZERO).normalize(), Vec3::splat(4.0))), shadow, ..Default::default() };
         fog_volume::froxel(&fog_volume::march(&volumes, view_proj, &sources, &settings, 0).expect("froxels"), [48, 28, 2])
     };
-    let cleared_to = |depth: f32| {
+    let cleared_to = |depth: f32, reverse_z: bool| {
         let target = Target { depth: map, ..Default::default() };
         draw::execute(&target, &Lighting::default(), Load { color: None, depth: Some(depth) }, &[]);
-        Some(SunShadow { world_to_shadow, map })
+        Some(SunShadow { world_to_shadow, map, reverse_z })
     };
     let open = scatter(None);
     assert!(open[0] > 0.01, "the sun scatters without a map: {open:?}");
-    assert_eq!(scatter(cleared_to(1.0)), open, "nothing in front");
-    let shadowed = scatter(cleared_to(0.2));
+    assert_eq!(scatter(cleared_to(1.0, false)), open, "nothing in front");
+    let shadowed = scatter(cleared_to(0.2, false));
     assert!(shadowed[0] == 0.0 && shadowed[3] == open[3], "no sun, same density: {shadowed:?}");
+    assert_eq!(scatter(cleared_to(0.0, true)), open, "reverse-Z: nothing in front");
+    assert_eq!(scatter(cleared_to(0.8, true)), shadowed, "reverse-Z: an occluder in front");
     crate::resource::destroy_handle(map);
 }

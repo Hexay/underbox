@@ -44,21 +44,21 @@ local positions under it, as native does.
   Native must behave the same way, or walker's map would move when it loads. Walker's triggers act
   only on the owner, whose body is dynamic. Found with the watcher's collider probe
   (`GAME:COLLIDER`, logged when the drop trace misses).
-
-## Open (renderer lane)
-
-- **7 of 13 MeshComponents fail to deserialize**, on servers and host clients:
-  `Error when deserializing Sandbox.MeshComponent.Mesh (ITexture was null when calling
-  IsStrongHandleValid)`. `PolygonMesh.CalculateTextureSize` reads `material.FirstTexture`, and
-  `Texture.FromNative` calls `IsStrongHandleValid()` on the handle, which throws on null.
-  `render/material.rs` (`GET_FIRST_TEXTURE_ATTRIBUTE`, `GET_TEXTURE`) returns `Texture::NULL` for
-  a material without textures, as the error material that stands in for a missing `.vmat` is. The
-  meshes that fail are the ones that list a missing material: the brick walls, the door frame and
-  the `TriggerHurt` volume. They have neither collision nor a mesh. Same class as the samples'
-  `EnvmapProbe` error (docs/sample-games.md).
-- The health HUD wraps "100" onto two lines ("10" / "0") in every client frame.
+- **Meshes with a missing material didn't load** (7 of 13: the brick walls, the door frame, the
+  `TriggerHurt` volume). `PolygonMesh.CalculateTextureSize` reads `Material.FirstTexture`, whose
+  `Texture.FromNative` calls `IsStrongHandleValid()` on the returned pointer and throws on null.
+  The error material has no textures, and the getter returned null. Texture getters now return an
+  empty strong handle (`resource::empty_handle`), which managed reads as no texture. All meshes
+  load with collision (`meshes=12 colliders=45`), and no client logs the error.
 
 ## Expected gaps
+
+The health HUD wraps "100" onto two lines ("10" / "0"). That's missing content, not a layout bug:
+`.health` is `width: 100px` in `font-family: Poppins` at 64px, Poppins ships with s&box's Steam
+content (`Font 'Poppins' not found`), and the system fallback, DejaVu Sans, sets "100" 122px wide
+(Liberation Sans: 107px). RichTextKit breaks a word that overflows the line at a character, as in
+docs/real-games.md's icon-font case.
+
 
 No textures or models: the Citizen, coins, road cone and door are error models, and the floor and
 boxes are untextured. Neither scene has a sky. A joined client lacks walker's sounds

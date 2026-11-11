@@ -57,10 +57,11 @@ fn blit_texture(c: context::Ref, src: texture::Ref, viewport: RenderViewport, sr
 /// groups), as (mesh, draw call, flags, material). A mesh of -1 ends managed's loop.
 fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: RawPtr<c_void>, flags: RawPtr<c_void>) -> NativeRef<class::IMaterial2> {
     const VISIBLE: i32 = 1;
+    const ALPHA_BLENDED: i32 = 2;
     let Some(obj) = object::get(o) else { return NativeRef::NULL };
-    let (m, groups) = {
+    let (m, groups, material_override) = {
         let s = obj.state.lock().unwrap();
-        (s.model, s.mesh_groups)
+        (s.model, s.mesh_groups, s.material_override.clone())
     };
     let Some(model) = crate::model::get(m) else { return NativeRef::NULL };
     let mut n = 0;
@@ -70,13 +71,16 @@ fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: Raw
         }
         for (ci, dc) in mm.mesh.draw_calls().iter().enumerate() {
             if n == index {
+                // Native's draw states carry a whole-object override (managed's SceneMirror.ApplyMesh).
+                let material = material_override.as_ref().or(dc.material.as_ref());
+                let blends = material.and_then(|m| m.material()).is_some_and(|m| m.blend().is_some());
                 // SAFETY: managed passes three ints on its stack (RenderContext.ReadSceneObjectDraws).
                 unsafe {
                     *mesh.cast::<i32>().as_ptr() = mi as i32;
                     *call.cast::<i32>().as_ptr() = ci as i32;
-                    *flags.cast::<i32>().as_ptr() = VISIBLE;
+                    *flags.cast::<i32>().as_ptr() = VISIBLE | if blends { ALPHA_BLENDED } else { 0 };
                 }
-                return crate::mesh::material_ref::handle(dc.material.as_ref());
+                return crate::mesh::material_ref::handle(material);
             }
             n += 1;
         }
@@ -187,4 +191,36 @@ pub fn register(r: &mut Registry) {
     bind!(r, dev::GET_DEVICE_SPECIFIC_INFO, |_| RawPtr::NULL);
     bind!(r, dev::GET_GRAPHICS_API_SPECIFIC_TEXTURE_HANDLE, |_| RawPtr::NULL);
     bind!(r, dev::GET_DEVICE_SPECIFIC_TEXTURE, |_| RawPtr::NULL);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mesh::material_ref::MaterialRef;
+    use crate::render::material;
+    use crate::scene::{object::State, world};
+
+    /// What managed's SceneMirror reads: (mesh, call, flags, material's shader).
+    fn draw(o: object::Ref) -> (i32, i32, i32, String) {
+        let (mut mesh, mut call, mut flags) = (-1i32, 0i32, 0i32);
+        let ptr = |v: &mut i32| RawPtr::from_raw((v as *mut i32).cast::<c_void>());
+        let m = scene_object_draw(o, 0, ptr(&mut mesh), ptr(&mut call), ptr(&mut flags));
+        let name = material::resolve(m).map(|m| m.shader().to_owned()).unwrap_or_default();
+        crate::resource::destroy_handle(m);
+        (mesh, call, flags, name)
+    }
+
+    #[test]
+    fn draws_carry_a_translucent_override_and_its_blend() {
+        crate::render::scene::tests::fake_managed();
+        let w: world::Ref = objects::create_shared(std::sync::Arc::new(world::SceneWorld::default()));
+        let mat = material::create_raw(Some(c"materials/test/glass.vmat"), Some(c"shaders/complex.shader"), true);
+        material::set_vector(mat, "F_TRANSLUCENT", crate::math::vec4(1.0, 0.0, 0.0, 0.0));
+        let model = crate::model::create_runtime("models/test/glass.vmdl", Default::default());
+        let state = State { model, material_override: MaterialRef::keep(mat), ..State::default() };
+        let (o, _) = object::create_native::<class::CSceneObject, class::CSceneObject>(w, crate::handles::Kind::SceneObject, state, None);
+        assert_eq!(draw(o), (0, 0, 3, "shaders/complex.shader".to_owned()), "visible and alpha blended, drawn with the override");
+        object::with(o, |s| s.material_override = None);
+        assert_eq!(draw(o).2, 1, "the model's own draw is opaque");
+    }
 }

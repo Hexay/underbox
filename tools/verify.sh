@@ -20,5 +20,7 @@ step frame-fog env CORPUS=fog sh "$ROOT/tools/client-frame.sh"
 step frame-fog-managed env CORPUS=fog MANAGED=1 sh "$ROOT/tools/client-frame.sh"
 step frame-hud env CORPUS=hud sh "$ROOT/tools/client-frame.sh"
 step frame-hud-managed env CORPUS=hud MANAGED=1 sh "$ROOT/tools/client-frame.sh"
+step frame-glass env CORPUS=glass sh "$ROOT/tools/client-frame.sh"
+step frame-glass-managed env CORPUS=glass MANAGED=1 sh "$ROOT/tools/client-frame.sh"
 step coverage cargo run -q --manifest-path "$ROOT/Cargo.toml" -p engine2 --bin coverage -j4
 echo "RESULT: PASS"
