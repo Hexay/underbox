@@ -12,6 +12,7 @@ mod compat;
 pub mod comparison;
 pub mod compiler;
 pub mod decl;
+pub mod directives;
 pub mod dxc;
 pub mod expr;
 mod formats;

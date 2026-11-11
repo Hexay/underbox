@@ -4,7 +4,7 @@
 //! The ones the platform reports itself (lobbies, inventory, web tickets) are decoded on the way.
 
 use crate::steam::user::steam;
-use crate::steam::{Calls, SteamInventory, SteamLobbies, SteamServers, SteamUgc, auth_ticket, decode, pump, strings};
+use crate::steam::{Calls, SteamInventory, SteamLobbies, SteamPeers, SteamServers, SteamUgc, auth_ticket, decode, pump, strings};
 use crate::{
     Apps, BeginAuth, Client, CloudStorage, Event, Friends, Inventory, InventoryEvent, Lobbies, LobbyEvent, NetUtils, PeerMessages, ServerBrowser,
     SteamId, TextFilter, Ticket, Workshop,
@@ -19,6 +19,7 @@ pub struct SteamClient {
     calls: Arc<Calls>,
     workshop: SteamUgc,
     lobbies: SteamLobbies,
+    peers: SteamPeers,
     /// Lobbies we've entered; Steam only answers membership for those we're still in.
     joined: Mutex<HashSet<u64>>,
     inventory: SteamInventory,
@@ -58,6 +59,7 @@ impl SteamClient {
             inventory: SteamInventory::client(calls.clone(), events.clone()),
             calls,
             lobbies: SteamLobbies,
+            peers: SteamPeers::client(),
             joined: Mutex::default(),
             servers: SteamServers::default(),
             events,
@@ -81,7 +83,9 @@ impl SteamClient {
         if let Some(user) = decode::session_request(kind, data) {
             let joined: Vec<u64> = self.joined.lock().unwrap().iter().copied().collect();
             if joined.into_iter().any(|l| self.lobbies.is_member(SteamId(l), user)) {
-                self.lobbies.accept(user);
+                self.peers.accept(user);
+            } else {
+                self.peers.requested(user);
             }
         }
         if kind == decode::ids::INVENTORY_DEFINITIONS {
@@ -165,7 +169,7 @@ impl Client for SteamClient {
     }
 
     fn peers(&self) -> Option<&dyn PeerMessages> {
-        Some(&self.lobbies)
+        Some(&self.peers)
     }
 
     fn net_utils(&self) -> Option<&dyn NetUtils> {

@@ -19,7 +19,21 @@ pub struct Clip {
     /// empty when the clip drives no morphs.
     pub morphs: Vec<Vec<f32>>,
     pub events: Vec<ClipEvent>,
+    /// Its sync track's events; empty for the default track (see [`Clip::sync_track`]).
+    pub sync: Vec<SyncEvent>,
 }
+
+/// One sync track event: an ID over a span of the clip, in cycles (0..1). Spans run to the next
+/// event's start, the last wrapping round to the first.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncEvent {
+    pub id: String,
+    pub start: f32,
+    pub duration: f32,
+}
+
+/// Esoterica's default track: one unnamed event over the whole clip.
+static WHOLE_CLIP: SyncEvent = SyncEvent { id: String::new(), start: 0.0, duration: 1.0 };
 
 /// A named event at a time in the clip, with its payload (`AE_FOOTSTEP {Foot, volume}`...).
 #[derive(Debug, Clone, PartialEq)]
@@ -42,7 +56,13 @@ pub struct Fired {
 
 impl Clip {
     pub fn new(name: &str, fps: f32) -> Self {
-        Self { name: name.to_owned(), fps, frames: Vec::new(), looping: false, delta: false, interpolate: true, hidden: false, morphs: Vec::new(), events: Vec::new() }
+        Self { name: name.to_owned(), fps, frames: Vec::new(), looping: false, delta: false, interpolate: true, hidden: false, morphs: Vec::new(), events: Vec::new(), sync: Vec::new() }
+    }
+
+    /// The sync events phase-matched blending divides the clip into: its own, else the one
+    /// whole-clip default event.
+    pub fn sync_track(&self) -> &[SyncEvent] {
+        if self.sync.is_empty() { std::slice::from_ref(&WHOLE_CLIP) } else { &self.sync }
     }
 
     /// Events in `[from, to)` of unwrapped playback time: every lap of a looping clip, else

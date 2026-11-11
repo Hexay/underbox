@@ -105,8 +105,8 @@ impl<'a> Conv<'a> {
     /// `AddState`'s event IDs; timed events keep `ComparisonOperator` (0: ≤, 1: ≥).
     fn state_events(&self, st: &Node) -> StateEvents {
         let ids = |k: &str| st.ints(k).iter().map(|&id| self.id_name(id)).collect();
-        let elapsed = st.items("TimedElapsedEvents").iter().map(|e| (self.id_name(e.setter("ID")), e.float("m_timeValue"), e.setter("ComparisonOperator") == 0)).collect();
-        StateEvents { entry: ids("EntryEvents"), exit: ids("ExitEvents"), fully_in: ids("FullyInStateEvents"), elapsed }
+        let timed = |k: &str| st.items(k).iter().map(|e| (self.id_name(e.setter("ID")), e.float("m_timeValue"), e.setter("ComparisonOperator") == 0)).collect();
+        StateEvents { entry: ids("EntryEvents"), exit: ids("ExitEvents"), fully_in: ids("FullyInStateEvents"), elapsed: timed("TimedElapsedEvents"), remaining: timed("TimedRemainingEvents") }
     }
 
     /// Base, then each overlay layer blended on by its weight (unset: full weight).

@@ -28,6 +28,8 @@ impl Resource for Graph2 {
 pub struct Graph1 {
     name: String,
     pub params: Arc<[ParamDef]>,
+    /// Its sequence nodes' tag spans, raised while direct playback plays that sequence.
+    pub tags: Vec<anim::tag_spans::SequenceTags>,
     error: bool,
     guid: Guid,
     list: OnceLock<NativeRef<class::IAnimParameterList>>,
@@ -49,7 +51,8 @@ struct Entry(Arc<Graph1>, usize);
 static GRAPHS2: ByName<Graph2> = ByName::new();
 static GRAPHS1: ByName<Graph1> = ByName::new();
 
-fn source(name: &str) -> Option<String> {
+/// The source text of resource `name` (compiled `_c` names read their source) on GAME.
+pub(super) fn source(name: &str) -> Option<String> {
     std::fs::read_to_string(crate::fs::resolve(name.strip_suffix("_c").unwrap_or(name), "GAME")?).ok()
 }
 
@@ -75,11 +78,15 @@ pub fn definition(r: Ref2) -> Option<Arc<Definition>> {
 }
 
 pub fn load1(name: &str, guid: Guid) -> Arc<Graph1> {
-    GRAPHS1.find_or_insert(name, || {
-        let params = source(name).and_then(|s| anim::source::vanmgrph::parameters(&s).inspect_err(|e| abi::rt::log::warn(&format!("{name}: {e:?}"))).ok());
-        let error = params.is_none();
-        Graph1 { name: name.to_owned(), params: params.unwrap_or_default().into(), error, guid, list: OnceLock::new(), entries: OnceLock::new() }
-    })
+    GRAPHS1.find_or_insert(name, || parse1(name, source(name).as_deref(), guid))
+}
+
+/// A legacy graph from its `.vanmgrph` text; an error graph without one.
+pub fn parse1(name: &str, src: Option<&str>, guid: Guid) -> Graph1 {
+    let read = src.and_then(|s| anim::source::vanmgrph::read(s).inspect_err(|e| abi::rt::log::warn(&format!("{name}: {e:?}"))).ok());
+    let error = read.is_none();
+    let read = read.unwrap_or_default();
+    Graph1 { name: name.to_owned(), params: read.params.into(), tags: read.tags, error, guid, list: OnceLock::new(), entries: OnceLock::new() }
 }
 
 pub fn handle1(g: Arc<Graph1>) -> Ref1 {

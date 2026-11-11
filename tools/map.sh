@@ -11,7 +11,7 @@ SECS=${1:-90}
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 OUT=$ROOT/target/map
 LOG=$OUT/server.log
-PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" 0)}
+PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" $$)}
 mkdir -p "$OUT"
 
 OUT=$OUT UNTIL='MAP:END' GRACE=1 sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- \

@@ -8,7 +8,7 @@ SECS=${1:-90}
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${2:-}")
 OUT=$ROOT/target/match
 LOG=$OUT/server.log
-PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" 0)}
+PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" $$)}
 mkdir -p "$OUT"
 
 rc=0

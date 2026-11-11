@@ -161,6 +161,37 @@ fn graph_parameters_drive_state_transitions() {
     assert_eq!(*TAGS.lock().unwrap(), [("waving".to_string(), 0)], "up and down between dispatches: Fired");
 }
 
+const LEGACY_GRAPH: &str = r#"<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:animgraph2:version{0f7898b8-5471-45c4-9867-cd9c46bcfdb5} -->
+{
+    _class = "CAnimationGraph"
+    m_pTagManager = { m_tags = [ { _class = "CStringAnimTag" m_name = "lift" m_tagID = { m_id = 1 } }, { _class = "CStringAnimTag" m_name = "hold" m_tagID = { m_id = 2 } } ] }
+    m_pNodeManager = { m_nodes = [ { key = { m_id = 7 } value = { _class = "CSequenceAnimNode" m_sequenceName = "wave" m_tagSpans = [
+        { m_id = { m_id = 1 } m_fStartCycle = 0.25 m_fDuration = 0.1 },
+        { m_id = { m_id = 2 } m_fStartCycle = 0.6 m_fDuration = 0.3 },
+    ] } } ] }
+}"#;
+
+/// `wave` (1 s, looping) under a legacy graph whose `wave` node spans `lift` over cycles
+/// 0.25..0.35 and `hold` over 0.6..0.9: the cycles each update sweeps raise them.
+#[test]
+fn legacy_graph_tag_spans_follow_sequence_playback() {
+    use anim::graph::TagStatus::{self, End, Start};
+    let model = build(c"anim_test_tag_spans");
+    let mut s = AnimState::new(model);
+    s.set_graph1(Some(Arc::new(graph::parse1("legacy.vanmgrph", Some(LEGACY_GRAPH), abi::Guid::default()))));
+    s.sequence.play("wave");
+    let mut step = |dt: f32| {
+        s.update(dt, Xform::IDENTITY);
+        s.graph1.as_mut().unwrap().tags.drain()
+    };
+    let tag = |t: &str, st: TagStatus| (t.to_string(), st);
+    assert_eq!(step(0.2), [], "0..0.2");
+    assert_eq!(step(0.2), [tag("lift", Start)], "0.2..0.4");
+    assert_eq!(step(0.3), [tag("lift", End), tag("hold", Start)], "0.4..0.7");
+    assert_eq!(step(0.5), [], "0.7..1.2 (wrapped): still in hold");
+    assert_eq!(step(0.2), [tag("hold", End), tag("lift", Start)], "the next lap's 0.2..0.4");
+}
+
 static TAGS: Mutex<Vec<(String, i32)>> = Mutex::new(Vec::new());
 
 extern "C" fn on_tag(name: *const std::ffi::c_char, status: i32) {

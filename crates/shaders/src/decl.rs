@@ -63,6 +63,9 @@ pub struct Decls {
     pub attributes: Vec<AttributeDecl>,
     /// `CreateInputTexture2D( ... )` and friends: macro name, then its arguments.
     pub inputs: Vec<Vec<String>>,
+    /// The 1-based line of each `inputs` entry.
+    #[serde(default)]
+    pub input_lines: Vec<u32>,
     /// `ExternalDescriptorSet name Slot n;`
     pub descriptor_sets: Vec<(String, u32)>,
 }
@@ -113,6 +116,9 @@ pub fn extract(text: &str, decls: &mut Decls) -> Result<String, String> {
         if word == "RenderState" {
             decls.render_state_guards.resize(decls.render_states.len() - 1, String::new());
             decls.render_state_guards.push(guards.at(i).to_owned());
+        }
+        if word.starts_with("CreateInputTexture") {
+            decls.input_lines.push(line_of(&s, i));
         }
         blank_bytes(&mut out[i..=end]);
         i = end + 1;

@@ -52,11 +52,19 @@ Read: `m_sceneObjects[]` (`m_renderableModel` or `m_renderable`, `m_vTransform` 
 `m_flFade{Start,End}Distance`, `m_skin`, `m_nLODOverride` (-1 automatic)), `m_sceneObjectLayerIndices`,
 `m_layerNames`, `m_aggregateSceneObjects[]` (`m_renderableModel`, `m_nLayer`, `m_anyFlags`, and
 `m_aggregateMeshes[]` in the CS2 layout (VRF `SceneAggregate.cs`): `m_nDrawCallIndex`, `m_bHasTransform`,
-`m_vTintColor` 0..255, `m_objectFlags`, `m_nLODGroupMask`; `m_fragmentTransforms[]` (3×4 like
-`m_vTransform`) are taken in order by the meshes with a transform, the rest sit at identity: fragments are
-world space). The older layout (meshes without `m_nDrawCallIndex`, draw call → mesh) draws the model whole.
+`m_vTintColor` 0..255, `m_objectFlags`, `m_nLODGroupMask`, `m_nLODSetupIndex`; `m_fragmentTransforms[]`
+(3×4 like `m_vTransform`) are taken in order by the meshes with a transform, the rest sit at identity:
+fragments are world space), and `m_lodSetups[]` (`m_vLODOrigin`, `m_fMaxObjectScale`, `m_fSwitchDistances[]`;
+field names from CS2's `AggregateLODSetup_t`, unverified against a real map). The older layout (meshes without
+`m_nDrawCallIndex`, draw call → mesh) draws the model whole.
 Skipped (counted): `m_clutterSceneObjects`, `m_infoOverlays`. Not read: vis cluster membership, extra vertex
-streams (baked vertex lighting), material overrides, lighting origins, aggregate `m_lodSetups`.
+streams (baked vertex lighting), material overrides, lighting origins.
+
+Fragment LODs (judgment call): a fragment's `m_nLODGroupMask` bit i means "drawn in LOD group i of its
+setup", the same meaning a model mesh's `m_refLODGroupMasks` entry has, and a setup's `m_fSwitchDistances`
+play the model's `m_lodGroupSwitchDistances` (where each group starts). So a fragment's one-draw model takes
+the fragment's mask as its mesh LOD mask (0 = every LOD) and the setup's distances as its own; whatever picks
+model LODs then picks fragment LODs. The LOD origin and max object scale are read but not used.
 
 ## World visibility (`world_visibility.vvis_c`: DATA + VXVS)
 
@@ -91,7 +99,7 @@ u32 type, value)` and `attributeCount × (u32 hash, cstring name, u32 type, valu
 `CreateWorld` opens the pak (a `MountWorldVPK` mount for the stem, else the path on the GAME search paths,
 else loose files), mounts it into the native filesystem (`fs::read`), loads the map, and creates one
 `CSceneObject` per world-node object through `model::load` (`m_nLODOverride` sets the object's LOD), or per
-aggregate fragment over a runtime one-draw copy of the compiled model (fragment LOD masks aren't applied).
+aggregate fragment over a runtime one-draw copy of the compiled model (with the fragment's LOD groups, above).
 Bounds are the union of the placed model bounds. `SetWorldTransform` re-places objects.
 `BuildPvs` reads `world_visibility.vvis_c` and always returns a valid `IPVS`: without usable vis it is empty
 (`IsEmptyPVS`; managed's network culling then skips it) and every query answers visible. `IsInPVS` /

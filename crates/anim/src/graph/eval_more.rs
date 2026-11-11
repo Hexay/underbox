@@ -23,18 +23,20 @@ impl Instance {
         let coords: Vec<[f32; 2]> = points.iter().map(|p| p.0).collect();
         let mut weights = blend2d::weights(at, &coords, triangles);
         weights.retain(|w| w.1 > 1e-6);
-        let Some(&(top, _)) = weights.iter().max_by(|a, b| a.1.total_cmp(&b.1)) else { return Out { pose: bind.clone(), finished: true } };
-        let (mut pose, mut sum, mut finished) = (None::<Pose>, 0.0, false);
+        let Some(&(top, _)) = weights.iter().max_by(|a, b| a.1.total_cmp(&b.1)) else { return Out::ended(bind.clone()) };
+        let (mut pose, mut sum, mut finished, mut remaining) = (None::<Pose>, 0.0, false, 0.0);
         for (i, w) in weights {
             let out = self.eval(points[i].1, dt, bind);
             sum += w;
-            finished |= i == top && out.finished;
+            if i == top {
+                (finished, remaining) = (out.finished, out.remaining);
+            }
             pose = Some(match pose {
                 None => out.pose,
                 Some(acc) => acc.blend(&out.pose, w / sum),
             });
         }
-        Out { pose: pose.unwrap_or_else(|| bind.clone()), finished }
+        Out { pose: pose.unwrap_or_else(|| bind.clone()), finished, remaining }
     }
 
     /// The option `id` chose when it started, choosing it now if it hasn't.
