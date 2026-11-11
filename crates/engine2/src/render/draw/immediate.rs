@@ -6,12 +6,13 @@
 //! (scene/execute.rs), identity otherwise. After `SetRenderState`, `Draw` and `Draw*` shade with
 //! that mode's material program and attributes; the placeholder when it doesn't build or bind.
 
-use super::{Draw, gpu_mesh, model as model_draw, topology};
+use super::{Draw, gizmo, gpu_mesh, model as model_draw, topology};
 use crate::mesh::buffers::{self, IndexBuffer, VertexBuffer};
 use crate::mesh::layout::{self, Layout};
 use super::shaded::{self, ContextBindings, Shaded};
 use crate::render::lighting::Lighting;
 use crate::render::shading::bind::Instance;
+use crate::render::shading::standin;
 use crate::render::{attributes, buffers as gpu_buffers, context, device, material_mode, swap_chain, texture};
 use abi::slots::{i_render_context as ctx, render_tools as tools};
 use abi::structs::{Transform, Vector4};
@@ -125,14 +126,26 @@ fn draw_dynamic(c: Ctx, prim: i64, l: layout::Ref, vertices: RawPtr<c_void>, n: 
     let range = 0..if ib.is_some() { n_indices as u32 } else { n as u32 };
     let state = RasterState { topology: topology(prim), ..Default::default() };
     let shaded = render_state_shading(c, &layout);
-    let draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded };
+    let mut draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded };
+    expand_gizmo(gpu, &mut draw, prim, &layout);
     submit(c, &[draw]);
+}
+
+/// A gizmo material's lines and points as the quads its geometry shader would emit (gizmo.rs).
+fn expand_gizmo(gpu: &render::Gpu, draw: &mut Draw, prim: i64, layout: &Layout) {
+    let kind = draw.shaded.as_ref().and_then(|s| standin::mapped(s.material.shader())).filter(|k| k.replaces_source());
+    if let Some(kind) = kind.filter(|_| *layout == *Layout::sbox_vertex()) {
+        gizmo::expand_bound(gpu, draw, prim, kind);
+    }
 }
 
 /// A draw from the bound buffers: `range` is indices when an index buffer is bound and `indexed`.
 fn draw_bound(c: Ctx, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) {
     let Some((mut draw, layout)) = with(c, |s| bound_draw(s, prim, range, instances, base_vertex, indexed)) else { return };
     draw.shaded = render_state_shading(c, &layout);
+    if let Some(gpu) = device::gpu() {
+        expand_gizmo(gpu, &mut draw, prim, &layout);
+    }
     submit(c, &[draw]);
 }
 
