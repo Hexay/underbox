@@ -182,7 +182,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, sfx::FAILED_RESOURCE_LOAD, |s| sfx(s).is_none_or(|s| s.source().is_none()));
     bind!(r, sfx::CREATE_MIXER, |s| {
         let src = source(s);
-        super::stats::voice_started(src.is_some());
+        super::stats::voice_started(&sfx(s).map(|t| t.name.clone()).unwrap_or_default(), src.is_some());
         src.map_or(NativeRef::null(), |src| crate::audio::mixer::create(Sampler::new(src), s))
     });
 

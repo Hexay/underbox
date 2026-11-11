@@ -36,8 +36,21 @@ fn peak_of(blocks: &[Block]) -> f32 {
     blocks.iter().flat_map(|b| b.iter()).fold(0.0, |m, s| m.max(s.abs()))
 }
 
-pub fn voice_started(ok: bool) {
+/// Names logged per outcome, so a run shows which sounds played without one line per voice.
+const NAMES_LOGGED: usize = 12;
+static NAMES: std::sync::Mutex<Vec<(bool, String)>> = std::sync::Mutex::new(Vec::new());
+
+pub fn voice_started(name: &str, ok: bool) {
     if ok { &STATS.voices } else { &STATS.voice_failures }.fetch_add(1, Relaxed);
+    if !*ENABLED {
+        return;
+    }
+    let mut names = NAMES.lock().unwrap_or_else(|e| e.into_inner());
+    if names.iter().filter(|(o, _)| *o == ok).count() < NAMES_LOGGED && !names.iter().any(|(o, n)| *o == ok && n == name) {
+        names.push((ok, name.to_owned()));
+        let what = if ok { "voice started" } else { "voice failed (no samples)" };
+        abi::rt::log::log(abi::rt::log::Level::Info, &format!("audio stats: {what}: {name}"));
+    }
 }
 
 pub fn voice_read(blocks: &[Block]) {
