@@ -23,14 +23,25 @@ fn read_file(path: &str) -> Option<Vec<u8>> {
     crate::fs::read(path, "GAME")
 }
 
-/// The compiled model at `path`; `None` when there's no `.vmdl_c` (or it doesn't parse).
-pub fn read(path: &str) -> Option<model::Model> {
+type Reader = fn(&[u8], &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<model::Model, assets::compiled::Error>;
+
+fn read_with(path: &str, reader: Reader) -> Option<model::Model> {
     let file = read_file(&compiled_path(path))?;
-    let m = model::read(&file, &read_file).inspect_err(|e| abi::rt::log::warn(&format!("{path}: {e:?}"))).ok()?;
+    let m = reader(&file, &read_file).inspect_err(|e| abi::rt::log::warn(&format!("{path}: {e:?}"))).ok()?;
     if !m.missing.is_empty() {
-        abi::rt::log::warn(&format!("{path}: missing meshes {}", m.missing.join(", ")));
+        abi::rt::log::warn(&format!("{path}: missing {}", m.missing.join(", ")));
     }
     Some(m)
+}
+
+/// The compiled model at `path`; `None` when there's no `.vmdl_c` (or it doesn't parse).
+pub fn read(path: &str) -> Option<model::Model> {
+    read_with(path, model::read)
+}
+
+/// As [`read`] without geometry (see `model::read_rig`).
+pub fn read_rig(path: &str) -> Option<model::Model> {
+    read_with(path, model::read_rig)
 }
 
 fn vertex(v: &assets::compiled::vertex::Vertex) -> Vertex {
@@ -98,6 +109,7 @@ pub fn content(m: &model::Model) -> Content {
         material_groups,
         lod_distances: m.lod_distances.clone(),
         physics,
+        game_data: m.key_value_tree().map(|v| crate::kv3::node::from_value(&v)),
         ..Content::default()
     }
 }

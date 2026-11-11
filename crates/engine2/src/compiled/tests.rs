@@ -13,11 +13,12 @@ use std::sync::{Arc, Once};
 const WORLD_PHYSICS: &str = "maps/compiledtest/world_physics.vphys";
 
 /// One game folder with the fixture files for every test here, on the search paths.
-fn game_dir() -> PathBuf {
+pub(super) fn game_dir() -> PathBuf {
     static MOUNT: Once = Once::new();
     let dir = std::env::temp_dir().join(format!("underbox_compiled_{}", std::process::id()));
     MOUNT.call_once(|| {
         let mut files = fixture::crate_files();
+        files.extend(fixture::rigged_files());
         files.push((format!("{WORLD_PHYSICS}_c"), assets::compiled::physics::write(&fixture::world_physics(256.0, &[]))));
         for (path, bytes) in files {
             let file = dir.join(path);

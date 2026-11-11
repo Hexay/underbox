@@ -38,8 +38,13 @@ fn rigged_model_reads_rig_morphs_and_key_values() {
     let blink = &mesh.targets[1];
     assert_eq!(blink.deltas.len(), 1);
     assert!((blink.deltas[0].1[0] + 1.0).abs() < 1e-2 && (blink.deltas[0].2[2] - 0.5).abs() < 1e-2, "{:?}", blink.deltas);
+    let files = fixture::rigged_files();
+    let rig = model::read_rig(&files[0].1, &|p| files.iter().find(|(n, _)| n == p).map(|(_, b)| b.clone())).unwrap();
+    assert!(rig.meshes[0].mesh.vertices.is_empty() && rig.meshes[0].targets.is_empty());
+    assert_eq!((&rig.animations, &rig.attachments, rig.flex_controllers()), (&m.animations, &m.attachments, m.flex_controllers()));
     let kv = m.key_value_tree().unwrap();
     let kv = kv.as_object().unwrap();
     assert_eq!(kv.str("anim_graph_resource"), Some("animgraphs/rigged.vanmgrph"));
+    assert_eq!(m.anim_graph().as_deref(), Some("animgraphs/rigged.vanmgrph"));
     assert!(kv.get("prop_data").and_then(|v| v.as_object()).is_some());
 }

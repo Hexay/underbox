@@ -9,7 +9,7 @@ use super::super::morph::{self, Target};
 use super::super::rig::{Attachment, Hitbox, HitboxSet, Influence};
 use super::super::texture::{Format, Texture};
 use super::super::vbib::Packing;
-use super::{HALF, MATERIAL, cube};
+use super::{HALF, cube};
 
 pub const RIGGED: &str = "models/compiled/rigged.vmdl";
 pub const ATLAS: &str = "models/compiled/rigged_morphs.vtex";
@@ -136,7 +136,8 @@ fn atlas() -> Texture {
     Texture { width: w as u16, height: h as u16, depth: 1, format: Format::RGBA8888, levels: vec![px], ..Texture::default() }
 }
 
-/// (compiled path, bytes) of the rigged model, its morph atlas, animation group and `.vanim`.
+/// (compiled path, bytes) of the rigged model, its morph atlas, animation group and `.vanim`;
+/// its material is the crate's (see `crate_files`).
 pub fn rigged_files() -> Vec<(String, Vec<u8>)> {
     let (bones, flex) = (rig_bones(), flex_names());
     let (data, key) = encode::write(&[stretch()], &Rig { bones: &bones, flex: &flex }, 2);
@@ -145,6 +146,5 @@ pub fn rigged_files() -> Vec<(String, Vec<u8>)> {
         (format!("{ATLAS}_c"), super::super::texture::write(&atlas(), false)),
         (format!("{GROUP}_c"), encode::group_file(&key, None, &[VANIM])),
         (format!("{VANIM}_c"), encode::anim_file(&data)),
-        (format!("{MATERIAL}_c"), super::super::material::write(&super::material(MATERIAL, [1.0; 4]))),
     ]
 }

@@ -71,6 +71,8 @@ pub struct Model {
     pub anim_groups: Vec<String>,
     /// Embedded animations (after their sequences), then each group's.
     pub animations: Vec<Animation>,
+    /// AnimGraph2 graphs (`m_animGraph2Refs[].m_hGraph`), the default first.
+    pub graph2_refs: Vec<String>,
 }
 
 impl Model {
@@ -82,6 +84,13 @@ impl Model {
     /// The key values as a tree (`None` when empty or unparsable).
     pub fn key_value_tree(&self) -> Option<Value> {
         kv::kv3_text(&self.key_values)
+    }
+
+    /// The animation graph: key value `anim_graph_resource`, else the default AnimGraph2.
+    pub fn anim_graph(&self) -> Option<String> {
+        let kv = self.key_value_tree();
+        let named = kv.as_ref().and_then(Value::as_object).and_then(|o| o.str("anim_graph_resource")).filter(|s| !s.is_empty());
+        named.map(str::to_owned).or_else(|| self.graph2_refs.first().cloned())
     }
 }
 
@@ -110,27 +119,43 @@ fn object_at(file: &[u8], index: i64) -> Result<Object, Error> {
 /// A mesh with its data object and morph set.
 type Loaded = (String, Mesh, Object, Option<MorphSet>);
 
-/// The CTRL entry for mesh slot `index`, if the mesh is embedded.
-fn embedded(file: &[u8], ctrl: &Object, index: usize) -> Result<Option<Loaded>, Error> {
+/// The CTRL entry for mesh slot `index`, if the mesh is embedded. Without `full` the mesh is
+/// left empty (its buffers aren't decoded).
+fn embedded(file: &[u8], ctrl: &Object, index: usize, full: bool) -> Result<Option<Loaded>, Error> {
     let Some(e) = objects(ctrl, "embedded_meshes").find(|e| kv::int_or(e, "mesh_index", kv::int_or(e, "m_nMeshIndex", -1)) == index as i64) else { return Ok(None) };
     let old = e.get("vbib_block").is_some();
     let (name, data_block, morph_block) =
         if old { (string(e, "name"), int(e, "data_block"), kv::int_or(e, "morph_block", -1)) } else { (string(e, "m_Name"), int(e, "m_nDataBlock"), kv::int_or(e, "m_nMorphBlock", -1)) };
     let data = object_at(file, data_block)?;
+    let morph = (morph_block >= 0).then(|| object_at(file, morph_block)).transpose()?.map(|o| morph::read(&o));
+    if !full {
+        return Ok(Some((name, Mesh::default(), data, morph)));
+    }
     let buffers = match e.get("vbib_block") {
         Some(v) => vbib::read(block_at(file, kv::int_of(v).unwrap_or(-1))?)?,
         None => vbib::from_kv3(e, file)?,
     };
-    let morph = (morph_block >= 0).then(|| object_at(file, morph_block)).transpose()?.map(|o| morph::read(&o));
     Ok(Some((name, mesh::build(&data, &buffers)?, data, morph)))
+}
+
+/// A `.vmesh_c` named by the model; without `full`, only its data and morph set.
+fn external(path: &str, bytes: &[u8], full: bool) -> Result<Loaded, Error> {
+    let (mesh, data) = if full {
+        mesh::read_with_data(bytes)?
+    } else {
+        let Value::Object(data) = super::kv3_block(bytes, b"DATA", "DATA")? else { return Err(format("mesh DATA isn't an object")) };
+        (Mesh::default(), data)
+    };
+    let own = crate::container::block(bytes, b"MRPH")?.map(crate::kv3bin::read).transpose()?;
+    Ok((path.to_owned(), mesh, data, own.as_ref().and_then(Value::as_object).map(morph::read)))
 }
 
 pub(crate) fn compiled_name(path: &str) -> String {
     if path.ends_with("_c") { path.to_owned() } else { format!("{path}_c") }
 }
 
-/// A mesh's own morph set, else the `.vmorf` its data names; and its targets from the atlas.
-fn morph_targets(data: &Object, own: Option<MorphSet>, load: &dyn Fn(&str) -> Option<Vec<u8>>) -> (Option<MorphSet>, Vec<Target>) {
+/// A mesh's own morph set, else the `.vmorf` its data names; and with `full`, its targets from the atlas.
+fn morph_targets(data: &Object, own: Option<MorphSet>, load: &dyn Fn(&str) -> Option<Vec<u8>>, full: bool) -> (Option<MorphSet>, Vec<Target>) {
     let set = own.or_else(|| {
         let path = string(data, "m_morphSet");
         let bytes = (!path.is_empty()).then(|| load(&compiled_name(&path))).flatten()?;
@@ -139,7 +164,7 @@ fn morph_targets(data: &Object, own: Option<MorphSet>, load: &dyn Fn(&str) -> Op
     });
     let targets = set
         .as_ref()
-        .filter(|s| !s.atlas.is_empty())
+        .filter(|s| full && !s.atlas.is_empty())
         .and_then(|s| {
             let t = super::texture::read(&load(&compiled_name(&s.atlas))?).ok()?;
             Some(s.targets(&super::texture::decode(&t, 0, 0, 0)?))
@@ -178,6 +203,16 @@ fn animations(file: &[u8], ctrl: &Object, model: &mut Model, load: &dyn Fn(&str)
 
 /// The model in `file`; `load` reads another compiled file by resource path.
 pub fn read(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<Model, Error> {
+    read_parts(file, load, true)
+}
+
+/// Everything but geometry: meshes come back empty and morph sets without targets, so only
+/// the skeleton, rig, flex data, key values and animations are decoded.
+pub fn read_rig(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<Model, Error> {
+    read_parts(file, load, false)
+}
+
+fn read_parts(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>, full: bool) -> Result<Model, Error> {
     let data = super::kv3_block(file, b"DATA", "DATA")?;
     let data = data.as_object().ok_or_else(|| format("model DATA isn't an object"))?;
     let ctrl = crate::container::block(file, b"CTRL")?.map(crate::kv3bin::read).transpose()?;
@@ -194,19 +229,16 @@ pub fn read(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<Model
         physics_refs: strings(data, "m_refPhysicsData"),
         key_values: string(kv::object(data, "m_modelInfo"), "m_keyValueText"),
         anim_groups: strings(data, "m_refAnimGroups"),
+        graph2_refs: objects(data, "m_animGraph2Refs").map(|g| string(g, "m_hGraph")).filter(|g| !g.is_empty()).collect(),
         ..Model::default()
     };
     for (i, r) in refs.iter().enumerate() {
         let path = r.as_str().unwrap_or_default();
-        let found = match embedded(file, &ctrl, i)? {
+        let found = match embedded(file, &ctrl, i, full)? {
             Some(m) => Some(m),
             None if path.is_empty() => None,
             None => match load(&compiled_name(path)) {
-                Some(bytes) => {
-                    let (mesh, data) = mesh::read_with_data(&bytes)?;
-                    let own = crate::container::block(&bytes, b"MRPH")?.map(crate::kv3bin::read).transpose()?;
-                    Some((path.to_owned(), mesh, data, own.as_ref().and_then(Value::as_object).map(morph::read)))
-                }
+                Some(bytes) => Some(external(path, &bytes, full)?),
                 None => {
                     model.missing.push(path.to_owned());
                     None
@@ -214,7 +246,7 @@ pub fn read(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<Model
             },
         };
         let Some((name, mesh, data, own)) = found else { continue };
-        let (morph, targets) = morph_targets(&data, own, load);
+        let (morph, targets) = morph_targets(&data, own, load, full);
         for a in rig::attachments(&data) {
             if !model.attachments.iter().any(|x| x.name.eq_ignore_ascii_case(&a.name)) {
                 model.attachments.push(a);

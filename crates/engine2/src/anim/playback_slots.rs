@@ -85,18 +85,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::RUN_ANIMATION_EVENTS, |_, _| {});
     bind!(r, o::DISPATCH_TAG_EVENTS, |_, _| {});
 
-    // Morph overrides by index; by name needs flex controllers, which no model of ours has yet.
-    bind!(r, o::S_BOX_SET_FLEX_OVERRIDE_1, |r, i, w, _fade| with(r, |s| {
-        s.flex.insert(i, w);
-    }));
-    bind!(r, o::S_BOX_GET_FLEX_OVERRIDE, |r, i| with(r, |s| s.flex.get(&i).copied().unwrap_or(0.0)));
-    bind!(r, o::S_BOX_CLEAR_FLEX_OVERRIDE, |r, _fade| with(r, |s| s.flex.clear()));
-    bind!(r, o::S_BOX_CLEAR_FLEX_OVERRIDE_2, |r, i, _fade| with(r, |s| {
-        s.flex.remove(&i);
-    }));
-    bind!(r, o::S_BOX_SET_FLEX_OVERRIDE, |_, _, _, _| {});
-    bind!(r, o::S_BOX_GET_FLEX_OVERRIDE_1, |_, _| 0.0);
-    bind!(r, o::S_BOX_CLEAR_FLEX_OVERRIDE_1, |_, _, _| {});
+    // Morph overrides are in `super::flex`.
     // Deformation volumes only change rendered vertices.
     bind!(r, o::SET_DEFORMATION_VOLUMES, |_, _, _| {});
     bind!(r, o::SET_DEFORMATION_ANCHORS, |_, _, _| {});
