@@ -9,4 +9,6 @@ pub mod material;
 pub mod meshopt;
 pub mod model;
 pub mod project;
+#[cfg(test)]
+mod real_files_tests;
 mod redi;
