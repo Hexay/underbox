@@ -39,6 +39,7 @@ fn index_state(s: &Sampler) -> IndexState {
 fn read_to_buffer(r: Ref, pitch: f32, out: DevRef) {
     let mut blocks = audio::blocks(mix::channel_count(out));
     with(r, |s| s.read(pitch, &mut blocks));
+    super::stats::voice_read(&blocks);
     mix::write_all(out, &blocks);
 }
 
