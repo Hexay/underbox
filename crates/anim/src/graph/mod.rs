@@ -6,6 +6,7 @@ pub mod blend2d;
 mod eval;
 mod eval_more;
 pub mod ik;
+mod random;
 pub mod recording;
 mod smooth;
 mod value;
@@ -84,6 +85,8 @@ pub enum ValueNode {
     Ease { input: ValueId, time: f32, easing: Easing, start: Option<f32> },
     /// A damped spring (`hertz`, damping ratio) tracking `input`.
     Spring { input: ValueId, hertz: f32, damping: f32, start: Option<f32> },
+    /// Uniform in `[min, max]`, drawn when a pose node reading it starts (see `random`).
+    Random { min: f32, max: f32 },
 }
 
 /// managed's `GraphBuilder.Easing`, in its order.

@@ -27,6 +27,7 @@ impl Compiler {
                 let easing = Easing::named(str_of(n, "Easing")).unwrap_or(Easing::Linear);
                 ValueNode::Ease { input: input(self), time: f32_of(n, "EaseTime", 0.0), easing, start: start(n) }
             }
+            "RandomFloatNode" => ValueNode::Random { min: f32_of(n, "Min", 0.0), max: f32_of(n, "Max", 1.0) },
             "ConstBoneTargetNode" => ValueNode::Const(Value::Target(Target { set: true, bone: Some(str_of(n, "Bone").to_owned()), ..Target::default() })),
             _ => return None,
         })

@@ -2,6 +2,7 @@
 //! root. Only active nodes advance; entering a state restarts its subtree.
 
 use super::eval_more::Rig;
+use super::random::{self, Draws};
 use super::smooth::{self, Smooth};
 use super::value::{StateCtx, Values};
 use super::{Definition, PoseId, PoseNode, State};
@@ -46,6 +47,7 @@ pub struct Instance {
     smooth: Vec<Smooth>,
     /// Clip events passed since the last `take_events`.
     events: Vec<Fired>,
+    pub(super) draws: Draws,
 }
 
 impl Instance {
@@ -55,7 +57,8 @@ impl Instance {
         let clips = def.slots.iter().map(|s| clip(s)).collect();
         let nodes = vec![NodeState::Idle; def.poses.len()];
         let smooth = vec![Smooth::default(); def.values.len()];
-        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new() }
+        let draws = Draws::new(random::next_seed(), &def.values);
+        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new(), draws }
     }
 
     /// The clip events playing clips passed since the last call.
@@ -79,6 +82,7 @@ impl Instance {
     pub fn restart(&mut self) {
         self.nodes.fill(NodeState::Idle);
         self.smooth.fill(Smooth::default());
+        self.draws.rewind(&self.def.values);
     }
 
     /// Advance by `dt` seconds and return the pose. `bind` is the skeleton's bind pose.
@@ -98,7 +102,7 @@ impl Instance {
     }
 
     pub(super) fn values(&self, ctx: StateCtx) -> Values<'_> {
-        Values { def: &self.def, params: &self.params, ctx, smooth: &self.smooth }
+        Values { def: &self.def, params: &self.params, ctx, smooth: &self.smooth, random: &self.draws.held }
     }
 
     pub(super) fn eval(&mut self, id: PoseId, dt: f32, bind: &Pose) -> Out {
@@ -217,6 +221,7 @@ impl Instance {
     fn reset(&mut self, id: PoseId) {
         let def = self.def.clone();
         self.nodes[id] = NodeState::Idle;
+        self.redraw_for(id);
         for input in def.poses[id].inputs() {
             self.reset(input);
         }

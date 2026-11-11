@@ -1,4 +1,4 @@
-//! Builder nodes beyond `convert`/`convert_pose`: eases, springs and const targets; blend2D,
+//! Builder nodes beyond `convert`/`convert_pose`: eases, springs, random floats and const targets; blend2D,
 //! the selectors, and the IK nodes (foot IK as a two-bone IK per foot).
 
 use super::convert::Conv;
@@ -31,6 +31,7 @@ impl<'a> Conv<'a> {
                 ValueNode::Ease { input: self.value(input), time: n.float("m_easeTime"), easing, start: start(n) }
             }
             "CFloatSpringNode" => ValueNode::Spring { input: self.value(input), hertz: n.float("m_hertz"), damping: n.float("m_dampingRatio"), start: start(n) },
+            "CFloatRandomNode" => ValueNode::Random { min: n.float("m_min"), max: n.float("m_max") },
             "CConstTargetNode" => {
                 let bone = n.bool("m_isBoneTarget").then(|| self.id_name(n.setter("BoneID")));
                 let t = n.components("m_translation");

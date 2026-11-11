@@ -50,6 +50,8 @@ pub struct Values<'a> {
     pub ctx: StateCtx,
     /// Ease/spring state per value node (see `smooth`); empty reads their input.
     pub(super) smooth: &'a [Smooth],
+    /// Each random node's held draw (see `random`); empty reads `min`.
+    pub(super) random: &'a [f32],
 }
 
 impl Values<'_> {
@@ -87,6 +89,7 @@ impl Values<'_> {
                 Some(s) => Value::Float(s.value),
                 None => Value::Float(self.float(*input)),
             },
+            ValueNode::Random { min, .. } => Value::Float(self.random.get(id).copied().unwrap_or(*min)),
         }
     }
 

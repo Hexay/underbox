@@ -116,7 +116,7 @@ fn time_in_state_and_value_math() {
     let is_swim = def.add_value(ValueNode::IdMatches { id, ids: vec!["SWIM".into()], negate: false });
     let shared = def.into_shared();
     let mut g = Instance::new(shared.clone(), clips);
-    let values = value::Values { def: &shared, params: &g.params, ctx: Default::default(), smooth: &[] };
+    let values = value::Values { def: &shared, params: &g.params, ctx: Default::default(), smooth: &[], random: &[] };
     assert_eq!((values.float(sum), values.float(remap), values.bool(is_swim)), (2.0, 15.0, true));
     let unary = |op| value::math(-2.75, 0.0, op);
     assert_eq!(
