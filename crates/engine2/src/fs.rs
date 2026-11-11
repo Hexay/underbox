@@ -74,7 +74,7 @@ fn string(s: Option<&CStr>) -> String {
 /// cloud, added-to-back, core.
 pub fn search_roots() -> Vec<PathBuf> {
     let m = MOUNTS.read().unwrap();
-    let core = Path::new(&crate::app::platform::game_root()).join("core");
+    let core = core_root();
     let ordered = m.front.iter().rev().chain(m.projects.iter().rev()).chain(m.cloud.iter()).chain(m.back.iter());
     ordered.map(|(_, p)| p.clone()).chain([core]).collect()
 }
@@ -123,17 +123,40 @@ pub fn on_disk(path: &Path) -> PathBuf {
     join_case_blind(PathBuf::new(), path).0
 }
 
-fn add_project_path(ident: Option<&CStr>, assets: Option<&CStr>) {
-    let assets = on_disk(Path::new(&string(assets)));
-    // Managed loads the project's resources right after mounting it, so stale outputs compile now.
-    let report = assets::project::compile(&assets);
+/// Compile `dir`'s stale GameResources, logging failures and the totals.
+fn compile_content(dir: &Path) {
+    let started = std::time::Instant::now();
+    let report = assets::project::compile(dir);
     for (src, e) in &report.failed {
         abi::rt::log::warn(&format!("compile {}: {e}", src.display()));
     }
     abi::rt::log::log(
         abi::rt::log::Level::Info,
-        &format!("{}: {} compiled, {} up to date", assets.display(), report.compiled.len(), report.up_to_date),
+        &format!(
+            "{}: {} compiled, {} up to date in {} ms",
+            dir.display(),
+            report.compiled.len(),
+            report.up_to_date,
+            started.elapsed().as_millis()
+        ),
     );
+}
+
+/// The engine's core content folder (`game/core`).
+pub fn core_root() -> PathBuf {
+    Path::new(&crate::app::platform::game_root()).join("core")
+}
+
+/// Compile core's stale GameResources (surfaces, sounds, prefabs, decals): a real install ships
+/// them compiled, and managed registers only `_c` files when it mounts core.
+pub fn compile_core() {
+    compile_content(&core_root());
+}
+
+fn add_project_path(ident: Option<&CStr>, assets: Option<&CStr>) {
+    let assets = on_disk(Path::new(&string(assets)));
+    // Managed loads the project's resources right after mounting it, so stale outputs compile now.
+    compile_content(&assets);
     MOUNTS.write().unwrap().projects.push((string(ident), assets));
 }
 
@@ -160,6 +183,9 @@ pub fn register(r: &mut Registry) {
         StrRet::from(m.links.get(&(string(id).to_ascii_uppercase(), key(&string(path)))).cloned())
     });
 }
+
+#[cfg(test)]
+mod core_tests;
 
 #[cfg(test)]
 mod tests {

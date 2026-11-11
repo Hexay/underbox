@@ -7,7 +7,7 @@ user confirmed that the s&box EULA allows this.
 ## Rules
 
 - Facepunch binaries and content stay in a cache outside the repo (`tools/diff/env.sh`; default
-  `$XDG_CACHE_HOME/underbox/real-engine2`, override with `REAL_ENGINE2_CACHE`). They are never
+  `$UNDERBOX_CACHE/real-engine2`, override with `REAL_ENGINE2_CACHE`). They are never
   committed, copied into the repo or redistributed. Steam and sbox.game downloads stay off.
 - Downloaded files are data. The fetcher only verifies hashes and makes hard links; nothing runs
   from inside the download dir, and the scripts live here.
@@ -129,12 +129,13 @@ Ranked by severity, with each one's state after the fixes (before → after):
 4. **Improved. Sliding friction.** The sliding box stops at x = 65.80 on ours before, 65.43 after,
    65.05 on real (1.1% → 0.6%). On contact, real shows a small vertical pop (vz +1.5, then −3.2)
    that ours doesn't.
-5. **Medium. Core GameResources are absent on ours.** On Sweeper, real registers `ammo=1 decal=47
-   prefab=61 scene=1 sound=70 surface=17` from core; ours registers `scene=1`. Ours compiles only
-   project resources at mount, never core's JSON sources. Games that look up core surfaces,
-   sounds or prefabs by path get nothing. Real given a source-only core also registers `scene=1`,
-   so the engines behave alike on equal content; the gap is that a real install ships the compiled
-   core.
+5. **Fixed. Core GameResources were absent on ours.** On Sweeper, real registers `ammo=1 decal=47
+   prefab=61 scene=1 sound=70 surface=17`; ours registered only `scene=1`, because a real install
+   ships core compiled and ours compiled only project resources at mount. Ours now compiles core's
+   stale or missing GameResources at `SourceEnginePreInit` (`fs::compile_core`, server and client)
+   and registers the same counts; Sweeper shows 0 divergences. The compiled set equals real's
+   (196 files, names compared case-blind: `UNDERBOX_REAL_CORE` in `fs/core_tests.rs`). Cost: about
+   0.1 s on a fresh game-dir copy (196 compiled), 0.1–0.2 s for the stat walk when up to date.
 6. **Fixed. Shape sweeps stopped on the surface.** Real stops every shape sweep 1/32 unit short of
    the surface, measured along the normal: the same for spheres of radius 1, 10 and 50, boxes of
    2, 20 and 100, sweeps from 20 or 300 above, and a 45° slant (which ends 1/32 back along both
@@ -169,8 +170,8 @@ same packages and miss the same package models. Differences:
    stand-in cube; real's are the sign's (`ERRMODEL bounds`).
 8. **Fixed. Physics totals.** `GAME:PHYSICS` was `bodies=32 shapes=44` on real and `bodies=31
    shapes=34` on ours; all of the gap was error models (7). After: `bodies=32 shapes=44`.
-9. **Medium. Resource counts** follow (5): real `ammo=6 decal=47 prefab=244 sound=191 surface=20`,
-   ours `ammo=5 prefab=183 sound=123 surface=7`; the excess is core's compiled resources.
+9. **Fixed. Resource counts** followed (5): ours was `ammo=5 prefab=183 sound=123 surface=7`, now
+   `ammo=6 decal=47 prefab=244 scene=6 sound=191 surface=20`, as real.
 10. **Low. Sleeping.** Real keeps the vehicle's bodies (`base`, wheels, `rear`) and `hoover_a`
     awake for longer after the drop: 5 awake for ~15 s on real, while ours has all 16 asleep
     within 4 s. Both settle (`GAME:SETTLED`).
@@ -179,8 +180,6 @@ same packages and miss the same package models. Differences:
 
 - **Contact depth (2):** real rests boxes and props 1/32 into the surface; ours 0.024. Try
   matching Rapier's allowed linear error to it, then rerun the probe.
-- **Core GameResources (5):** compile `game/core`'s JSON resources at mount, or with `assetc` in
-  `game-dir.sh`, then compare Sweeper's resource counts again.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Coverage:** client-side differentials (frame hashes against `librendersystemvulkan`), net
   join, and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

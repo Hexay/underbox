@@ -1,5 +1,5 @@
-//! Compile a project's content folder: every source with a compiler gets its `<file>_c` beside
-//! it, when that output is missing or older than the source.
+//! Compile a content folder (a project's Assets, or the engine's core): every source with a
+//! compiler gets its `<file>_c` beside it, when that output is missing or older than the source.
 
 use crate::game_resource;
 use std::path::{Path, PathBuf};
@@ -41,7 +41,13 @@ pub fn compile(root: &Path) -> Report {
 fn compile_one(root: &Path, src: &Path, out: &Path) -> Result<(), String> {
     let json = std::fs::read_to_string(src).map_err(|e| e.to_string())?;
     let rel = src.strip_prefix(root).unwrap_or(src).to_string_lossy().replace('\\', "/");
-    std::fs::write(out, game_resource::compile(&json, &rel, GAME_RESOURCE_VERSION)).map_err(|e| e.to_string())
+    // Write then rename: another process sharing the content folder may be reading `out` right now.
+    let tmp = PathBuf::from(format!("{}.{}.tmp", out.display(), std::process::id()));
+    std::fs::write(&tmp, game_resource::compile(&json, &rel, GAME_RESOURCE_VERSION)).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, out).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e.to_string()
+    })
 }
 
 fn is_fresh(src: &Path, out: &Path) -> bool {
