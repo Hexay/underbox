@@ -1,0 +1,24 @@
+name: rust
+description: Stable toolchain, sccache, and a rust-cache of registry crates.
+inputs:
+  components:
+    description: Extra rustup components (comma-separated).
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+      with:
+        toolchain: stable
+        components: ${{ inputs.components }}
+    - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      with:
+        version: v0.19.0
+    # rust-cache never re-saves a key it fully matched, and its key ignores [profile] sections:
+    # without the manifest hash a profile change (naga opt-level) rebuilt those crates on every run.
+    # Only main saves; branches and PRs restore main's.
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      with:
+        key: ${{ hashFiles('Cargo.toml', '.cargo/config.toml') }}
+        cache-on-failure: true
+        save-if: ${{ github.ref == 'refs/heads/main' }}

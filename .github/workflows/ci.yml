@@ -1,108 +1,120 @@
 name: ci
 on:
   push:
-    branches: [main]
+    paths-ignore: &docs ["**.md", "docs/**", "research/**", "LICENSE", "NOTICE"]
   pull_request:
+    paths-ignore: *docs
 
-# A newer push to the same branch supersedes an in-flight run.
+permissions:
+  contents: read
+
+# A newer push supersedes an in-flight run, except on main, where every commit gets a full run.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  # No debuginfo: smaller rust-cache, faster links (most of all MSVC's PDBs).
+  # No debuginfo: smaller caches, faster links (most of all MSVC's PDBs).
   CARGO_PROFILE_DEV_DEBUG: 0
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
 
+# Every job skips a pull_request from this repo's own branches: their push run already covers it.
 jobs:
-  linux:
+  clippy:
+    if: &not-own-pr github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
-    # clippy's workspace wrapper gives workspace crates their own build-script runs, so the GNS and
-    # SDL cmake builds would compile twice per job; sccache serves the second (and the next run's).
+    timeout-minutes: 30
     env:
-      SCCACHE_GHA_ENABLED: "true"
-      CMAKE_C_COMPILER_LAUNCHER: sccache
-      CMAKE_CXX_COMPILER_LAUNCHER: sccache
+      # Lints never come from a cache: sccache doesn't hash clippy's configuration.
+      RUSTC_WRAPPER: ""
     steps:
       # Not recursive: GNS's nested submodules (webrtc, abseil, vjson) are for ICE and its tools, both off.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
-      # No libasound2-dev: libasound is dlopened (.cargo/config.toml, crates/audio/src/alsa_dl).
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake protobuf-compiler libprotobuf-dev libssl-dev
-      # SDL3 (crates/window): X11 and its extensions, udev for gamepads, D-Bus for portals and IME.
-      - run: sudo apt-get install -y --no-install-recommends libx11-dev libxext-dev libxcursor-dev libxfixes-dev libxi-dev libxrandr-dev libxss-dev libxtst-dev libudev-dev libdbus-1-dev
-      # lavapipe: software Vulkan, so the wgpu render tests run on a GPU-less runner.
-      - run: sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
-      - uses: dtolnay/rust-toolchain@stable
+          persist-credentials: false
+      - uses: ./.github/actions/linux-deps
+      - uses: ./.github/actions/rust
         with:
           components: clippy
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace --no-fail-fast
-      - run: sccache --show-stats
 
-  # The release libengine2, built on the oldest supported distro so its glibc symbol versions are
-  # the baseline; dist-check fails on any other dynamic dependency (docs/release.md).
-  dist:
+  test-linux:
+    if: *not-own-pr
     runs-on: ubuntu-24.04
-    container: ubuntu:22.04
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      CMAKE_C_COMPILER_LAUNCHER: sccache
-      CMAKE_CXX_COMPILER_LAUNCHER: sccache
-      DIST_GLIBC_MAX: "2.35"
+    timeout-minutes: 30
     steps:
-      # git before checkout, or it downloads a tarball without submodules.
-      - run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl unzip build-essential cmake pkg-config libssl-dev
-      - run: apt-get install -y --no-install-recommends libx11-dev libxext-dev libxcursor-dev libxfixes-dev libxi-dev libxrandr-dev libxss-dev libxtst-dev libudev-dev libdbus-1-dev
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
-      # The workspace belongs to another uid inside the container; dist.sh reads its git hash.
-      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: sh tools/dist.sh
-      # A tarball keeps the module symlinks; upload-artifact would copy libengine2 once per link.
-      - run: tar -czf libengine2-linux-x64.tar.gz -C dist .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: libengine2-linux-x64
-          path: libengine2-linux-x64.tar.gz
+          persist-credentials: false
+      - uses: ./.github/actions/linux-deps
+      - uses: ./.github/actions/dxc
+      - uses: ./.github/actions/rust
+      - run: cargo test --workspace --no-fail-fast
 
   windows:
+    if: *not-own-pr
     runs-on: windows-2022
+    timeout-minutes: 60
     env:
       VCPKG_ROOT: C:\vcpkg
+      # The Visual Studio generators ignore the compiler launcher, so sccache needs Ninja.
+      CMAKE_GENERATOR: Ninja
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
+          persist-credentials: false
       # Saved right after install, not at job end: the build takes ~28 min and must survive a failed job.
       - id: vcpkg
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: C:\vcpkg\installed
           key: vcpkg-protobuf-x64-windows-static-md-v1
       - if: steps.vcpkg.outputs.cache-hit != 'true'
         run: vcpkg install protobuf:x64-windows-static-md
       - if: steps.vcpkg.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: C:\vcpkg\installed
           key: vcpkg-protobuf-x64-windows-static-md-v1
-      - uses: dtolnay/rust-toolchain@stable
-      # Without cache-on-failure a red job saves nothing and the next run is cold again.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
+      - uses: ./.github/actions/dxc
+      - uses: ./.github/actions/rust
       # No clippy here: Linux lints the same code, and a check pass shares no artifacts with test.
       - run: cargo test --workspace --no-fail-fast
+
+  # The release libengine2, built on the oldest supported distro so its glibc symbol versions are
+  # the baseline; dist-check fails on any other dynamic dependency (docs/release.md).
+  dist:
+    if: *not-own-pr
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 30
+    env:
+      DIST_GLIBC_MAX: "2.35"
+    steps:
+      # git before checkout, or it downloads a tarball without submodules.
+      - run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends git ca-certificates curl unzip build-essential cmake pkg-config libssl-dev \
+            libx11-dev libxext-dev libxcursor-dev libxfixes-dev libxi-dev libxrandr-dev libxss-dev libxtst-dev libudev-dev libdbus-1-dev
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      # The workspace belongs to another uid inside the container; dist.sh reads its git hash.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: ./.github/actions/rust
+      - run: sh tools/dist.sh
+      # A tarball keeps the module symlinks; upload-artifact would copy libengine2 once per link.
+      - run: tar -czf libengine2-linux-x64.tar.gz -C dist .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: libengine2-linux-x64
+          path: libengine2-linux-x64.tar.gz

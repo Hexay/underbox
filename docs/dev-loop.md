@@ -63,10 +63,17 @@ crates once (about 5 s). Removing `CARGO_INCREMENTAL=0` from the agent environme
 
 ## CI
 
-Windows builds GameNetworkingSockets against the cached `VCPKG_ROOT` protobuf in classic mode;
-manifest mode (GNS ships a `vcpkg.json`) rebuilt protobuf, openssl and abseil on every cold run
-(about 55 min). Windows runs tests only; Linux runs clippy for both. rust-cache saves on failure too.
-On Linux, clippy and test each run the workspace build scripts (clippy's wrapper changes their
-hash); sccache as the cmake compiler launcher makes the second GNS build mostly cache hits.
-Checkouts aren't recursive: GNS's nested submodules (webrtc, abseil) are only for ICE. The `dist`
-job runs in parallel, in an `ubuntu:22.04` container (docs/release.md).
+`.github/workflows/ci.yml` runs four parallel jobs: `clippy` and `test-linux` (Linux), `windows`
+(tests only; Linux lints for both) and `dist` (an `ubuntu:22.04` container, docs/release.md).
+Docs-only pushes (`*.md`, `docs/`, `research/`) skip CI. Shared steps are composite actions in
+`.github/actions/` (`rust`, `linux-deps`, `dxc`).
+
+- Tests need DXC: the `dxc` action runs `tools/fetch-dxc.sh` into a cached `UNDERBOX_DXC_DIR`.
+- sccache caches Rust (`RUSTC_WRAPPER`, except clippy) and the cmake builds (GNS, SDL, protobuf);
+  Windows uses Ninja because the Visual Studio generators ignore the compiler launcher.
+- rust-cache saves only on main and keys on `Cargo.toml` too: it never re-saves a fully matched key,
+  and its own key ignores `[profile]` sections.
+- Windows builds GameNetworkingSockets against the cached `VCPKG_ROOT` protobuf in classic mode;
+  manifest mode (GNS ships a `vcpkg.json`) rebuilt protobuf, openssl and abseil (about 55 min).
+- Checkouts aren't recursive: GNS's nested submodules (webrtc, abseil) are only for ICE.
+- Public repo: `contents: read` token, actions pinned by SHA, no secrets, no `pull_request_target`.
