@@ -101,6 +101,22 @@ fn touch_events_follow_the_function_mask() {
     assert_eq!(run(&mut world, 1), [EventKind::TouchEnd], "dropping SOLID ends the touch");
 }
 
+/// sbox-walker's teleport trigger overlaps its floor and a keyframed coin; reporting either pair
+/// teleported the coin's root, the whole map.
+#[test]
+fn static_trigger_ignores_static_and_keyframed_but_sees_dynamic() {
+    let mut world = World::default();
+    world.set_gravity(Vector::ZERO);
+    slab(&mut world, true, &[]);
+    slab(&mut world, false, &[]);
+    let coin = world.add_body(BodyType::Keyframed, Pose::from_translation(Vector::new(50.0, 0.0, 5.0)));
+    world.add_shape(coin, &Shape::Sphere { center: Vector::ZERO, radius: 5.0 }, Surface::default()).unwrap();
+    assert_eq!(run(&mut world, 5), [], "no static or keyframed trigger touch");
+    let (body, _) = ball(&mut world, 60.0, &[]);
+    world.body_mut(body).unwrap().set_linvel(Vector::new(0.0, 0.0, -600.0), true);
+    assert!(run(&mut world, 10).contains(&EventKind::TriggerBegin));
+}
+
 #[test]
 fn touch_event_carries_contact_data() {
     let mut world = World::default();

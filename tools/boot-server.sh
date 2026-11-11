@@ -29,10 +29,16 @@ lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
 sh "$ROOT/tools/submodules.sh"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX")
-trap 'rm -f "$GAME/.underbox-lease.$$"' EXIT
+LEASED=$GAME
+trap 'rm -f "$LEASED/.underbox-lease.$$"' EXIT
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
-sh "$ROOT/tools/install-engine2.sh" "$GAME"
+if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
+    # Facepunch's engine2 instead of ours: see docs/differential.md
+    GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$UNDERBOX_REAL_ENGINE2" $$ "$@")
+else
+    sh "$ROOT/tools/install-engine2.sh" "$GAME"
+fi
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
 
 cd "$GAME"

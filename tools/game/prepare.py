@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make a scratch copy of a game project start in one of its own scenes with our watcher in it.
 
-Only ever pointed at a copy under /srv/agents/cache: the checkouts it comes from stay read-only.
+Only ever pointed at a copy under $UNDERBOX_GAME_COPIES: the checkouts it comes from stay read-only.
 Prints the copy's .sbproj path.
 """
 import argparse
@@ -41,6 +41,17 @@ def set_startup_scene(sbproj, scene):
     sbproj.write_text(json.dumps(project, indent=2), encoding="utf-8")
 
 
+def on_disk(root, rel):
+    """`root/rel` as spelled on disk; engine2 and managed resolve resource paths case-blind (walker: Scenes/)."""
+    path = root
+    for part in pathlib.PurePosixPath(rel).parts:
+        exact = path / part
+        if not exact.exists() and path.is_dir():
+            exact = next((p for p in path.iterdir() if p.name.lower() == part.lower()), exact)
+        path = exact
+    return path
+
+
 def add_watcher(scene_path, idle_seconds, command):
     scene = load(scene_path)
     objects = [g for g in scene["GameObjects"] if g.get("Name") != WATCH_NAME]
@@ -70,7 +81,7 @@ def main():
     a = args.parse_args()
     sbproj = project_file(a.root)
     scene = a.scene or load(sbproj).get("Metadata", {}).get("StartupScene") or ""
-    scene_path = a.root / "Assets" / scene
+    scene_path = on_disk(a.root / "Assets", scene)
     if not scene or not scene_path.is_file():
         sys.exit(f"prepare: no such scene {scene_path}")
     set_startup_scene(sbproj, scene)

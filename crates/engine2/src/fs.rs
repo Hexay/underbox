@@ -85,14 +85,23 @@ pub fn resolve(path: &str, path_id: &str) -> Option<PathBuf> {
         return Some(PathBuf::from(real));
     }
     let rel = key(path);
-    search_roots().into_iter().map(|root| root.join(&rel)).find(|p| p.is_file())
+    search_roots().into_iter().find_map(|root| {
+        let exact = root.join(&rel);
+        if exact.is_file() {
+            return Some(exact);
+        }
+        // Keys are lowercase; a game authored on Windows may spell folders `Audio/Ui`.
+        let (found, complete) = join_case_blind(root, Path::new(&rel));
+        (complete && found.is_file()).then_some(found)
+    })
 }
 
-/// `path` as it's spelled on disk, matching each missing component case-blind. Managed lowercases
-/// some paths it hands us (AddProjectPath), which only works on Windows' case-blind filesystems.
-pub fn on_disk(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for part in path.components() {
+/// `base/rel` as spelled on disk, matching each component case-blind. Stops at the first component
+/// no spelling matches and appends the rest as given; the flag says whether every component matched.
+fn join_case_blind(base: PathBuf, rel: &Path) -> (PathBuf, bool) {
+    let mut out = base;
+    let mut parts = rel.components();
+    while let Some(part) = parts.next() {
         let exact = out.join(part);
         if exact.exists() {
             out = exact;
@@ -100,9 +109,18 @@ pub fn on_disk(path: &Path) -> PathBuf {
         }
         let wanted = part.as_os_str().to_string_lossy().to_lowercase();
         let found = std::fs::read_dir(&out).into_iter().flatten().flatten().map(|e| e.file_name()).find(|n| n.to_string_lossy().to_lowercase() == wanted);
-        out.push(found.as_deref().unwrap_or(part.as_os_str()));
+        match found {
+            Some(name) => out.push(name),
+            None => return (out.join(part).join(parts.as_path()), false),
+        }
     }
-    out
+    (out, true)
+}
+
+/// `path` as it's spelled on disk, matching each missing component case-blind. Managed lowercases
+/// some paths it hands us (AddProjectPath), which only works on Windows' case-blind filesystems.
+pub fn on_disk(path: &Path) -> PathBuf {
+    join_case_blind(PathBuf::new(), path).0
 }
 
 fn add_project_path(ident: Option<&CStr>, assets: Option<&CStr>) {
@@ -145,10 +163,26 @@ pub fn register(r: &mut Registry) {
 
 #[cfg(test)]
 mod tests {
-    use super::key;
+    use super::{add_search_path, key, on_disk, remove_search_path, resolve};
 
     #[test]
     fn keys_are_case_and_separator_blind() {
         assert_eq!(key("\\Scenes\\Minimal.scene_c"), "scenes/minimal.scene_c");
+    }
+
+    #[test]
+    fn resolve_finds_mixed_case_folders() {
+        let root = std::env::temp_dir().join(format!("underbox_fs_case_{}", std::process::id()));
+        std::fs::create_dir_all(root.join("Audio/Ui")).unwrap();
+        std::fs::write(root.join("Audio/Ui/Cancel.ogg"), b"x").unwrap();
+        let root_s = root.to_string_lossy().into_owned();
+        add_search_path("UNDERBOX_FS_CASE", &root_s, true);
+        let found = resolve("audio/ui/cancel.ogg", "GAME");
+        let missing = resolve("audio/ui/absent.ogg", "GAME");
+        remove_search_path("UNDERBOX_FS_CASE", &root_s);
+        assert_eq!(found, Some(root.join("Audio/Ui/Cancel.ogg")));
+        assert_eq!(missing, None);
+        assert_eq!(on_disk(&root.join("audio/ui/absent/x")), root.join("Audio/Ui/absent/x"));
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

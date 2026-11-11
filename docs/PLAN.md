@@ -14,7 +14,7 @@ games call) and fix the rest; see "Lessons from engine-shim".
 | Area | Decision |
 | --- | --- |
 | Scope | `igen_engine` + the `VFX_DLL_001` interface. The editor tables (`igen_tools`, assetsystem, Hammer, ModelDoc, AnimGraph) and lighting baking are out of scope; creators author in real s&box |
-| Correctness | Per-slot contracts with tests, a CI game corpus, and differential runs against real engine2 (blocked until the EULA is confirmed) |
+| Correctness | Per-slot contracts with tests, a CI game corpus, and differential runs against real engine2 (docs/differential.md) |
 | Platform services | One `Platform` trait: Steam (steamworks-rs), offline/dev, custom. The core never names a backend |
 | Renderer | Our own, on wgpu, mirroring s&box's render-context and scene-object model one to one |
 | Shaders | Ahead-of-time translation: vfx blocks and combos parsed in Rust, HLSL to SPIR-V (DXC/Slang), naga to WGSL, cached |
@@ -98,8 +98,8 @@ Each slot has a status, recorded in the generated table and in the coverage repo
 2. **Corpus.** Open-source games (Sweeper, Facepunch/sandbox, apetavern/grubs, and more as found)
    run headless in CI with scripted scenarios and assertions (positions, events, frame hashes for
    the client).
-3. **Differential.** Blocked until the user confirms the s&box EULA permits running real engine2
-   for comparison.
+3. **Differential.** The same scenario on real engine2 (its Linux build, from the artifacts
+   sbox-public's Setup restores) and on ours, comparing what managed observes: docs/differential.md.
 
 ## Tracking upstream
 
@@ -128,13 +128,13 @@ added, removed or retyped, and the interop hash. Generated code is never edited 
 
 ## Open
 
-- s&box EULA: does it allow differential testing against engine2? (user to confirm)
 - Content licences: Facepunch's Citizen models and sbox.game packages are under Facepunch's
   terms; each corpus game needs its creator's terms checked.
 - Project name ("underbox" is the working name; never use "s&box" as ours).
 
 ## Answered
 
+- s&box EULA: the user confirmed it allows differential testing against engine2.
 - `.shader_c` holds SPIR-V: every combo is a `CVfxShaderFileVulkan` blob (version, size, raw
   SPIR-V, reflection, v5 spec constants; `SpirvDump.cs`), compiled for `SM_6_0_VULKAN`. Shipped
   bytecode can go straight to naga; the HLSL path is for source. Native's program-body framing and

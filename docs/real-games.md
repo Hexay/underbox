@@ -1,23 +1,25 @@
 # Real games on underbox
 
-Runs of real games: Facepunch/sandbox and apetavern/grubs (both MIT), read from checkouts outside
-this repo, and the sample and template games inside sbox-public. Nothing from them is copied,
+Runs of real games: Facepunch/sandbox, Facepunch/sbox-walker and apetavern/grubs (all MIT), read
+from checkouts outside this repo, and the sample and template games inside sbox-public. Nothing from them is copied,
 committed or downloaded. Tests that read their files take the folders from an env var and skip
 without it.
 
 ## Running
 
-`[MODE=server|join|host|grubs|render|play|sound] tools/game.sh <checkout> [scene]` (optional, not in
-verify.sh). Each mode ends with PASS/FAIL lines quoting the log line that proves each check, then
+`[MODE=server|join|host|grubs|walker|render|play|sound] [MAP=..] tools/game.sh <checkout> [scene]`
+(optional, not in verify.sh). `MAP` is passed as `+game <sbproj> <map>` for a MapInstance with
+`UseMapFromLaunch`. Each mode ends with PASS/FAIL lines quoting the log line that proves each check, then
 `RESULT:`. Without a scene it runs `scenes/zoo.scene` if the checkout has one, else the project's
 `StartupScene` (grubs: `scenes/beach.scene`).
 
 | Mode | Command | Takes | Passes when |
 |---|---|---|---|
-| server | `tools/game.sh /srv/agents/work/sandbox` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
-| join | `MODE=join tools/game.sh /srv/agents/work/sandbox` | ~1.5 min | the server's player and the joined client's own player both stand |
+| server | `tools/game.sh ../sandbox` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
+| join | `MODE=join tools/game.sh ../sandbox` | ~1.5 min | the server's player and the joined client's own player both stand |
 | host | `MODE=host [START_CMD=..] tools/game.sh <checkout>` | ~1.5 min | a headless client hosts the game to `GAME:END` |
-| grubs | `MODE=grubs tools/game.sh /srv/agents/work/grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
+| grubs | `MODE=grubs tools/game.sh ../grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
+| walker | `MODE=walker tools/game.sh ../sbox-walker` | ~1.5 min | join on walker's map: both sides see the client's player stand on it |
 | render | `MODE=render tools/game.sh <checkout>` | ~1.5 min | `GAME:END`, last frame in `$OUT/frame.png` |
 | play | `MODE=play [PLAY_VIA=host] tools/game.sh <checkout>` | ~2 min | a client in an X11 window takes XTest input; see [Playing in a window](#playing-in-a-window) |
 | sound | `MODE=sound [START_CMD=..] tools/game.sh <checkout>` | ~1.5 min | voices start and audible blocks reach the device; see [Sound](#sound) |
@@ -36,7 +38,7 @@ Project quirks the scratch copy smooths over (`tools/game.sh`, `tools/game/prepa
 
 - Clients render on lavapipe. `UNDERBOX_RENDER=empty` fails a client at its swap chain ("Couldn't
   create the swap chain for GameWindow"), so it can't make a client headless.
-- Runs happen in a reflinked copy under `/srv/agents/cache/underbox-real-games/`. The copy gets
+- Runs happen in a reflinked copy under `$UNDERBOX_GAME_COPIES` (default `$UNDERBOX_CACHE/underbox-real-games/`). The copy gets
   `tools/game/RealGameWatch.cs` (a component logging `GAME:*` markers) and the startup scene, with
   `PackageReferences` and `MapList` emptied (`tools/game/prepare.py`).
 - Package downloads stay off: the game process gets `HTTP(S)_PROXY=http://127.0.0.1:9`. Every
@@ -64,6 +66,7 @@ the pin (`tools/regen.sh`) rather than running an older Sandbox.
 | Grubs round | passes | `gr_ffa_next_state` starts Free For All: `Sdf2DChunk=100`, physics `bodies=5 shapes=50`, `Grub=2`, `Equipment=29`, with `geq=30 sdflayer=9` loaded. The terrain renders untextured. See [Grubs](#grubs). |
 | sbox-public samples | pass | Sweeper, `game.minimal` and `game.playercontroller` load, compile and settle on a dedicated server and in a host client. See [sbox-public samples](#sbox-public-samples). |
 | Playable in a window | passes | `MODE=play` on the zoo: holding W in the joined client's X11 window gets `GAME:PLAYER_MOVED ... local=False dist=49` on the dedicated server, and moving the mouse gets `GAME:PLAYER_TURNED ... yaw=0->-19`. See [Playing in a window](#playing-in-a-window). |
+| sbox-walker | passes | Its scene map loads under `minimal.scene`. The server sees a joined player stand (`on=Box`), move 37 units and turn 11°. See [sbox-walker](#sbox-walker). |
 | Sound reaches the mixer | passes | Sandbox's `spawn` plays `sounds/ui/ui.spawn.1.vsnd`, decoded from the checkout's mp3: `voices=1 ... audible_output_blocks=20 peak=0.133`. A Grubs round: `voices=1 ... audible_output_blocks=5938`. See [Sound](#sound). |
 
 ### Falling props
@@ -155,6 +158,12 @@ Two bugs appeared once the player spawned:
 Sweeper and the `game.minimal` and `game.playercontroller` templates run on a server, in a host
 client and with input. They ship no compiled assets, so no frame is textured, but their dev box
 and plane models are real geometry, built from `.vmdl` source. See docs/sample-games.md.
+
+## sbox-walker
+
+Played on its own scene map (`MAP=scenes/scenemap.scene`). Server, host, join and play pass with 0
+stubs. It needed case-blind resource paths and triggers that ignore keyframed colliders (the map
+teleported itself). 7 of 13 MeshComponents fail to deserialize (renderer lane). See docs/walker.md.
 
 ## Playing in a window
 
@@ -297,38 +306,12 @@ KV3, which `kv3bin` decodes) and a `SNAP` block. Check them with
 - **Render:** `Texture.Clear` on plain textures, as described in [Client frame](#client-frame);
   the `sprite_cs` hang and the grey frame, as described in [Rendering](#rendering).
 - **Networking:** GNS never got managed's Bootstrap socket config, as described in [Join](#join).
+- **Files:** resource paths missed mixed-case folders (`Audio/Ui`). **Physics:** triggers reported
+  keyframed and static colliders. Both are in docs/walker.md.
 - **Input:** mouse look on an SDL without XInput2 (emulated relative mode). **Audio:** headless
   clients mixed about 15x faster than real time into ALSA's null PCM. Both are in
   docs/play-and-sound.md.
 
 ## Candidates
 
-More MIT-licensed s&box games on GitHub, for the user to approve. Nothing was cloned or
-downloaded. The data comes from the GitHub API on 2026-11-11: licence, the default branch's last
-commit, and file counts from its recursive tree. `_c` counts compiled files. vmdl/vmat/img/snd
-counts source assets (img: png/tga/jpg; snd: wav/mp3/ogg/.sound). "Scene" means the current scene
-system: a `.sbproj`, `.scene`/`.prefab` files and no `.addon`.
-
-| Repo | Licence | Last commit | `_c` | vmdl/vmat/img/snd | API | Notes |
-|---|---|---|---|---|---|---|
-| Facepunch/sbox-walker | MIT | 2026-01-29 | 0 | 0/0/0/6 | Scene | Facepunch's minimal walking game. 22 .cs, no PackageReferences. Smallest next step |
-| timmybo5/simple-weapon-base | MIT | 2026-11-10 | 3 | 27/30/146/109 | Scene | FPS weapon base and demo. Sets `DedicatedServerStartupScene`. Active |
-| Titanovsky/Driving-Drunk | MIT | 2026-07-01 | 0 | 0/5/5/6 | Scene | Small vehicle game, MaxPlayers 8. Sets `DedicatedServerStartupScene` |
-| Facepunch/sbox-spritetools | MIT | 2026-01-07 | 0 | 3/5/42/0 | Scene | 2D sprite library and demo game: the sprite path |
-| Facepunch/sbox-gpu-voxels | MIT | 2026-06-13 | 5 | 1/2/20/0 | Scene | GPU voxel demo: compute shaders |
-| CarsonKompon/sbox-scenebox-2 | MIT | 2024-09-28 | 1 | 0/3/66/71 | Scene | Menu and game scenes. Heavy on UI, sound and prefabs |
-| Nolankicks/sbox-OpenWorld | MIT | 2024-12-06 | 0 | 17/13/56/8 | Scene | Open world. Bundles Facepunch's libsdf |
-| Small-Fish-Dev/blubber_runner | MIT | 2024-11-29 | 0 | 3/9/1/4 | Scene | Tiny jam game |
-| openframeworkRP/core | MIT | 2026-05-04 | 0 | 38/128/1048/578 | Scene | Large roleplay gamemode. Main `.sbproj` not located (unverified) |
-| Facepunch/sbox-tabletennis-vr | MIT | 2025-04-15 | 0 | 18/20/73/11 | Scene | VR, 2 players. Needs OpenXR |
-| ShadowBrian/sbox-scene-VRcontroller | MIT | 2024-08-06 | 0 | 0/0/0/0 | Scene | VR controller test, 20 scenes |
-| shishkabob27/hls2 | MIT | 2023-08-30 | 93 | 213/718/1454/2573 | legacy | Half-Life remake. Its HL1-derived content may not be the author's to license, whatever the repo's licence says |
-| Facepunch/sbox-spire | MIT | 2022-12-06 | 73 | 3/3/18/12 | legacy (`.addon`, archived) | Old entity API only |
-
-Every `.sbproj` read has empty `PackageReferences`. Scenes may still name cloud models, which this
-survey didn't check. Few commit compiled assets: simple-weapon-base (3), gpu-voxels (5) and
-scenebox-2 (1). None would give a fully textured frame.
-
-Excluded: Facepunch/sbox-hc1, sbox-jumpgame, sbox-bombroyale, sbox-battlebugs and
-sbox-scenestaging have no licence. TTTReborn/tttreborn is GPL-3.0. wiremod/wirebox is an addon,
-sbox-sdf and sbox-juicebox are libraries, and Advisor and sandboxplusplus are legacy addons.
+More MIT-licensed s&box games, with licence and asset counts: docs/real-game-candidates.md.

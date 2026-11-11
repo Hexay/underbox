@@ -28,7 +28,7 @@
 
 `sbox-public/game` holds the shared managed build: `game-dir.sh` builds the server or client launcher there and
 ReadyToRun-compiles `game/bin/managed` (`tools/r2r-managed.sh`), both under the boot lock. Each
-boot then runs in a reflinked copy, `/srv/agents/cache/underbox-game/<worktree>-<hash>.vXXXXXX`
+boot then runs in a reflinked copy, `$UNDERBOX_GAME_DIRS/<worktree>-<hash>.vXXXXXX`
 (about 0.5 s, no extra disk; `logs/` is skipped); `<worktree>-<hash>.current` names the newest. A
 boot reuses that copy unless a managed dll or `.underbox-*` stamp in the shared dir is newer, or
 another live boot uses it; then it gets a fresh one. Only shared work (a build, R2R, a copy from
@@ -42,7 +42,7 @@ in `GetCwd`. Unused copies can be deleted any time.
 
 A script that changes the shared build (a dotnet build into `game/`) runs under `boot-lock.sh`;
 boots pick the change up on their next start. Each boot borrows its port from
-`tools/worktree-port.sh` (12 per worktree, held in `/srv/agents/cache/underbox-ports` while the
+`tools/worktree-port.sh` (12 per worktree, held in `$UNDERBOX_PORT_HOLDS` while the
 boot's script lives), so `match.sh`, `map.sh` and `net-probe.sh` run side by side, here and in
 other worktrees. `boot-server.sh` borrows one unless the args carry `+port`.
 
@@ -51,15 +51,34 @@ other worktrees. `boot-server.sh` borrows one unless the args carry `+port`.
 probe (s&box's DLLImportResolver can miss an assembly), and exits 3 naming any required native
 that is missing or not ELF. `match.sh` prints that line instead of an opaque DllNotFound.
 
+## Scratch directories
+
+The scripts keep shared state outside the checkout, under one root: `UNDERBOX_CACHE`, default
+`${XDG_CACHE_HOME:-$HOME/.cache}/underbox`. Put it on btrfs or XFS for cheap reflinks. Each
+directory below defaults to a path under it and can be set on its own; `tools/cache-dir.sh` derives
+them, and every script sources it.
+
+| Variable | Default under `$UNDERBOX_CACHE` | Holds |
+| --- | --- | --- |
+| `UNDERBOX_GAME_DIRS` | `underbox-game` | per-boot copies of `sbox-public/game` |
+| `UNDERBOX_GAME_COPIES` | `underbox-real-games` | `tools/game.sh` copies of game checkouts |
+| `UNDERBOX_PORT_HOLDS` | `underbox-ports` | port leases (`worktree-port.sh`) |
+| `UNDERBOX_BOOT_LOCK` | `underbox-boot.lock` | the shared-build lock file |
+| `UNDERBOX_DXC_DIR` | `dxc` | Microsoft's DXC release (`fetch-dxc.sh`; `crates/shaders` mirrors this default) |
+
+All sessions that share an sbox-public checkout must share `UNDERBOX_BOOT_LOCK`.
+
+Tests that read sbox-public take its path from `SBOX_PUBLIC`.
+
 ## Incremental
 
-The agent environment sets `CARGO_INCREMENTAL=0`, which overrides the dev profile and turns off
+If your environment sets `CARGO_INCREMENTAL=0`, it overrides the dev profile and turns off
 incremental compilation for workspace crates. sccache doesn't need that: it passes incremental
 (workspace) compiles straight through and still caches registry crates. The `tools/*` scripts unset
 the variable, which roughly halves an abi edit → engine2 test cycle.
 
 Switching between a plain `cargo` (variable set) and a `tools/*` script rebuilds the workspace
-crates once (about 5 s). Removing `CARGO_INCREMENTAL=0` from the agent environment ends that.
+crates once (about 5 s). Unsetting `CARGO_INCREMENTAL` in your environment ends that.
 
 ## CI
 

@@ -1,6 +1,7 @@
 #!/bin/sh
 # Release libengine2 for other Linux machines: the bin/linuxsteamrt64 layout tools/install-engine2.sh
-# writes, plus manifest.txt (version, git hash, dependencies), in <out> (default dist/). See docs/release.md.
+# writes, plus manifest.txt (version, git hash, dependencies), LICENSE, NOTICE and the third_party
+# licences, in <out> (default dist/). See docs/release.md.
 # usage: tools/dist.sh [out]   (DIST_GLIBC_MAX=2.35 fails the build on newer glibc symbol versions)
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -14,6 +15,9 @@ deps=$(sh "$ROOT/tools/dist-check.sh" "$SO") || { echo "$deps"; exit 1; }
 
 rm -rf "$OUT"
 UNDERBOX_ENGINE2=$SO sh "$ROOT/tools/install-engine2.sh" "$OUT"
+cp "$ROOT/LICENSE" "$ROOT/NOTICE" "$OUT/"
+mkdir -p "$OUT/licenses"
+for d in "$ROOT"/third_party/*/; do n=$(basename -- "$d"); cp "$d/LICENSE" "$OUT/licenses/$n.LICENSE"; done
 dirty=$(git -C "$ROOT" diff --quiet HEAD -- || echo "-dirty")
 {
     echo "version: $(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/crates/engine2/Cargo.toml")"

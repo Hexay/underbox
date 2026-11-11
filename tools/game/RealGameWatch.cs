@@ -58,7 +58,7 @@ public sealed class RealGameWatch : Component
 		if ( down.GameObject?.Components.Get<PlayerController>().IsValid() == true )
 			down = Scene.Trace.Ray( new Vector3( 128, 128, 4000 ), new Vector3( 128, 128, -4000 ) ).Run();
 		Mark( $"TRACE origin hit={down.Hit} z={down.EndPosition.z:0} on={down.GameObject?.Name}" );
-		if ( !down.Hit ) return;
+		if ( !down.Hit ) { ReportColliders(); return; }
 		var go = Scene.CreateObject();
 		go.Name = "RealGameWatchController";
 		go.WorldPosition = down.EndPosition + Vector3.Up * DropHeight;
@@ -68,6 +68,19 @@ public sealed class RealGameWatch : Component
 		dropped.UseCameraControls = false;
 		dropped.UseLookControls = false;
 		Mark( $"DROP at z={go.WorldPosition.z:0}" );
+	}
+
+	// Why the drop trace missed: where each non-trigger collider's body is, and what it covers.
+	void ReportColliders()
+	{
+		foreach ( var c in Scene.GetAllComponents<Collider>().Where( c => !c.IsTrigger ).Take( 12 ) )
+		{
+			var body = c.KeyframeBody ?? c.Rigidbody?.PhysicsBody;
+			var go = c.GameObject;
+			Mark( $"COLLIDER {go.Name} {c.GetType().Name} static={c.Static} world={go.WorldPosition} local={go.LocalPosition} rot={go.WorldRotation.Angles()}"
+				+ $" parent={go.Parent?.Name}@{go.Parent?.WorldPosition} body={body?.Position} enabled={body?.Enabled}"
+				+ $" shapes={body?.ShapeCount} bounds={body?.GetBounds()} tags=[{c.GameObject.Tags}]" );
+		}
 	}
 
 	// What a round built: resources by extension and the scene's components by type.

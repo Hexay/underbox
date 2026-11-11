@@ -1,7 +1,8 @@
 #!/bin/sh
 # Boot a real game from a checkout (Facepunch/sandbox, apetavern/grubs, sbox-public's samples) on our
 # libengine2; print evidence lines and a PASS/FAIL summary.
-# usage: [MODE=server|join|host|grubs|render|play|sound] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
+# usage: [MODE=server|join|host|grubs|walker|render|play|sound] [MAP=<map>] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
+#   MAP     passed as `+game <sbproj> <map>`: what a MapInstance with UseMapFromLaunch loads
 #   server  dedicated server on the scene until its bodies settle and it has idled
 #   join    the server plus a second instance joining it with +connect; PASS when the client's own player
 #           stands on the floor. The client gets an offline package record for the local checkout
@@ -9,6 +10,8 @@
 #   host    a headless client hosting the scene; START_CMD runs once it settles
 #   grubs   host on scenes/beach.scene with START_CMD=gr_ffa_next_state (Grubs' "start the round");
 #           PASS when terrain and equipment load
+#   walker  join on sbox-walker's own map (MAP defaults to scenes/scenemap.scene); PASS adds the joined
+#           player standing on the map's floor (docs/walker.md)
 #   render  host; its last frame goes to $OUT/frame.png
 #   play    a client in a real SDL window on Xvfb, driven by XTest (tools/game/play.sh): hold W, then turn
 #           the mouse. PLAY_VIA=join (default): PASS when the dedicated server sees the joined player move
@@ -17,7 +20,7 @@
 # Scene: scenes/beach.scene for grubs, else scenes/zoo.scene if the checkout has it, else the project's StartupScene.
 # Clients render on lavapipe: headless (SDL offscreen) except in play. UNDERBOX_RENDER=empty fails a client
 # at its swap chain. CLIENT_ARGS: extra client launch args (e.g. +hotload_log 2).
-# The checkout stays read-only: runs happen in a scratch copy under /srv/agents/cache, which gets the
+# The checkout stays read-only: runs happen in a scratch copy under $UNDERBOX_GAME_COPIES, which gets the
 # watcher tools/game/RealGameWatch.cs and the chosen startup scene. Stops at the watcher's GAME:END.
 # Optional and never part of tools/verify.sh: it needs checkouts this repo does not ship.
 # Package downloads stay off: the game processes get a dead HTTP(S) proxy, so any request for sbox.game
@@ -28,6 +31,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 CHECKOUT=$(cd -- "${1:?usage: tools/game.sh <checkout> [scene]}" && pwd)
 MODE=${MODE:-server}
 PLAY_VIA=${PLAY_VIA:-join}
+if [ "$MODE" = walker ]; then MODE=join WALKER=1 MAP=${MAP-scenes/scenemap.scene}; fi
 case $MODE in
     server) IDLE=15 ;;
     join) IDLE=90 ;;
@@ -46,7 +50,8 @@ NAME=$(basename -- "$CHECKOUT")
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "${SBOX:-}")
 OUT=${OUT:-$ROOT/target/game/$NAME}
 PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" $$)}
-COPIES=/srv/agents/cache/underbox-real-games
+. "$ROOT/tools/cache-dir.sh"
+COPIES=$UNDERBOX_GAME_COPIES
 COPY=$COPIES/$NAME-$(printf %s "$ROOT" | cksum | cut -d' ' -f1)
 mkdir -p "$OUT" "$COPIES"
 . "$ROOT/tools/game/report.sh"
@@ -104,7 +109,7 @@ run_client() {
 host_client() {
     # shellcheck disable=SC2086
     run_client OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL="$CLIENT_UNTIL" GRACE="${CLIENT_GRACE:-3}" SHADOW_QUALITY="${SHADOW_QUALITY:-2}" \
-        sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" ${CLIENT_ARGS:-}
+        sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" ${MAP:+"$MAP"} ${CLIENT_ARGS:-}
 }
 
 # The join client: offline package seed, the manifest server on a borrowed port, then +connect.
@@ -141,7 +146,7 @@ else
         *) until='GAME:END' grace=3 ;;
     esac
     OUT=$OUT UNTIL=$until GRACE=$grace \
-        sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" +port "$PORT" > "$OUT/boot.txt" 2>&1 &
+        sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" ${MAP:+"$MAP"} +port "$PORT" > "$OUT/boot.txt" 2>&1 &
     SERVER=$!
     if [ "$MODE" != server ]; then
         until grep -q 'GAME:SETTLED' "$OUT/server.log" 2>/dev/null; do

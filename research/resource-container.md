@@ -3,7 +3,7 @@
 Sources (read 2026-11-10):
 - VRF = github.com/ValveResourceFormat/ValveResourceFormat @ `574c74f3`, MIT. Paths below are relative to its
   `ValveResourceFormat/` dir unless noted.
-- SB = `/srv/agents/work/sbox-public/engine` (local checkout).
+- SB = `<sbox-public>/engine` (local checkout).
 - FIX = VRF `Tests/Files/sbox_bullet-wood.sbox_c` (906 bytes, a real s&box `.decal`-style managed resource shipped
   as an MIT test fixture). Hex offsets marked `FIX@0x..` were verified with `xxd`.
 - Valve developer wiki: `developer.valvesoftware.com/wiki/Resource` returned HTTP 403 to automated fetch; nothing
