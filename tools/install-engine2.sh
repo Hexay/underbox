@@ -1,16 +1,21 @@
 #!/bin/sh
 # Build our libengine2 and install it (plus the natives managed loads by name) into a game dir.
 # usage: tools/install-engine2.sh <game-dir>   (this worktree's copy, from tools/game-dir.sh)
+# UNDERBOX_ENGINE2=<libengine2.so> installs that build instead of building debug (e.g. dist/, docs/release.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 GAME=$1
 
-# see docs/dev-loop.md (incremental)
-env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
+SO=${UNDERBOX_ENGINE2:-}
+if [ -z "$SO" ]; then
+    # see docs/dev-loop.md (incremental)
+    env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
+    SO="${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so"
+fi
 NATIVE="$GAME/bin/linuxsteamrt64"
 mkdir -p "$NATIVE"
 # Rename, not overwrite: a process still mapping the old file would crash on an in-place rewrite.
-cp --reflink=auto "${CARGO_TARGET_DIR:-$ROOT/target}/debug/libengine2.so" "$NATIVE/.libengine2.so.$$"
+cp --reflink=auto "$SO" "$NATIVE/.libengine2.so.$$"
 mv -f "$NATIVE/.libengine2.so.$$" "$NATIVE/libengine2.so"
 # Managed loads these modules by name for their CreateInterface; they're all engine2, and the
 # loader dedupes symlinks by inode so they share its state. TODO(windows): needs forwarder DLLs.
