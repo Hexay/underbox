@@ -96,6 +96,8 @@ pub struct Loaded {
     pub programs: Vec<i64>,
     /// The HLSL block's `{Programs: {"VFX_PROGRAM_VS": masked source}}`.
     pub embedded: HashMap<String, String>,
+    /// A native FEATURE body's records, which `embedded` needs (see native_features.rs).
+    pub native_features: Vec<super::native_features::NativeFeature>,
 }
 
 fn u32_at(b: &[u8], at: usize) -> Option<u32> {
@@ -144,7 +146,12 @@ pub fn read(file: &[u8]) -> Result<Loaded, String> {
             return Err(format!("program {program} isn't a VCS body"));
         }
         out.programs.push(program as i64);
-        let Some(payload) = b.get(12..).and_then(|b| b.strip_prefix(OURS)) else { continue };
+        let Some(payload) = b.get(12..).and_then(|b| b.strip_prefix(OURS)) else {
+            if program as i64 == FEATURE {
+                out.native_features = super::native_features::read(b);
+            }
+            continue;
+        };
         let bad = || format!("program {program}: corrupt body");
         if program as i64 == FEATURE {
             out.features = Some(serde_json::from_slice(payload).map_err(|e| format!("{}: {e}", bad()))?);

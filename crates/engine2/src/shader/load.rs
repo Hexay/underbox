@@ -4,6 +4,7 @@
 
 use super::compile::{byte_code, info_combo};
 use super::compiled::{self, FEATURE, Features, Loaded};
+use super::native_features;
 use super::{GAME_COMPILED, LOADED, Vfx, includes, locate, modified, resolve, resource_path, source_hash, stage, string};
 use crate::{resource, utl_buffer};
 use abi::slots::{c_vfx as vfx, c_vfx_program_data as pd};
@@ -29,9 +30,16 @@ fn from_embedded(l: &Loaded, path: &Path) -> Result<VfxShader, String> {
         .filter_map(|(name, src)| Some((Stage::from_block(name.strip_prefix("VFX_PROGRAM_")?)?, src)))
         .collect();
     programs.sort_by_key(|(st, _)| *st as u32);
+    let features = native_features::block(&l.native_features);
     let mut out: Option<VfxShader> = None;
     for (st, src) in programs {
-        let parsed = VfxShader::parse(src, path, &includes())?;
+        // Native's masking blanks the block keywords too (MODES, FEATURES, `VS {`), leaving the
+        // program's HLSL bare; our own keeps them. Bare HLSL is that stage's block.
+        let mut parsed = VfxShader::parse(src, path, &includes());
+        if parsed.as_ref().is_ok_and(|p| p.program_for(st).is_none()) || (parsed.is_err() && !l.native_features.is_empty()) {
+            parsed = VfxShader::parse(&format!("{features}{}\n{{\n{src}\n}}\n", st.block()), path, &includes());
+        }
+        let parsed = parsed?;
         let program = parsed.program_for(st).cloned().ok_or_else(|| format!("embedded {} has no {} block", st.block(), st.block()))?;
         out.get_or_insert(VfxShader { programs: Vec::new(), ..parsed }).programs.push(program);
     }

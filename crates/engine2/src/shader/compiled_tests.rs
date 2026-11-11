@@ -128,6 +128,72 @@ fn native_compiled_files_load_from_their_embedded_source() {
     assert!(load::apply(&v, &resource_file(compiled::sprv_payload(&[]), None), None, 0).is_err(), "no shader at all");
 }
 
+/// A program body in the layout real files have (docs/real-games.md): VCS header (65 or 68, ABI 2),
+/// program hash and shared hash, reflection text, then combos as `-3` and a zstd frame needing
+/// dictionary 0x2bc2fa87, which no file carries.
+fn real_layout_body(vcs: i32) -> Vec<u8> {
+    let mut b = [b"vcs2".as_slice(), &vcs.to_le_bytes(), &2i32.to_le_bytes(), &[0xA5; 32], b"g_flScale\0"].concat();
+    b.extend((-3i32).to_le_bytes());
+    b.extend([0x28, 0xB5, 0x2F, 0xFD, 0x63, 0x87, 0xFA, 0xC2, 0x2B, 0x01, 0x02, 0x03]);
+    b
+}
+
+/// Real files put GUID and REDI before the empty DATA, and resource versions run 2..=4.
+fn real_layout_file(blocks: Vec<([u8; 4], Vec<u8>)>, version: u16) -> Vec<u8> {
+    let mut all = vec![(*b"GUID", vec![7; 16]), (*b"REDI", vec![0; 64]), (*b"DATA", Vec::new())];
+    all.extend(blocks);
+    Container { version, blocks: all }.write()
+}
+
+#[test]
+fn real_layout_loads_from_embedded_source_without_decoding_combos() {
+    for (vcs, version) in [(68, 4), (65, 3)] {
+        let sprv = compiled::sprv_payload(&[(FEATURE as usize, real_layout_body(vcs)), (PS as usize, real_layout_body(vcs))]);
+        let hlsl = serde_json::json!({ "Programs": { "VFX_PROGRAM_PS": tools::mask(SRC, PS, false) } }).to_string();
+        let file = real_layout_file(vec![(*b"SPRV", sprv), (*b"HLSL", hlsl.into_bytes())], version);
+        let v = Vfx::new("real".into(), None);
+        load::apply(&v, &file, None, 2).unwrap();
+        assert!(v.shader().unwrap().program_for(Stage::Ps).is_some());
+        let st = v.state.lock().unwrap();
+        assert_eq!(st.from_compiled, [FEATURE, PS]);
+        assert!(st.combos.is_empty(), "dictionary-compressed combos stay undecoded");
+    }
+}
+
+/// A FEATURE body with one record as real files lay it out (see native_features.rs).
+fn real_feature_body(vcs: i32, name: &str, max: i32) -> Vec<u8> {
+    let field = |s: &str| [s.as_bytes(), &vec![0; 64 - s.len()]].concat();
+    let ints: &[i32] = if vcs >= 68 { &[0, 0, 0, max, 0, -1] } else { &[0, 0, max, 0, -1, 0] };
+    let mut b = [real_layout_body(vcs), vec![0], field(name), field("Rendering")].concat();
+    ints.iter().for_each(|i| b.extend(i.to_le_bytes()));
+    b
+}
+
+#[test]
+fn natively_blanked_sources_take_features_from_the_feature_body() {
+    let src = "\n\n\nStaticCombo( S_PATTERN, F_PATTERN, Sys( ALL ) );\nfloat4 MainPs() : SV_Target0 { return S_PATTERN; }\n";
+    for (vcs, max) in [(65, 1), (68, 3)] {
+        let sprv = compiled::sprv_payload(&[(FEATURE as usize, real_feature_body(vcs, "F_PATTERN", max)), (PS as usize, real_layout_body(vcs))]);
+        let hlsl = serde_json::json!({ "Programs": { "VFX_PROGRAM_PS": src } }).to_string();
+        let v = Vfx::new("blanked".into(), None);
+        load::apply(&v, &real_layout_file(vec![(*b"SPRV", sprv), (*b"HLSL", hlsl.into_bytes())], 4), None, 0).unwrap();
+        let s = v.shader().unwrap();
+        assert_eq!((s.features[0].name.as_str(), s.features[0].min, s.features[0].max), ("F_PATTERN", 0, max as u32));
+        let combo = &s.program_for(Stage::Ps).unwrap().statics.combos[0];
+        assert_eq!((combo.name.as_str(), combo.max), ("S_PATTERN", max as u32));
+    }
+}
+
+#[test]
+fn real_files_without_usable_programs_fail_cleanly() {
+    let v = Vfx::new("real".into(), None);
+    let dxbc_only = real_layout_file(vec![(*b"DXBC", vec![1; 32])], 2);
+    assert!(load::apply(&v, &dxbc_only, None, 0).unwrap_err().contains("no SPRV"));
+    let no_hlsl = real_layout_file(vec![(*b"SPRV", compiled::sprv_payload(&[(PS as usize, real_layout_body(68))]))], 3);
+    assert!(load::apply(&v, &no_hlsl, None, 0).is_err());
+    assert!(v.shader().is_none());
+}
+
 #[test]
 fn game_compiled_shaders_load_without_their_source() {
     let file = resource_file(load::serialize(&loaded()).unwrap(), None);

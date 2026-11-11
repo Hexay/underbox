@@ -8,6 +8,7 @@ mod combos;
 mod compile;
 mod compiled;
 mod load;
+mod native_features;
 mod schema;
 mod tools;
 
@@ -182,6 +183,8 @@ fn load(v: &Vfx, path: &str) -> bool {
 
 #[cfg(test)]
 mod compiled_tests;
+#[cfg(test)]
+mod real_files;
 #[cfg(test)]
 mod tests;
 
