@@ -41,7 +41,10 @@ fn shader_declarations(shader: &str) -> Option<Vec<(String, String)>> {
 
 /// `None` when the source is missing or unreadable (the caller makes the error material).
 pub fn load(path: &str) -> Option<Loaded> {
-    let file = crate::fs::resolve(&source_path(path, ".vmat"), "GAME")?;
+    let Some(file) = crate::fs::resolve(&source_path(path, ".vmat"), "GAME") else {
+        let c = crate::compiled::material::load(path)?;
+        return Some(Loaded { shader: c.shader, vectors: c.vectors, textures: c.textures });
+    };
     let material = assets::material::from_vmat(&std::fs::read_to_string(file).ok()?)
         .inspect_err(|e| log(Level::Warn, &format!("{path}: {e:?}")))
         .ok()?;

@@ -62,6 +62,10 @@ static LOADED: ByName<Texture> = ByName::new();
 pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = LOADED.find_or_insert(&name, || {
+        if let Some(c) = crate::compiled::texture::load(&name) {
+            let gpu = gpu_texture(&name, &c.config, &c.data);
+            return Texture { desc: Box::new(desc_of(&c.config)), config: c.config, name: name.clone(), data: Mutex::new(c.data), gpu, error: false, guid };
+        }
         let generated = super::texture_generated::texture(&name);
         let error = generated.is_none();
         let (w, h, data) = generated.unwrap_or((1, 1, vec![255, 0, 255, 255]));
