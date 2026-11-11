@@ -75,8 +75,8 @@ directory. `tools/dist.sh` builds a portable release copy ([release.md](docs/rel
 The scripts look for sbox-public next to this repo (`../sbox-public`) unless given a path
 (`tools/sbox-path.sh`). They build its launcher, fill in what its build needs without Facepunch's
 binary download (`tools/prepare-sbox.sh`), and install the fresh libengine2 into a copy of its game
-directory. First set the scratch directories listed in
-[dev-loop.md](docs/dev-loop.md#scratch-directories).
+directory. Their scratch state goes under `UNDERBOX_CACHE`, default `~/.cache/underbox`
+([dev-loop.md](docs/dev-loop.md#scratch-directories)).
 
 ```sh
 sh tools/match.sh                     # headless server plays a scripted match from corpus/

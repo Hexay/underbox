@@ -1,6 +1,6 @@
 # Shaders: what `.shader_c` holds and how underbox should consume it
 
-Answer: **yes, every compiled combo holds raw SPIR-V.** The DXIL path doesn't exist. Paths below are relative to `/srv/agents/work/sbox-public/engine/`.
+Answer: **yes, every compiled combo holds raw SPIR-V.** The DXIL path doesn't exist. Paths below are relative to `<sbox-public>/engine/`.
 
 ## Compile path (managed)
 - The native compiler `vfx_vulkan.dll` (`VFX_DLL_001`) is loaded at `Sandbox.Engine/Systems/Render/ShaderCompile/ShaderCompile.cs:74-88`.

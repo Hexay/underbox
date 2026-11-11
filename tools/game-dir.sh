@@ -15,7 +15,8 @@ case $LAUNCHER in
     client) DLL=sbox.dll; PROJ=Sbox/Sbox.csproj ;;
     *) echo "game-dir.sh: unknown launcher '$LAUNCHER'" >&2; exit 2 ;;
 esac
-GAMES=${UNDERBOX_GAME_DIRS:-/srv/agents/cache/underbox-game}
+. "$ROOT/tools/cache-dir.sh"
+GAMES=$UNDERBOX_GAME_DIRS
 BASE=$GAMES/$(basename -- "$ROOT")-$(printf %s "$ROOT" | cksum | cut -d' ' -f1)
 CUR=$BASE.current
 # Exported: the flock re-exec below changes $PPID.

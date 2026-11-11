@@ -7,7 +7,8 @@ set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 OWNER=${1:?usage: worktree-port.sh <owner-pid>}
 BASE=$(( 20000 + $(printf %s "$ROOT" | cksum | cut -d' ' -f1) % 1000 * 12 ))
-HOLDS=${UNDERBOX_PORT_HOLDS:-/srv/agents/cache/underbox-ports}
+. "$ROOT/tools/cache-dir.sh"
+HOLDS=$UNDERBOX_PORT_HOLDS
 mkdir -p "$HOLDS"
 
 i=0

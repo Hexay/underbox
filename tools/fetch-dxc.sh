@@ -1,10 +1,11 @@
 #!/bin/sh
 # Fetch Microsoft's official DXC release (libdxcompiler / dxcompiler.dll) into $UNDERBOX_DXC_DIR
-# (default /srv/agents/cache/dxc), pinned by version and sha256. Prints the library directory.
+# (default $UNDERBOX_CACHE/dxc, tools/cache-dir.sh), pinned by version and sha256. Prints the library directory.
 # usage: tools/fetch-dxc.sh            crates/shaders finds it through $UNDERBOX_DXC_DIR or that default
 set -eu
 TAG=v1.9.2609
-ROOT=${UNDERBOX_DXC_DIR:-/srv/agents/cache/dxc}
+. "$(dirname -- "$0")/cache-dir.sh"
+ROOT=$UNDERBOX_DXC_DIR
 DEST="$ROOT/$TAG"
 BASE="https://github.com/microsoft/DirectXShaderCompiler/releases/download/$TAG"
 case "$(uname -s)" in

@@ -53,19 +53,22 @@ that is missing or not ELF. `match.sh` prints that line instead of an opaque Dll
 
 ## Scratch directories
 
-The scripts keep shared state outside the checkout. The defaults sit under `/srv/agents/cache`,
-which exists only on the original dev machine; elsewhere, point these at a writable directory
-(btrfs or XFS for cheap reflinks):
+The scripts keep shared state outside the checkout, under one root: `UNDERBOX_CACHE`, default
+`${XDG_CACHE_HOME:-$HOME/.cache}/underbox`. Put it on btrfs or XFS for cheap reflinks. Each
+directory below defaults to a path under it and can be set on its own; `tools/cache-dir.sh` derives
+them, and every script sources it.
 
-| Variable | Holds |
-| --- | --- |
-| `UNDERBOX_GAME_DIRS` | per-boot copies of `sbox-public/game` |
-| `UNDERBOX_PORT_HOLDS` | port leases (`worktree-port.sh`) |
-| `UNDERBOX_BOOT_LOCK` | the shared-build lock file |
-| `UNDERBOX_DXC_DIR` | Microsoft's DXC release (`fetch-dxc.sh`; also read by `crates/shaders`) |
+| Variable | Default under `$UNDERBOX_CACHE` | Holds |
+| --- | --- | --- |
+| `UNDERBOX_GAME_DIRS` | `underbox-game` | per-boot copies of `sbox-public/game` |
+| `UNDERBOX_GAME_COPIES` | `underbox-real-games` | `tools/game.sh` copies of game checkouts |
+| `UNDERBOX_PORT_HOLDS` | `underbox-ports` | port leases (`worktree-port.sh`) |
+| `UNDERBOX_BOOT_LOCK` | `underbox-boot.lock` | the shared-build lock file |
+| `UNDERBOX_DXC_DIR` | `dxc` | Microsoft's DXC release (`fetch-dxc.sh`; `crates/shaders` mirrors this default) |
 
-`tools/game.sh` writes its scratch copies to `/srv/agents/cache/underbox-real-games` with no
-override yet.
+All sessions that share an sbox-public checkout must share `UNDERBOX_BOOT_LOCK`.
+
+Tests that read sbox-public take its path from `SBOX_PUBLIC`.
 
 ## Incremental
 

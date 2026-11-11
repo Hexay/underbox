@@ -100,11 +100,12 @@ fn reports_unsupported_nodes() {
     assert_eq!(c.def.root.map(|r| &c.def.poses[r]), Some(&PoseNode::Zero), "layer blends pass their base through");
 }
 
-/// The citizen graph from sbox-public, when it's checked out next to us.
+/// The citizen graph from the sbox-public checkout at `$SBOX_PUBLIC`.
 #[test]
 fn compiles_citizen_human_graph() {
-    let path = "/srv/agents/work/sbox-public/game/addons/citizen/Assets/models/citizen_human/animgraphs/human.ag";
-    let Ok(src) = std::fs::read_to_string(path) else { return };
+    let Some(root) = std::env::var_os("SBOX_PUBLIC") else { return eprintln!("skipped: SBOX_PUBLIC unset") };
+    let path = std::path::Path::new(&root).join("game/addons/citizen/Assets/models/citizen_human/animgraphs/human.ag");
+    let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let c = compile(&src).unwrap();
     assert!(c.def.params.len() > 50 && c.def.param("move_x").is_some() && c.def.param("holdtype").is_some());
     assert!(c.def.root.is_some() && !c.def.slots.is_empty(), "root {:?}, {} poses, unsupported {:?}", c.def.root, c.def.poses.len(), c.unsupported);

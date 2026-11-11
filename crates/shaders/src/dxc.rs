@@ -22,15 +22,16 @@ pub struct Dxc {
 
 impl Dxc {
     /// Loads libdxcompiler: `$UNDERBOX_DXC_LIB` (file or directory), then the fetch script's
-    /// install under `$UNDERBOX_DXC_DIR` (default /srv/agents/cache/dxc), then the system search path.
+    /// install under [`dxc_dir`], then the system search path.
     pub fn load() -> Result<Dxc, String> {
         let file = libloading_name();
         let mut candidates: Vec<PathBuf> = Vec::new();
         if let Some(p) = std::env::var_os("UNDERBOX_DXC_LIB").map(PathBuf::from) {
             candidates.push(if p.is_dir() { p.join(&file) } else { p });
         }
-        let root = std::env::var_os("UNDERBOX_DXC_DIR").map_or_else(|| PathBuf::from("/srv/agents/cache/dxc"), PathBuf::from);
-        candidates.push(root.join(DXC_TAG).join(if cfg!(windows) { "bin/x64" } else { "lib" }).join(&file));
+        if let Some(root) = dxc_dir() {
+            candidates.push(root.join(DXC_TAG).join(if cfg!(windows) { "bin/x64" } else { "lib" }).join(&file));
+        }
         let found = candidates.into_iter().find(|p| p.is_file());
         let path = found.clone().unwrap_or_else(|| PathBuf::from(&file));
         let lib = hassle_rs::Dxc::new(Some(path.clone())).map_err(|e| format!("loading {}: {e}", path.display()))?;
@@ -40,7 +41,22 @@ impl Dxc {
         };
         Ok(Dxc { lib, path, version })
     }
+}
 
+/// Where `tools/fetch-dxc.sh` installs: `$UNDERBOX_DXC_DIR`, else `$UNDERBOX_CACHE/dxc`, with the
+/// cache root defaulting as in `tools/cache-dir.sh`. `None` when no home directory is known.
+pub fn dxc_dir() -> Option<PathBuf> {
+    let var = |k| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
+    if let Some(dir) = var("UNDERBOX_DXC_DIR") {
+        return Some(dir);
+    }
+    let cache = var("UNDERBOX_CACHE")
+        .or_else(|| var("XDG_CACHE_HOME").map(|x| x.join("underbox")))
+        .or_else(|| var("HOME").map(|h| h.join(".cache/underbox")))?;
+    Some(cache.join("dxc"))
+}
+
+impl Dxc {
     /// Compiles `source` (named `name` in diagnostics) to SPIR-V words.
     pub fn compile(&self, source: &str, name: &Path, entry: &str, profile: &str, defines: &[(String, String)]) -> Result<Vec<u32>, String> {
         let e = |e: hassle_rs::HassleError| e.to_string();

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make a scratch copy of a game project start in one of its own scenes with our watcher in it.
 
-Only ever pointed at a copy under /srv/agents/cache: the checkouts it comes from stay read-only.
+Only ever pointed at a copy under $UNDERBOX_GAME_COPIES: the checkouts it comes from stay read-only.
 Prints the copy's .sbproj path.
 """
 import argparse
