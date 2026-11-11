@@ -11,6 +11,9 @@ use super::vbib::Packing;
 use super::vertex::Vertex;
 use crate::bitmap::bc;
 
+mod rigged;
+pub use rigged::*;
+
 pub const MODEL: &str = "models/compiled/crate.vmdl";
 pub const MATERIAL: &str = "materials/compiled/crate.vmat";
 pub const SKIN_MATERIAL: &str = "materials/compiled/crate_dark.vmat";
@@ -102,7 +105,10 @@ pub fn model() -> Model {
     let hull = Shapes { hulls: vec![(corners([-HALF, -HALF, 0.0], [HALF, HALF, 2.0 * HALF]), Ids::default())], ..Shapes::default() };
     Model {
         name: MODEL.into(),
-        meshes: vec![ModelMesh { name: "crate".into(), mesh: cube(HALF), group_mask: 1, lod_mask: 1 }, ModelMesh { name: "crate_lod1".into(), mesh: lod1, group_mask: 1, lod_mask: 2 }],
+        meshes: vec![
+            ModelMesh { name: "crate".into(), mesh: cube(HALF), group_mask: 1, lod_mask: 1, ..ModelMesh::default() },
+            ModelMesh { name: "crate_lod1".into(), mesh: lod1, group_mask: 1, lod_mask: 2, ..ModelMesh::default() },
+        ],
         mesh_groups: vec!["body".into()],
         default_group_mask: 1,
         lod_distances: vec![0.0, 400.0],

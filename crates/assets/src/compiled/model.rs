@@ -1,15 +1,23 @@
-//! Compiled models (`.vmdl_c`): DATA (skeleton, mesh groups, LOD masks, skins, physics
-//! references), CTRL (which blocks hold embedded meshes and physics), the MDAT/MBUF mesh blocks
-//! and PHYS. Meshes named in `m_refMeshes` are separate `.vmesh_c` files read through `load`.
+//! Compiled models (`.vmdl_c`): DATA (skeleton, mesh groups, LOD masks, skins, physics and
+//! animation-group references, key values), CTRL (which blocks hold embedded meshes, morph sets,
+//! physics and animation), the MDAT/MBUF/MRPH mesh blocks, PHYS, and AGRP/ANIM/ASEQ. Meshes
+//! named in `m_refMeshes` are `.vmesh_c` files and animation groups `.vagrp_c` files, both
+//! read through `load`. The writer is [`super::model_write`].
 
-use super::kv::{self, floats, int, int_value, list, obj, objects, resource, string, strings, text};
+use super::anim::{self, Animation, Rig};
+use super::flex::Controller;
+use super::kv::{self, int, objects, string, strings};
 use super::mesh::{self, Mesh};
+use super::morph::{self, MorphSet, Target};
 use super::physics::{self, Aggregate};
-use super::vbib::{self, Packing};
+use super::rig::{self, Attachment, HitboxSet};
+use super::vbib;
 use super::{Error, block_at, format};
 use ::kv::{Object, Value};
 
-#[derive(Debug, Clone, PartialEq)]
+pub use super::model_write::write;
+
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ModelMesh {
     pub name: String,
     pub mesh: Mesh,
@@ -17,6 +25,9 @@ pub struct ModelMesh {
     pub group_mask: u64,
     /// Bit i: drawn at LOD i.
     pub lod_mask: u64,
+    pub morph: Option<MorphSet>,
+    /// The morph set's targets, decoded from its atlas (empty if the atlas is missing).
+    pub targets: Vec<Target>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,7 +50,7 @@ pub struct MaterialGroup {
 pub struct Model {
     pub name: String,
     pub meshes: Vec<ModelMesh>,
-    /// Mesh files the model names that `load` couldn't supply.
+    /// Files the model names (meshes, animation groups) that `load` couldn't supply or decode.
     pub missing: Vec<String>,
     pub mesh_groups: Vec<String>,
     pub default_group_mask: u64,
@@ -53,6 +64,25 @@ pub struct Model {
     pub physics: Option<Aggregate>,
     /// `m_modelInfo.m_keyValueText` (KV3 text).
     pub key_values: String,
+    /// From every mesh's data, first of each name kept.
+    pub attachments: Vec<Attachment>,
+    pub hitbox_sets: Vec<HitboxSet>,
+    /// `.vagrp` resources (`m_refAnimGroups`); their animations are in `animations`.
+    pub anim_groups: Vec<String>,
+    /// Embedded animations (after their sequences), then each group's.
+    pub animations: Vec<Animation>,
+}
+
+impl Model {
+    /// The flex controllers: the first morph set's that has any.
+    pub fn flex_controllers(&self) -> &[Controller] {
+        self.meshes.iter().filter_map(|m| m.morph.as_ref()).map(|m| m.controllers.as_slice()).find(|c| !c.is_empty()).unwrap_or_default()
+    }
+
+    /// The key values as a tree (`None` when empty or unparsable).
+    pub fn key_value_tree(&self) -> Option<Value> {
+        kv::kv3_text(&self.key_values)
+    }
 }
 
 fn skeleton(o: &Object) -> Vec<Bone> {
@@ -70,21 +100,80 @@ fn skeleton(o: &Object) -> Vec<Bone> {
         .collect()
 }
 
-/// (mesh, buffers) of the CTRL entry for mesh slot `index`, if the mesh is embedded.
-fn embedded(file: &[u8], ctrl: &Object, index: usize) -> Result<Option<(String, Mesh)>, Error> {
+fn object_at(file: &[u8], index: i64) -> Result<Object, Error> {
+    match crate::kv3bin::read(block_at(file, index)?)? {
+        Value::Object(o) => Ok(o),
+        _ => Err(format(format!("block {index} isn't an object"))),
+    }
+}
+
+/// A mesh with its data object and morph set.
+type Loaded = (String, Mesh, Object, Option<MorphSet>);
+
+/// The CTRL entry for mesh slot `index`, if the mesh is embedded.
+fn embedded(file: &[u8], ctrl: &Object, index: usize) -> Result<Option<Loaded>, Error> {
     let Some(e) = objects(ctrl, "embedded_meshes").find(|e| kv::int_or(e, "mesh_index", kv::int_or(e, "m_nMeshIndex", -1)) == index as i64) else { return Ok(None) };
-    let (name, data_block) = if e.get("vbib_block").is_some() { (string(e, "name"), int(e, "data_block")) } else { (string(e, "m_Name"), int(e, "m_nDataBlock")) };
-    let data = crate::kv3bin::read(block_at(file, data_block)?)?;
-    let data = data.as_object().ok_or_else(|| format("MDAT isn't an object"))?;
+    let old = e.get("vbib_block").is_some();
+    let (name, data_block, morph_block) =
+        if old { (string(e, "name"), int(e, "data_block"), kv::int_or(e, "morph_block", -1)) } else { (string(e, "m_Name"), int(e, "m_nDataBlock"), kv::int_or(e, "m_nMorphBlock", -1)) };
+    let data = object_at(file, data_block)?;
     let buffers = match e.get("vbib_block") {
         Some(v) => vbib::read(block_at(file, kv::int_of(v).unwrap_or(-1))?)?,
         None => vbib::from_kv3(e, file)?,
     };
-    Ok(Some((name, mesh::build(data, &buffers)?)))
+    let morph = (morph_block >= 0).then(|| object_at(file, morph_block)).transpose()?.map(|o| morph::read(&o));
+    Ok(Some((name, mesh::build(&data, &buffers)?, data, morph)))
 }
 
-fn compiled_name(path: &str) -> String {
+pub(crate) fn compiled_name(path: &str) -> String {
     if path.ends_with("_c") { path.to_owned() } else { format!("{path}_c") }
+}
+
+/// A mesh's own morph set, else the `.vmorf` its data names; and its targets from the atlas.
+fn morph_targets(data: &Object, own: Option<MorphSet>, load: &dyn Fn(&str) -> Option<Vec<u8>>) -> (Option<MorphSet>, Vec<Target>) {
+    let set = own.or_else(|| {
+        let path = string(data, "m_morphSet");
+        let bytes = (!path.is_empty()).then(|| load(&compiled_name(&path))).flatten()?;
+        let block = crate::container::block(&bytes, b"MRPH").ok().flatten().or_else(|| crate::container::block(&bytes, b"DATA").ok().flatten())?;
+        crate::kv3bin::read(block).ok()?.as_object().map(morph::read)
+    });
+    let targets = set
+        .as_ref()
+        .filter(|s| !s.atlas.is_empty())
+        .and_then(|s| {
+            let t = super::texture::read(&load(&compiled_name(&s.atlas))?).ok()?;
+            Some(s.targets(&super::texture::decode(&t, 0, 0, 0)?))
+        })
+        .unwrap_or_default();
+    (set, targets)
+}
+
+/// Just the skeleton: only DATA is decoded.
+pub fn bones(file: &[u8]) -> Result<Vec<Bone>, Error> {
+    let data = super::kv3_block(file, b"DATA", "DATA")?;
+    Ok(skeleton(data.as_object().ok_or_else(|| format("model DATA isn't an object"))?))
+}
+
+fn animations(file: &[u8], ctrl: &Object, model: &mut Model, load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<(), Error> {
+    let flex: Vec<String> = model.flex_controllers().iter().map(|c| c.name.clone()).collect();
+    let bones = model.bones.clone();
+    let rig = Rig { bones: &bones, flex: &flex };
+    if let Some(e) = ctrl.get("embedded_animation").and_then(Value::as_object) {
+        let group = object_at(file, int(e, "group_data_block"))?;
+        let mut anims = anim::read(&object_at(file, int(e, "anim_data_block"))?, kv::object(&group, "m_decodeKey"), &rig);
+        if let Some(seq) = Some(kv::int_or(e, "seqgroup_data_block", -1)).filter(|&b| b > 0) {
+            anims = anim::sequences(&object_at(file, seq)?, anims);
+        }
+        model.animations.extend(anims);
+    }
+    for path in model.anim_groups.clone().iter().filter(|p| !p.is_empty()) {
+        match load(&compiled_name(path)).map(|bytes| anim::read_group(&bytes, &rig, load)) {
+            Some(Ok(a)) => model.animations.extend(a),
+            Some(Err(e)) => model.missing.push(format!("{path}: {e}")),
+            None => model.missing.push(path.clone()),
+        }
+    }
+    Ok(())
 }
 
 /// The model in `file`; `load` reads another compiled file by resource path.
@@ -104,6 +193,7 @@ pub fn read(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<Model
         bones: skeleton(data),
         physics_refs: strings(data, "m_refPhysicsData"),
         key_values: string(kv::object(data, "m_modelInfo"), "m_keyValueText"),
+        anim_groups: strings(data, "m_refAnimGroups"),
         ..Model::default()
     };
     for (i, r) in refs.iter().enumerate() {
@@ -112,71 +202,35 @@ pub fn read(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>) -> Result<Model
             Some(m) => Some(m),
             None if path.is_empty() => None,
             None => match load(&compiled_name(path)) {
-                Some(bytes) => Some((path.to_owned(), mesh::read(&bytes)?)),
+                Some(bytes) => {
+                    let (mesh, data) = mesh::read_with_data(&bytes)?;
+                    let own = crate::container::block(&bytes, b"MRPH")?.map(crate::kv3bin::read).transpose()?;
+                    Some((path.to_owned(), mesh, data, own.as_ref().and_then(Value::as_object).map(morph::read)))
+                }
                 None => {
                     model.missing.push(path.to_owned());
                     None
                 }
             },
         };
-        if let Some((name, mesh)) = found {
-            let mask = |m: &[i64]| m.get(i).map_or(u64::MAX, |&v| v as u64);
-            model.meshes.push(ModelMesh { name, mesh, group_mask: mask(&groups), lod_mask: mask(&lods) });
+        let Some((name, mesh, data, own)) = found else { continue };
+        let (morph, targets) = morph_targets(&data, own, load);
+        for a in rig::attachments(&data) {
+            if !model.attachments.iter().any(|x| x.name.eq_ignore_ascii_case(&a.name)) {
+                model.attachments.push(a);
+            }
         }
+        for s in rig::hitbox_sets(&data) {
+            if !model.hitbox_sets.iter().any(|x| x.name.eq_ignore_ascii_case(&s.name)) {
+                model.hitbox_sets.push(s);
+            }
+        }
+        let mask = |m: &[i64]| m.get(i).map_or(u64::MAX, |&v| v as u64);
+        model.meshes.push(ModelMesh { name, mesh, group_mask: mask(&groups), lod_mask: mask(&lods), morph, targets });
     }
     if let Some(block) = kv::object(&ctrl, "embedded_physics").get("phys_data_block").and_then(kv::int_of) {
-        let phys = crate::kv3bin::read(block_at(file, block)?)?;
-        model.physics = phys.as_object().map(physics::from_kv3);
+        model.physics = Some(physics::from_kv3(&object_at(file, block)?));
     }
+    animations(file, &ctrl, &mut model, load)?;
     Ok(model)
-}
-
-fn write_data(m: &Model) -> Value {
-    let s = &m.bones;
-    let skeleton = obj(vec![
-        ("m_boneName", list(s.iter().map(|b| text(&b.name)))),
-        ("m_nParent", list(s.iter().map(|b| int_value(b.parent.map_or(-1, |p| p as i64))))),
-        ("m_bonePosParent", list(s.iter().map(|b| floats(&b.position)))),
-        ("m_boneRotParent", list(s.iter().map(|b| floats(&b.rotation)))),
-    ]);
-    let groups = m.material_groups.iter().map(|g| obj(vec![("m_name", text(&g.name)), ("m_materials", list(g.materials.iter().map(|x| resource(x))))]));
-    obj(vec![
-        ("m_name", text(&m.name)),
-        ("m_modelSkeleton", skeleton),
-        ("m_refMeshes", list(m.meshes.iter().map(|_| text("")))),
-        ("m_refMeshGroupMasks", list(m.meshes.iter().map(|x| int_value(x.group_mask as i64)))),
-        ("m_refLODGroupMasks", list(m.meshes.iter().map(|x| int_value(x.lod_mask as i64)))),
-        ("m_meshGroups", list(m.mesh_groups.iter().map(|g| text(g)))),
-        ("m_nDefaultMeshGroupMask", int_value(m.default_group_mask as i64)),
-        ("m_lodGroupSwitchDistances", floats(&m.lod_distances)),
-        ("m_materialGroups", list(groups)),
-        ("m_refPhysicsData", list(m.physics_refs.iter().map(|p| resource(p)))),
-        ("m_modelInfo", obj(vec![("m_keyValueText", text(&m.key_values))])),
-    ])
-}
-
-/// A `.vmdl_c` with every mesh embedded (an MDAT and MBUF block each, the older CTRL layout) and
-/// `physics` as its PHYS block. `missing` isn't written.
-pub fn write(m: &Model, packing: Packing) -> Vec<u8> {
-    // Block 0 is RERL (see `super::write`), DATA is 1, CTRL 2; meshes follow.
-    let mut blocks = vec![(*b"DATA", super::kv3(&write_data(m))), (*b"CTRL", Vec::new())];
-    let mut entries = Vec::new();
-    for (i, mm) in m.meshes.iter().enumerate() {
-        let first = blocks.len() as i64 + 1;
-        blocks.push((*b"MDAT", super::kv3(&mesh::write_data(&mm.mesh))));
-        blocks.push((*b"MBUF", vbib::write(&mesh::write_buffers(&mm.mesh), packing)));
-        entries.push(obj(vec![("name", text(&mm.name)), ("mesh_index", int_value(i as i64)), ("data_block", int_value(first)), ("vbib_block", int_value(first + 1)), ("morph_block", int_value(-1))]));
-    }
-    let mut ctrl = vec![("embedded_meshes", list(entries))];
-    if let Some(p) = &m.physics {
-        ctrl.push(("embedded_physics", obj(vec![("phys_data_block", int_value(blocks.len() as i64 + 1)), ("parts", int_value(p.parts.len() as i64))])));
-        blocks.push((*b"PHYS", super::kv3(&physics::write_kv3(p))));
-    }
-    blocks[1].1 = super::kv3(&obj(ctrl));
-    let mut refs: Vec<&str> = m.meshes.iter().flat_map(|x| x.mesh.draws.iter().map(|d| d.material.as_str())).collect();
-    refs.extend(m.material_groups.iter().flat_map(|g| g.materials.iter().map(String::as_str)));
-    refs.extend(m.physics_refs.iter().map(String::as_str));
-    refs.sort_unstable();
-    refs.dedup();
-    super::write(0, &refs, blocks)
 }

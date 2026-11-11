@@ -81,6 +81,11 @@ pub fn blob<'a>(o: &'a Object, key: &str) -> &'a [u8] {
     }
 }
 
+/// KV3 text (a model's key values) as a tree; `None` when blank or unparsable.
+pub fn kv3_text(s: &str) -> Option<Value> {
+    (!s.trim().is_empty()).then(|| kv::kv3::parse(s).ok().map(|(_, v)| v)).flatten()
+}
+
 pub fn obj(members: Vec<(&str, Value)>) -> Value {
     Value::Object(Object(members.into_iter().map(|(k, v)| (k.to_owned(), v)).collect()))
 }

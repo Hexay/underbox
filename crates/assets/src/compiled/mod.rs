@@ -2,12 +2,19 @@
 //! materials (`.vmat_c`) and physics (`.vphys_c`, a model's PHYS block). Each reader has a writer
 //! beside it for fixtures. Layouts and sources: research/resources.md.
 
+pub mod anim;
 pub mod fixture;
+pub mod flex;
 pub mod kv;
 pub mod material;
 pub mod mesh;
 pub mod model;
+mod model_write;
+pub mod morph;
 pub mod physics;
+pub mod rig;
+#[cfg(test)]
+mod rigged_tests;
 #[cfg(test)]
 mod tests;
 pub mod texture;
