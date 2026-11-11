@@ -135,7 +135,7 @@ fn two_bone_ik_reaches_a_world_target_and_look_at_turns_the_chain() {
     let yaw = param(&mut def, "yaw", Value::Float(0.0));
     let zero = def.add_value(ValueNode::Const(Value::Float(0.0)));
     let source = def.add_pose(PoseNode::Reference);
-    let ik = def.add_pose(PoseNode::TwoBoneIk(Box::new(TwoBoneIk { source, effector: "hand".into(), target, enabled: None, weight: None, world: true })));
+    let ik = def.add_pose(PoseNode::TwoBoneIk(Box::new(TwoBoneIk::new(source, "hand", target, true))));
     let bones = vec![("hand".to_owned(), 1.0)];
     let look = LookAt { source: ik, pitch: zero, yaw, weight: None, reference: String::new(), reference_rotation: Quat::IDENTITY, bones, yaw_limit: 45.0, pitch_limit: 45.0 };
     def.root = Some(def.add_pose(PoseNode::LookAt(Box::new(look))));

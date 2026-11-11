@@ -1,9 +1,8 @@
-//! The instance's multi-input and effect nodes: blend2D, selectors and the IK nodes.
+//! The instance's multi-input nodes: blend2D and the selectors. The IK nodes are in `ik_node`.
 
 use super::eval::{Instance, NodeState, Out};
 use super::value::StateCtx;
-use super::{LookAt, PoseId, TwoBoneIk, ValueId, blend2d, ik};
-use crate::params::Value;
+use super::{PoseId, ValueId, blend2d};
 use crate::pose::Pose;
 use crate::skeleton::Skeleton;
 use crate::xform::Xform;
@@ -69,55 +68,5 @@ impl Instance {
             _ => Some(s.max(0.0) as usize),
         };
         options[k.unwrap_or(last).min(last)]
-    }
-
-    /// The target's model-space transform, `None` when unset or unresolvable.
-    fn target(&self, rig: &Rig, value: ValueId, world: bool, pose: &Pose) -> Option<Xform> {
-        let Value::Target(t) = self.values(StateCtx::default()).get(value) else { return None };
-        if !t.set {
-            return None;
-        }
-        match t.bone.as_deref().filter(|b| !b.is_empty()) {
-            Some(bone) => Some(rig.skeleton.model_space(&pose.0)[rig.skeleton.find(bone)?]),
-            None if world => Some(rig.world.inverse().mul(&t.xform)),
-            None => Some(t.xform),
-        }
-    }
-
-    fn weight(&self, enabled: Option<ValueId>, weight: Option<ValueId>) -> f32 {
-        let v = self.values(StateCtx::default());
-        if enabled.is_some_and(|e| !v.bool(e)) {
-            return 0.0;
-        }
-        weight.map_or(1.0, |w| v.float(w).clamp(0.0, 1.0))
-    }
-
-    pub(super) fn two_bone_ik(&mut self, n: &TwoBoneIk, dt: f32, bind: &Pose) -> Out {
-        let out = self.eval(n.source, dt, bind);
-        let w = self.weight(n.enabled, n.weight);
-        let Some(rig) = self.rig.clone().filter(|_| w > 0.0) else { return out };
-        let (Some(effector), Some(target)) = (rig.skeleton.find(&n.effector), self.target(&rig, n.target, n.world, &out.pose)) else { return out };
-        let mut solved = out.pose.clone();
-        if !ik::two_bone(&rig.skeleton, &mut solved, effector, &target) {
-            return out;
-        }
-        Out { pose: out.pose.blend(&solved, w), finished: out.finished }
-    }
-
-    pub(super) fn look_at(&mut self, n: &LookAt, dt: f32, bind: &Pose) -> Out {
-        let out = self.eval(n.source, dt, bind);
-        let w = self.weight(None, n.weight);
-        let Some(rig) = self.rig.clone().filter(|_| w > 0.0) else { return out };
-        let v = self.values(StateCtx::default());
-        let yaw = v.float(n.yaw).clamp(-n.yaw_limit.abs(), n.yaw_limit.abs()) * w;
-        let pitch = v.float(n.pitch).clamp(-n.pitch_limit.abs(), n.pitch_limit.abs()) * w;
-        let s = &rig.skeleton;
-        let frame = s.find(&n.reference).map_or(glam::Quat::IDENTITY, |r| s.model_space(&out.pose.0)[r].rot) * n.reference_rotation;
-        let bones: Vec<(usize, f32)> = n.bones.iter().filter_map(|(b, w)| Some((s.find(b)?, *w))).collect();
-        let mut pose = out.pose;
-        if pose.0.len() >= s.len() {
-            ik::look_at(s, &mut pose, frame, yaw, pitch, &bones);
-        }
-        Out { pose, finished: out.finished }
     }
 }

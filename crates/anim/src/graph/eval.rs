@@ -30,6 +30,8 @@ pub(super) enum NodeState {
     Machine(Machine),
     /// A selector's option, picked when it started.
     Chosen(PoseId),
+    /// An IK node's enable blend, 0 (off) to 1 (on).
+    Ik(f32),
 }
 
 pub(super) struct Out {
@@ -134,7 +136,7 @@ impl Instance {
                 self.eval(p, dt, bind)
             }
             PoseNode::Variation { .. } => Out { pose: bind.clone(), finished: true },
-            PoseNode::TwoBoneIk(n) => self.two_bone_ik(n, dt, bind),
+            PoseNode::TwoBoneIk(n) => self.two_bone_ik(id, n, dt, bind),
             PoseNode::LookAt(n) => self.look_at(n, dt, bind),
         }
     }

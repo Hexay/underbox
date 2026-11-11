@@ -6,6 +6,7 @@ pub mod blend2d;
 mod eval;
 mod eval_more;
 pub mod ik;
+mod ik_node;
 mod random;
 pub mod recording;
 mod smooth;
@@ -145,6 +146,19 @@ pub struct TwoBoneIk {
     pub weight: Option<ValueId>,
     /// The target is in world space (else the character's).
     pub world: bool,
+    /// Seconds to blend in or out when `enabled` flips.
+    pub blend_time: f32,
+    /// Blend the target (else the solved pose) by the weight.
+    pub blend_target: bool,
+    /// 0..1: how far the bend plane twists back toward the reference pose's (`ChainRotationWeight`).
+    pub twist: f32,
+}
+
+impl TwoBoneIk {
+    /// Always on, at full weight, blending the target (GraphBuilder's defaults bar the blend time).
+    pub fn new(source: PoseId, effector: &str, target: ValueId, world: bool) -> Self {
+        Self { source, effector: effector.to_owned(), target, enabled: None, weight: None, world, blend_time: 0.0, blend_target: true, twist: 0.0 }
+    }
 }
 
 /// A look-at chain: `bones` (end first) share a yaw/pitch turn of the reference bone's frame.
@@ -260,5 +274,7 @@ impl Definition {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_ik;
 #[cfg(test)]
 mod tests_nodes;

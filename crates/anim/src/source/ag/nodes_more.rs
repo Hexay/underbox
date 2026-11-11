@@ -82,6 +82,7 @@ impl Compiler {
                 PoseNode::LookAt(Box::new(look))
             }
             "TwoBoneIKNode" => {
+                let pose_mode = matches!(n.get("BlendMode"), Some(Json::String(s)) if s == "Pose") || n.get("BlendMode").and_then(Json::as_i64) == Some(1);
                 let ik = TwoBoneIk {
                     source: self.pose_input(n.get("Input"), scope),
                     effector: n.pointer("/DefaultVariationData/EffectorBone").and_then(Json::as_str).unwrap_or_default().to_owned(),
@@ -89,6 +90,9 @@ impl Compiler {
                     enabled: self.optional(n, "Enable", scope, Value::Bool(true)),
                     weight: self.optional(n, "Weight", scope, Value::Float(1.0)),
                     world: n.get("IsTargetInWorldSpace").and_then(Json::as_bool).unwrap_or(false),
+                    blend_time: n.pointer("/DefaultVariationData/BlendTime").and_then(Json::as_f64).map_or(0.0, |t| t.max(0.0) as f32),
+                    blend_target: !pose_mode,
+                    twist: f32_of(n, "ReferencePoseTwistWeight", 0.0).clamp(0.0, 1.0),
                 };
                 PoseNode::TwoBoneIk(Box::new(ik))
             }

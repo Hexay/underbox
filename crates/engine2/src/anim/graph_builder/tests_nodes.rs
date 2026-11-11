@@ -115,10 +115,15 @@ fn two_bone_ik_from_the_builder_reaches_its_target() {
     field!(i16, c_two_bone_ik_node_definition::GET_M_EFFECTOR_TARGET_NODE_IDX, ik, 0);
     field!(bool, c_two_bone_ik_node_definition::GET_M_IS_TARGET_IN_WORLD_SPACE, ik, true);
     items::set(ik, "EffectorBoneID", intern(b, "hand") as i64);
+    field!(f32, c_two_bone_ik_node_definition::GET_M_BLEND_TIME, ik, 0.25);
+    field!(f32, c_two_bone_ik_node_definition::GET_M_CHAIN_ROTATION_WEIGHT, ik, 0.5);
+    items::set(ik, "BlendMode", 1);
     let snap = capture(b, 2, "", "").unwrap();
     delete(b);
     let out = super::convert::convert(&snap);
     assert!(out.unsupported.is_empty(), "{:?}", out.unsupported);
+    let Some(PoseNode::TwoBoneIk(n)) = out.def.root.map(|r| &out.def.poses[r]) else { panic!("{:?}", out.def) };
+    assert_eq!((n.blend_time, n.blend_target, n.twist), (0.25, false, 0.5), "BlendTime, Pose blend mode, ChainRotationWeight");
 
     let mut s = Skeleton::default();
     s.push_local("shoulder", None, Xform::IDENTITY);

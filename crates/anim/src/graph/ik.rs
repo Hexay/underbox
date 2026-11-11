@@ -49,6 +49,30 @@ pub fn two_bone(s: &Skeleton, pose: &mut Pose, effector: usize, target: &Xform) 
     true
 }
 
+/// Twist the solved chain about its root → effector axis by `weight` of the way toward the bend
+/// plane `reference` (the bind pose) has, carried onto the current axis. The effector keeps its
+/// position and model-space rotation. A straight reference chain has no plane to twist toward.
+pub fn twist_toward(s: &Skeleton, pose: &mut Pose, effector: usize, reference: &Pose, weight: f32) {
+    let Some(mid) = s.bone(effector).and_then(|b| b.parent) else { return };
+    let Some(root) = s.bone(mid).and_then(|b| b.parent) else { return };
+    let (m, r) = (s.model_space(&pose.0), s.model_space(&reference.0));
+    let (axis, ref_axis) = ((m[effector].pos - m[root].pos).normalize_or_zero(), (r[effector].pos - r[root].pos).normalize_or_zero());
+    if axis == Vec3::ZERO || ref_axis == Vec3::ZERO {
+        return;
+    }
+    let flat = |v: Vec3, a: Vec3| v - a * v.dot(a);
+    let now = flat(m[mid].pos - m[root].pos, axis);
+    let want = flat(Quat::from_rotation_arc(ref_axis, axis) * flat(r[mid].pos - r[root].pos, ref_axis), axis);
+    if now.length_squared() < 1e-8 || want.length_squared() < 1e-8 {
+        return;
+    }
+    let angle = axis.dot(now.cross(want)).atan2(now.dot(want));
+    let hand = m[effector].rot;
+    turn(s, pose, root, Quat::from_axis_angle(axis, angle * weight));
+    let parent = s.model_space(&pose.0)[mid].rot;
+    pose.0[effector].rot = (parent.inverse() * hand).normalize();
+}
+
 /// Look-at: the reference frame's yaw (about its Z) and pitch (about its Y, positive down) turn,
 /// shared out over `bones` (end first, cumulative weights descending).
 pub fn look_at(s: &Skeleton, pose: &mut Pose, reference: Quat, yaw: f32, pitch: f32, bones: &[(usize, f32)]) {
