@@ -60,6 +60,9 @@ pub struct Decls {
     pub attributes: Vec<AttributeDecl>,
     /// `CreateInputTexture2D( ... )` and friends: macro name, then its arguments.
     pub inputs: Vec<Vec<String>>,
+    /// The 1-based line of each `inputs` entry.
+    #[serde(default)]
+    pub input_lines: Vec<u32>,
     /// `ExternalDescriptorSet name Slot n;`
     pub descriptor_sets: Vec<(String, u32)>,
 }
@@ -106,6 +109,9 @@ pub fn extract(text: &str, decls: &mut Decls) -> Result<String, String> {
         let semi = skip_trivia(&s, close + 1);
         let end = if b.get(semi) == Some(&b';') { semi } else { close };
         record(word, &s[open + 1..close], decls).map_err(err)?;
+        if word.starts_with("CreateInputTexture") {
+            decls.input_lines.push(line_of(&s, i));
+        }
         blank_bytes(&mut out[i..=end]);
         i = end + 1;
     }

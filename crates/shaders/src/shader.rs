@@ -63,6 +63,12 @@ pub struct Program {
     /// Render state, attributes, material inputs and descriptor sets declared for this stage.
     pub decls: Decls,
     pub annotations: Vec<Annotated>,
+    /// Annotations left in `source` because they end in a macro (see `annotation::strip_keeping_macros`).
+    #[serde(default)]
+    pub macro_annotations: Vec<Annotated>,
+    /// The preprocessor skeleton of the expanded text (`directives::collect`).
+    #[serde(default)]
+    pub directives: Vec<(u32, String)>,
     #[serde(skip)]
     pub deps: Vec<Dependency>,
     pub missing_includes: Vec<String>,
@@ -132,8 +138,9 @@ impl VfxShader {
         }
         let mut decls = Decls::default();
         let text = decl::extract(&text, &mut decls)?;
-        let mut annotations = Vec::new();
-        let source = crate::word_buffers::rewrite(&crate::compat::rewrite(&annotation::strip(&text, &mut annotations)));
+        let (mut annotations, mut macro_annotations) = (Vec::new(), Vec::new());
+        let stripped = annotation::strip_keeping_macros(&text, &mut annotations, &mut macro_annotations);
+        let source = crate::word_buffers::rewrite(&crate::compat::rewrite(&stripped));
         let statics = ComboSet {
             combos: self.combos(&decls.static_combos)?,
             rules: decls.static_rules.iter().chain(&self.feature_rules).cloned().collect(),
@@ -144,8 +151,10 @@ impl VfxShader {
             source,
             statics,
             dynamics,
+            directives: crate::directives::collect(&text),
             decls,
             annotations,
+            macro_annotations,
             deps: expander.deps,
             missing_includes: expander.missing,
         })
