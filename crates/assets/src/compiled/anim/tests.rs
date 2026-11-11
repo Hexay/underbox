@@ -61,6 +61,30 @@ fn sequences_rename_and_reflag() {
     assert_eq!(got[1].frames, anims[0].frames, "a sequence can play another sequence");
 }
 
+/// A 2×1 blend of `wave` and `nod` on `aim` (−1..1, keys 0 and 1): aim's default 0 sits halfway.
+#[test]
+fn blend_sequences_mix_their_references_at_default_pose_parameters() {
+    use crate::compiled::kv::{floats, int_value, list, obj, text};
+    let anims = fixture::animations();
+    let fetch = obj(vec![
+        ("m_localReferenceArray", list([int_value(0), int_value(1)])),
+        ("m_nGroupSize", list([int_value(2), int_value(1)])),
+        ("m_nLocalPose", list([int_value(0), int_value(-1)])),
+        ("m_poseKeyArray0", floats(&[0.0, 1.0])),
+    ]);
+    let desc = obj(vec![("m_sName", text("aim_blend")), ("m_flags", obj(vec![])), ("m_fetch", fetch)]);
+    let param = obj(vec![("m_sName", text("aim")), ("m_flStart", Value::Double(-1.0)), ("m_flEnd", Value::Double(1.0))]);
+    let seq = obj(vec![("m_localSequenceNameArray", list([text("wave"), text("nod")])), ("m_localS1SeqDescArray", list([desc])), ("m_localPoseParamArray", list([param]))]);
+    let weights = super::blend::weights(object(&object(&seq).get("m_localS1SeqDescArray").and_then(|d| d.as_array()).unwrap()[0]).get("m_fetch").map(object).unwrap(), object(&seq));
+    assert_eq!(weights, [(0, 0.5), (1, 0.5)]);
+    let got = sequences(object(&seq), anims.clone());
+    let (blend, wave, nod) = (&got[0], &anims[0], &anims[1]);
+    assert_eq!((blend.name.as_str(), blend.frames.len()), ("aim_blend", wave.frames.len()), "over the heavier (first) part's frames");
+    let (w, n) = (wave.frames[4][0].position, nod.frames[2][0].position);
+    let mid = [0, 1, 2].map(|i| (w[i] + n[i]) / 2.0);
+    assert!(blend.frames[4][0].position.iter().zip(mid).all(|(a, b)| (a - b).abs() < 1e-4), "last frames meet: {:?} vs {mid:?}", blend.frames[4][0].position);
+}
+
 #[test]
 fn groups_hold_animations_inline_or_in_vanim_files() {
     let (bones, flex) = (fixture::rig_bones(), fixture::flex_names());

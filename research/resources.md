@@ -78,8 +78,13 @@ m_szElementNameArray, m_nElementIndexArray}`. Elements bind to bones or flex con
 component, word 2's is its sign), half3 positions, base + half
 delta, full floats/vectors, static variants. Unkeyed bones hold the bind pose (identity in a delta).
 
-**Sequences (ASEQ):** `m_localSequenceNameArray`, `m_localS1SeqDescArray[] {m_sName, m_flags, m_fetch.m_localReferenceArray}`.
-A sequence plays its first reference under its own name; blends aren't evaluated.
+**Sequences (ASEQ):** `m_localSequenceNameArray`, `m_localS1SeqDescArray[] {m_sName, m_flags, m_fetch {m_localReferenceArray,
+m_nGroupSize, m_nLocalPose, m_poseKeyArray0/1}}`, `m_localPoseParamArray[] {m_sName, m_flStart, m_flEnd}`. Blends bake at
+each pose parameter's 0 (nothing sets them; see `crates/assets/src/compiled/anim/blend.rs`). Field names past
+`m_localReferenceArray` follow VRF and are unchecked against a shipped model.
+
+**Events:** an animation desc's `m_eventArray[] {m_nFrame, m_flCycle, m_sEventName, m_EventData}`; managed reads the payload
+in `SceneModel.OnAnimationEvent`.
 
 ## Morphs (MRPH, `.vmorf_c`)
 

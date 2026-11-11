@@ -4,6 +4,7 @@
 //! each segment element is. Sequences (ASEQ) rename and reflag animations. Layout and sources:
 //! research/resources.md.
 
+pub mod blend;
 pub mod encode;
 pub mod segment;
 
@@ -190,16 +191,20 @@ pub fn read(data: &Object, key: &Object, rig: &Rig) -> Vec<Animation> {
 }
 
 /// Sequences (`m_localS1SeqDescArray`) over `anims`: each plays the animation (or earlier
-/// sequence) its first fetch reference names, under its own name and flags; animations no
-/// sequence took keep their own. A blend's other references are not played.
+/// sequence) its fetch references name, blended per [`blend`], under its own name and flags;
+/// animations no sequence took keep their own.
 pub fn sequences(seq: &Object, anims: Vec<Animation>) -> Vec<Animation> {
     let names = strings(seq, "m_localSequenceNameArray");
     let mut out: Vec<Animation> = Vec::new();
     for desc in objects(seq, "m_localS1SeqDescArray") {
-        let first = kv::ints(kv::object(desc, "m_fetch"), "m_localReferenceArray").first().copied();
-        let Some(target) = first.and_then(|i| names.get(usize::try_from(i).ok()?)) else { continue };
-        let found = anims.iter().chain(out.iter()).find(|a| a.name.eq_ignore_ascii_case(target)).cloned();
-        let Some(mut a) = found else { continue };
+        let fetch = kv::object(desc, "m_fetch");
+        let refs = kv::ints(fetch, "m_localReferenceArray");
+        let find = |i: i64| {
+            let target = names.get(usize::try_from(i).ok()?)?;
+            anims.iter().chain(out.iter()).find(|a| a.name.eq_ignore_ascii_case(target))
+        };
+        let parts: Vec<(&Animation, f32)> = blend::weights(fetch, seq).into_iter().filter_map(|(r, w)| Some((find(*refs.get(r)?)?, w))).collect();
+        let Some(mut a) = blend::blend(&parts) else { continue };
         let flags = kv::object(desc, "m_flags");
         a.name = string(desc, "m_sName");
         (a.looping, a.hidden) = (kv::bool(flags, "m_bLooping"), kv::bool(flags, "m_bHidden"));
