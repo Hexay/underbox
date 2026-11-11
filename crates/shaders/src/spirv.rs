@@ -131,6 +131,25 @@ pub fn strip_reflection(words: &[u32]) -> (Vec<u32>, Vec<InputSemantic>) {
     (stripped, out)
 }
 
+const OP_EXECUTION_MODE: u32 = 16;
+const OP_CAPABILITY: u32 = 17;
+/// `ComputeDerivativeGroupQuadsKHR`, `ComputeDerivativeGroupLinearKHR`.
+const DERIVATIVE_CAPABILITIES: [u32; 2] = [5288, 5350];
+/// `DerivativeGroupQuadsKHR`, `DerivativeGroupLinearKHR`.
+const DERIVATIVE_MODES: [u32; 2] = [5289, 5290];
+
+/// Drops `SPV_KHR_compute_shader_derivatives` (DXC adds it for quad ops in compute, e.g.
+/// downsample_spd), which naga rejects. Quads become consecutive invocations, the layout the
+/// extension's linear mode names; shaders that swizzle their own thread ids (SPD) don't mind.
+pub fn strip_compute_derivatives(words: &[u32]) -> Vec<u32> {
+    rebuild(words, |inst| match op(inst) {
+        OP_EXTENSION if string(&inst[1..]).ends_with("_compute_shader_derivatives") => None,
+        OP_CAPABILITY if inst.len() >= 2 && DERIVATIVE_CAPABILITIES.contains(&inst[1]) => None,
+        OP_EXECUTION_MODE if inst.len() >= 3 && DERIVATIVE_MODES.contains(&inst[2]) => None,
+        _ => Some(inst.to_vec()),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,5 +188,17 @@ mod tests {
         let (stripped, inputs) = strip_reflection(&s);
         assert_eq!(inputs, [InputSemantic { location: 2, semantic: "POSITION".into(), name: "in.var.POSITION".into() }]);
         assert!(instructions(&stripped).all(|i| op(i) != OP_DECORATE_STRING && op(i) != OP_EXTENSION));
+    }
+
+    #[test]
+    fn strips_compute_derivatives_only() {
+        let mut m = vec![0x0723_0203, 0x10000, 0, 100, 0];
+        m.extend(inst(OP_CAPABILITY, &[1]));
+        m.extend(inst(OP_CAPABILITY, &[5288]));
+        m.extend(inst(OP_EXTENSION, &words("SPV_KHR_compute_shader_derivatives")));
+        m.extend(inst(OP_EXECUTION_MODE, &[4, 17, 256, 1, 1]));
+        m.extend(inst(OP_EXECUTION_MODE, &[4, 5289]));
+        let ops: Vec<_> = instructions(&strip_compute_derivatives(&m)).map(<[u32]>::to_vec).collect();
+        assert_eq!(ops, [inst(OP_CAPABILITY, &[1]), inst(OP_EXECUTION_MODE, &[4, 17, 256, 1, 1])]);
     }
 }

@@ -127,15 +127,18 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     ok.then(|| gpu.view.clone())
 }
 
-/// A `RWTexture2D`'s texture by name: mip 0 of a texture in exactly that format that allows
-/// storage writes (formats.rs gives that usage where wgpu guarantees it).
+/// A `RWTexture2D`'s texture by name: the mip the attribute names (downsample_spd binds one per
+/// mip) of a texture in exactly that format that allows storage writes (formats.rs gives that
+/// usage where wgpu guarantees it).
 fn storage_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding, format: wgpu::TextureFormat) -> Result<wgpu::TextureView, String> {
-    let t = inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n))).and_then(texture::resolve);
-    let gpu = t.as_ref().and_then(|t| t.gpu.as_ref()).ok_or_else(|| format!("{}: no texture to write", b.name))?;
+    let found = inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture_mip(*a, n)));
+    let (t, mip) = found.and_then(|(t, mip)| Some((texture::resolve(t)?, mip))).ok_or_else(|| format!("{}: no texture to write", b.name))?;
+    let gpu = t.gpu.as_ref().ok_or_else(|| format!("{}: no texture to write", b.name))?;
     if gpu.desc.format != format || !gpu.texture.usage().contains(wgpu::TextureUsages::STORAGE_BINDING) {
         return Err(format!("{}: {:?} isn't writable as {format:?}", b.name, gpu.desc.format));
     }
-    Ok(gpu.texture.create_view(&wgpu::TextureViewDescriptor { mip_level_count: Some(1), ..Default::default() }))
+    let mip = mip.min(gpu.texture.mip_level_count() - 1);
+    Ok(gpu.texture.create_view(&wgpu::TextureViewDescriptor { base_mip_level: mip, mip_level_count: Some(1), ..Default::default() }))
 }
 
 fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -> Result<Resource, String> {

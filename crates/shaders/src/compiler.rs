@@ -61,7 +61,7 @@ impl Compiler {
             return Ok(hit);
         }
         let words = self.spirv(shader, program, v)?;
-        let (words, semantics) = spirv::strip_reflection(&words);
+        let (words, semantics) = spirv::strip_reflection(&spirv::strip_compute_derivatives(&words));
         let words = crate::bindings::unalias(&crate::row_major::transpose_members(&crate::comparison::split(&words)));
         let t = translate::spirv_to_wgsl(&words)?;
         let reflection = reflect::reflect(&t.module, &t.info, program.stage, &semantics)

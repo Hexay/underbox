@@ -61,6 +61,8 @@ impl Gpu {
                 max_storage_buffers_per_shader_stage: limits.max_storage_buffers_per_shader_stage,
                 max_sampled_textures_per_shader_stage: limits.max_sampled_textures_per_shader_stage,
                 max_samplers_per_shader_stage: limits.max_samplers_per_shader_stage,
+                // downsample_spd writes seven mips.
+                max_storage_textures_per_shader_stage: limits.max_storage_textures_per_shader_stage,
                 max_uniform_buffers_per_shader_stage: limits.max_uniform_buffers_per_shader_stage,
                 ..wgpu::Limits::default().using_resolution(limits)
             },
@@ -83,6 +85,8 @@ impl Gpu {
         let scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
         let r = f();
         match pollster::block_on(scope.pop()) {
+            // wgpu's Display is just "Validation Error"; the cause is in the description.
+            Some(wgpu::Error::Validation { description, .. }) => Err(description),
             Some(e) => Err(e.to_string()),
             None => Ok(r),
         }

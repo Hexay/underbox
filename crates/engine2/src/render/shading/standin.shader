@@ -193,17 +193,13 @@ PS
 	// no spheres and one cascade.
 	int SunCascade( float3 vPositionWs, bool bOurs )
 	{
-		if ( bOurs )
-			return 0;
-		for ( int n = 0; n < 4; n++ )
+		for ( int n = 0; !bOurs && n < min( 4, (int)g_DirectionalLightCascadeCount ); n++ )
 		{
-			if ( n >= (int)g_DirectionalLightCascadeCount )
-				break;
 			float3 vToCenter = vPositionWs - g_DirectionalLightCascadeSpheres[n].xyz;
 			if ( dot( vToCenter, vToCenter ) < g_DirectionalLightCascadeSpheres[n].w )
 				return n;
 		}
-		return -1;
+		return bOurs ? 0 : -1;
 	}
 
 	float SunVisibility( float3 vPositionWs, float3 vNormalWs )

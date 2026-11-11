@@ -7,10 +7,11 @@ Part of the renderer (docs/renderer.md).
 `RenderTools.Compute` (`render/compute/`) translates the `.shader`'s CS stage like any other
 (`shading::compute`, combos 0/0) into a `render::ComputeProgram` and dispatches
 `ceil(threads / workgroup size)` groups, bound by name from attributes and the view's lighting.
-On the GPU: `clustered_light_culling_cs`, `depthresolve_cs`, `postprocess/cmaa2_cs`. On the CPU:
-`occlusion_cull_cs` (naga rejects DXC's output; `render/compute/` keeps a CPU cull). Skipped with a
-warning: `downsample_spd` (needs `SPV_KHR_compute_shader_derivatives`). `compute/gpu_tests.rs`
-lists which must build. Storage images need the adapter's format features
+On the GPU: `clustered_light_culling_cs`, `depthresolve_cs`, `postprocess/cmaa2_cs`,
+`downsample_spd` (`spirv::strip_compute_derivatives` drops the extension DXC adds for its quad
+ops; each `RWTexture2D` binds the mip its attribute names; seven storage images need the
+adapter's limit). On the CPU: `occlusion_cull_cs` (naga rejects atomics on `DrawArgs` fields;
+`render/compute/` keeps a CPU cull). `compute/gpu_tests.rs` lists which must build. Storage images need the adapter's format features
 (`TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES`: lavapipe writes `Rg32Float` read-write).
 
 ## Lighting and shadows

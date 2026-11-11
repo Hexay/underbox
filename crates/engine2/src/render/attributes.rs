@@ -147,8 +147,13 @@ pub fn buffer(r: Ref, name: &str) -> Option<usize> {
 
 /// The texture named `name` (with parents).
 pub fn texture(r: Ref, name: &str) -> Option<NativeRef<class::CTextureBase>> {
+    texture_mip(r, name).map(|(t, _)| t)
+}
+
+/// [`texture`] with the mip managed set it for (0 when it asked for none).
+pub fn texture_mip(r: Ref, name: &str) -> Option<(NativeRef<class::CTextureBase>, u32)> {
     on(r, |a| match a.get(Kind::Texture, StringToken::of(name)) {
-        Some(Value::Texture(t, _)) if !t.is_null() => Some(t),
+        Some(Value::Texture(t, mip)) if !t.is_null() => Some((t, mip.max(0).unsigned_abs())),
         _ => None,
     })
 }
