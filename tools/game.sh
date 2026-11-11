@@ -104,7 +104,7 @@ run_client() {
 host_client() {
     # shellcheck disable=SC2086
     run_client OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL="$CLIENT_UNTIL" GRACE="${CLIENT_GRACE:-3}" SHADOW_QUALITY="${SHADOW_QUALITY:-2}" \
-        sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" ${CLIENT_ARGS:-}
+        sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" ${MAP:+"$MAP"} ${CLIENT_ARGS:-}
 }
 
 # The join client: offline package seed, the manifest server on a borrowed port, then +connect.
@@ -141,7 +141,7 @@ else
         *) until='GAME:END' grace=3 ;;
     esac
     OUT=$OUT UNTIL=$until GRACE=$grace \
-        sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" +port "$PORT" > "$OUT/boot.txt" 2>&1 &
+        sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" ${MAP:+"$MAP"} +port "$PORT" > "$OUT/boot.txt" 2>&1 &
     SERVER=$!
     if [ "$MODE" != server ]; then
         until grep -q 'GAME:SETTLED' "$OUT/server.log" 2>/dev/null; do
