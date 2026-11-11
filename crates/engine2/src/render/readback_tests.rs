@@ -28,7 +28,7 @@ fn sync_read_converts_and_strides() {
 fn clearing_a_plain_texture_uploads_the_colour() {
     device::create().expect("a wgpu adapter (lavapipe on headless Linux)");
     let mut config = abi::structs::TextureCreationConfig_t::default();
-    (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels, config.m_n_image_format) = (4, 1, 1, 1, RGBA8888.into());
+    (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels, config.m_n_image_format) = (4, 1, 1, 1, RGBA8888);
     let t = texture::create(None, true, config, &mut []);
     texture::clear(t, Color32 { r: 5, g: 6, b: 7, a: 8 });
     let mut out = vec![0u8; 16];
