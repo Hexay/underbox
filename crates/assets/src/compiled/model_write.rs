@@ -29,6 +29,10 @@ fn model_info(m: &Model) -> Value {
     ])
 }
 
+/// What real's compiler gives a plain skinned bone: used by vertices at every LOD (0x400 <<
+/// 0..8) plus 0x40. Real animates only bones flagged as used; with 0 it holds the bind pose.
+const BONE_FLAGS: i64 = 0x3FC40;
+
 /// `PermModelData_t` with every member real's compiler writes, in its order: its schema
 /// conversion rejects a DATA block that leaves members out (docs/differential.md).
 fn write_data(m: &Model) -> Value {
@@ -37,7 +41,7 @@ fn write_data(m: &Model) -> Value {
         ("m_boneName", list(s.iter().map(|b| text(&b.name)))),
         ("m_nParent", list(s.iter().map(|b| int_value(b.parent.map_or(-1, |p| p as i64))))),
         ("m_boneSphere", list(s.iter().map(|_| Value::Double(0.0)))),
-        ("m_nFlag", list(s.iter().map(|_| int_value(0)))),
+        ("m_nFlag", list(s.iter().map(|_| int_value(BONE_FLAGS)))),
         ("m_bonePosParent", list(s.iter().map(|b| floats(&b.position)))),
         ("m_boneRotParent", list(s.iter().map(|b| floats(&b.rotation)))),
     ]);
@@ -70,10 +74,69 @@ fn write_data(m: &Model) -> Value {
     ])
 }
 
-/// The mesh data's (empty) attachments and hitbox sets replaced by the model's.
-fn with_rig(data: Value, m: &Model) -> Value {
+fn qmul(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
+    let [ax, ay, az, aw] = a;
+    let [bx, by, bz, bw] = b;
+    [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz]
+}
+
+/// Rows of `q`'s rotation matrix.
+fn qmat(q: [f32; 4]) -> [[f32; 3]; 3] {
+    let [x, y, z, w] = q;
+    [
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+        [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+        [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+    ]
+}
+
+fn apply(m: &[[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] {
+    m.map(|r| r[0] * v[0] + r[1] * v[1] + r[2] * v[2])
+}
+
+/// Each bone's inverse world bind pose, 3x4 row-major.
+fn inverse_binds(m: &Model) -> Vec<[f32; 12]> {
+    let mut world: Vec<([f32; 3], [f32; 4])> = Vec::with_capacity(m.bones.len());
+    for b in &m.bones {
+        let (pp, pq) = b.parent.and_then(|p| world.get(p).copied()).unwrap_or(([0.0; 3], [0.0, 0.0, 0.0, 1.0]));
+        let offset = apply(&qmat(pq), b.position);
+        world.push((std::array::from_fn(|i| pp[i] + offset[i]), qmul(pq, b.rotation)));
+    }
+    world
+        .iter()
+        .map(|(p, q)| {
+            let r = qmat([-q[0], -q[1], -q[2], q[3]]);
+            let t = apply(&r, *p);
+            std::array::from_fn(|i| if i % 4 == 3 { -t[i / 4] } else { r[i / 4][i % 4] })
+        })
+        .collect()
+}
+
+/// `CRenderMesh::m_skeleton`: real skins vertex blend index `i` (through `m_remappingTable`)
+/// with mesh bone `i`'s inverse bind pose; with no bones it deforms the mesh arbitrarily.
+fn mesh_skeleton(m: &Model, mesh: &super::mesh::Mesh) -> Value {
+    let (lo, hi) = mesh.bounds.unwrap_or(([0.0; 3], [0.0; 3]));
+    let size: [f32; 3] = std::array::from_fn(|i| hi[i] - lo[i]);
+    let radius = size.iter().map(|s| s * s).sum::<f32>().sqrt() * 0.5;
+    let bones = m.bones.iter().zip(inverse_binds(m)).map(|(b, inv)| {
+        let parent = b.parent.and_then(|p| m.bones.get(p)).map_or("", |p| p.name.as_str());
+        let center = apply(&[[inv[0], inv[1], inv[2]], [inv[4], inv[5], inv[6]], [inv[8], inv[9], inv[10]]], std::array::from_fn(|i| (lo[i] + hi[i]) * 0.5));
+        let center: [f32; 3] = std::array::from_fn(|i| center[i] + inv[i * 4 + 3]);
+        let bbox = obj(vec![("m_vecCenter", floats(&center)), ("m_vecSize", floats(&size))]);
+        obj(vec![("m_boneName", text(&b.name)), ("m_parentName", text(parent)), ("m_invBindPose", floats(&inv)), ("m_bbox", bbox), ("m_flSphereRadius", Value::Double(f64::from(radius)))])
+    });
+    obj(vec![("m_bones", list(bones)), ("m_boneParents", list([])), ("m_nBoneWeightCount", int_value(4))])
+}
+
+/// The mesh data's skeleton, and for the first mesh its (empty) attachments and hitbox sets,
+/// replaced by the model's.
+fn with_rig(data: Value, m: &Model, mesh: &super::mesh::Mesh, first: bool) -> Value {
     let Value::Object(Object(mut members)) = data else { return data };
-    for (k, v) in rig::write(&m.attachments, &m.hitbox_sets) {
+    let mut rig = if first { rig::write(&m.attachments, &m.hitbox_sets) } else { Vec::new() };
+    if !m.bones.is_empty() {
+        rig.push(("m_skeleton", mesh_skeleton(m, mesh)));
+    }
+    for (k, v) in rig {
         match members.iter_mut().find(|(name, _)| name == k) {
             Some(slot) => slot.1 = v,
             None => members.push((k.to_owned(), v)),
@@ -92,7 +155,7 @@ pub fn write(m: &Model, packing: Packing) -> Vec<u8> {
     for (i, mm) in m.meshes.iter().enumerate() {
         let first = next(&blocks);
         let data = mesh::write_data(&mm.mesh);
-        blocks.push((*b"MDAT", super::kv3(&if i == 0 { with_rig(data, m) } else { data })));
+        blocks.push((*b"MDAT", super::kv3(&with_rig(data, m, &mm.mesh, i == 0))));
         blocks.push((*b"MBUF", vbib::write(&mesh::write_buffers(&mm.mesh), packing)));
         let morph_block = mm.morph.as_ref().map_or(-1, |s| {
             blocks.push((*b"MRPH", super::kv3(&morph::write(s))));
@@ -124,4 +187,22 @@ pub fn write(m: &Model, packing: Packing) -> Vec<u8> {
     refs.sort_unstable();
     refs.dedup();
     super::write(super::RESOURCE_VERSION, &refs, blocks)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inverse_binds_undo_the_world_bind_pose() {
+        let mut m = Model { bones: super::super::fixture::rig_bones(), ..Model::default() };
+        m.bones[1].rotation = [0.0, 0.0, 0.5f32.sqrt(), 0.5f32.sqrt()];
+        let inv = inverse_binds(&m);
+        // The head sits 8 above the spine at z 16, whatever the spine's turn about z.
+        let head = [0.0, 0.0, 24.0];
+        let local: [f32; 3] = std::array::from_fn(|r| (0..3).map(|c| inv[2][r * 4 + c] * head[c]).sum::<f32>() + inv[2][r * 4 + 3]);
+        assert!(local.iter().all(|v| v.abs() < 1e-5), "{local:?}");
+        let x = inv[1][0..3].to_vec();
+        assert!((x[0]).abs() < 1e-5 && (x[1] - 1.0).abs() < 1e-5, "spine's inverse turns -90 about z: {x:?}");
+    }
 }

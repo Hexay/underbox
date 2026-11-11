@@ -7,13 +7,22 @@ const GLOW_SIZE: u32 = 64;
 
 /// `(width, height, rgba8)` for a texture we generate, by its resource path.
 pub fn texture(path: &str) -> Option<(u32, u32, Vec<u8>)> {
-    let stem = path.trim_end_matches("_c").trim_end_matches(".vtex").trim_end_matches(".tga").replace('\\', "/");
+    let stem = path.trim_end_matches("_c").trim_end_matches(".vtex").trim_end_matches(".generated").trim_end_matches(".tga").replace('\\', "/");
+    // The compiler's `x_tga_<hash>.generated.vtex` is image `x.tga`.
+    let stem = stem.rsplit_once("_tga_").map_or(stem.as_str(), |(s, _)| s);
     if stem.ends_with("dev/helper/testgrid_color") {
         return Some(testgrid());
     }
     // Real's compiled default normal map: a flat hemi-octahedral normal and roughness 0.5 in blue.
     if stem.ends_with("materials/default/default_normal") {
         return Some((1, 1, vec![128, 128, 128, 255]));
+    }
+    // Real's core images, which sbox-public leaves out: what the compiler binds for unset inputs.
+    if stem.ends_with("materials/default/default_color") {
+        return Some((1, 1, vec![187, 187, 187, 255]));
+    }
+    if stem.ends_with("materials/default/default_ao") {
+        return Some((1, 1, vec![255; 4]));
     }
     let flare = stem.contains("textures/particles/flares/") && !stem.contains("light_cone");
     (flare || stem.contains("textures/lightcookies/")).then(glow)
@@ -67,7 +76,7 @@ mod tests {
         let (w, h, data) = texture("dev/helper/testgrid_color.tga").unwrap();
         assert_eq!((w, h, data.len()), (GRID_SIZE, GRID_SIZE, (GRID_SIZE * GRID_SIZE * 4) as usize));
         assert!(texture("materials/dev/helper/testgrid_color.vtex_c").is_some());
-        assert!(texture("materials/default/default_color.tga").is_none());
+        assert_eq!(texture("materials/default/default_color.tga"), Some((1, 1, vec![187, 187, 187, 255])));
         assert_eq!(texture("materials/default/default_normal.tga"), Some((1, 1, vec![128, 128, 128, 255])));
         // A cell interior differs from its neighbour, and edges are darker than both.
         let at = |x: u32, y: u32| data[((y * GRID_SIZE + x) * 4) as usize];

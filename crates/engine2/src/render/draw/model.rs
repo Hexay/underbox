@@ -54,6 +54,7 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
         return None;
     }
     let state = RasterState { topology: topology(call.prim.into()), ..state };
+    let uniforms = DrawUniforms { tint: call.tinted(uniforms.tint), ..uniforms };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
     let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj, Default::default()));
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
@@ -97,7 +98,7 @@ pub fn object(s: &crate::scene::object::State, deform: &Deform, view_proj: Mat4)
         let world = matrix(&s.transform);
         let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) };
         let posed = deform.pose.as_ref().and_then(|p| Some((p, skin::mesh_skin(&model, s.model, i)?)));
-        let skinned = posed.and_then(|(pose, sk)| skin::native::skinned(deform.key, i, &sk, s.model, pose, tint(s.tint), deform.morphs.as_ref().and_then(|m| Some((m.mesh(i)?, mesh)))));
+        let skinned = posed.and_then(|(pose, sk)| skin::native::skinned(deform.key, i, &sk, s.model, pose, call.tinted(tint(s.tint)),deform.morphs.as_ref().and_then(|m| Some((m.mesh(i)?, mesh)))));
         let Some(attrs) = skinned else {
             let vertices = deform.morphs.as_ref().and_then(|m| morph::vertices(m, i, mesh));
             out.extend(draw_call_of(mesh, vertices, call, uniforms, view_proj, RasterState::default()));
@@ -127,6 +128,12 @@ pub fn cull_placeholder(d: Draw) -> Draw {
 pub fn depth_only(d: Draw) -> Draw {
     let cached = d.shaded.as_ref().is_some_and(|s| !s.context.attributes.is_empty());
     if cached { d } else { Draw { shaded: None, ..d } }
+}
+
+/// A scene object's draws into a shadow map seen through `view_proj`: depth only, and none of
+/// its translucent ones (real's translucent materials cast no shadow).
+pub fn shadow_draws(s: &crate::scene::object::State, deform: &Deform, view_proj: Mat4) -> Vec<Draw> {
+    object(s, deform, view_proj).into_iter().filter(|d| !translucent(d)).map(depth_only).collect()
 }
 
 /// Every draw of `model` placed at `world` (model to world), seen through `view_proj`, each with

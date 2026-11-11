@@ -161,6 +161,8 @@ PS
 	float g_flMetalness < Attribute( "g_flMetalness" ); Default( 0.0 ); >;
 	// 1 for shaders that map here from an unlit original (standin.rs).
 	float g_flStandinUnlit < Attribute( "StandinUnlit" ); Default( 0.0 ); >;
+	// A managed draw's compiled draw-call tint (draw/draw_call.rs); native draws fold it into the instance tint.
+	float4 g_vStandinDrawTint < Attribute( "StandinDrawTint" ); Default4( 1.0, 1.0, 1.0, 1.0 ); >;
 	// UNDERBOX_STANDIN_DEBUG (standin.rs): 1 paints sun visibility, 2 cascade 0's shadow-space position.
 	float g_flStandinDebug < Attribute( "StandinDebug" ); Default( 0.0 ); >;
 
@@ -225,8 +227,10 @@ PS
 	{
 		PS_OUTPUT o;
 		float4 vAlbedo = g_tColor.Sample( g_sStandin, i.vTexCoord );
-		float3 vTint = lerp( float3( 1.0, 1.0, 1.0 ), i.vTint.rgb, g_flModelTintAmount );
-		float3 vColor = vAlbedo.rgb * g_vColorTint.rgb * vTint;
+		float4 vInstanceTint = i.vTint * g_vStandinDrawTint;
+		float3 vTint = lerp( float3( 1.0, 1.0, 1.0 ), vInstanceTint.rgb, g_flModelTintAmount );
+		// complex's colour tint is gamma space (vr_shared_standard_vs_code.fxc).
+		float3 vColor = vAlbedo.rgb * SrgbGammaToLinear( g_vColorTint.rgb ) * vTint;
 
 		float3 vNormalWs = normalize( i.vNormalWs );
 		Surface s;
@@ -241,7 +245,7 @@ PS
 		s.vSpecularColor = lerp( float3( 0.04, 0.04, 0.04 ), vColor, g_flMetalness );
 		DirectLight d = Direct( s );
 		float3 vLit = vColor * ( 1.0 - g_flMetalness ) * ( AmbientLightColor.rgb + d.vDiffuse ) + d.vSpecular;
-		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), lerp( vLit, vColor, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * i.vTint.a );
+		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), lerp( vLit, vColor, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * vInstanceTint.a );
 		if ( g_flStandinDebug == 1.0 )
 			o.vColor = float4( SunVisibility( i.vPositionWs, vNormalWs ).xxx, 1.0 );
 		else if ( g_flStandinDebug == 2.0 )

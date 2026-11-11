@@ -28,6 +28,14 @@ pub struct DrawCall {
     pub index_count: i32,
     pub start_vertex: i32,
     pub vertex_count: i32,
+    /// A compiled draw call's `m_vTintColor` and `m_flAlpha`, multiplied into the object's tint.
+    pub tint: Option<[f32; 4]>,
+}
+
+impl DrawCall {
+    pub fn tinted(&self, object: [f32; 4]) -> [f32; 4] {
+        self.tint.map_or(object, |t| std::array::from_fn(|i| object[i] * t[i]))
+    }
 }
 
 /// One morph target: per-vertex position and normal offsets.
@@ -132,7 +140,7 @@ impl RenderMesh {
         }
         let vertex_count = if s.vertex_range.1 > 0 { s.vertex_range.1 } else { s.vertices.as_ref().map_or(0, |v| v.count() as i32) };
         let index_count = if s.index_range.1 > 0 { s.index_range.1 } else { s.indices.as_ref().map_or(0, |i| i.indices().len() as i32) };
-        vec![DrawCall { material: s.material.clone(), prim: s.prim, start_index: s.index_range.0, index_count, start_vertex: s.vertex_range.0, vertex_count }]
+        vec![DrawCall { material: s.material.clone(), prim: s.prim, start_index: s.index_range.0, index_count, start_vertex: s.vertex_range.0, vertex_count, tint: None }]
     }
 
     /// Every vertex in the vertex buffer, decoded.
@@ -214,7 +222,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, g::SET_MESH_VERTEX_RANGE, |m, start, count| with(m, |s| s.vertex_range = (start, count)));
     bind!(r, g::SET_MESH_INDEX_RANGE, |m, start, count| with(m, |s| s.index_range = (start, count)));
     bind!(r, g::ADD_MESH_DRAW_CALL, |m, mat, prim, start_index, index_count, start_vertex, vertex_count| {
-        let call = DrawCall { material: MaterialRef::keep(mat), prim, start_index, index_count, start_vertex, vertex_count };
+        let call = DrawCall { material: MaterialRef::keep(mat), prim, start_index, index_count, start_vertex, vertex_count, tint: None };
         let mut n = -1;
         with(m, |s| {
             s.draw_calls.push(call);

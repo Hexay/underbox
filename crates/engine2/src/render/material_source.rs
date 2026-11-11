@@ -49,7 +49,12 @@ pub fn load(path: &str) -> Option<Loaded> {
         .inspect_err(|e| log(Level::Warn, &format!("{path}: {e:?}")))
         .ok()?;
     let declared = shader_declarations(&material.shader);
-    let textures = assets::material::bind_textures(&material, declared.as_deref())
+    let mut textures = assets::material::bind_textures(&material, declared.as_deref());
+    // Real's compiler fills complex's unset inputs (an unset colour is grey, not white).
+    if std::path::Path::new(&material.shader).file_stem().is_some_and(|s| s == "complex") {
+        textures = assets::compiled::material::with_default_textures(textures);
+    }
+    let textures = textures
         .into_iter()
         .map(|(attr, tex)| (attr, texture::load(CString::new(tex).ok().as_deref(), Guid::default())))
         .collect();

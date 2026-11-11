@@ -1,6 +1,6 @@
 //! Writing animations for fixtures: an `AnimationResourceData_t` and its decode key, and the
 //! group, `.vanim_c` and sequence data around them. Static bones go in static segments, moving
-//! positions as base + half deltas, moving rotations as 48-bit quaternions, scale and morphs
+//! positions as base + half deltas, rotations as 48-bit quaternions, scale and morphs
 //! as full floats, split into frame blocks of `block` frames.
 
 use super::layout::{self, ANGLE, MORPH, POSITION, SCALE};
@@ -11,7 +11,34 @@ use ::kv::Value;
 
 pub use layout::sequences;
 
-const DECODERS: [(Decoder, i64); 5] = [(Decoder::StaticFullVector3, 3), (Decoder::StaticQuaternion, 4), (Decoder::DeltaVector3, 3), (Decoder::AnimQuaternion, 4), (Decoder::FullFloat, 1)];
+/// Real's `m_decoderArray`, in its order (with its two `CCompressedStaticInt`): real indexes
+/// segments' decoders by position in this list whatever a file's own array says.
+const DECODERS: [(&str, i64); 24] = [
+    ("CCompressedStaticFloat", 1),
+    ("CCompressedFullFloat", 1),
+    ("CCompressedStaticVector3", 3),
+    ("CCompressedStaticFullVector3", 3),
+    ("CCompressedAnimVector3", 3),
+    ("CCompressedDeltaVector3", 3),
+    ("CCompressedFullVector3", 3),
+    ("CCompressedStaticQuaternion", 4),
+    ("CCompressedAnimQuaternion", 4),
+    ("CCompressedFullQuaternion", 4),
+    ("CCompressedStaticChar", 5),
+    ("CCompressedFullChar", 5),
+    ("CCompressedStaticInt", 5),
+    ("CCompressedFullShort", 5),
+    ("CCompressedStaticInt", 5),
+    ("CCompressedFullInt", 5),
+    ("CCompressedStaticBool", 6),
+    ("CCompressedFullBool", 6),
+    ("CCompressedStaticColor32", 9),
+    ("CCompressedFullColor32", 9),
+    ("CCompressedStaticVector2D", 25),
+    ("CCompressedFullVector2D", 25),
+    ("CCompressedStaticVector4D", 27),
+    ("CCompressedFullVector4D", 27),
+];
 
 fn floats(v: &[f32]) -> impl Iterator<Item = u8> + '_ {
     v.iter().flat_map(|f| f.to_le_bytes())
@@ -27,7 +54,7 @@ struct Segments<'a> {
 impl Segments<'_> {
     /// Pushes a segment keying `targets` (bone or controller indices) of `channel`; its index.
     fn push(&mut self, channel: i64, decoder: Decoder, cardinality: i16, targets: &[usize], data: &[u8]) -> i64 {
-        let index = DECODERS.iter().position(|(d, _)| *d == decoder).expect("writer decoder") as i16;
+        let index = DECODERS.iter().position(|(d, _)| *d == decoder.name()).expect("writer decoder") as i16;
         let length = (8 + targets.len() * 2 + data.len()).min(i16::MAX as usize) as i16;
         let mut bytes: Vec<u8> = [index, cardinality, targets.len() as i16, length].iter().flat_map(|v| v.to_le_bytes()).collect();
         bytes.extend(targets.iter().flat_map(|&t| (layout::element(channel, t, self.bones) as i16).to_le_bytes()));
@@ -62,14 +89,10 @@ fn block_segments(a: &Animation, base: &[Key], range: std::ops::RangeInclusive<u
         }
         segs.push(out.push(POSITION, Decoder::DeltaVector3, 3, &moved, &data));
     }
-    let (still, moved): (Vec<usize>, Vec<usize>) = rotations.iter().partition(|&&b| !moving(b, &rot_differs));
-    if !still.is_empty() {
-        let data: Vec<u8> = still.iter().flat_map(|&b| encode_quaternion(frames[0][b].rotation)).collect();
-        segs.push(out.push(ANGLE, Decoder::StaticQuaternion, 4, &still, &data));
-    }
-    if !moved.is_empty() {
-        let data: Vec<u8> = frames.iter().flat_map(|fr| moved.iter().flat_map(|&b| encode_quaternion(fr[b].rotation))).collect();
-        segs.push(out.push(ANGLE, Decoder::AnimQuaternion, 4, &moved, &data));
+    // Real's compiler keys every rotation with AnimQuaternion; its StaticQuaternion decodes ours as NaN.
+    if !rotations.is_empty() {
+        let data: Vec<u8> = frames.iter().flat_map(|fr| rotations.iter().flat_map(|&b| encode_quaternion(fr[b].rotation))).collect();
+        segs.push(out.push(ANGLE, Decoder::AnimQuaternion, 4, &rotations, &data));
     }
     let scaled = keyed(&|x: &Key, y: &Key| x.scale != y.scale);
     if !scaled.is_empty() {
@@ -93,10 +116,13 @@ pub fn write(anims: &[Animation], rig: &Rig, block: usize) -> (Value, Value) {
         .iter()
         .map(|a| {
             let base: Vec<Key> = rig.bones.iter().map(|b| if a.delta { Key::IDENTITY } else { Key::bind(b) }).collect();
-            let blocks: Vec<Value> = (0..a.frames.len())
+            // Each block repeats the next one's first frame: real interpolates frame f to f + 1
+            // inside one block, and reads NaN past its end.
+            let last = a.frames.len() - 1;
+            let blocks: Vec<Value> = (0..last.max(1))
                 .step_by(block.max(1))
                 .map(|s| {
-                    let end = (s + block.max(1) - 1).min(a.frames.len() - 1);
+                    let end = (s + block.max(1)).min(last);
                     let segs = block_segments(a, &base, s..=end, &mut out);
                     obj(vec![("m_nStartFrame", int_value(s as i64)), ("m_nEndFrame", int_value(end as i64)), ("m_segmentIndexArray", list(segs.into_iter().map(int_value)))])
                 })
@@ -104,7 +130,7 @@ pub fn write(anims: &[Animation], rig: &Rig, block: usize) -> (Value, Value) {
             layout::desc(a, blocks, rig.bones.len())
         })
         .collect();
-    let decoders = DECODERS.iter().map(|(d, ty)| obj(vec![("m_szName", text(d.name())), ("m_nVersion", int_value(0)), ("m_nType", int_value(*ty))]));
+    let decoders = DECODERS.iter().map(|(d, ty)| obj(vec![("m_szName", text(d)),("m_nVersion", int_value(0)), ("m_nType", int_value(*ty))]));
     let count = segments.len() as i64;
     let fields = [("m_name", text("")), ("m_animArray", list(descs)), ("m_decoderArray", list(decoders)), ("m_nMaxUniqueFrameIndex", int_value(count)), ("m_segmentArray", list(segments))];
     (obj(fields.into()), layout::decode_key(rig))
