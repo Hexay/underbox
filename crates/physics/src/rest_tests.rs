@@ -66,3 +66,21 @@ fn bodies_sink_as_deep_as_real() {
         assert!(world.body(b).unwrap().is_sleeping(), "{name} asleep by 3 s");
     }
 }
+
+/// Real (probe `STACKSLEEP`): a lone resting box sleeps at step 25, a three-box stack at 26.
+#[test]
+fn a_stack_sleeps_a_step_after_a_lone_box() {
+    let mut world = slab_world();
+    let stack: Vec<_> = (0..3).map(|i| put(&mut world, 0.0, 16.0 + 32.0 * i as f32, cube(16.0))).collect();
+    let lone = put(&mut world, 400.0, 16.0, cube(16.0));
+    let mut asleep = [0; 4];
+    for step in 1..=60 {
+        world.step(DT, SUBSTEPS);
+        for (i, &b) in stack.iter().chain([&lone]).enumerate() {
+            if asleep[i] == 0 && world.body(b).unwrap().is_sleeping() {
+                asleep[i] = step;
+            }
+        }
+    }
+    assert_eq!(asleep, [26, 26, 26, 25]);
+}

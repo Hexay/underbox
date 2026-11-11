@@ -176,6 +176,10 @@ public sealed class RealGameWatch : Component
 		{
 			reportedSettled = true;
 			Mark( $"SETTLED bodies={bodies.Count} fallen={below}" );
+			// Where small scenes (the zoo) came to rest; big ones (Sweeper's cubes) would only add noise.
+			if ( bodies.Count <= 20 )
+				foreach ( var b in bodies )
+					Mark( $"RESTED {b.GameObject.Name} at={b.WorldPosition.x:0},{b.WorldPosition.y:0},{b.WorldPosition.z:0} up={b.WorldRotation.Up.z:0.0}" );
 			// A client's controller would be a local object nobody else sees: only the host drops one.
 			if ( Networking.IsHost ) DropController();
 			if ( Networking.IsHost && !string.IsNullOrWhiteSpace( StartCommand ) )

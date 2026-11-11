@@ -65,6 +65,22 @@ fn hinge_motor_drives_its_speed() {
     assert!((spin - 2.0).abs() < 0.1, "spins at the motor's speed: {spin}");
 }
 
+/// Real's hinge ignores friction (probe `HINGE friction`: a spin of 10 rad/s keeps it at 1e7).
+#[test]
+fn hinge_friction_does_nothing() {
+    let mut world = World::default();
+    world.set_gravity(Vector::ZERO);
+    let (a, b) = arm(&mut world);
+    let id = world.add_joint(a, b, hinge(JointKind::Revolute)).unwrap();
+    world.update_joint(id, |j| j.friction = 1.0e7);
+    let rb = world.body_mut(b).unwrap();
+    rb.set_angvel(Vector::new(0.0, 2.0, 0.0), true);
+    rb.set_linvel(Vector::new(0.0, 0.0, -40.0), true);
+    run(&mut world, 10);
+    let spin = world.body(b).unwrap().angvel().length();
+    assert!((spin - 2.0).abs() < 0.05, "still spinning: {spin}");
+}
+
 #[test]
 fn weld_holds_and_breaks_past_its_strength() {
     let mut world = World::default();
