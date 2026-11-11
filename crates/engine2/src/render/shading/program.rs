@@ -160,5 +160,5 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
     blocks.extend(layout::uniform_blocks(&ps.wgsl));
     let mut storage = layout::storage_elements(&vs.wgsl);
     storage.extend(layout::storage_elements(&ps.wgsl));
-    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader) })
+    Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader, v) })
 }

@@ -33,7 +33,7 @@ pub use gpu::{Gpu, GpuError};
 pub use mesh::{Mesh, Vertex};
 pub use placeholder::{DRAW_UNIFORM_SIZE, Placeholder, Semantic};
 pub use program::{Program, Stage};
-pub use state::{PipelineKey, RasterState, VertexBufferKey};
+pub use state::{PipelineKey, RasterState, Stencil, VertexBufferKey};
 pub use surface::{Surface, SurfaceError, SurfaceTarget};
 pub use texture::{DEPTH_FORMAT, Texture, TextureDesc, srgb_twin};
 pub use wgpu;
