@@ -14,8 +14,8 @@ verify.sh). Each mode ends with PASS/FAIL lines quoting the log line that proves
 
 | Mode | Command | Takes | Passes when |
 |---|---|---|---|
-| server | `tools/game.sh /srv/agents/cache/sandbox-6322a2a5` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
-| join | `MODE=join tools/game.sh /srv/agents/cache/sandbox-6322a2a5` | ~1.5 min | the server's player and the joined client's own player both stand |
+| server | `tools/game.sh /srv/agents/work/sandbox` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
+| join | `MODE=join tools/game.sh /srv/agents/work/sandbox` | ~1.5 min | the server's player and the joined client's own player both stand |
 | host | `MODE=host [START_CMD=..] tools/game.sh <checkout>` | ~1.5 min | a headless client hosts the game to `GAME:END` |
 | grubs | `MODE=grubs tools/game.sh /srv/agents/work/grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
 | render | `MODE=render tools/game.sh <checkout>` | ~1.5 min | `GAME:END`, last frame in `$OUT/frame.png` |
@@ -46,12 +46,9 @@ Project quirks the scratch copy smooths over (`tools/game.sh`, `tools/game/prepa
 - `COMPILED_ONLY=1` deletes `.geq/.sdflayer/.surface/.vsnap` sources from the copy. engine2
   recompiles project JSON resources at mount, which would otherwise replace the shipped `_c` files.
 
-Sandbox HEAD `397952f3` doesn't compile against sbox-public `2643ebd6`: `PlayerController` has no
-`ShowArmsInFirstPerson` / `UseFirstPersonAnimation`. Its parent `6322a2a5` compiles. Export it
-with `git -C /srv/agents/work/sandbox archive 6322a2a5 | tar -x -C <cache dir>`.
-sbox-public `1a845a09` ("PlayerController - First Person Body & Shadows", 10 commits past the pin)
-adds both members, so the matching pair is sandbox `397952f3` + sbox-public `1a845a09`. Its 116
-changed files touch no `.def` or interop file. The pin hasn't moved.
+Sandbox runs at its HEAD (`397952f3`) against the sbox-public pin (`abi/SBOX_PUBLIC_COMMIT`). A
+Sandbox commit that uses newer `PlayerController` members than the pin has fails to compile; move
+the pin (`tools/regen.sh`) rather than running an older Sandbox.
 
 ## What runs
 
