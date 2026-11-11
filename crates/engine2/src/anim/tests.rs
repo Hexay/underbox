@@ -37,7 +37,7 @@ fn build(name: &std::ffi::CStr) -> NativeRef<class::CModel> {
         c.fps = 1.0;
         c.looping = true;
         let data = kv::Value::Object(kv::Object(vec![("Foot".to_owned(), kv::Value::Int(1))]));
-        c.events = vec![anim::clip::ClipEvent { time: 0.25, name: "AE_FOOTSTEP".into(), data }];
+        c.events = vec![anim::clip::ClipEvent { time: 0.25, duration: 0.0, name: "AE_FOOTSTEP".into(), data }];
     });
     let arm = transform(Vec3::new(5.0, 0.0, 0.0), Quat::IDENTITY);
     for turn in [0.0, FRAC_PI_2] {

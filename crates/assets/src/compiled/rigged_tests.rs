@@ -20,7 +20,7 @@ fn rigged_model_reads_animations_from_blocks_and_groups() {
     assert_eq!(wave.morphs.iter().map(|w| w[0]).collect::<Vec<_>>(), [0.0, 0.25, 0.5, 0.75, 1.0]);
     let head = wave.frames[4][2];
     assert!((head.position[2] - (fixture::rig_bones()[2].position[2] + 2.0)).abs() < 1e-2 && (head.scale - 2.0).abs() < 1e-6, "{head:?}");
-    assert_eq!(wave.events, [fixture::footstep()], "m_eventArray with its KV3 payload");
+    assert_eq!(wave.events, fixture::wave_events(), "m_eventArray with end frames and KV3 payloads");
     assert!(m.animations[1].delta && m.animations[1].events.is_empty());
     assert_eq!(m.animations[2].frames[2][0].position, [2.0, 0.0, 0.0]);
 }

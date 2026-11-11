@@ -25,6 +25,8 @@ pub struct Clip {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClipEvent {
     pub time: f32,
+    /// Seconds the event spans; 0 for a point event.
+    pub duration: f32,
     pub name: String,
     pub data: kv::Value,
 }

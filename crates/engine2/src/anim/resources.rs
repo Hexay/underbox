@@ -10,6 +10,7 @@ use crate::resource::{self, Resource};
 use abi::slots::{c_anim_clip_resource as c, c_anim_skeleton_resource as s, glue_resources as g};
 use abi::structs::Transform;
 use crate::bind_resource_handle;
+use crate::kv3::node::{self, Node};
 use abi::{NativeRef, Registry, StrRet, bind, class};
 use anim::{Clip, Pose};
 use std::ffi::CStr;
@@ -23,10 +24,41 @@ pub struct SkeletonResource {
 pub struct ClipResource {
     pub skeleton: SkeletonResource,
     pub clip: Arc<Clip>,
+    /// Each event's payload. `GetEventData` hands out these nodes' handles, owned here and
+    /// freed with the resource: managed (`Clip.ReadEvents`) reads them and never deletes them.
+    payloads: Vec<Arc<Node>>,
+}
+
+impl ClipResource {
+    pub fn new(skeleton: SkeletonResource, clip: Arc<Clip>) -> Self {
+        let payloads = clip.events.iter().map(|e| node::from_value(&e.data)).collect();
+        Self { skeleton, clip, payloads }
+    }
+
+    fn event(&self, i: i32) -> Option<(&anim::clip::ClipEvent, &Arc<Node>)> {
+        let i = usize::try_from(i).ok()?;
+        Some((self.clip.events.get(i)?, self.payloads.get(i)?))
+    }
+}
+
+impl Drop for ClipResource {
+    fn drop(&mut self) {
+        self.payloads.iter().for_each(|n| node::release(n));
+    }
 }
 
 impl Resource for SkeletonResource {}
 impl Resource for ClipResource {}
+
+/// `GetEventData(i, out start, out duration)`: the payload, start and span in seconds.
+pub(crate) fn event_data(h: ClipRef, i: i32, start: &mut f32, duration: &mut f32) -> node::Ref {
+    with_clip(h, |c| {
+        let (e, payload) = c.event(i)?;
+        (*start, *duration) = (e.time, e.duration);
+        Some(node::handle(payload))
+    })
+    .unwrap_or(node::Ref::NULL)
+}
 
 type SkeletonRef = NativeRef<class::CAnimSkeletonResource>;
 type ClipRef = NativeRef<class::CAnimClipResource>;
@@ -50,7 +82,7 @@ pub fn clip(name: &str) -> Option<ClipResource> {
     };
     let (model_name, model, clip_name) = found?;
     let clip = model.anim.clip(&clip_name)?.clone();
-    Some(ClipResource { skeleton: SkeletonResource { name: model_name, model }, clip })
+    Some(ClipResource::new(SkeletonResource { name: model_name, model }, clip))
 }
 
 fn with_skeleton<R: Default>(h: SkeletonRef, f: impl FnOnce(&SkeletonResource) -> R) -> R {
@@ -102,11 +134,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, c::GET_FPS, |h| with_clip(h, |c| c.clip.fps));
     bind!(r, c::IS_ADDITIVE, |h| with_clip(h, |c| c.clip.delta));
     bind!(r, c::GET_NUM_TRACKS, |h| with_clip(h, |c| c.skeleton.model.anim.skeleton.len() as i32));
-    // TODO: clip events and sync events (no source format carries them yet).
+    // TODO: sync events (no source format carries them yet).
     bind!(r, c::GET_NUM_SYNC_EVENTS, |_| 0);
-    bind!(r, c::GET_NUM_EVENTS, |_| 0);
-    bind!(r, c::GET_EVENT_NAME, |_, _| StrRet::from(None::<String>));
-    bind!(r, c::GET_EVENT_DATA, |_, _, _, _| NativeRef::NULL);
+    bind!(r, c::GET_NUM_EVENTS, |h| with_clip(h, |c| c.clip.events.len() as i32));
+    bind!(r, c::GET_EVENT_NAME, |h, i| StrRet::from(with_clip(h, |c| c.event(i).map(|(e, _)| e.name.clone()))));
+    bind!(r, c::GET_EVENT_DATA, event_data);
     bind!(r, c::GET_SKELETON_NAME, |h| StrRet::from(with_clip(h, |c| Some(c.skeleton.name.clone()))));
     bind!(r, c::IS_BOUND, |h| with_clip(h, |c| !c.skeleton.model.anim.skeleton.is_empty()));
     bind!(r, c::GET_BONE_PARENT_SPACE_TRANSFORM_S2, |h, time, i| {
