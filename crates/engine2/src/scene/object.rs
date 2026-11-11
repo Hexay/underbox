@@ -37,12 +37,17 @@ pub struct State {
 
 /// `SceneObjectFlags.IsOpaque`.
 pub const IS_OPAQUE: i64 = 0x1;
+/// `SceneObjectFlags.IsTranslucent`.
+pub const IS_TRANSLUCENT: i64 = 0x2;
 
 impl State {
-    /// The flags managed reads: a model object also reports `IsOpaque`, which native derives from
-    /// its draws' materials (`UpdateFlagsBasedOnMaterial`). TODO: translucent materials.
+    /// The flags managed reads: a model object also reports `IsOpaque` and/or `IsTranslucent`,
+    /// which native derives from its draws' materials (`render::draw::model::surface_flags`).
     pub fn effective_flags(&self) -> i64 {
-        self.flags | if self.model.is_null() { 0 } else { IS_OPAQUE }
+        if self.model.is_null() {
+            return self.flags;
+        }
+        self.flags | crate::render::draw::model::surface_flags(self.model, self.mesh_groups, self.material_override.as_ref())
     }
 }
 

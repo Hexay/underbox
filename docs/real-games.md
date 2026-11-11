@@ -209,8 +209,16 @@ Fixed, in the order they showed up after spawn:
 - **Combos from the draw:** graphics programs were always built at combo 0, so sprites'
   additive `D_BLEND` drew alpha-blended (dark rims) and `D_TEXT` was ignored. Programs now build
   at the combos the draw's attributes set (`shading::program`).
-- **CMAA2** blends: its image atomics are lowered to image read/write
-  (`shaders/src/image_atomics.rs`).
+- **CMAA2** blends, the same every frame. Its blend-list heads (`RWTexture2D<uint>`) are cleared
+  by plain writes in pass 0, pushed onto with `InterlockedExchange` in pass 2 and walked by plain
+  reads in pass 3. Lowering those atomics to image read/write lost exchanges between threads, so
+  threaded lavapipe dropped different blend items each frame (up to ~70/255 on edge pixels). Real
+  atomics on a word buffer fixed that but cut pass 2 off from the image the other passes use:
+  pass 2 chained onto last frame's stale heads and pass 3 saw only empty lists, so CMAA2 did
+  nothing. The renderer now copies the image into the words before a dispatch and back after
+  (`shading/texel_words.rs`). `compute/cmaa2_tests.rs` runs core's `cmaa2_cs` the way
+  `Cmaa2Renderer` dispatches it and checks that it blends and repeats exactly. Golden frames
+  include it again.
 
 What's left, and why:
 
@@ -218,6 +226,16 @@ What's left, and why:
   `skybox_day_01.vmat`, whose `.tga`/`.exr` aren't in the repo and no `.vtex_c` ships. The sky is
   our flat placeholder. Grubs' `rocks_a_*` textures are absent from its checkout too.
 - The one spotlight is the `studio_light_projector` prop's; the scene itself has only the sun.
+- Grubs' input hints show words (`arrow_drop_up`, `arrow_left`) instead of icons. That's a
+  content gap, not a renderer bug. Core's `styles/base/rootpanel.scss` sets `IconPanel, i` to
+  `font-family: Material Icons`, a ligature font. Managed's `FontManager` loads fonts only from
+  `/fonts/*.ttf|otf` in the mounted file systems. sbox-public's core has no `fonts/` folder (no
+  Roboto or Inter either), Grubs ships only Londrina Solid and Passion One, and this machine has
+  no icon font. So `TypefaceFromStyle` logs `Font 'Material Icons' not found` and falls back to
+  SkiaSharp's system default, which draws the ligature names as text. The font is Apache-2.0
+  (sbox-public's `thirdpartylegalnotices/licenses/material-design-icons`), but it ships with
+  s&box's Steam content, which we don't download. A user-supplied `MaterialIcons-Regular.ttf`
+  under a mounted `fonts/` folder would load unchanged.
 
 ## Shaders
 

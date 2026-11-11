@@ -78,6 +78,9 @@ impl Inputs {
 }
 
 #[cfg(test)]
+#[path = "cmaa2_tests.rs"]
+mod cmaa2_tests;
+#[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
 #[cfg(test)]

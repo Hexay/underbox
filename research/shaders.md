@@ -140,8 +140,10 @@ Fixed by passes:
   `ConstOffset` on a fetch is dropped by naga (WGSL's `textureLoad` has none).
 - "unsupported storage class" (CMAA2's `InterlockedExchange`/`InterlockedAdd` on
   `RWTexture2D<uint>`): DXC emits `OpImageTexelPointer`, whose Image storage class naga rejects.
-  `image_atomics.rs` lowers each atomic on one to a non-atomic image read, the operation, and an
-  image write (racy; the module doc says why CMAA2 tolerates it). An atomic it doesn't know
+  `image_atomics.rs` moves such an image's texels into a `<image>_texel_words` storage buffer
+  (rows padded to 256 bytes) and makes every texel access in that module a real atomic on it.
+  Other modules use the image itself, so the renderer copies image → words before the dispatch
+  and back after (engine2 `shading/texel_words.rs`). An atomic it doesn't know
   leaves the module unchanged.
 - `UNDERBOX_DUMP_SPV=<dir>` writes the module naga gets per stage (cache misses only).
 

@@ -4,6 +4,7 @@
 //! [`execute`] runs the layers into the view's targets. [`system`] has the per-frame slots.
 
 pub mod camera;
+mod collect;
 pub mod execute;
 pub mod layer;
 pub(crate) mod pvs;
@@ -13,6 +14,8 @@ pub mod system;
 pub(crate) mod trace;
 pub mod view;
 
+#[cfg(test)]
+mod layer_tests;
 #[cfg(test)]
 mod tests;
 
