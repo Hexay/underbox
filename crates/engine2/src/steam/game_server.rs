@@ -8,6 +8,9 @@ use platform::{ServerInfo, SteamId};
 use std::ffi::CStr;
 use std::sync::OnceLock;
 
+/// Managed's ticket buffer, as for the client's tickets.
+const TICKET_CAPACITY: usize = 1024;
+
 fn text(s: Option<&CStr>) -> String {
     s.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
 }
@@ -52,10 +55,13 @@ pub fn register(r: &mut Registry) {
         p().begin_auth(SteamId(user), ticket) as i64
     });
     bind!(r, gs::END_AUTH_SESSION, |_, user| p().end_auth(SteamId(user)));
-    // A server issuing its own tickets is server-to-server auth, which s&box never does.
-    bind!(r, gs::GET_AUTH_SESSION_TICKET, |_, _, _, len| {
-        *len = 0;
-        HAuthTicket::default()
+    bind!(r, gs::GET_AUTH_SESSION_TICKET, |_, target, buffer, len| {
+        let t = p().server_ticket(SteamId(target));
+        let n = t.bytes.len().min(TICKET_CAPACITY);
+        // SAFETY: managed passes a TICKET_CAPACITY-byte buffer.
+        unsafe { buffer.cast::<u8>().as_mut_slice(n) }.copy_from_slice(&t.bytes[..n]);
+        *len = n as u32;
+        HAuthTicket { value: t.handle }
     });
-    bind!(r, gs::CANCEL_AUTH_TICKET, |_, _| {});
+    bind!(r, gs::CANCEL_AUTH_TICKET, |_, h| p().cancel_server_ticket(h.value));
 }

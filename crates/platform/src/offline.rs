@@ -77,8 +77,9 @@ impl Platform for Offline {
         self.state().sessions.retain(|&u| u != user);
     }
 
-    fn poll(&self) -> Vec<Event> {
-        std::mem::take(&mut self.state().events)
+    fn run_callbacks(&self, event: &mut dyn FnMut(Event), _raw: &mut dyn FnMut(i32, &[u8])) {
+        let events = std::mem::take(&mut self.state().events);
+        events.into_iter().for_each(event);
     }
 
     fn client(&self) -> &dyn Client {
@@ -99,12 +100,15 @@ mod tests {
         let user = SteamId(76561197960265729);
         assert_eq!(p.begin_auth(user, b"x"), BeginAuth::Ok);
         assert_eq!(p.begin_auth(user, b"x"), BeginAuth::DuplicateRequest);
-        assert_eq!(p.poll(), [Event::ServerConnected, Event::AuthResult { user, owner: user, response: AuthResponse::Ok }]);
-        assert!(p.poll().is_empty());
+        let poll = || crate::events(|e, r| p.run_callbacks(e, r));
+        assert_eq!(poll(), [Event::ServerConnected, Event::AuthResult { user, owner: user, response: AuthResponse::Ok }]);
+        assert!(poll().is_empty());
         p.end_auth(user);
         assert_eq!(p.begin_auth(user, b"x"), BeginAuth::Ok);
         p.server_shutdown();
         assert!(!p.server_logged_on());
-        assert!(p.poll().is_empty(), "shutdown drops pending events");
+        assert!(poll().is_empty(), "shutdown drops pending events");
+        assert!(p.server_workshop().is_none() && p.server_inventory().is_none());
+        assert!(p.server_ticket(SteamId(0)).bytes.is_empty());
     }
 }

@@ -1,43 +1,70 @@
 //! A real Steam game server through steamworks-rs. Steam starts in `server_init` (it needs the ports);
 //! before that, after `server_shutdown`, or if it fails (no steamclient, no app id), every call goes to
 //! an [`Offline`] fallback. Steam needs the app id from `steam_appid.txt` in the working directory or
-//! `SteamAppId` in the env, and `libsteam_api.so` on the loader path.
+//! `SteamAppId` in the env, and `libsteam_api.so` on the loader path. Callbacks are pumped by hand
+//! (never steamworks-rs's `run_callbacks`, which would swallow our call results).
+
+pub(crate) mod decode;
+mod ffi;
+mod inventory;
+mod lobby;
+pub(crate) mod pump;
+mod servers;
+pub(crate) mod strings;
+mod ugc;
+mod ugc_query;
+pub(crate) mod user;
+
+pub(crate) use inventory::SteamInventory;
+pub(crate) use lobby::SteamLobbies;
+pub(crate) use pump::Calls;
+pub(crate) use servers::SteamServers;
+pub(crate) use ugc::SteamUgc;
 
 use crate::steam_client::SteamClient;
-use crate::{AuthResponse, BeginAuth, Client, Event, Offline, Platform, ServerInfo, SteamId, SteamResult};
+use crate::{BeginAuth, Client, Event, Inventory, Offline, Platform, ServerInfo, SteamId, Ticket, Workshop};
+use std::ffi::c_void;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, Mutex, OnceLock};
-use steamworks::{
-    AuthSessionError, AuthSessionValidateError as V, CallbackHandle, Server, ServerMode, SteamError,
-    SteamServerConnectFailure, SteamServersConnected, SteamServersDisconnected, ValidateAuthTicketResponse, sys,
-};
+use steamworks::{AuthSessionError, Server, ServerMode, sys};
 
-type Events = Arc<Mutex<Vec<Event>>>;
-
-#[derive(Default)]
 pub struct Steam {
     started: OnceLock<()>,
     /// Dropping it shuts Steam down (steamworks' Manager calls SteamGameServer_Shutdown).
     live: Mutex<Option<Live>>,
     fallback: Offline,
     info: Mutex<ServerInfo>,
-    events: Events,
+    calls: Arc<Calls>,
+    workshop: SteamUgc,
+    inventory: SteamInventory,
     client: OnceLock<Option<SteamClient>>,
+}
+
+impl Default for Steam {
+    fn default() -> Self {
+        let calls = Arc::new(Calls::default());
+        Self {
+            started: OnceLock::new(),
+            live: Mutex::default(),
+            fallback: Offline::default(),
+            info: Mutex::default(),
+            workshop: SteamUgc::server(calls.clone()),
+            inventory: SteamInventory::server(calls.clone()),
+            calls,
+            client: OnceLock::new(),
+        }
+    }
 }
 
 struct Live {
     server: Server,
-    _callbacks: [CallbackHandle; 4],
 }
 
 impl Live {
-    fn start(port: u16, query_port: u16, version: &str, events: &Events) -> Option<Self> {
+    fn start(port: u16, query_port: u16, version: &str) -> Option<Self> {
         // TODO: AuthenticationAndSecure once VAC is wanted; game_server.rs reports bSecure false to match.
         match Server::init(Ipv4Addr::UNSPECIFIED, port, query_port, ServerMode::Authentication, version) {
-            Ok((server, _client)) => {
-                let _callbacks = listen(&server, events);
-                Some(Self { server, _callbacks })
-            }
+            Ok((server, _client)) => Some(Self { server }),
             Err(e) => {
                 eprintln!("platform: Steam game server init failed ({e}); falling back to offline");
                 None
@@ -51,43 +78,22 @@ impl Live {
     }
 }
 
-/// Queue the callbacks the trait reports; they fire inside `run_callbacks` (from `poll`).
-fn listen(server: &Server, events: &Events) -> [CallbackHandle; 4] {
-    let sink = || {
-        let events = events.clone();
-        move |e: Event| events.lock().unwrap().push(e)
+/// An auth ticket from `get(buffer, capacity, &mut len, identity)`, for `target` (0: anyone).
+pub(crate) fn auth_ticket(target: SteamId, get: impl FnOnce(*mut c_void, i32, *mut u32, *const sys::SteamNetworkingIdentity) -> u32) -> Ticket {
+    // SAFETY: a zeroed identity is Steam's "invalid" one, which SetSteamID64 overwrites.
+    let mut identity: sys::SteamNetworkingIdentity = unsafe { std::mem::zeroed() };
+    let identity = if target.0 == 0 {
+        std::ptr::null()
+    } else {
+        // SAFETY: as above.
+        unsafe { sys::SteamAPI_SteamNetworkingIdentity_SetSteamID64(&mut identity, target.0) };
+        &identity as *const _
     };
-    let (connected, failed, lost, auth) = (sink(), sink(), sink(), sink());
-    [
-        server.register_callback(move |_: SteamServersConnected| connected(Event::ServerConnected)),
-        server.register_callback(move |f: SteamServerConnectFailure| {
-            failed(Event::ServerConnectFailure { result: result_code(f.reason), retrying: f.still_retrying })
-        }),
-        server.register_callback(move |d: SteamServersDisconnected| lost(Event::ServersDisconnected { result: result_code(d.reason) })),
-        server.register_callback(move |r: ValidateAuthTicketResponse| auth(auth_event(&r))),
-    ]
-}
-
-/// steamworks only converts EResult → SteamError, so invert it by search; unknown codes become Fail (2).
-fn result_code(e: SteamError) -> SteamResult {
-    (1..=130).find(|&n| SteamError::try_from(n as i64).ok() == Some(e)).unwrap_or(2)
-}
-
-fn auth_event(r: &ValidateAuthTicketResponse) -> Event {
-    let response = match r.response {
-        Ok(()) => AuthResponse::Ok,
-        Err(V::UserNotConnectedToSteam) => AuthResponse::UserNotConnectedToSteam,
-        Err(V::NoLicenseOrExpired) => AuthResponse::NoLicenseOrExpired,
-        Err(V::VACBanned) => AuthResponse::VacBanned,
-        Err(V::LoggedInElseWhere) => AuthResponse::LoggedInElsewhere,
-        Err(V::VACCheckTimedOut) => AuthResponse::VacCheckTimedOut,
-        Err(V::AuthTicketCancelled) => AuthResponse::TicketCanceled,
-        Err(V::AuthTicketInvalidAlreadyUsed) => AuthResponse::TicketAlreadyUsed,
-        Err(V::PublisherIssuedBan) => AuthResponse::PublisherIssuedBan,
-        Err(V::AuthTicketNetworkIdentityFailure) => AuthResponse::NetworkIdentityFailure,
-        Err(_) => AuthResponse::TicketInvalid,
-    };
-    Event::AuthResult { user: SteamId(r.steam_id.raw()), owner: SteamId(r.owner_steam_id.raw()), response }
+    let mut bytes = vec![0u8; 1024];
+    let mut len = 0u32;
+    let handle = get(bytes.as_mut_ptr().cast(), 1024, &mut len, identity);
+    bytes.truncate(len as usize);
+    Ticket { handle, bytes }
 }
 
 fn begin_result(r: Result<(), AuthSessionError>) -> BeginAuth {
@@ -150,7 +156,7 @@ impl Platform for Steam {
 
     fn server_init(&self, port: u16, query_port: u16, version: &str) {
         self.started.get_or_init(|| {
-            let live = Live::start(port, query_port, version, &self.events);
+            let live = Live::start(port, query_port, version);
             if let Some(l) = &live {
                 push_info(&l.server, None, &self.info.lock().unwrap());
             }
@@ -160,7 +166,6 @@ impl Platform for Steam {
 
     fn server_shutdown(&self) {
         self.live.lock().unwrap().take();
-        self.events.lock().unwrap().clear();
         self.fallback.server_shutdown();
     }
 
@@ -209,12 +214,45 @@ impl Platform for Steam {
         self.with(|l| l.server.end_authentication_session(id)).unwrap_or_else(|| self.fallback.end_auth(user))
     }
 
-    fn poll(&self) -> Vec<Event> {
-        // Callbacks push into `events` (its own lock), so running them under the live lock is fine.
-        match self.with(|l| l.server.run_callbacks()) {
-            Some(()) => std::mem::take(&mut self.events.lock().unwrap()),
-            None => self.fallback.poll(),
+    fn server_ticket(&self, target: SteamId) -> Ticket {
+        // SAFETY: a live server pointer and the buffers auth_ticket passes.
+        let get = |l: &Live| auth_ticket(target, |p, cap, len, id| unsafe { sys::SteamAPI_ISteamGameServer_GetAuthSessionTicket(l.raw(), p, cap, len, id) });
+        self.with(get).unwrap_or_default()
+    }
+
+    fn cancel_server_ticket(&self, handle: u32) {
+        // SAFETY: a live server pointer.
+        self.with(|l| unsafe { sys::SteamAPI_ISteamGameServer_CancelAuthTicket(l.raw(), handle) });
+    }
+
+    fn run_callbacks(&self, event: &mut dyn FnMut(Event), raw: &mut dyn FnMut(i32, &[u8])) {
+        // Not under the live lock: the handlers run managed code, which calls back into this platform.
+        if self.with(|_| ()).is_none() {
+            return self.fallback.run_callbacks(event, raw);
         }
+        // SAFETY: the game server is initialised.
+        let pipe = unsafe { sys::SteamGameServer_GetHSteamPipe() };
+        pump::pump(pipe, &self.calls, &mut |kind, b| match decode::server_event(kind, b) {
+            Some(e) => event(e),
+            None => raw(kind, b),
+        });
+    }
+
+    fn server_workshop(&self) -> Option<&dyn Workshop> {
+        self.with(|_| &self.workshop as &dyn Workshop)
+    }
+
+    fn server_inventory(&self) -> Option<&dyn Inventory> {
+        self.with(|_| &self.inventory as &dyn Inventory)
+    }
+
+    fn start_client(&self, app_id: u32) {
+        if app_id != 0 && std::env::var_os("SteamAppId").is_none() {
+            // SAFETY: called once at engine pre-init on managed's main thread, before the engine's own
+            // threads exist; steam_api reads it during SteamAPI_Init just below.
+            unsafe { std::env::set_var("SteamAppId", app_id.to_string()) };
+        }
+        self.client();
     }
 
     fn client(&self) -> &dyn Client {

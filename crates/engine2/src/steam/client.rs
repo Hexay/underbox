@@ -4,7 +4,7 @@
 
 use super::interface;
 use abi::slots::{
-    global_steam as global, i_steam_apps as apps, i_steam_friends as friends, i_steam_remote_storage as rs, i_steam_user as user,
+    engine_glue as glue, global_steam as global, i_steam_apps as apps, i_steam_friends as friends, i_steam_remote_storage as rs, i_steam_user as user,
     i_steam_utils as utils,
 };
 use abi::structs::HAuthTicket;
@@ -139,6 +139,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, rs::FILE_WRITE, |_, name, data, len| storage(|s| s.write(&text(name), bytes(data, len.max(0) as usize))));
     bind!(r, rs::FILE_WRITE_ASYNC, |_, name, data, len| storage(|s| s.write_async(&text(name), bytes(data, len as usize))));
     bind!(r, rs::FILE_DELETE, |_, name| storage(|s| s.delete(&text(name))));
+
+    // A ticket arrives some frames after the request; managed polls until it does (null meanwhile).
+    bind!(r, glue::REQUEST_WEB_AUTH_TICKET, || user(|c| c.request_web_ticket()));
+    bind!(r, glue::CANCEL_WEB_AUTH_TICKET, || user(|c| c.cancel_web_ticket()));
+    bind!(r, glue::GET_WEB_AUTH_TICKET, || StrRet::from(local().and_then(|c| c.web_ticket())));
 
     bind!(r, utils::INIT_FILTER_TEXT, |_, options| filter(|f| f.init(options)));
     bind!(r, utils::FILTER_TEXT, |_, context, source, input, out, cap| filter_text(context, source, input, out, cap));

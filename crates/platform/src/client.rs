@@ -1,7 +1,7 @@
 //! The local user's side of a platform: identity, auth tickets, social, app ownership and cloud
 //! files. Only a game client asks for it; a dedicated server is [`crate::Platform`]'s server side.
 
-use crate::{BeginAuth, Event, SteamId};
+use crate::{BeginAuth, Event, Inventory, Lobbies, NetUtils, PeerMessages, ServerBrowser, SteamId, Workshop};
 
 /// An auth ticket for a server to validate, and the handle that cancels it.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -34,6 +34,37 @@ pub trait Client: Send + Sync {
     fn text_filter(&self) -> Option<&dyn TextFilter> {
         None
     }
+    fn workshop(&self) -> Option<&dyn Workshop> {
+        None
+    }
+    fn lobbies(&self) -> Option<&dyn Lobbies> {
+        None
+    }
+    fn peers(&self) -> Option<&dyn PeerMessages> {
+        None
+    }
+    fn net_utils(&self) -> Option<&dyn NetUtils> {
+        None
+    }
+    fn inventory(&self) -> Option<&dyn Inventory> {
+        None
+    }
+    fn servers(&self) -> Option<&dyn ServerBrowser> {
+        None
+    }
+
+    /// Add an RGB8 image to the user's screenshot library; false if there's none.
+    fn write_screenshot(&self, _rgb: &[u8], _width: i32, _height: i32) -> bool {
+        false
+    }
+
+    /// Ask for a ticket proving who we are to a web service; [`Client::web_ticket`] has it once it's come.
+    fn request_web_ticket(&self) {}
+    /// The ticket as hex, once it has arrived.
+    fn web_ticket(&self) -> Option<String> {
+        None
+    }
+    fn cancel_web_ticket(&self) {}
 
     /// Deliver pending events, then any backend-native callbacks verbatim (`raw(kind, bytes)`, Steam's
     /// callback id and struct). Each raw callback is valid only during its call.

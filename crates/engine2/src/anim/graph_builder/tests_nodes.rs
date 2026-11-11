@@ -81,6 +81,29 @@ fn blend2d_id_selector_and_ease_convert() {
     assert!(matches!((&def.poses[run], &def.poses[*fallback]), (PoseNode::Clip { slot: 1, .. }, PoseNode::Clip { slot: 0, .. })));
 }
 
+/// `RandomFloat(2, 2.5)` (0) seeds an unweighted variation (4) over clips 1..=3.
+#[test]
+fn random_floats_convert_and_seed_variations() {
+    let b = create();
+    let random = add_node::<class::CFloatRandomNode_Definition>(b);
+    field!(f32, c_float_random_node_definition::GET_M_MIN, random, 2.0);
+    field!(f32, c_float_random_node_definition::GET_M_MAX, random, 2.5);
+    (0..3).for_each(|s| clip(b, s));
+    let sel = add_node::<class::CParameterizedSelectorNode_Definition>(b);
+    field!(i16, c_parameterized_selector_node_definition::GET_M_PARAMETER_NODE_IDX, sel, 0);
+    let options = list::<_, class::CUtlVector_int16_>(sel, "OptionNodeIndices");
+    (1..=3).for_each(|i| push_int(options, i));
+    let snap = capture(b, 4, "", "").unwrap();
+    delete(b);
+    let out = super::convert::convert(&snap);
+    assert!(out.unsupported.is_empty(), "{:?}", out.unsupported);
+    let def = out.def.into_shared();
+    let Some(PoseNode::Variation { seed, options, weights: None }) = def.root.map(|r| &def.poses[r]) else { panic!("{def:?}") };
+    assert_eq!((def.values[*seed].clone(), options.len()), (ValueNode::Random { min: 2.0, max: 2.5 }, 3));
+    let drawn = Instance::new(def.clone(), |_| None).value(*seed).as_float();
+    assert!((2.0..=2.5).contains(&drawn), "{drawn}");
+}
+
 /// A target parameter (0) drives a two-bone IK (2) of `hand` over the reference pose (1).
 #[test]
 fn two_bone_ik_from_the_builder_reaches_its_target() {
@@ -92,10 +115,15 @@ fn two_bone_ik_from_the_builder_reaches_its_target() {
     field!(i16, c_two_bone_ik_node_definition::GET_M_EFFECTOR_TARGET_NODE_IDX, ik, 0);
     field!(bool, c_two_bone_ik_node_definition::GET_M_IS_TARGET_IN_WORLD_SPACE, ik, true);
     items::set(ik, "EffectorBoneID", intern(b, "hand") as i64);
+    field!(f32, c_two_bone_ik_node_definition::GET_M_BLEND_TIME, ik, 0.25);
+    field!(f32, c_two_bone_ik_node_definition::GET_M_CHAIN_ROTATION_WEIGHT, ik, 0.5);
+    items::set(ik, "BlendMode", 1);
     let snap = capture(b, 2, "", "").unwrap();
     delete(b);
     let out = super::convert::convert(&snap);
     assert!(out.unsupported.is_empty(), "{:?}", out.unsupported);
+    let Some(PoseNode::TwoBoneIk(n)) = out.def.root.map(|r| &out.def.poses[r]) else { panic!("{:?}", out.def) };
+    assert_eq!((n.blend_time, n.blend_target, n.twist), (0.25, false, 0.5), "BlendTime, Pose blend mode, ChainRotationWeight");
 
     let mut s = Skeleton::default();
     s.push_local("shoulder", None, Xform::IDENTITY);

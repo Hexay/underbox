@@ -120,8 +120,12 @@ pub fn register(r: &mut Registry) {
     bind!(r, c::RESET_CONTROL_PARAMETERS, |ctl| on(ctl, |p, _, _| p.reset_all()));
     bind!(r, c::RESET_CONTROL_PARAMETER, |ctl, name| on(ctl, |p, _, _| index(p, name).is_some_and(|i| p.reset(i))));
     bind!(r, c::GET_DEBUG_ID_NAME, |ctl, id| StrRet::from(on(ctl, |_, def, _| Some(id_name(def, id)))));
-    // TODO: tags, float channels and external graph slots need the graph's event and slot data.
-    bind!(r, c::IS_TAG_ACTIVE, |_, _| false);
+    // TODO: float channels and external graph slots need the graph's channel and slot data.
+    bind!(r, c::IS_TAG_ACTIVE, |ctl, tag| {
+        let Some(state) = objects::get::<_, Handle>(ctl).and_then(|h| h.0.upgrade()) else { return false };
+        let s = state.lock().unwrap();
+        s.graph2.as_ref().is_some_and(|g| g.instance.active_tags().iter().any(|t| StringToken::of(t) == tag))
+    });
     bind!(r, c::HAS_EXTERNAL_GRAPH_SLOT, |_, _| false);
     bind!(r, c::IS_EXTERNAL_GRAPH_SLOT_CONNECTED, |_, _| false);
 

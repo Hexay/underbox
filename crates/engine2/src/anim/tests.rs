@@ -37,7 +37,7 @@ fn build(name: &std::ffi::CStr) -> NativeRef<class::CModel> {
         c.fps = 1.0;
         c.looping = true;
         let data = kv::Value::Object(kv::Object(vec![("Foot".to_owned(), kv::Value::Int(1))]));
-        c.events = vec![anim::clip::ClipEvent { time: 0.25, name: "AE_FOOTSTEP".into(), data }];
+        c.events = vec![anim::clip::ClipEvent { time: 0.25, duration: 0.0, name: "AE_FOOTSTEP".into(), data }];
     });
     let arm = transform(Vec3::new(5.0, 0.0, 0.0), Quat::IDENTITY);
     for turn in [0.0, FRAC_PI_2] {
@@ -136,8 +136,8 @@ fn graph_parameters_drive_state_transitions() {
     let slot = def.slot("wave");
     let wave = def.add_pose(PoseNode::Clip { slot, looping: true, speed: 1.0 });
     let states = vec![
-        State { name: "Rest".into(), pose: rest, transitions: vec![Transition { to: 1, condition: b_wave, duration: 0.0 }] },
-        State { name: "Wave".into(), pose: wave, transitions: vec![] },
+        State { name: "Rest".into(), pose: rest, transitions: vec![Transition { to: 1, condition: b_wave, duration: 0.0 }], events: Default::default() },
+        State { name: "Wave".into(), pose: wave, transitions: vec![], events: anim::graph::StateEvents { entry: vec!["waving".into()], ..Default::default() } },
     ];
     def.root = Some(def.add_pose(PoseNode::StateMachine { states, default: 0 }));
     let resource: graph::Ref2 = crate::resource::new_handle(Arc::new(graph::Graph2 { def: Some(def.into_shared()) }));
@@ -152,6 +152,18 @@ fn graph_parameters_drive_state_transitions() {
     let mut s = shared.lock().unwrap();
     s.update(0.5, Xform::IDENTITY);
     assert!(s.local[0].rot.abs_diff_eq(Quat::IDENTITY, 1e-5), "Wave enters at its first frame");
+    assert!(s.graph2.as_ref().unwrap().instance.is_tag_active("Waving"), "its entry tag is up on the entering update");
     s.update(0.5, Xform::IDENTITY);
     assert!(s.local[0].rot.abs_diff_eq(Quat::from_rotation_z(FRAC_PI_2 / 2.0), 1e-4), "then plays the clip");
+    let tags = s.graph2.as_mut().unwrap().tags.drain();
+    drop(s);
+    super::callback::tag_events(on_tag as *const () as usize, &tags);
+    assert_eq!(*TAGS.lock().unwrap(), [("waving".to_string(), 0)], "up and down between dispatches: Fired");
+}
+
+static TAGS: Mutex<Vec<(String, i32)>> = Mutex::new(Vec::new());
+
+extern "C" fn on_tag(name: *const std::ffi::c_char, status: i32) {
+    let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_string_lossy().into_owned();
+    TAGS.lock().unwrap().push((name, status));
 }

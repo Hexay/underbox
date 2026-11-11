@@ -83,10 +83,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, glue::REMOVE_SEARCH_PATH, |path, id| crate::fs::remove_search_path(&text(id), &text(path)));
     bind!(r, glue::SET_ENGINE_LOGGING_VERBOSE, |_| {});
     // Web API tickets come from a Steam user; until one arrives managed keeps asking, then runs offline.
-    // TODO: ISteamUser::GetAuthTicketForWebApi through platform::Client once its identity is known.
-    bind!(r, glue::REQUEST_WEB_AUTH_TICKET, || {});
-    bind!(r, glue::CANCEL_WEB_AUTH_TICKET, || {});
-    bind!(r, glue::GET_WEB_AUTH_TICKET, || StrRet::from(None::<String>));
+    // Web auth tickets are bound in steam::client.
 
     bind!(r, low::COPY, copy);
     bind!(r, low::MURMUR_HASH64, hash);

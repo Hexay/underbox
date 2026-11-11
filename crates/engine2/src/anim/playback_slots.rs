@@ -85,8 +85,11 @@ pub fn register(r: &mut Registry) {
         let events = with(r, |s| std::mem::take(&mut s.pending));
         callback::animation_events(cb.as_ptr() as usize, &events);
     });
-    // TODO: anim tags need the graph's tag data (AnimGraph1 tag spans aren't read yet).
-    bind!(r, o::DISPATCH_TAG_EVENTS, |_, _| {});
+    // TODO: AnimGraph1 tag spans aren't read; only AnimGraph2 state tags dispatch.
+    bind!(r, o::DISPATCH_TAG_EVENTS, |r, cb: RawPtr<c_void>| {
+        let tags = with(r, |s| s.graph2.as_mut().map(|g| g.tags.drain()).unwrap_or_default());
+        callback::tag_events(cb.as_ptr() as usize, &tags);
+    });
 
     // Morph overrides are in `super::flex`.
     // Deformation volumes only change rendered vertices.

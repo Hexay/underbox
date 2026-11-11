@@ -51,12 +51,20 @@ impl World {
         Some(Hit { shape, fraction: hit.time_of_impact, position, point: hit.witness1, normal: hit.normal1, started_in_solid })
     }
 
-    /// The triangle of mesh shape `shape` nearest world `point` (a hit's contact point); `None`
-    /// for other shapes.
+    /// The triangle of mesh shape `shape` nearest world `point` (a hit's contact point). For a
+    /// heightfield it's the cell under the point, as its low-corner sample's index in
+    /// [`crate::Grid`] (`x + y * size_x`). `None` for other shapes.
     pub fn triangle_at(&self, shape: ColliderHandle, point: Vector) -> Option<u32> {
         let c = self.shape(shape)?;
+        let local = c.position().inverse_transform_point(point);
+        if let Some(field) = c.shape().as_heightfield() {
+            // Rows (i) run along the sample x axis, columns (j) along y: see Grid::shape. parry
+            // counts cells, one fewer than samples.
+            let (i, j) = field.cell_at_point(local)?;
+            return u32::try_from(i + j * (field.nrows() + 1)).ok();
+        }
         let mesh = c.shape().as_trimesh()?;
-        let (_, (triangle, _)) = mesh.project_local_point_and_get_location(c.position().inverse_transform_point(point), false);
+        let (_, (triangle, _)) = mesh.project_local_point_and_get_location(local, false);
         Some(triangle)
     }
 
@@ -142,6 +150,25 @@ mod tests {
         };
         assert_eq!((at(5.0, -5.0), at(-5.0, 5.0)), (Some(0), Some(1)));
         assert_eq!(world.triangle_at(slab, Vector::ZERO), None, "not a mesh");
+    }
+
+    #[test]
+    fn heightfield_hits_name_their_cell() {
+        let mut world = World::default();
+        let body = world.add_body(BodyType::Static, Pose::IDENTITY);
+        let grid = crate::Grid::new(3, 4, vec![0; 12], 10.0, 1.0).unwrap();
+        let field = world.add_shape(body, &Shape::HeightField(grid), Surface::default()).unwrap();
+        world.step(1.0 / 60.0, 1);
+        // In the shape frame sample (x, y) is at (y * cell, h, x * cell).
+        let cell = |x: f32, y: f32| {
+            let s = Sweep { probe: None, rotation: Rotation::IDENTITY, start: Vector::new(y * 10.0, 50.0, x * 10.0), end: Vector::new(y * 10.0, -50.0, x * 10.0) };
+            let hit = world.trace(&s, &|_, _| true).unwrap();
+            world.triangle_at(hit.shape, hit.point)
+        };
+        assert_eq!(cell(0.5, 0.5), Some(0));
+        assert_eq!(cell(1.5, 0.5), Some(1), "x steps by one");
+        assert_eq!(cell(0.5, 2.5), Some(6), "y steps by size_x");
+        assert_eq!(world.triangle_at(field, Vector::new(500.0, 0.0, 0.0)), None, "off the grid");
     }
 
     #[test]

@@ -45,7 +45,8 @@ pub fn clip(a: &canim::Animation) -> Clip {
 fn event(a: &canim::Animation, e: &canim::Event) -> anim::clip::ClipEvent {
     let duration = if a.fps > 0.0 { a.frames.len().saturating_sub(1) as f32 / a.fps } else { 0.0 };
     let time = if e.frame > 0 || e.cycle <= 0.0 { e.frame as f32 / a.fps.max(f32::EPSILON) } else { e.cycle * duration };
-    anim::clip::ClipEvent { time: time.min(duration), name: e.name.clone(), data: e.data.clone() }
+    let span = (e.end_frame - e.frame).max(0) as f32 / a.fps.max(f32::EPSILON);
+    anim::clip::ClipEvent { time: time.min(duration), duration: span, name: e.name.clone(), data: e.data.clone() }
 }
 
 pub fn model_anim(m: &model::Model) -> ModelAnim {

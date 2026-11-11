@@ -58,6 +58,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, global::SOURCE_ENGINE_INIT_STARTUP_WINDOW, |_| window::video::ensure());
     bind!(r, global::SOURCE_ENGINE_PRE_INIT, |cmd, _app| {
         *COMMAND_LINE.write().unwrap() = string(cmd);
+        // Managed's SteamClient.Init reads the flat interfaces right after this returns.
+        let config = dict::current_config();
+        if !config.dedicated_server {
+            platform::get().start_client(config.steam_app_id);
+        }
         true
     });
     bind!(r, global::SOURCE_ENGINE_INIT, |_| {

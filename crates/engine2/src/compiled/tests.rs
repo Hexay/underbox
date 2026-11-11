@@ -91,6 +91,25 @@ fn compiled_ragdoll_spawns_jointed_bodies() {
     aggregate::destroy(doll);
 }
 
+/// The wave's managed event: frames 1..=3 at 10 fps, its payload owned by the clip resource.
+#[test]
+fn compiled_clip_events_read_through_the_clip_resource() {
+    game_dir();
+    let clip = crate::anim::resources::clip(&format!("{}/wave", fixture::RIGGED)).expect("wave");
+    assert_eq!(clip.clip.events.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(), ["AE_FOOTSTEP", "AE_MANAGED_EVENT"]);
+    let h: abi::NativeRef<abi::class::CAnimClipResource> = crate::resource::new_handle(Arc::new(clip));
+    let (mut start, mut duration) = (0.0, 0.0);
+    let payload = crate::anim::resources::event_data(h, 1, &mut start, &mut duration);
+    assert!((start - 0.1).abs() < 1e-6 && (duration - 0.2).abs() < 1e-6, "{start} {duration}");
+    let value = crate::kv3::node::to_value(&crate::kv3::node::get(payload).expect("payload"));
+    let member = |k: &str| value.as_object().and_then(|o| o.get(k)).and_then(|v| v.as_str()).map(str::to_owned);
+    assert_eq!((member("Type").as_deref(), member("Data").as_deref()), (Some("Footfall"), Some("{\"Foot\":1}")));
+    assert_eq!(crate::anim::resources::event_data(h, 1, &mut start, &mut duration), payload, "one payload per event");
+    assert!(crate::anim::resources::event_data(h, 2, &mut start, &mut duration).is_null());
+    crate::resource::destroy_handle(h);
+    assert!(crate::kv3::node::get(payload).is_none(), "freed with the resource");
+}
+
 fn new_world() -> world::Ref {
     objects::create_shared(Arc::new(PhysicsWorld::default()))
 }

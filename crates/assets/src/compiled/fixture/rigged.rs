@@ -20,7 +20,17 @@ pub const VANIM: &str = "models/compiled/rigged_stretch.vanim";
 /// The wave's one event: a left footstep at frame 2.
 pub fn footstep() -> super::super::anim::Event {
     let data = super::super::kv::obj(vec![("Foot", super::super::kv::int_value(0)), ("volume", ::kv::Value::Double(0.5))]);
-    super::super::anim::Event { frame: 2, cycle: 0.5, name: "AE_FOOTSTEP".into(), data }
+    super::super::anim::Event { frame: 2, end_frame: 2, cycle: 0.5, name: "AE_FOOTSTEP".into(), data }
+}
+
+/// A managed (`AnimationEvent`) span over frames 1..=3: what `Clip.GetEvents` reads.
+pub fn managed_event() -> super::super::anim::Event {
+    let data = super::super::kv::obj(vec![("Type", ::kv::Value::String("Footfall".into())), ("Data", ::kv::Value::String("{\"Foot\":1}".into()))]);
+    super::super::anim::Event { frame: 1, end_frame: 3, cycle: 0.25, name: "AE_MANAGED_EVENT".into(), data }
+}
+
+pub fn wave_events() -> Vec<super::super::anim::Event> {
+    vec![footstep(), managed_event()]
 }
 
 /// The spine's rotation about z at wave frame `f`, in degrees.
@@ -73,7 +83,7 @@ pub fn animations() -> Vec<Animation> {
     };
     let nod = [0.0, 15.0, 0.0].iter().map(|&d| vec![Key::IDENTITY, Key::IDENTITY, tilt(d)]).collect();
     vec![
-        Animation { name: "wave".into(), fps: 10.0, looping: true, frames: wave, morphs: smile, events: vec![footstep()], ..Animation::default() },
+        Animation { name: "wave".into(), fps: 10.0, looping: true, frames: wave, morphs: smile, events: wave_events(), ..Animation::default() },
         Animation { name: "nod".into(), fps: 30.0, delta: true, frames: nod, ..Animation::default() },
     ]
 }

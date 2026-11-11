@@ -8,7 +8,7 @@
 
 use super::convert::Conv;
 use super::snapshot::Node;
-use anim::graph::{PoseId, PoseNode, State, Transition, ValueNode};
+use anim::graph::{PoseId, PoseNode, State, StateEvents, Transition, ValueNode};
 use anim::params::Value;
 
 impl<'a> Conv<'a> {
@@ -78,6 +78,7 @@ impl<'a> Conv<'a> {
         let mut states = Vec::new();
         for (k, s) in n.items("StateDefinition").iter().enumerate() {
             let state = self.node(s.idx("m_stateNodeIdx"));
+            let events = state.filter(|st| st.class == "CStateNode_Definition").map(|st| self.state_events(st)).unwrap_or_default();
             let pose = match state {
                 Some(st) if st.class == "CStateNode_Definition" => self.state_child(st.idx("m_childNodeIdx")),
                 _ => self.pose(s.idx("m_stateNodeIdx")),
@@ -95,10 +96,17 @@ impl<'a> Conv<'a> {
                     Some(Transition { to, condition, duration })
                 })
                 .collect();
-            states.push(State { name: format!("state{k}"), pose, transitions });
+            states.push(State { name: format!("state{k}"), pose, transitions, events });
         }
         let default = usize::try_from(n.idx("m_defaultStateIndex")).unwrap_or(0);
         PoseNode::StateMachine { states, default }
+    }
+
+    /// `AddState`'s event IDs; timed events keep `ComparisonOperator` (0: ≤, 1: ≥).
+    fn state_events(&self, st: &Node) -> StateEvents {
+        let ids = |k: &str| st.ints(k).iter().map(|&id| self.id_name(id)).collect();
+        let elapsed = st.items("TimedElapsedEvents").iter().map(|e| (self.id_name(e.setter("ID")), e.float("m_timeValue"), e.setter("ComparisonOperator") == 0)).collect();
+        StateEvents { entry: ids("EntryEvents"), exit: ids("ExitEvents"), fully_in: ids("FullyInStateEvents"), elapsed }
     }
 
     /// Base, then each overlay layer blended on by its weight (unset: full weight).

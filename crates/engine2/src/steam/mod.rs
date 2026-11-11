@@ -7,7 +7,11 @@ mod dispatch;
 #[cfg(not(feature = "steam"))]
 mod flat_api;
 mod game_server;
+mod inventory;
+mod lobby;
+mod server_list;
 mod ugc;
+mod ugc_query;
 mod unavailable;
 
 use abi::slots::{global_steam as global, i_steam_networking_sockets as sockets};
@@ -28,6 +32,9 @@ pub fn register(r: &mut Registry) {
     dispatch::register(r);
     client::register(r);
     ugc::register(r);
+    lobby::register(r);
+    inventory::register(r);
+    server_list::register(r);
     unavailable::register(r);
     static SOCKETS: OnceLock<usize> = OnceLock::new();
     bind!(r, global::STEAM_NETWORKING_SOCKETS, || interface::<class::ISteamNetworkingSockets>(&SOCKETS));

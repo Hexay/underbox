@@ -11,4 +11,6 @@ description = "Platform services (Steam, offline, custom) behind one trait; the 
 steam = ["dep:steamworks"]
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
 steamworks = { version = "0.13.1", features = ["raw-bindings"], optional = true }

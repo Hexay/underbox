@@ -72,6 +72,53 @@ fn ease_and_spring_values_move_toward_their_input() {
     assert!((g.value(ease).as_float() - 10.0).abs() < 1e-4 && (g.value(spring).as_float() - 10.0).abs() < 0.05);
 }
 
+/// A machine flipping between a variation state, picking by `RandomFloat(0, 4)` as an index over
+/// idle/walk/run/jump, and an idle state, on bool `go`. Returns each variation entry's pick.
+fn variation_picks(g: &mut Instance, entries: usize) -> Vec<f32> {
+    let bind = Pose::zero(1);
+    let mut picks = Vec::new();
+    for _ in 0..entries {
+        g.params.set_by_name("go", Value::Bool(false));
+        g.update(0.1, &bind);
+        let pick = x(&g.update(0.1, &bind));
+        assert_eq!(x(&g.update(0.1, &bind)), pick, "held while the state plays");
+        picks.push(pick);
+        g.params.set_by_name("go", Value::Bool(true));
+        g.update(0.1, &bind);
+    }
+    picks
+}
+
+fn random_variation_graph() -> Arc<Definition> {
+    let mut def = Definition::default();
+    let go = param(&mut def, "go", Value::Bool(false));
+    let stay = def.add_value(ValueNode::Not(go));
+    let seed = def.add_value(ValueNode::Random { min: 0.0, max: 3.999 });
+    let options = ["idle", "walk", "run", "jump"].map(|c| clip(&mut def, c, true)).to_vec();
+    let pick = def.add_pose(PoseNode::Variation { seed, options, weights: None });
+    let rest = clip(&mut def, "idle", true);
+    let states = vec![
+        State { name: "pick".into(), pose: pick, transitions: vec![Transition { to: 1, condition: go, duration: 0.0 }], events: Default::default() },
+        State { name: "rest".into(), pose: rest, transitions: vec![Transition { to: 0, condition: stay, duration: 0.0 }], events: Default::default() },
+    ];
+    def.root = Some(def.add_pose(PoseNode::StateMachine { states, default: 1 }));
+    def.into_shared()
+}
+
+#[test]
+fn random_floats_redraw_each_time_their_state_starts() {
+    let def = random_variation_graph();
+    let mut g = Instance::new(def.clone(), clips);
+    let picks = variation_picks(&mut g, 24);
+    assert!(picks.iter().all(|p| [0.0, 10.0, 30.0, 100.0].contains(p)), "{picks:?}");
+    let distinct = [0.0, 10.0, 30.0, 100.0].iter().filter(|o| picks.contains(o)).count();
+    assert!(distinct >= 3, "the seed varies, so the variation does: {picks:?}");
+    g.restart();
+    assert_eq!(variation_picks(&mut g, 24), picks, "restart rewinds the instance's stream (recordings replay)");
+    let mut other = Instance::new(def, clips);
+    assert_ne!(variation_picks(&mut other, 24), picks, "each instance draws its own stream");
+}
+
 /// Shoulder at the origin; elbow and hand 10 apart along +X.
 fn arm() -> Arc<Skeleton> {
     let mut s = Skeleton::default();
@@ -88,7 +135,7 @@ fn two_bone_ik_reaches_a_world_target_and_look_at_turns_the_chain() {
     let yaw = param(&mut def, "yaw", Value::Float(0.0));
     let zero = def.add_value(ValueNode::Const(Value::Float(0.0)));
     let source = def.add_pose(PoseNode::Reference);
-    let ik = def.add_pose(PoseNode::TwoBoneIk(Box::new(TwoBoneIk { source, effector: "hand".into(), target, enabled: None, weight: None, world: true })));
+    let ik = def.add_pose(PoseNode::TwoBoneIk(Box::new(TwoBoneIk::new(source, "hand", target, true))));
     let bones = vec![("hand".to_owned(), 1.0)];
     let look = LookAt { source: ik, pitch: zero, yaw, weight: None, reference: String::new(), reference_rotation: Quat::IDENTITY, bones, yaw_limit: 45.0, pitch_limit: 45.0 };
     def.root = Some(def.add_pose(PoseNode::LookAt(Box::new(look))));

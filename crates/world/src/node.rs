@@ -25,6 +25,23 @@ pub struct SceneObject {
     pub layer: i32,
     /// From `m_aggregateSceneObjects`: world-space geometry, drawn untransformed.
     pub aggregate: bool,
+    /// `m_nLODOverride`: a LOD the compiler forced, -1 for automatic.
+    pub lod_override: i32,
+    /// An aggregate's draw calls placed one by one (`m_aggregateMeshes`); empty draws it whole.
+    pub fragments: Vec<Fragment>,
+}
+
+/// One `m_aggregateMeshes` entry: a draw call of the aggregate's model, with its own transform
+/// (from `m_fragmentTransforms`, taken in order by the fragments that have one) and tint.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fragment {
+    pub draw_call: usize,
+    pub transform: Option<Matrix>,
+    /// 0..1 (stored 0..255).
+    pub tint: [f32; 3],
+    pub flags: u64,
+    /// LOD levels it belongs to, one bit each; 0 for all.
+    pub lod_mask: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -68,7 +85,31 @@ fn scene_object(o: &Object, layer: i32) -> Option<SceneObject> {
         skin: field_str(o, "m_skin"),
         layer,
         aggregate: false,
+        lod_override: int_or(o, "m_nLODOverride", -1) as i32,
+        fragments: Vec::new(),
     })
+}
+
+fn int_or(o: &Object, key: &str, default: i64) -> i64 {
+    o.get(key).and_then(number).map_or(default, |n| n as i64)
+}
+
+/// The CS2 layout (each mesh names its draw call); older layouts map draw calls to meshes and
+/// are drawn whole.
+fn fragments(o: &Object) -> Vec<Fragment> {
+    let meshes = array(o, "m_aggregateMeshes");
+    if meshes.first().and_then(Value::as_object).is_none_or(|m| m.get("m_nDrawCallIndex").is_none()) {
+        return Vec::new();
+    }
+    let mut transforms = array(o, "m_fragmentTransforms").iter();
+    let fragment = |m: &Object, transforms: &mut std::slice::Iter<Value>| Fragment {
+        draw_call: int_or(m, "m_nDrawCallIndex", 0).max(0) as usize,
+        transform: m.get("m_bHasTransform").and_then(number).is_some_and(|b| b != 0.0).then(|| matrix(transforms.next())),
+        tint: field_floats::<3>(m, "m_vTintColor").map_or([1.0; 3], |c| c.map(|x| x / 255.0)),
+        flags: int_or(m, "m_objectFlags", 0) as u64,
+        lod_mask: int_or(m, "m_nLODGroupMask", 0) as u32,
+    };
+    meshes.iter().filter_map(Value::as_object).map(|m| fragment(m, &mut transforms)).collect()
 }
 
 fn aggregate(o: &Object) -> Option<SceneObject> {
@@ -82,6 +123,8 @@ fn aggregate(o: &Object) -> Option<SceneObject> {
         skin: String::new(),
         layer: o.get("m_nLayer").and_then(number).map_or(-1, |n| n as i32),
         aggregate: true,
+        lod_override: -1,
+        fragments: fragments(o),
     })
 }
 

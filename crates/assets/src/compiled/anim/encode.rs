@@ -95,7 +95,7 @@ pub fn write(anims: &[Animation], rig: &Rig, block: usize) -> (Value, Value) {
             let flags = obj(vec![("m_bLooping", Value::Bool(a.looping)), ("m_bDelta", Value::Bool(a.delta)), ("m_bHidden", Value::Bool(a.hidden))]);
             let data = obj(vec![("m_nFrames", int_value(a.frames.len() as i64)), ("m_frameblockArray", list(blocks))]);
             let events = a.events.iter().map(|e| {
-                let fields = [("m_nFrame", int_value(e.frame)), ("m_flCycle", Value::Double(e.cycle.into())), ("m_sEventName", text(&e.name)), ("m_EventData", e.data.clone())];
+                let fields = [("m_nFrame", int_value(e.frame)), ("m_nEndFrame", int_value(e.end_frame)), ("m_flCycle", Value::Double(e.cycle.into())), ("m_sEventName", text(&e.name)), ("m_EventData", e.data.clone())];
                 obj(fields.into())
             });
             let fields = [("m_name", text(&a.name)), ("fps", Value::Double(a.fps.into())), ("m_flags", flags), ("m_pData", data), ("m_movementArray", list([])), ("m_eventArray", list(events))];
