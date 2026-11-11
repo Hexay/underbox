@@ -12,6 +12,7 @@ pub mod device;
 pub mod draw;
 pub mod fog;
 pub mod fog_managed;
+mod fog_march;
 pub mod fog_volume;
 mod formats;
 mod frames;

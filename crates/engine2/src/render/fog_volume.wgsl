@@ -10,7 +10,11 @@ struct Params {
     ambient: vec4f,
     sun_direction: vec4f,
     sun_color: vec4f,
+    // Volumes, lights, whether there is history.
     counts: vec4u,
+    previous_view_proj: mat4x4f,
+    // This frame's weight, the history's near and range.
+    history_blend: vec4f,
 };
 
 struct Volume {
@@ -32,6 +36,29 @@ struct Light {
 @group(0) @binding(1) var<storage, read> volumes: array<Volume>;
 @group(0) @binding(2) var<storage, read> lights: array<Light>;
 @group(0) @binding(3) var froxels: texture_storage_3d<rgba16float, write>;
+// Per-froxel lighting (rgb in-scattered radiance, a density): last frame's, and this frame's.
+@group(0) @binding(4) var history: texture_3d<f32>;
+@group(0) @binding(5) var lighting: texture_storage_3d<rgba16float, write>;
+
+// `current` blended with the froxel last frame had at `world`, reprojected through its
+// world-to-clip (w is view depth). The nearest froxel, not a filtered one: a still camera
+// reads back exactly what it wrote.
+fn temporal(world: vec3f, current: vec4f) -> vec4f {
+    if p.counts.z == 0u {
+        return current;
+    }
+    let clip = p.previous_view_proj * vec4f(world, 1.0);
+    if clip.w <= 0.0 {
+        return current;
+    }
+    let size = vec3f(textureDimensions(history));
+    let uvw = vec3f(clip.x / clip.w * 0.5 + 0.5, 0.5 - clip.y / clip.w * 0.5, (clip.w - p.history_blend.y) / p.history_blend.z);
+    let at = uvw * size;
+    if any(at < vec3f(0.0)) || any(at >= size) {
+        return current;
+    }
+    return mix(textureLoad(history, vec3u(at), 0), current, p.history_blend.x);
+}
 
 // Henyey-Greenstein, scaled so an isotropic medium scatters 1.
 fn phase(cosine: f32) -> f32 {
@@ -88,9 +115,15 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
         let depth = p.camera_near.w + (f32(z) + 0.5) * slice;
         let world = p.camera_near.xyz + direction * depth * per_depth;
         let m = medium(world) * smoothstep(p.fade_phase.x, p.fade_phase.y, depth);
+        var lit = vec4f(0.0);
         if m.a > 0.0 {
-            let through = exp(-m.a * slice * per_depth);
-            scattered += transmittance * (1.0 - through) * (m.rgb / m.a) * incoming(world, direction) * p.fade_phase.w;
+            lit = vec4f((m.rgb / m.a) * incoming(world, direction) * p.fade_phase.w, m.a);
+        }
+        lit = temporal(world, lit);
+        textureStore(lighting, vec3u(id.xy, z), lit);
+        if lit.a > 0.0 {
+            let through = exp(-lit.a * slice * per_depth);
+            scattered += transmittance * (1.0 - through) * lit.rgb;
             transmittance *= through;
         }
         textureStore(froxels, vec3u(id.xy, z), vec4f(scattered, transmittance));

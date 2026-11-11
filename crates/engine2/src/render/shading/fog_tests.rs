@@ -144,15 +144,15 @@ fn volumetric_fog_attenuates_and_scatters() {
     let mut params = SceneVolumetricFogParameters::default();
     (params.m_b_fog_enabled, params.m_fl_scattering, params.m_fl_draw_distance, params.m_fl_indirect_strength) = (1, 1.0, 1000.0, 1.0);
     let ambient = Lighting { ambient: Vec4::ONE, ..Default::default() };
-    assert!(fog_volume::render(&[empty], view_proj, &ambient, &params).is_none(), "no volumes, no grid");
-    let frustum = fog_volume::render(&[world], view_proj, &ambient, &params).expect("froxels");
+    assert!(fog_volume::render(&[empty], view_proj, &ambient, &params, 0).is_none(), "no volumes, no grid");
+    let frustum = fog_volume::render(&[world], view_proj, &ambient, &params, 0).expect("froxels");
     let near = fog_volume::froxel(&frustum, [48, 28, 2]);
     assert!(near[3] < 0.9 && near[0] > near[1], "a slice past the camera scatters red: {near:?}");
     let fogged = middle(&Lighting { fog_volume: Some(frustum), ..with_view_fog(ViewFog::default()) }).unwrap();
     assert!(i32::from(fogged[1]) + 40 < i32::from(clear[1]), "attenuated: {fogged:?} from {clear:?}");
     assert!(i32::from(fogged[0]) > i32::from(fogged[1]) + 40, "red in-scattering: {fogged:?}");
     fog_volume::remove(world.addr(), 1);
-    assert!(fog_volume::render(&[world], view_proj, &ambient, &params).is_none(), "removed");
+    assert!(fog_volume::render(&[world], view_proj, &ambient, &params, 0).is_none(), "removed");
 }
 
 /// A spot at the eye lights the medium inside its cone only: the centre column scatters with
@@ -167,7 +167,7 @@ fn spot_lights_scatter_inside_their_cone() {
     let scatter = |aim: Vec3| {
         let spot = fog_volume::FogLight { position: eye, radius: 500.0, color: Vec3::splat(4.0), spot: Some((aim, 0.95, 0.9)) };
         let sources = fog_volume::Sources { lights: vec![spot], ..Default::default() };
-        let grid = fog_volume::march(&volumes, view_proj, &sources, &settings()).expect("froxels");
+        let grid = fog_volume::march(&volumes, view_proj, &sources, &settings(), 0).expect("froxels");
         fog_volume::froxel(&grid, [48, 28, 2])
     };
     let ahead = (Vec3::ZERO - eye).normalize();
@@ -175,4 +175,25 @@ fn spot_lights_scatter_inside_their_cone() {
     assert!(lit[0] > 0.01 && lit[1] == 0.0, "inside the cone, the red medium scatters: {lit:?}");
     let dark = scatter(-ahead);
     assert!(dark[0] == 0.0, "outside the cone: {dark:?}");
+}
+
+/// Under one history key a still view settles on exactly what it marched alone; a light switched
+/// on shows up partly at first (blended with the dark history), then converges.
+#[test]
+fn froxels_blend_with_their_history() {
+    let Some(_) = middle(&with_view_fog(ViewFog::default())) else { return };
+    let eye = Vec3::new(-30.0, 0.0, 30.0);
+    let view_proj = render::Camera::perspective(90f32.to_radians(), 1.0, 1.0, eye, Vec3::ZERO).view_proj;
+    let settings = fog_volume::Settings { draw_distance: 1000.0, fade_in: (-2.0, -1.0), anisotropy: 0.0, scattering: 1.0 };
+    let volumes = [fog_volume::Volume::native(&volume(4.0))];
+    let lit = |ambient: f32| fog_volume::Sources { ambient: Vec3::splat(ambient), ..Default::default() };
+    let at = |sources: &fog_volume::Sources, key: usize| fog_volume::froxel(&fog_volume::march(&volumes, view_proj, sources, &settings, key).expect("froxels"), [48, 28, 4]);
+    let alone = at(&lit(1.0), 0);
+    const KEY: usize = 0xF06_0001;
+    assert_eq!(at(&lit(0.0), KEY)[0], 0.0, "dark first frame");
+    let first = at(&lit(1.0), KEY);
+    assert!(first[0] > 0.0 && first[0] < alone[0] * 0.5, "partly lit after one frame: {first:?} of {alone:?}");
+    let settled = (0..60).map(|_| at(&lit(1.0), KEY)).last().unwrap();
+    // History is stored at half precision.
+    assert!(settled.iter().zip(alone).all(|(a, b)| (a - b).abs() <= b.abs() * 2e-3), "converged: {settled:?} to {alone:?}");
 }

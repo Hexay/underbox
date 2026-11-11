@@ -59,7 +59,7 @@ pub fn dispatch(attrs: &[attributes::Ref]) -> Result<(), String> {
     let count = config.iter().take(2).map(|n| n.to_bits() as usize).sum();
     let lights = attrs.iter().find_map(|a| attributes::buffer(*a, LIGHTS)).map_or_else(Vec::new, |h| binned_lights(h, count));
     let sources = Sources { ambient: ambient * fog.f(at::INDIRECT_STRENGTH), sun: block("DirectionalLightCB").and_then(|b| sun(&b)), lights };
-    let grid = fog_volume::march(&fog.volumes(), fog.view_proj()?, &sources, &fog.settings());
+    let grid = fog_volume::march(&fog.volumes(), fog.view_proj()?, &sources, &fog.settings(), out.addr());
     let mut grids = GRIDS.lock().unwrap();
     match grid {
         Some(g) => grids.insert(out.addr(), g),

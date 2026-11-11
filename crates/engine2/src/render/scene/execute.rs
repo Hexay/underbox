@@ -92,7 +92,7 @@ pub fn run(v: view::Ref) {
         shadow::render(&mut lighting, &worlds, view.view_proj);
         local_shadow::render(&mut lighting, &worlds);
         let volumetric = lighting.view_fog.as_ref().and_then(|f| f.volumetric);
-        lighting.fog_volume = volumetric.and_then(|p| fog_volume::render(&worlds, view.view_proj, &lighting, &p));
+        lighting.fog_volume = volumetric.and_then(|p| fog_volume::render(&worlds, view.view_proj, &lighting, &p, view.color.addr()));
     }
     immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {
