@@ -162,8 +162,7 @@ pub fn register(r: &mut Registry) {
         let model = crate::model::get(m);
         usize::try_from(mesh).ok().and_then(|i| model?.content.meshes.get(i).map(|e| !e.mesh.state().morphs.is_empty())).unwrap_or(false)
     });
-    // No indirect compute or ray tracing yet.
-    bind!(r, tools::COMPUTE_INDIRECT, |_, _, _, _, _| {});
+    // No ray tracing.
     bind!(r, tools::TRACE_RAYS, |_, _, _, _, _, _| {});
     bind!(r, tools::TRACE_RAYS_INDIRECT, |_, _, _, _, _| {});
     bind!(r, tools::COPY_GPU_BUFFER_HIDDEN_STRUCTURE_COUNT, |_, _, _, _| {});

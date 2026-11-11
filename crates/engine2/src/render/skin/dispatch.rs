@@ -68,7 +68,7 @@ pub fn run(shader: &str, skin: &MeshSkin, transforms: &Arc<render::Buffer>, jobs
     for chunk in jobs.chunks(MAX_INSTANCES) {
         attributes::set(a, "InstanceCount", Value::Float(chunk.len() as f32));
         attributes::set_constant_buffer(a, StringToken::of("Instances_t"), &instances(chunk, skin.weights));
-        result = result.and(compute::gpu::dispatch(gpu, shader, &[a], [skin.vertices, chunk.len() as u32, 1]));
+        result = result.and(compute::gpu::dispatch(gpu, shader, &[a], compute::gpu::Work::Threads([skin.vertices, chunk.len() as u32, 1])));
     }
     objects::destroy(a);
     result

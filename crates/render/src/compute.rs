@@ -32,6 +32,16 @@ impl ComputeProgram {
 
     /// Run over `threads` and submit.
     pub fn dispatch(&self, gpu: &Gpu, bind_groups: &[wgpu::BindGroup], threads: [u32; 3]) {
+        let [x, y, z] = self.groups(threads);
+        self.submit(gpu, bind_groups, |pass| pass.dispatch_workgroups(x, y, z));
+    }
+
+    /// Run over the workgroup counts (three u32s) at byte `offset` of `args`, and submit.
+    pub fn dispatch_indirect(&self, gpu: &Gpu, bind_groups: &[wgpu::BindGroup], args: &wgpu::Buffer, offset: u64) {
+        self.submit(gpu, bind_groups, |pass| pass.dispatch_workgroups_indirect(args, offset));
+    }
+
+    fn submit(&self, gpu: &Gpu, bind_groups: &[wgpu::BindGroup], dispatch: impl FnOnce(&mut wgpu::ComputePass)) {
         let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(&self.label) });
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some(&self.label), timestamp_writes: None });
@@ -39,8 +49,7 @@ impl ComputeProgram {
             for (i, g) in bind_groups.iter().enumerate() {
                 pass.set_bind_group(i as u32, g, &[]);
             }
-            let [x, y, z] = self.groups(threads);
-            pass.dispatch_workgroups(x, y, z);
+            dispatch(&mut pass);
         }
         gpu.submit(encoder.finish());
     }

@@ -21,7 +21,13 @@ pub(crate) fn warn_once(shader: &str, what: &str) {
     }
 }
 
-fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, threads: [i32; 3]) {
+/// What `Compute` or `ComputeIndirect` asked for.
+enum Size {
+    Threads([i32; 3]),
+    Indirect(buffers::Handle, u32),
+}
+
+fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, size: Size) {
     let (Some(material), Some(gpu)) = (material_mode::material(mode), device::gpu()) else { return };
     let shader = material.shader();
     crate::render::submits::log_to(c, &format!("compute {shader}"), "-");
@@ -30,14 +36,22 @@ fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, t
     let attrs = if occlusion { pvs_cull::filter(attrs) } else { attrs };
     let mut layers = vec![attrs];
     layers.extend(context::get(c).map(|c| c.attributes));
-    let threads = threads.map(|n| n.max(1) as u32);
     if shader.contains(crate::render::fog_managed::SHADER) {
         if let Err(e) = crate::render::fog_managed::dispatch(&layers) {
             warn_once(shader, &format!("fog stand-in skipped ({e})"));
         }
         return;
     }
-    match gpu::dispatch(gpu, shader, &layers, threads) {
+    let args = match size {
+        Size::Indirect(h, _) => buffers::get(h),
+        Size::Threads(_) => None,
+    };
+    let work = match (size, &args) {
+        (Size::Threads(threads), _) => Ok(gpu::Work::Threads(threads.map(|n| n.max(1) as u32))),
+        (Size::Indirect(_, offset), Some(args)) => Ok(gpu::Work::Indirect(&args.buffer, u64::from(offset))),
+        (Size::Indirect(..), None) => Err("no indirect args buffer".to_owned()),
+    };
+    match work.and_then(|work| gpu::dispatch(gpu, shader, &layers, work)) {
         Ok(()) => {}
         Err(e) if occlusion => {
             warn_once(shader, &format!("on the CPU ({e})"));
@@ -67,9 +81,13 @@ impl Inputs {
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
 #[cfg(test)]
+#[path = "indirect_tests.rs"]
+mod indirect_tests;
+#[cfg(test)]
 #[path = "packed_tests.rs"]
 mod packed_tests;
 
 pub fn register(r: &mut Registry) {
-    bind!(r, tools::COMPUTE, |c, attrs, mode, x, y, z| dispatch(c, attrs, mode, [x, y, z]));
+    bind!(r, tools::COMPUTE, |c, attrs, mode, x, y, z| dispatch(c, attrs, mode, Size::Threads([x, y, z])));
+    bind!(r, tools::COMPUTE_INDIRECT, |c, attrs, mode, args, offset| dispatch(c, attrs, mode, Size::Indirect(args, offset)));
 }
