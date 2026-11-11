@@ -73,14 +73,36 @@ Two bugs appeared once the player spawned:
 1. **Fixed:** managed `Texture.Clear` on a plain (non-render-target) texture became a clear pass
    on a view without `RENDER_ATTACHMENT`, which failed wgpu validation. Plain RGBA8 textures now
    get the fill uploaded instead (`engine2/src/render/texture.rs`).
-2. **Open, renderer lane:** the GPU spins forever in `sprite/sprite_cs` (`SpriteBatch`), and the
-   main thread waits on its fence. Probable cause: managed `SpriteData` is packed (`Vector3` is
-   12 bytes), but DXC's `-fvk-use-gl-layout` lays `StructuredBuffer<SpriteData>` out as std430.
-   There `float3 Rotation` sits at offset 16, so every later field is shifted. That makes
-   `Splots` garbage, and the shader runs `for (f < splotCount)` for billions of iterations. Any
-   structured buffer of a struct with a `float3` that isn't followed by a 4-byte scalar has the
-   same mismatch. The fix is a `word_buffers.rs`-style rewrite to `uint` words, extended to
-   vector fields.
+2. **Fixed:** the GPU spun forever in `sprite/sprite_cs`. See [Rendering](#rendering).
+
+## Rendering
+
+Fixed, in the order they showed up after spawn:
+
+- **GPU hang in `sprite_cs`.** Managed `SpriteData` is packed (`Vector3` is 12 bytes), but DXC's
+  `-fvk-use-gl-layout` lays structured buffers out as std430: `Rotation` lands at 16, `Splots` at
+  80 instead of 68, stride 176 instead of 148. `Splots` read a float's bits, so the splot loop
+  ran billions of times. `shaders/src/packed_buffers.rs` rewrites any structured buffer whose
+  struct std430 would pad into packed `uint` words. The same mismatch was in every lit shader's
+  light, shadow, DDGI and decal buffers, the UI box and text buffers, `line_cs` and the terrain
+  brush (`crates/shaders/tests/packed_audit.rs` lists them).
+- **Hangs in general** now log `wgpu error: GPU hang` and drop work until the queue drains
+  (docs/renderer.md, GPU hangs).
+- **Uniform grey frame.** The first-person arms and physgun are vmdl-only, so they are 16-unit
+  error cubes centred on the eye, and the placeholder drew their inside faces over the whole
+  view. The placeholder now culls back faces as native's default material does.
+
+What's left, and why:
+
+- No textures, no sky texture: the zoo's materials are `reflectivity_30.vmat` and
+  `skybox_day_01.vmat`, whose `.tga`/`.exr` aren't in the repo and no `.vtex_c` ships. The sky is
+  our flat placeholder.
+- The one spotlight is the `studio_light_projector` prop's; the scene itself has only the sun.
+- No HUD visible yet; not triaged.
+- `downsample_spd` skips (Rg32Float mip through an Rgba32Float view), and CMAA2's indirect
+  passes are no-ops, so it never blends (docs/renderer.md, Next).
+- Grubs: `gr_foreground*` placeholder shaders fail GPU validation and `new_water.shader` fails
+  to compile; not triaged.
 
 ## Shaders
 
@@ -139,4 +161,5 @@ KV3, which `kv3bin` decodes) and a `SNAP` block. Check them with
   missed the zoo's `world`-tagged floor. The fix is in `ShapeMeta::base_tag`.
 - **Shaders:** native-masked embedded HLSL didn't parse. It now does, as described in
   [Shaders](#shaders).
-- **Render:** `Texture.Clear` on plain textures, as described in [Client frame](#client-frame).
+- **Render:** `Texture.Clear` on plain textures, as described in [Client frame](#client-frame);
+  the `sprite_cs` hang and the grey frame, as described in [Rendering](#rendering).
