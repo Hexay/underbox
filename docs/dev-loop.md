@@ -94,5 +94,7 @@ Docs-only pushes (`*.md`, `docs/`, `research/`) skip CI. Shared steps are compos
   and its own key ignores `[profile]` sections.
 - Windows builds GameNetworkingSockets against the cached `VCPKG_ROOT` protobuf in classic mode;
   manifest mode (GNS ships a `vcpkg.json`) rebuilt protobuf, openssl and abseil (about 55 min).
+- apt's `.debs` are cached per runner image; a warm cache installs with `dpkg -i` and never touches
+  the Ubuntu mirror, falling back to `apt-get` if that fails.
 - Checkouts aren't recursive: GNS's nested submodules (webrtc, abseil) are only for ICE.
 - Public repo: `contents: read` token, actions pinned by SHA, no secrets, no `pull_request_target`.

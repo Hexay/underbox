@@ -101,14 +101,25 @@ jobs:
     env:
       DIST_GLIBC_MAX: "2.35"
     steps:
+      # .debs cached as in .github/actions/linux-deps, which can't run before the checkout. Bump the
+      # key with the package list.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/underbox-debs
+          key: apt-dist-ubuntu-22.04-v1
       # git before checkout, or it downloads a tarball without submodules.
       - timeout-minutes: 10
         env:
+          DEBS: /var/cache/underbox-debs
           APT: -q -o Acquire::Retries=5 -o Acquire::http::Timeout=30
         run: |
+          if ls "$DEBS"/*.deb > /dev/null 2>&1 && dpkg -i "$DEBS"/*.deb > /dev/null; then exit 0; fi
+          mkdir -p "$DEBS/partial"
           apt-get $APT update
-          apt-get $APT install -y --no-install-recommends git ca-certificates curl unzip build-essential cmake pkg-config libssl-dev \
+          apt-get $APT install -y --no-install-recommends -o Dir::Cache::archives="$DEBS" \
+            git ca-certificates curl unzip build-essential cmake pkg-config libssl-dev \
             libx11-dev libxext-dev libxcursor-dev libxfixes-dev libxi-dev libxrandr-dev libxss-dev libxtst-dev libudev-dev libdbus-1-dev
+          rm -rf "$DEBS/lock" "$DEBS/partial"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
