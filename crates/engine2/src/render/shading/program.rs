@@ -116,9 +116,21 @@ fn layouts(gpu: &render::Gpu, label: &str, stages: &[&CompiledStage]) -> Vec<wgp
         .collect()
 }
 
+/// A storage image's (group, binding) and the format it is rebuilt for.
+pub type StorageFormat = (u32, u32, wgpu::TextureFormat);
+
 /// A vfx shader's `CS` program for one combo.
 pub fn build_compute(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, v: &Variant) -> Result<Shading<render::ComputeProgram>, String> {
-    let cs = stage(compiler, shader, Stage::Cs, v)?;
+    build_compute_for(gpu, compiler, shader, label, v, &[])
+}
+
+/// [`build_compute`] with storage images declared in the formats of the textures bound to them
+/// (`shaders::retarget_storage`).
+pub fn build_compute_for(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, v: &Variant, storage: &[StorageFormat]) -> Result<Shading<render::ComputeProgram>, String> {
+    let mut cs = stage(compiler, shader, Stage::Cs, v)?;
+    for &(group, binding, format) in storage {
+        shaders::retarget_storage(&mut cs, group, binding, format)?;
+    }
     let bindings = merged(gpu, &[&cs])?;
     let program = gpu.checked(|| {
         let stage = render::Stage::new(gpu, label, &cs.wgsl, &cs.reflection.entry);

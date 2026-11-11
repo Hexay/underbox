@@ -158,6 +158,22 @@ fn bindless_views(gpu: &render::Gpu, b: &Binding, dimension: wgpu::TextureViewDi
     (0..len).map(|i| bindless::view(i, dimension, sample_type).unwrap_or_else(|| fallback.clone())).collect()
 }
 
+/// Storage images whose bound texture has another format than the program declares, with that
+/// format (downsample_spd's float4 mips over managed's Rg32Float pyramid).
+pub fn storage_mismatches<P>(s: &Shading<P>, attrs: &[attributes::Ref]) -> Vec<program::StorageFormat> {
+    let bound = |name: &str| {
+        let (t, _) = attrs.iter().find_map(|a| names(s, name).find_map(|n| attributes::texture_mip(*a, n)))?;
+        Some(texture::resolve(t)?.gpu.as_ref()?.desc.format)
+    };
+    s.bindings
+        .iter()
+        .filter_map(|b| match b.ty {
+            B::StorageTexture { format, .. } => bound(&b.name).filter(|f| *f != format).map(|f| (b.group, b.binding, f)),
+            _ => None,
+        })
+        .collect()
+}
+
 /// A `RWTexture2D`'s texture by name: the mip the attribute names (downsample_spd binds one per
 /// mip) of a texture in exactly that format that allows storage writes (formats.rs gives that
 /// usage where wgpu guarantees it).

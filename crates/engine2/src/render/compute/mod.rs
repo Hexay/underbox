@@ -86,6 +86,9 @@ mod indirect_tests;
 #[cfg(test)]
 #[path = "packed_tests.rs"]
 mod packed_tests;
+#[cfg(test)]
+#[path = "storage_tests.rs"]
+mod storage_tests;
 
 pub fn register(r: &mut Registry) {
     bind!(r, tools::COMPUTE, |c, attrs, mode, x, y, z| dispatch(c, attrs, mode, Size::Threads([x, y, z])));
