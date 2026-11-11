@@ -41,8 +41,10 @@ load a second libengine2, which aborts in protobuf ("File already exists in data
 in `GetCwd`. Unused copies can be deleted any time.
 
 A script that changes the shared build (a dotnet build into `game/`) runs under `boot-lock.sh`;
-boots pick the change up on their next start. Ports come from `tools/worktree-port.sh`, so
-servers in different worktrees don't collide; two servers in one worktree still share a port.
+boots pick the change up on their next start. Each boot borrows its port from
+`tools/worktree-port.sh` (12 per worktree, held in `/srv/agents/cache/underbox-ports` while the
+boot's script lives), so `match.sh`, `map.sh` and `net-probe.sh` run side by side, here and in
+other worktrees. `boot-server.sh` borrows one unless the args carry `+port`.
 
 `install-engine2.sh` installs NuGet natives via `nuget-file.sh` (cached in
 `~/.cache/underbox/nuget`, written by rename), links them into `bin/managed` for .NET's fallback

@@ -14,6 +14,7 @@ shift $(( $# > 2 ? 2 : $# ))
 [ $# -eq 0 ] && UNTIL=${UNTIL-Server is idle}
 UNTIL=${UNTIL:-}
 GRACE=${GRACE:-2}
+case " $* " in *" +port "*) ;; *) set -- "$@" +port "$(sh "$ROOT/tools/worktree-port.sh" $$)" ;; esac
 # Close an inherited boot-lock fd (from a raw `flock <lock> ...` caller) so lingering children can't hold it.
 for fd in /proc/$$/fd/[3-9]; do
     case $(readlink "$fd" 2>/dev/null) in *underbox-boot.lock) eval "exec ${fd##*/}>&-" ;; esac
