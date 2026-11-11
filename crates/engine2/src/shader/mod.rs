@@ -172,6 +172,15 @@ fn load_source(v: &Vfx, path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The shipped `.shader_c` of a resource path, loaded on its own (not cached): what a game run
+/// draws with natively, where the source beside it is only for the editor.
+pub fn shipped(path: &str) -> Option<Arc<VfxShader>> {
+    let compiled = format!("{}_c", resource_path(path));
+    locate(&compiled)?;
+    let v = Vfx::new(compiled.clone(), None);
+    load::from_resource_file(&v, &compiled, 0).then(|| v.shader()).flatten()
+}
+
 /// A resource path's source, else its `.shader_c`; logs why when neither loads.
 fn load(v: &Vfx, path: &str) -> bool {
     let Err(source) = load_source(v, path) else { return true };

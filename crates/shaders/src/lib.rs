@@ -17,6 +17,7 @@ pub mod dxc;
 pub mod expr;
 mod formats;
 mod image_coords;
+mod overrides;
 pub mod include;
 pub mod packed_buffers;
 mod packed_layout;

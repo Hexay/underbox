@@ -232,3 +232,32 @@ fn combo_results_carry_their_fields() {
     assert_eq!(compile::info_combo(r).map(|(ids, _, failed)| (ids, failed)), Some(((2, 0), true)));
     objects::destroy(r);
 }
+
+/// A game's source edited after its `.shader_c` was built, and broken against core (grubs'
+/// new_water reads a VS-only interpolant in PS): the renderer draws with the shipped file.
+#[test]
+fn a_source_that_fails_to_compile_draws_with_its_shipped_file() {
+    let Some(gpu) = crate::render::device::create() else { return eprintln!("skipped: no GPU") };
+    let good = "HEADER { }\nFEATURES { }\nCOMMON { struct PsIn { float4 vPositionPs : SV_Position; }; }\n\
+        VS { PsIn MainVs( float3 p : POSITION ) { PsIn o; o.vPositionPs = float4( p, 1 ); return o; } }\n\
+        PS { float4 MainPs( PsIn i ) : SV_Target0 { return float4( 1, 0, 0, 1 ); } }\n";
+    let broken = good.replace("float4( 1, 0, 0, 1 )", "i.vMissing");
+    let name = format!("ubx_shipped_{}", std::process::id());
+    let root = write_temp("root", "").parent().unwrap().to_path_buf();
+    let path = root.join(format!("shaders/{name}.shader"));
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, &broken).unwrap();
+    let body = [b"vcs2".as_slice(), &68i32.to_le_bytes(), &2i32.to_le_bytes(), &[9; 16]].concat();
+    let vs = Stage::Vs as i64;
+    let sprv = compiled::sprv_payload(&[(FEATURE as usize, body.clone()), (vs as usize, body.clone()), (PS as usize, body)]);
+    let hlsl = serde_json::json!({ "Programs": { "VFX_PROGRAM_VS": tools::mask(good, vs, false), "VFX_PROGRAM_PS": tools::mask(good, PS, false) } });
+    std::fs::write(format!("{}_c", path.display()), resource_file(sprv, Some(&hlsl.to_string()))).unwrap();
+    let root = root.to_string_lossy().into_owned();
+    crate::fs::add_search_path("GAME", &root, false);
+
+    let resource = format!("shaders/{name}.shader");
+    assert!(find(&resource).is_some(), "the broken source still parses");
+    assert!(crate::render::shading::program(gpu, &resource).is_some(), "built from the shipped file's HLSL");
+    crate::fs::remove_search_path("GAME", &root);
+    std::fs::remove_dir_all(&root).unwrap();
+}

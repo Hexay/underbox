@@ -9,12 +9,12 @@ use glam::Mat4;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
-fn vmats(dir: &Path, out: &mut Vec<PathBuf>) {
+fn files(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
     for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let p = e.path();
         if p.is_dir() {
-            vmats(&p, out);
-        } else if p.extension().is_some_and(|x| x == "vmat") {
+            files(&p, ext, out);
+        } else if p.extension().is_some_and(|x| x == ext) {
             out.push(p);
         }
     }
@@ -40,6 +40,10 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
     } else {
         return "placeholder: no source, not mapped".into();
     };
+    built_verdict(gpu, compiler, shader, stem, kind)
+}
+
+fn built_verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, shader: Result<shaders::VfxShader, String>, stem: &str, kind: &str) -> String {
     let built = shader.and_then(|sh| program::build(gpu, compiler, &sh, stem, &shaders::Variant::default()));
     let s = match built {
         Ok(s) => s,
@@ -60,6 +64,25 @@ fn verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, core: &Path, stem: &
     }
 }
 
+/// Every `.shader` source under the `UNDERBOX_REAL_SHADERS` folders (game checkouts, read only)
+/// through the same build and bind: one verdict line each. Never asserts.
+#[test]
+fn real_shader_sources() {
+    let Ok(dirs) = std::env::var("UNDERBOX_REAL_SHADERS") else { return eprintln!("skipped: UNDERBOX_REAL_SHADERS unset") };
+    let (Some(core), Some(gpu)) = (super::tests::core_dir(), crate::render::device::create()) else { return eprintln!("skipped: no sbox-public checkout or GPU") };
+    let compiler = shaders::Compiler::new().unwrap();
+    let only = std::env::var("UNDERBOX_REAL_ONLY").unwrap_or_default();
+    let mut found = Vec::new();
+    dirs.split(':').filter(|d| !d.is_empty()).for_each(|d| files(Path::new(d), "shader", &mut found));
+    for file in found.iter().filter(|f| only.split(',').any(|o| f.to_string_lossy().contains(o))) {
+        // The content root is the folder holding `shaders/`.
+        let root = file.ancestors().find(|a| a.file_name().is_some_and(|n| n == "shaders")).and_then(Path::parent).unwrap_or(Path::new("/"));
+        let includes = shaders::IncludePaths::new([root.to_path_buf(), core.clone()]);
+        let stem = file.file_stem().unwrap().to_string_lossy();
+        eprintln!("{}\t{}", file.display(), built_verdict(gpu, &compiler, shaders::VfxShader::parse_file(file, &includes), &stem, "program"));
+    }
+}
+
 #[test]
 #[ignore = "runs DXC over every shader the corpus materials name"]
 fn material_coverage() {
@@ -67,10 +90,10 @@ fn material_coverage() {
         eprintln!("skipped: no sbox-public checkout or GPU");
         return;
     };
-    let mut files = Vec::new();
-    vmats(core.parent().unwrap(), &mut files);
+    let mut found = Vec::new();
+    files(core.parent().unwrap(), "vmat", &mut found);
     let mut by_shader: BTreeMap<String, usize> = BTreeMap::new();
-    files.iter().filter_map(|f| shader_of(f)).for_each(|s| *by_shader.entry(s).or_default() += 1);
+    found.iter().filter_map(|f| shader_of(f)).for_each(|s| *by_shader.entry(s).or_default() += 1);
     let compiler = shaders::Compiler::new().unwrap();
     let mut rows = Vec::new();
     let mut real = 0;
@@ -83,5 +106,5 @@ fn material_coverage() {
     }
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/material-coverage.tsv");
     std::fs::write(&out, rows.join("\n") + "\n").unwrap();
-    eprintln!("{}\n== {real} of {} materials draw with a program or the stand-in ({})", rows.join("\n"), files.len(), out.display());
+    eprintln!("{}\n== {real} of {} materials draw with a program or the stand-in ({})", rows.join("\n"), found.len(), out.display());
 }

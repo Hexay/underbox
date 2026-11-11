@@ -91,10 +91,16 @@ pub fn program(gpu: &render::Gpu, shader_path: &str) -> Option<Arc<Shading>> {
     {
         return cached.clone();
     }
-    let built = (|| {
+    let built = (|| -> Result<Shading, String> {
         let compiler = COMPILER.as_ref().ok_or("no shader compiler")?;
-        let shader = source(shader_path)?;
-        program::build(gpu, compiler, &shader, shader_path, &shaders::Variant::new(key.1, key.2))
+        let variant = shaders::Variant::new(key.1, key.2);
+        source(shader_path).and_then(|s| program::build(gpu, compiler, &s, shader_path, &variant)).or_else(|e| {
+            // A source newer than its shipped .shader_c may not compile; native game runs load the .shader_c.
+            let shipped = crate::shader::shipped(shader_path).ok_or_else(|| e.clone())?;
+            let built = program::build(gpu, compiler, &shipped, shader_path, &variant).map_err(|e2| format!("{e}; its .shader_c: {e2}"))?;
+            abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader_path}: drawing with its .shader_c, the source fails ({e})"));
+            Ok(built)
+        })
     })();
     let built = built.inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader_path}: {e}"))).ok().map(Arc::new);
     PROGRAMS.lock().unwrap().insert(key, (generation, built.clone()));
