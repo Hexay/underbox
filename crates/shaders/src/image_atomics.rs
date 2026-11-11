@@ -1,210 +1,257 @@
 //! naga's SPIR-V frontend rejects `OpImageTexelPointer` ("unsupported storage class": the Image
 //! pointer class), which DXC emits for `Interlocked*` on a `RWTexture2D<uint>` (CMAA2's
 //! `InterlockedExchange( Cmaa2BlendHeads[quad], .. )`), and naga's own image atomics return no
-//! value. This pass lowers each such atomic to an image read, the operation, and an image write.
-//!
-//! Not atomic: two invocations racing on one texel can lose one's update. CMAA2 tolerates that:
-//! the heads form linked lists of blend items, a lost exchange drops one item from a quad's list
-//! (that pixel blends from fewer samples) and two "first" writers queue the quad twice (resolved
-//! twice to the same colour); the list itself stays acyclic and every link valid.
-//! A module with an atomic this pass doesn't know is returned unchanged.
+//! value. This pass moves such an image's texels into a storage buffer of words named
+//! `<image>_texel_words` (row-major, the image's width per row) and makes every texel access in
+//! the module a real atomic on its word: atomics keep their op, image reads and writes become
+//! atomic loads and stores. The image stays bound for its size but is never written, so only
+//! shaders that reach it through this pass may share its texels; the renderer binds one buffer
+//! per texture under that name (engine2 `shading/texel_words.rs`).
+//! A module whose image isn't a 2D `uint` one or has no name to bind by is returned unchanged.
 
-use crate::spirv::{HEADER_WORDS, inst, instructions, op};
+use crate::spirv::{HEADER_WORDS, inst, instructions, op, string};
 use std::collections::HashMap;
 
-const OP_TYPE_BOOL: u32 = 20;
+const OP_NAME: u32 = 5;
 const OP_TYPE_INT: u32 = 21;
 const OP_TYPE_VECTOR: u32 = 23;
+const OP_TYPE_IMAGE: u32 = 25;
+const OP_TYPE_RUNTIME_ARRAY: u32 = 29;
+const OP_TYPE_STRUCT: u32 = 30;
 const OP_TYPE_POINTER: u32 = 32;
+const OP_CONSTANT: u32 = 43;
+const OP_FUNCTION: u32 = 54;
 const OP_VARIABLE: u32 = 59;
 const OP_IMAGE_TEXEL_POINTER: u32 = 60;
 const OP_LOAD: u32 = 61;
 const OP_ACCESS_CHAIN: u32 = 65;
+const OP_DECORATE: u32 = 71;
+const OP_MEMBER_DECORATE: u32 = 72;
+const OP_COMPOSITE_CONSTRUCT: u32 = 80;
 const OP_COMPOSITE_EXTRACT: u32 = 81;
 const OP_IMAGE_READ: u32 = 98;
 const OP_IMAGE_WRITE: u32 = 99;
+const OP_IMAGE_QUERY_SIZE: u32 = 104;
+const OP_BITCAST: u32 = 124;
 const OP_IADD: u32 = 128;
-const OP_ISUB: u32 = 130;
-const OP_SELECT: u32 = 169;
-const OP_IEQUAL: u32 = 170;
-const OP_UGREATER_THAN: u32 = 172;
-const OP_SGREATER_THAN: u32 = 173;
-const OP_ULESS_THAN: u32 = 176;
-const OP_SLESS_THAN: u32 = 177;
-const OP_BITWISE_OR: u32 = 197;
-const OP_BITWISE_XOR: u32 = 198;
-const OP_BITWISE_AND: u32 = 199;
+const OP_IMUL: u32 = 132;
 const OP_ATOMIC_LOAD: u32 = 227;
 const OP_ATOMIC_STORE: u32 = 228;
-const OP_ATOMIC_EXCHANGE: u32 = 229;
-const OP_ATOMIC_COMPARE_EXCHANGE: u32 = 230;
-const OP_ATOMIC_IADD: u32 = 234;
-const OP_ATOMIC_ISUB: u32 = 235;
-const OP_ATOMIC_SMIN: u32 = 236;
-const OP_ATOMIC_UMIN: u32 = 237;
-const OP_ATOMIC_SMAX: u32 = 238;
-const OP_ATOMIC_UMAX: u32 = 239;
-const OP_ATOMIC_AND: u32 = 240;
-const OP_ATOMIC_OR: u32 = 241;
-const OP_ATOMIC_XOR: u32 = 242;
+const DECORATION_BLOCK: u32 = 2;
+const DECORATION_ARRAY_STRIDE: u32 = 6;
+const DECORATION_BINDING: u32 = 33;
+const DECORATION_DESCRIPTOR_SET: u32 = 34;
+const DECORATION_OFFSET: u32 = 35;
+const STORAGE_UNIFORM_CONSTANT: u32 = 0;
 const STORAGE_IMAGE: u32 = 11;
+const STORAGE_BUFFER: u32 = 12;
+const DIM_2D: u32 = 1;
+const SCOPE_DEVICE: u32 = 1;
 
-/// How an atomic's new value comes from the old one and its operand.
-enum Update {
-    Keep,
-    Replace,
-    Binary(u32),
-    /// Keep the old value where `compare(old, value)` holds (min with `<`, max with `>`).
-    Pick(u32),
-    CompareExchange,
+/// The suffix of the word buffer standing in for an image's texels.
+pub const TEXEL_WORDS: &str = "_texel_words";
+
+fn encode(s: &str) -> Vec<u32> {
+    let mut bytes = s.as_bytes().to_vec();
+    bytes.resize(bytes.len() / 4 * 4 + 4, 0);
+    bytes.chunks(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect()
 }
 
-fn update(opcode: u32) -> Option<Update> {
-    Some(match opcode {
-        OP_ATOMIC_LOAD => Update::Keep,
-        OP_ATOMIC_STORE | OP_ATOMIC_EXCHANGE => Update::Replace,
-        OP_ATOMIC_IADD => Update::Binary(OP_IADD),
-        OP_ATOMIC_ISUB => Update::Binary(OP_ISUB),
-        OP_ATOMIC_AND => Update::Binary(OP_BITWISE_AND),
-        OP_ATOMIC_OR => Update::Binary(OP_BITWISE_OR),
-        OP_ATOMIC_XOR => Update::Binary(OP_BITWISE_XOR),
-        OP_ATOMIC_UMIN => Update::Pick(OP_ULESS_THAN),
-        OP_ATOMIC_SMIN => Update::Pick(OP_SLESS_THAN),
-        OP_ATOMIC_UMAX => Update::Pick(OP_UGREATER_THAN),
-        OP_ATOMIC_SMAX => Update::Pick(OP_SGREATER_THAN),
-        OP_ATOMIC_COMPARE_EXCHANGE => Update::CompareExchange,
-        _ => return None,
-    })
+#[derive(Default)]
+struct Scan {
+    names: HashMap<u32, String>,
+    pointee: HashMap<u32, (u32, u32)>,
+    var_type: HashMap<u32, u32>,
+    images: HashMap<u32, (u32, u32)>,
+    vectors: HashMap<u32, (u32, u32)>,
+    uint: Option<u32>,
+    sets: HashMap<u32, u32>,
+    bindings: HashMap<u32, u32>,
+    /// Image loads: the variable each loaded.
+    loads: HashMap<u32, u32>,
+    /// Texel pointers: their image variable and coordinate.
+    texels: HashMap<u32, (u32, u32)>,
+    /// Result types inside functions, by first appearance (definitions precede uses).
+    types: HashMap<u32, u32>,
 }
 
-struct Texel {
-    image_pointer: u32,
-    coord: u32,
-    scalar: u32,
+fn scan(words: &[u32]) -> Scan {
+    let mut s = Scan::default();
+    let mut in_function = false;
+    for i in instructions(words) {
+        in_function |= op(i) == OP_FUNCTION;
+        if in_function && i.len() >= 3 {
+            s.types.entry(i[2]).or_insert(i[1]);
+        }
+        match op(i) {
+            OP_NAME if i.len() >= 3 => drop(s.names.insert(i[1], string(&i[2..]))),
+            OP_TYPE_INT if i.len() >= 4 && i[2] == 32 && i[3] == 0 => s.uint = s.uint.or(Some(i[1])),
+            OP_TYPE_VECTOR if i.len() >= 4 => drop(s.vectors.insert(i[1], (i[2], i[3]))),
+            OP_TYPE_IMAGE if i.len() >= 4 => drop(s.images.insert(i[1], (i[2], i[3]))),
+            OP_TYPE_POINTER if i.len() >= 4 => drop(s.pointee.insert(i[1], (i[2], i[3]))),
+            OP_VARIABLE if i.len() >= 4 => drop(s.var_type.insert(i[2], i[1])),
+            OP_DECORATE if i.len() >= 4 && i[2] == DECORATION_DESCRIPTOR_SET => drop(s.sets.insert(i[1], i[3])),
+            OP_DECORATE if i.len() >= 4 && i[2] == DECORATION_BINDING => drop(s.bindings.insert(i[1], i[3])),
+            OP_LOAD if i.len() >= 4 => drop(s.loads.insert(i[2], i[3])),
+            OP_IMAGE_TEXEL_POINTER if i.len() >= 6 => drop(s.texels.insert(i[2], (i[3], i[4]))),
+            _ => {}
+        }
+    }
+    s
+}
+
+/// An image whose texels move to words: its image type and its buffer variable.
+struct Moved {
+    image_type: u32,
+    buffer: u32,
+}
+
+/// Ids the lowering declares once.
+struct Ids {
+    uint: u32,
+    uvec2: u32,
+    zero: u32,
+    scope: u32,
+    array: u32,
+    block: u32,
+    block_pointer: u32,
+    word_pointer: u32,
+}
+
+struct Lowering {
+    bound: u32,
+    out: Vec<u32>,
+}
+
+impl Lowering {
+    fn fresh(&mut self) -> u32 {
+        self.bound += 1;
+        self.bound - 1
+    }
+
+    fn emit(&mut self, opcode: u32, operands: &[u32]) {
+        self.out.extend(inst(opcode, operands));
+    }
+
+    /// A pointer to the word of `coord`'s texel: y × width + x, the width that of `image` (loaded).
+    fn word(&mut self, ids: &Ids, m: &Moved, image: u32, coord: u32, result: Option<u32>) -> u32 {
+        let (size, width, c, x, y, row, at) = (self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh());
+        self.emit(OP_IMAGE_QUERY_SIZE, &[ids.uvec2, size, image]);
+        self.emit(OP_COMPOSITE_EXTRACT, &[ids.uint, width, size, 0]);
+        // Coordinates may be signed (`int2`); the bits are the same.
+        self.emit(OP_BITCAST, &[ids.uvec2, c, coord]);
+        self.emit(OP_COMPOSITE_EXTRACT, &[ids.uint, x, c, 0]);
+        self.emit(OP_COMPOSITE_EXTRACT, &[ids.uint, y, c, 1]);
+        self.emit(OP_IMUL, &[ids.uint, row, y, width]);
+        self.emit(OP_IADD, &[ids.uint, at, row, x]);
+        let pointer = result.unwrap_or_else(|| self.fresh());
+        self.emit(OP_ACCESS_CHAIN, &[ids.word_pointer, pointer, m.buffer, ids.zero, at]);
+        pointer
+    }
+
+    fn declare(&mut self, ids: &Ids, declare_uvec2: bool, moved: &[(u32, Moved)]) {
+        if declare_uvec2 {
+            self.emit(OP_TYPE_VECTOR, &[ids.uvec2, ids.uint, 2]);
+        }
+        self.emit(OP_CONSTANT, &[ids.uint, ids.zero, 0]);
+        self.emit(OP_CONSTANT, &[ids.uint, ids.scope, SCOPE_DEVICE]);
+        self.emit(OP_TYPE_RUNTIME_ARRAY, &[ids.array, ids.uint]);
+        self.emit(OP_TYPE_STRUCT, &[ids.block, ids.array]);
+        self.emit(OP_TYPE_POINTER, &[ids.block_pointer, STORAGE_BUFFER, ids.block]);
+        self.emit(OP_TYPE_POINTER, &[ids.word_pointer, STORAGE_BUFFER, ids.uint]);
+        for (_, m) in moved {
+            self.emit(OP_VARIABLE, &[ids.block_pointer, m.buffer, STORAGE_BUFFER]);
+        }
+    }
 }
 
 pub fn lower_image_atomics(words: &[u32]) -> Vec<u32> {
     if words.len() < HEADER_WORDS {
         return words.to_vec();
     }
-    let mut pointee = HashMap::new();
-    let mut image_pointers = Vec::new();
-    let mut pointer_type = HashMap::new();
-    let mut texels = HashMap::new();
-    let mut bool_type = None;
-    let mut vec4 = HashMap::new();
+    let s = scan(words);
+    let Some(uint) = s.uint.filter(|_| !s.texels.is_empty()) else { return words.to_vec() };
+    let mut l = Lowering { bound: words[3], out: words[..HEADER_WORDS].to_vec() };
+    let mut variables: Vec<u32> = s.texels.values().map(|(v, _)| *v).collect();
+    variables.sort_unstable();
+    variables.dedup();
+    let mut moved: Vec<(u32, Moved)> = Vec::new();
+    for v in variables {
+        let image_type = s.var_type.get(&v).and_then(|p| s.pointee.get(p)).filter(|(class, _)| *class == STORAGE_UNIFORM_CONSTANT).map(|(_, t)| *t);
+        let Some(image_type) = image_type.filter(|t| s.images.get(t) == Some(&(uint, DIM_2D))) else { return words.to_vec() };
+        if !s.names.contains_key(&v) || !s.sets.contains_key(&v) {
+            return words.to_vec();
+        }
+        moved.push((v, Moved { image_type, buffer: l.fresh() }));
+    }
+    let existing = s.vectors.iter().find(|(_, c)| **c == (uint, 2)).map(|(id, _)| *id);
+    let uvec2 = existing.unwrap_or_else(|| l.fresh());
+    let ids = Ids { uint, uvec2, zero: l.fresh(), scope: l.fresh(), array: l.fresh(), block: l.fresh(), block_pointer: l.fresh(), word_pointer: l.fresh() };
+    let find = |v: u32| moved.iter().position(|(id, _)| *id == v);
+    let mut declared = false;
     for i in instructions(words) {
+        let image_of = |at: usize| i.get(at).and_then(|load| s.loads.get(load)).and_then(|v| find(*v));
         match op(i) {
-            OP_TYPE_POINTER if i.len() >= 4 => {
-                pointee.insert(i[1], i[3]);
-                if i[2] == STORAGE_IMAGE {
-                    image_pointers.push(i[1]);
+            OP_TYPE_POINTER if s.pointee.get(&i[1]).is_some_and(|(class, _)| *class == STORAGE_IMAGE) => continue,
+            OP_FUNCTION if !std::mem::replace(&mut declared, true) => l.declare(&ids, existing.is_none(), &moved),
+            OP_NAME if find(i[1]).is_some() => {
+                let m = &moved[find(i[1]).unwrap()].1;
+                l.out.extend_from_slice(i);
+                l.emit(OP_NAME, &[[m.buffer].as_slice(), &encode(&format!("{}{TEXEL_WORDS}", s.names[&i[1]]))].concat());
+                continue;
+            }
+            OP_DECORATE if i.len() >= 4 && i[2] == DECORATION_DESCRIPTOR_SET && find(i[1]).is_some() => {
+                let order = find(i[1]).unwrap();
+                let set = i[3];
+                let last = s.bindings.iter().filter(|(id, _)| s.sets.get(id) == Some(&set)).map(|(_, b)| *b).max().unwrap_or(0);
+                l.out.extend_from_slice(i);
+                l.emit(OP_DECORATE, &[moved[order].1.buffer, DECORATION_DESCRIPTOR_SET, set]);
+                l.emit(OP_DECORATE, &[moved[order].1.buffer, DECORATION_BINDING, last + 1 + order as u32]);
+                if order == 0 {
+                    l.emit(OP_DECORATE, &[ids.block, DECORATION_BLOCK]);
+                    l.emit(OP_MEMBER_DECORATE, &[ids.block, 0, DECORATION_OFFSET, 0]);
+                    l.emit(OP_DECORATE, &[ids.array, DECORATION_ARRAY_STRIDE, 4]);
                 }
+                continue;
             }
-            OP_TYPE_BOOL => bool_type = Some(i[1]),
-            OP_TYPE_VECTOR if i.len() >= 4 && i[3] == 4 => {
-                vec4.insert(i[2], i[1]);
+            OP_IMAGE_TEXEL_POINTER if s.texels.contains_key(&i[2]) => {
+                let (v, coord) = s.texels[&i[2]];
+                let m = &moved[find(v).unwrap()].1;
+                let image = l.fresh();
+                l.emit(OP_LOAD, &[m.image_type, image, v]);
+                l.word(&ids, m, image, coord, Some(i[2]));
+                continue;
             }
-            OP_VARIABLE | OP_ACCESS_CHAIN if i.len() >= 3 => {
-                pointer_type.insert(i[2], i[1]);
+            OP_IMAGE_READ if i.len() >= 5 && image_of(3).is_some() => {
+                let m = &moved[image_of(3).unwrap()].1;
+                let pointer = l.word(&ids, m, i[3], i[4], None);
+                let n = s.vectors.get(&i[1]).map(|(_, n)| *n as usize);
+                let word = if n.is_some() { l.fresh() } else { i[2] };
+                l.emit(OP_ATOMIC_LOAD, &[uint, word, pointer, ids.scope, ids.zero]);
+                if let Some(n) = n {
+                    l.emit(OP_COMPOSITE_CONSTRUCT, &[[i[1], i[2]].as_slice(), &vec![word; n]].concat());
+                }
+                continue;
             }
-            OP_IMAGE_TEXEL_POINTER if i.len() >= 6 => {
-                let scalar = pointee.get(&i[1]).copied().unwrap_or(0);
-                texels.insert(i[2], Texel { image_pointer: i[3], coord: i[4], scalar });
+            OP_IMAGE_WRITE if i.len() >= 4 && image_of(1).is_some() => {
+                let m = &moved[image_of(1).unwrap()].1;
+                let pointer = l.word(&ids, m, i[1], i[2], None);
+                let value = if s.types.get(&i[3]).is_some_and(|t| s.vectors.contains_key(t)) {
+                    let first = l.fresh();
+                    l.emit(OP_COMPOSITE_EXTRACT, &[uint, first, i[3], 0]);
+                    first
+                } else {
+                    i[3]
+                };
+                l.emit(OP_ATOMIC_STORE, &[pointer, ids.scope, ids.zero, value]);
+                continue;
             }
             _ => {}
         }
+        l.out.extend_from_slice(i);
     }
-    if texels.is_empty() {
-        return words.to_vec();
-    }
-    let atomic_on_texel = |i: &[u32]| {
-        if !(OP_ATOMIC_LOAD..=OP_ATOMIC_XOR).contains(&op(i)) {
-            return None;
-        }
-        let pointer_at = if op(i) == OP_ATOMIC_STORE { 1 } else { 3 };
-        i.get(pointer_at).filter(|p| texels.contains_key(p)).map(|_| pointer_at)
-    };
-    let unsupported = instructions(words).any(|i| atomic_on_texel(i).is_some() && update(op(i)).is_none());
-    if unsupported {
-        return words.to_vec();
-    }
-
-    let mut bound = words[3];
-    let mut fresh = || {
-        bound += 1;
-        bound - 1
-    };
-    let mut declare_bool = bool_type.is_none();
-    let bool_type = bool_type.unwrap_or_else(&mut fresh);
-    let mut scalars: Vec<u32> = texels.values().map(|t| t.scalar).collect();
-    scalars.sort_unstable();
-    scalars.dedup();
-    scalars.retain(|s| !vec4.contains_key(s));
-    let mut new_vec4 = Vec::new();
-    for s in scalars {
-        let id = fresh();
-        vec4.insert(s, id);
-        new_vec4.push((s, id));
-    }
-
-    let mut out = words[..HEADER_WORDS].to_vec();
-    for i in instructions(words) {
-        match op(i) {
-            OP_IMAGE_TEXEL_POINTER if texels.contains_key(&i[2]) => continue,
-            OP_TYPE_POINTER if image_pointers.contains(&i[1]) => continue,
-            _ => {}
-        }
-        let Some(at) = atomic_on_texel(i) else {
-            out.extend_from_slice(i);
-            if op(i) == OP_TYPE_INT && i.len() >= 4 {
-                if std::mem::take(&mut declare_bool) {
-                    out.extend(inst(OP_TYPE_BOOL, &[bool_type]));
-                }
-                for (_, id) in new_vec4.iter().filter(|(s, _)| *s == i[1]) {
-                    out.extend(inst(OP_TYPE_VECTOR, &[*id, i[1], 4]));
-                }
-            }
-            continue;
-        };
-        let t = &texels[&i[at]];
-        let image_type = pointer_type.get(&t.image_pointer).and_then(|p| pointee.get(p)).copied().unwrap_or(0);
-        let image = fresh();
-        out.extend(inst(OP_LOAD, &[image_type, image, t.image_pointer]));
-        let value = *i.last().unwrap();
-        if op(i) == OP_ATOMIC_STORE {
-            out.extend(inst(OP_IMAGE_WRITE, &[image, t.coord, value]));
-            continue;
-        }
-        let texel = fresh();
-        out.extend(inst(OP_IMAGE_READ, &[vec4[&t.scalar], texel, image, t.coord]));
-        let old = i[2];
-        out.extend(inst(OP_COMPOSITE_EXTRACT, &[t.scalar, old, texel, 0]));
-        let new = match update(op(i)).unwrap() {
-            Update::Keep => continue,
-            Update::Replace => value,
-            Update::Binary(o) => {
-                let n = fresh();
-                out.extend(inst(o, &[t.scalar, n, old, value]));
-                n
-            }
-            Update::Pick(compare) => {
-                let (keep, n) = (fresh(), fresh());
-                out.extend(inst(compare, &[bool_type, keep, old, value]));
-                out.extend(inst(OP_SELECT, &[t.scalar, n, keep, old, value]));
-                n
-            }
-            Update::CompareExchange => {
-                let (swap, n) = (fresh(), fresh());
-                out.extend(inst(OP_IEQUAL, &[bool_type, swap, old, i[8]]));
-                out.extend(inst(OP_SELECT, &[t.scalar, n, swap, i[7], old]));
-                n
-            }
-        };
-        out.extend(inst(OP_IMAGE_WRITE, &[image, t.coord, new]));
-    }
-    out[3] = bound;
-    out
+    l.out[3] = l.bound;
+    l.out
 }
 
 #[cfg(test)]

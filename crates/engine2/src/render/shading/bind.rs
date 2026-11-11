@@ -7,6 +7,7 @@ use super::defaults;
 use super::layout::Value;
 use super::program::{self, Layouts, Shading};
 use super::shadow_slots;
+use super::texel_words;
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting, shadow};
 use crate::render::{attributes, bindless, buffers as gpu_buffers, fog, fog_volume, samplers, texture};
@@ -209,6 +210,10 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         B::Buffer { ty: wgpu::BufferBindingType::Storage { .. }, min_binding_size, .. } => {
             if let Some(given) = names(s, &b.name).find_map(|n| inputs.gpu_buffer(n)) {
                 return Ok(Resource::Buffer(given));
+            }
+            if let Some(image) = texel_words::image_of(&b.name) {
+                let t = inputs.attributes.iter().find_map(|a| names(s, image).find_map(|n| attributes::texture(*a, n))).and_then(texture::resolve);
+                return t.and_then(|t| texel_words::buffer(gpu, &t)).map(Resource::Buffer).ok_or_else(|| format!("{}: no texture", b.name));
             }
             if names(s, &b.name).any(|n| n == VERTEX_CACHE)
                 && let Some(cache) = crate::render::skin::cache::buffer()

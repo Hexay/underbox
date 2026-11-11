@@ -13,6 +13,7 @@ pub mod program;
 pub mod render_state;
 mod stages;
 pub mod standin;
+pub mod texel_words;
 pub mod vertex;
 pub mod view;
 #[cfg(test)]

@@ -40,6 +40,7 @@ pub use cache::Cache;
 pub use combo::{Combo, ComboSet, INVALID_INDEX};
 pub use compiler::{CompiledStage, Compiler, Variant};
 pub use formats::retarget_storage;
+pub use image_atomics::TEXEL_WORDS;
 pub use include::IncludePaths;
 /// The naga the WGSL comes from, for consumers reading it back (uniform member layouts).
 pub use naga;

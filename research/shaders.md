@@ -138,6 +138,11 @@ Fixed by passes:
   array, not its element (the env-map cube was a wrong suspect: it's sampled, which naga
   unwraps). `bindless_fetch.rs` outlines each such fetch into a function taking the image.
   `ConstOffset` on a fetch is dropped by naga (WGSL's `textureLoad` has none).
+- "unsupported storage class" (CMAA2's `InterlockedExchange`/`InterlockedAdd` on
+  `RWTexture2D<uint>`): DXC emits `OpImageTexelPointer`, whose Image storage class naga rejects.
+  `image_atomics.rs` lowers each atomic on one to a non-atomic image read, the operation, and an
+  image write (racy; the module doc says why CMAA2 tolerates it). An atomic it doesn't know
+  leaves the module unchanged.
 - `UNDERBOX_DUMP_SPV=<dir>` writes the module naga gets per stage (cache misses only).
 
 Remaining failures (`UNDERBOX_CORPUS_ONLY=a,b` runs only matching shaders):
