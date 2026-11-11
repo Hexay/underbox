@@ -76,6 +76,7 @@ fn translate(words: &[u32]) -> Result<Translated, Error> {
     let options = naga::front::spv::Options { adjust_coordinate_space: false, strict_capabilities: false, block_ctx_dump_prefix: None };
     let mut module = naga::front::spv::parse_u8_slice(&bytes, &options).map_err(|e| fail(Phase::SpvIn, chain(&e)))?;
     lower_is_nan(&mut module);
+    lower_vector_logic(&mut module);
     let info = validate(&module).map_err(|m| fail(Phase::Validate, m))?;
     let wgsl = naga::back::wgsl::write_string(&module, &info, naga::back::wgsl::WriterFlags::empty())
         .map_err(|e| fail(Phase::WgslOut, chain(&e)))?;
@@ -95,5 +96,47 @@ fn lower_is_nan(module: &mut naga::Module) {
                 *e = Expression::Binary { op: BinaryOperator::NotEqual, left: argument, right: argument };
             }
         }
+    }
+}
+
+/// HLSL 2018's `||`/`&&` on vectors is per component (screen_space_reflections_cs); naga only
+/// allows the logical operators on scalars, so on bool vectors they become `|`/`&`, which WGSL
+/// defines per component. Neither short-circuits on vectors, so nothing changes meaning.
+fn lower_vector_logic(module: &mut naga::Module) {
+    use naga::{BinaryOperator as Bo, Expression, Handle, TypeInner};
+    fn vector_ops(module: &naga::Module, f: &naga::Function) -> Vec<(Handle<Expression>, Bo)> {
+        // Type resolution rejects the vector form too, so each is rewritten before it's resolved.
+        let mut resolved: Vec<naga::proc::TypeResolution> = Vec::new();
+        let mut out = Vec::new();
+        for (h, e) in f.expressions.iter() {
+            let mut e = e.clone();
+            if let Expression::Binary { op: ref mut op @ (Bo::LogicalOr | Bo::LogicalAnd), left, .. } = e
+                && matches!(resolved[left.index()].inner_with(&module.types), TypeInner::Vector { .. })
+            {
+                *op = if *op == Bo::LogicalOr { Bo::InclusiveOr } else { Bo::And };
+                out.push((h, *op));
+            }
+            let ctx = naga::proc::ResolveContext::with_locals(module, &f.local_variables, &f.arguments);
+            match ctx.resolve(&e, |p| Ok(&resolved[p.index()])) {
+                Ok(r) => resolved.push(r),
+                Err(_) => break,
+            }
+        }
+        out
+    }
+    fn apply(f: &mut naga::Function, ops: Vec<(Handle<Expression>, Bo)>) {
+        for (h, bitwise) in ops {
+            if let Expression::Binary { op, .. } = &mut f.expressions[h] {
+                *op = bitwise;
+            }
+        }
+    }
+    let functions: Vec<_> = module.functions.iter().map(|(h, f)| (h, vector_ops(module, f))).collect();
+    let entries: Vec<_> = module.entry_points.iter().map(|e| vector_ops(module, &e.function)).collect();
+    for (h, ops) in functions {
+        apply(&mut module.functions[h], ops);
+    }
+    for (e, ops) in module.entry_points.iter_mut().zip(entries) {
+        apply(&mut e.function, ops);
     }
 }
