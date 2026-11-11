@@ -1,13 +1,16 @@
 //! Builds third_party/GameNetworkingSockets (static, no ICE) and src/shim.cpp.
-//! Linux: cmake, protobuf (protoc + libprotobuf) and OpenSSL dev packages.
+//! Linux: cmake and OpenSSL dev packages. Protobuf is the system's (protoc + libprotobuf dev) unless
+//! `UNDERBOX_STATIC_PROTOBUF=1`, which builds third_party/protobuf static with PIC (see docs/release.md).
 //! Windows: protobuf from vcpkg (`VCPKG_ROOT`, triplet x64-windows-static-md); crypto is BCrypt.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../third_party/GameNetworkingSockets");
+    let third_party = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../third_party");
+    let root = third_party.join("GameNetworkingSockets");
     assert!(root.join("CMakeLists.txt").exists(), "run `git submodule update --init third_party/GameNetworkingSockets`");
     let windows = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
+    let static_protobuf = !windows && std::env::var("UNDERBOX_STATIC_PROTOBUF").as_deref() == Ok("1");
 
     let mut cfg = cmake::Config::new(&root);
     cfg.define("BUILD_STATIC_LIB", "ON")
@@ -51,6 +54,12 @@ fn main() {
         }
     } else {
         cfg.define("USE_CRYPTO", "OpenSSL");
+        if static_protobuf {
+            let prefix = build_protobuf(&third_party.join("protobuf"));
+            // GNS finds it in config mode, and its protoc generates the .pb.cc (same reason as on Windows).
+            cfg.define("CMAKE_PREFIX_PATH", &prefix).define("Protobuf_PROTOC_EXECUTABLE", prefix.join("bin/protoc"));
+            println!("cargo:rustc-link-search=native={}", prefix.join("lib").display());
+        }
     }
     let dst = cfg.build();
     // Multi-config generators (MSVC) put the library in a per-profile subdirectory.
@@ -68,13 +77,15 @@ fn main() {
         .file("src/shim.cpp")
         .compile("gns_shim");
 
-    // TODO(release): static protobuf on Linux too; libprotobuf.so's soname ties the binary to the build
-    // distro. Distro libprotobuf.a isn't -fPIC (can't go in a cdylib), so that means building it.
     if windows {
         println!("cargo:rustc-link-lib=static=libprotobuf");
+    } else if static_protobuf {
+        println!("cargo:rustc-link-lib=static=protobuf");
     }
     let libs: &[&str] = if windows {
         &["ws2_32", "crypt32", "winmm", "iphlpapi", "bcrypt", "advapi32", "dbghelp"]
+    } else if static_protobuf {
+        &["ssl", "crypto", "stdc++", "pthread"]
     } else {
         &["protobuf", "ssl", "crypto", "stdc++", "pthread"]
     };
@@ -83,4 +94,21 @@ fn main() {
     }
     println!("cargo:rerun-if-changed=src/shim.cpp");
     println!("cargo:rerun-if-env-changed=VCPKG_ROOT");
+    println!("cargo:rerun-if-env-changed=UNDERBOX_STATIC_PROTOBUF");
+}
+
+/// Builds and installs libprotobuf (static, PIC, no zlib) and protoc; returns the install prefix.
+/// Its own out dir: the GNS build already owns `$OUT_DIR/build`.
+fn build_protobuf(src: &Path) -> PathBuf {
+    assert!(src.join("CMakeLists.txt").exists(), "run `git submodule update --init third_party/protobuf`");
+    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("protobuf");
+    cmake::Config::new(src)
+        .out_dir(&out)
+        .profile("Release")
+        .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
+        .define("CMAKE_INSTALL_LIBDIR", "lib")
+        .define("protobuf_BUILD_TESTS", "OFF")
+        .define("protobuf_BUILD_SHARED_LIBS", "OFF")
+        .define("protobuf_WITH_ZLIB", "OFF")
+        .build()
 }
