@@ -1,7 +1,8 @@
 #!/bin/sh
 # Boot a real game from a checkout (Facepunch/sandbox, apetavern/grubs, sbox-public's samples) on our
 # libengine2; print evidence lines and a PASS/FAIL summary.
-# usage: [MODE=server|join|host|grubs|render|play|sound] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
+# usage: [MODE=server|join|host|grubs|walker|render|play|sound] [MAP=<map>] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
+#   MAP     passed as `+game <sbproj> <map>`: what a MapInstance with UseMapFromLaunch loads
 #   server  dedicated server on the scene until its bodies settle and it has idled
 #   join    the server plus a second instance joining it with +connect; PASS when the client's own player
 #           stands on the floor. The client gets an offline package record for the local checkout
@@ -9,6 +10,8 @@
 #   host    a headless client hosting the scene; START_CMD runs once it settles
 #   grubs   host on scenes/beach.scene with START_CMD=gr_ffa_next_state (Grubs' "start the round");
 #           PASS when terrain and equipment load
+#   walker  join on sbox-walker's own map (MAP defaults to scenes/scenemap.scene); PASS adds the joined
+#           player standing on the map's floor (docs/walker.md)
 #   render  host; its last frame goes to $OUT/frame.png
 #   play    a client in a real SDL window on Xvfb, driven by XTest (tools/game/play.sh): hold W, then turn
 #           the mouse. PLAY_VIA=join (default): PASS when the dedicated server sees the joined player move
@@ -28,6 +31,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 CHECKOUT=$(cd -- "${1:?usage: tools/game.sh <checkout> [scene]}" && pwd)
 MODE=${MODE:-server}
 PLAY_VIA=${PLAY_VIA:-join}
+if [ "$MODE" = walker ]; then MODE=join WALKER=1 MAP=${MAP-scenes/scenemap.scene}; fi
 case $MODE in
     server) IDLE=15 ;;
     join) IDLE=90 ;;

@@ -14,6 +14,9 @@ case $MODE in
         check "server accepted the client" '[^]]+\] is connected' "$LOG"
         check "server sees the client's player standing" 'GAME:PLAYER_STANDING .*local=False.*' "$LOG"
         check "client's own player stands" 'GAME:PLAYER_STANDING .*local=True.*' "$CLIENT"
+        if [ "${WALKER:-0}" = 1 ]; then
+            check "the joined player stands on walker's map" 'GAME:PLAYER_STANDING .*local=False.* on=Box.*' "$LOG"
+        fi
         ;;
     grubs)
         compile_clean "$LOG" client
