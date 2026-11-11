@@ -20,13 +20,17 @@ unsafe extern "C" fn print(level: i32, msg: *const c_char) {
     eprintln!("gns[{level}] {}", unsafe { CStr::from_ptr(msg) }.to_string_lossy());
 }
 
-#[test]
-fn loopback_connect_send_receive() {
+// run_callbacks drains one process-wide queue: concurrent tests would steal each other's statuses.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    SERIAL.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// A listen socket and a connected client: (listen socket, client end, server end, statuses seen).
+fn connected_pair() -> (u32, u32, u32, Vec<Status>) {
     init().unwrap();
-    set_debug_output(4, Some(print));
     set_config_int(config::IP_ALLOW_WITHOUT_AUTH, 1);
-    // Managed's SteamNetworkMessage reads the first 208 bytes in place (through m_nUserData).
-    assert!(message_struct_size() >= 208);
     // GNS refuses port 0; borrow a free one from the OS.
     let free = std::net::UdpSocket::bind("[::]:0").unwrap().local_addr().unwrap().port();
     let sock = listen_ip(free);
@@ -35,10 +39,26 @@ fn loopback_connect_send_receive() {
     let port = addr.rsplit(':').next().unwrap();
     let client = connect_ip(&format!("127.0.0.1:{port}"));
     assert_ne!(client, 0);
-
     let mut seen = Vec::new();
-    pump(&mut seen, |s| s.iter().filter(|s| s.state == state::CONNECTED).count() == 2);
+    pump(&mut seen, |s| s.iter().any(|s| s.conn == client && s.state == state::CONNECTED)
+        && s.iter().any(|s| s.listen_socket == sock && s.state == state::CONNECTED));
     let server_side = seen.iter().find(|s| s.listen_socket == sock && s.state == state::CONNECTED).unwrap().conn;
+    (sock, client, server_side, seen)
+}
+
+/// Queue `count` reliable messages of `size` bytes on `conn` at once; the send results.
+fn burst(conn: u32, count: usize, size: i32) -> Vec<i64> {
+    let mut msgs: Vec<_> = (0..count).map(|_| allocate_message(conn, size, send::RELIABLE)).collect();
+    unsafe { send_messages(&mut msgs) }
+}
+
+#[test]
+fn loopback_connect_send_receive() {
+    let _serial = serial();
+    set_debug_output(4, Some(print));
+    // Managed's SteamNetworkMessage reads the first 208 bytes in place (through m_nUserData).
+    assert!(message_struct_size() >= 208);
+    let (sock, client, server_side, mut seen) = connected_pair();
     let pg = create_poll_group();
     assert!(set_poll_group(server_side, pg));
 
@@ -67,5 +87,22 @@ fn loopback_connect_send_receive() {
     pump(&mut seen, |s| s.iter().any(|s| s.conn == server_side && s.state == state::CLOSED_BY_PEER));
     assert!(close(server_side, 0, None, false));
     assert!(destroy_poll_group(pg));
+    assert!(close_listen(sock));
+}
+
+// A joining client's handshake queues every string table at once (a game's code archive alone is
+// hundreds of KB); with GNS's 512 KB default send buffer the overflow is refused, not queued.
+#[test]
+fn reliable_burst_needs_a_bigger_send_buffer() {
+    let _serial = serial();
+    let (sock, client, _, _) = connected_pair();
+    let refused = burst(client, 6, 200 * 1024);
+    assert!(refused.contains(&-25), "expected LimitExceeded past the default buffer: {refused:?}");
+    assert!(close_listen(sock));
+
+    set_config_int(config::SEND_BUFFER_SIZE, 64 * 1024 * 1024);
+    let (sock, client, _, _) = connected_pair();
+    let sent = burst(client, 6, 200 * 1024);
+    assert!(sent.iter().all(|&r| r > 0), "{sent:?}");
     assert!(close_listen(sock));
 }

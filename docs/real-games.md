@@ -6,8 +6,18 @@ read their files take the folders from an env var and skip without it.
 
 ## Running
 
-`tools/game.sh <checkout> [scene]` (optional, not in verify.sh). See its header for modes.
+`[MODE=server|join|grubs|render] tools/game.sh <checkout> [scene]` (optional, not in verify.sh).
+Each mode ends with PASS/FAIL lines quoting the log line that proves each check, then `RESULT:`.
 
+| Mode | Command | Takes | Passes when |
+|---|---|---|---|
+| server | `tools/game.sh /srv/agents/cache/sandbox-6322a2a5` | ~40 s | the zoo compiles, a dropped controller stands, `GAME:END` |
+| join | `MODE=join tools/game.sh /srv/agents/cache/sandbox-6322a2a5` | ~7 min | the server's player and the joined client's own player both stand |
+| grubs | `MODE=grubs tools/game.sh /srv/agents/work/grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
+| render | `MODE=render tools/game.sh <checkout>` | not timed | `GAME:END`, last frame in `$OUT/frame.png` |
+
+- Clients render on lavapipe. `UNDERBOX_RENDER=empty` fails a client at its swap chain ("Couldn't
+  create the swap chain for GameWindow"), so it can't make a client headless.
 - Runs happen in a reflinked copy under `/srv/agents/cache/underbox-real-games/`. The copy gets
   `tools/game/RealGameWatch.cs` (a component logging `GAME:*` markers) and the startup scene, with
   `PackageReferences` and `MapList` emptied (`tools/game/prepare.py`).
@@ -21,6 +31,9 @@ read their files take the folders from an env var and skip without it.
 Sandbox HEAD `397952f3` doesn't compile against sbox-public `2643ebd6`: `PlayerController` has no
 `ShowArmsInFirstPerson` / `UseFirstPersonAnimation`. Its parent `6322a2a5` compiles. Export it
 with `git -C /srv/agents/work/sandbox archive 6322a2a5 | tar -x -C <cache dir>`.
+sbox-public `1a845a09` ("PlayerController - First Person Body & Shadows", 10 commits past the pin)
+adds both members, so the matching pair is sandbox `397952f3` + sbox-public `1a845a09`. Its 116
+changed files touch no `.def` or interop file. The pin hasn't moved.
 
 ## What runs
 
@@ -28,10 +41,12 @@ with `git -C /srv/agents/work/sandbox archive 6322a2a5 | tar -x -C <cache dir>`.
 |---|---|---|
 | Zoo, dedicated server | passes | 0 compile errors, no missing components, no stubs hit. 15 bodies: 12 settle, 3 fall forever. The origin trace hits the floor. `GAME:END` reached in about 37 s. |
 | Stand on the floor | passes (host side) | A PlayerController dropped from 64 units reports `GAME:STANDING on=Block v=0`. |
-| Client joins | blocked without a patch | See [Join](#join). |
+| Client joins | passes | No patch, no download. The client finds `facepunch.sandbox` offline, gets the game code from the server and spawns. The server logs `GAME:PLAYER_STANDING owner=Player local=False Player@3,-1,0 on=Block v=0`. See [Join](#join). |
+| Joined client stands (client side) | blocked, renderer lane | The client's frames stop right after its player spawns: the same `sprite_cs` hang as [Client frame](#client-frame). |
 | Client renders the zoo | partly | Frames render until the player spawns. Then the GPU hangs in `sprite_cs`. See [Client frame](#client-frame). |
 | Shipped `.shader_c` | read | 26 of 28 files load from their embedded HLSL. Every VS and PS compiles with DXC. See [Shaders](#shaders). |
-| Grubs | partly | Code compiles. `beach.scene` loads on a server and on a host client. All 40 `.geq_c/.sdflayer_c/.surface_c/.vsnap_c` read. No round starts, so no terrain gets built. |
+| Grubs | partly | Code compiles. `beach.scene` loads on a server and on a host client. All 40 `.geq_c/.sdflayer_c/.surface_c/.vsnap_c` read. |
+| Grubs round | passes | `gr_ffa_next_state` starts Free For All: `Sdf2DChunk=100`, physics `bodies=5 shapes=50`, `Grub=2`, `Equipment=29`, with `geq=30 sdflayer=9` loaded. The terrain renders untextured. See [Grubs](#grubs). |
 
 ### Falling props
 
@@ -42,19 +57,63 @@ models. Model compiling isn't ours (closed), so all 15 to 20 renderers show erro
 
 ### Join
 
-The client connects over our transport and the handshake works. It then stops at "Package
-facepunch.sandbox wasn't found!" and disconnects cleanly.
+How a joining client finds the game:
 
-- A dedicated server announces its game as `facepunch.sandbox` (`GetIdent(false, true)`, no
-  `#local`).
-- The client calls `Package.FetchAsync`, which the proxy refuses. `FetchOffline` then has nothing.
-- The developer-host shortcut is `IsDeveloperHost = Application.IsEditor` only.
-- Adding `#local` to the server's ident hits an NRE in `LocalPackage.UpdateFromPackage`
-  (`TryGetCached` returns true with a null package). An org of `local` doesn't help either:
-  `FetchAsync` returns null for it.
+1. The server's `ServerInfo` names the package as `facepunch.sandbox` (`GetIdent(false, true)`, no
+   `#local`). The client runs `LoadGamePackageAsync` and then `Package.FetchAsync`.
+2. `FetchAsync` is Refit `GET /package/get/2/{ident}` against `https://public.facepunch.com/sbox`,
+   hard-coded in `Sandbox.Services`. No env var or launch arg moves it. The dead proxy makes it
+   throw, so it falls back to `FetchOffline`.
+3. `FetchOffline` reads the ServiceCache file `.source2/cache/services/package.<org>.<ident>.json`,
+   a `PackageDto`.
+4. Installing that `RemotePackage` downloads its manifest from `Version.ManifestUrl`.
+   `Utility.Web.DownloadJson` returns null on a network error instead of throwing, so the cached
+   `manifest.<id>` fallback never runs and the URL has to answer.
+5. Listed files resolve from `download/assets/` (`AssetDownloadCache`). Only existence is checked,
+   not the CRC. A remote game needs a `.bin/*.cll` code archive.
 
-Getting past this needs a managed patch, such as engine-shim's `IsDeveloperHost`, or the published
-package. Neither is allowed here, so it stops at this point.
+The option chosen is to seed the cache, with no patch and no download. `tools/game/offline_package.py`
+writes the DTO from the checkout's `.sbproj`, a placeholder code archive and a one-file manifest.
+`boot-client.sh SEED=` lays these over the client's game dir for one boot, and a loopback
+`http.server` answers the manifest URL. Only that client gets `NO_PROXY=127.0.0.1`. Nothing is
+relayed and nothing leaves the host. The real game code comes from the server, which always sends a
+local project's archive in its `CodeArchive` table (`GameInstanceDll.AddArchiveToCodeArchiveTable`).
+That archive replaces the placeholder by assembly name.
+
+The ruled-out alternatives:
+- `IsDeveloperHost` is `Application.IsEditor` only, so it needs a managed patch (engine-shim's route).
+- Adding `#local` to the server's ident hits an NRE in `LocalPackage.UpdateFromPackage`.
+- An org of `local` makes `FetchAsync` return null.
+
+**Root cause found on the way:** the client got the package but no game types, and every
+component was missing. Managed `Networking.Bootstrap` sets 64 MB send and receive buffers through
+`SteamNetworkingUtils.SetConfig`. That call reaches Steam's utils, or nothing when offline, and
+never reaches GNS. So GNS kept its 512 KB default send buffer, and the handshake's table burst
+(mostly the code archive) was refused with `LimitExceeded`, a result `send_messages` dropped.
+engine2 now applies the same values to GNS when it starts (`net/mod.rs`) and logs refused sends.
+The gns test `reliable_burst_needs_a_bigger_send_buffer` covers it.
+
+The client still can't report standing on its own side, because it hangs after its player spawns
+(see [Client frame](#client-frame)).
+
+## Grubs
+
+A round starts from the host with ConCmd `gr_ffa_next_state` (`FreeForAll.NextStateCmd`), which
+moves the state from Lobby to `Start()`. The lobby UI's own start button needs
+`Connection.All.Count > 1`. `MODE=grubs` hosts `beach.scene` in a client. Once the scene settles,
+the watcher runs the command from its `StartCommand` property (`START_CMD=` overrides it).
+
+The round then:
+- spawns 2 Grubs with their equipment;
+- builds the terrain from the `.sdflayer` resources: 100 `Sdf2DChunk`, plus physics bodies made
+  in code, which have no Collider components;
+- sets the state to Playing.
+
+The frame shows the generated terrain with the sky behind it, untextured and with no Grub models
+(models are expected to be missing). The terrain is untextured because `gr_foreground.shader` and
+`gr_foreground_scorch.shader` get placeholders: a sampler in the bind group and a sampler feature
+fail wgpu validation (renderer lane). `new_water.shader` fails in DXC on a redefined
+`SrgbGammaToLinear`. Nothing in the round needed an engine fix.
 
 ### Client frame
 
@@ -101,8 +160,7 @@ What's left, and why:
 - No HUD visible yet; not triaged.
 - `downsample_spd` skips (Rg32Float mip through an Rgba32Float view), and CMAA2's indirect
   passes are no-ops, so it never blends (docs/renderer.md, Next).
-- Grubs: `gr_foreground*` placeholder shaders fail GPU validation and `new_water.shader` fails
-  to compile; not triaged.
+- Grubs' untextured terrain and `new_water.shader` ([Grubs](#grubs)): not triaged.
 
 ## Shaders
 
@@ -163,3 +221,4 @@ KV3, which `kv3bin` decodes) and a `SNAP` block. Check them with
   [Shaders](#shaders).
 - **Render:** `Texture.Clear` on plain textures, as described in [Client frame](#client-frame);
   the `sprite_cs` hang and the grey frame, as described in [Rendering](#rendering).
+- **Networking:** GNS never got managed's Bootstrap socket config, as described in [Join](#join).

@@ -22,6 +22,7 @@ fn ready() -> bool {
         Ok(()) => {
             // Without Steam there's no certificate authority to vouch for either end.
             gns::set_config_int(gns::config::IP_ALLOW_WITHOUT_AUTH, 1);
+            apply_bootstrap_config();
             true
         }
         Err(e) => {
@@ -29,6 +30,27 @@ fn ready() -> bool {
             false
         }
     })
+}
+
+/// Managed's `Networking.Bootstrap` values. Its `SteamNetworkingUtils.SetConfig` calls reach Steam's
+/// utils (or nothing, offline), never GNS; without them a join's table burst outgrows GNS's 512 KB
+/// default send buffer and the overflow is refused (see gns tests `reliable_burst_*`).
+fn apply_bootstrap_config() {
+    use gns::config::*;
+    const MB64: i32 = 64 * 1024 * 1024;
+    for (key, value) in [
+        (SEND_BUFFER_SIZE, MB64),
+        (RECV_BUFFER_SIZE, MB64),
+        (RECV_MAX_MESSAGE_SIZE, MB64),
+        (RECV_BUFFER_MESSAGES, 65536),
+        (TIMEOUT_CONNECTED, 120_000),
+        (SEND_RATE_MIN, 1 << 30),
+        (SEND_RATE_MAX, 1 << 30),
+    ] {
+        if !gns::set_config_int(key, value) {
+            log_error(&format!("networking: config {key}={value} refused"));
+        }
+    }
 }
 
 fn log_error(msg: &str) {

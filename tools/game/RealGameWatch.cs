@@ -5,14 +5,18 @@ using System.Linq;
 /// <summary>
 /// Injected into a scratch copy of a real game by tools/game.sh. Logs `GAME:` markers once a second:
 /// what the scene holds, when its bodies settle, and whether a PlayerController dropped onto the
-/// floor comes to rest there. Logs `GAME:END` after idling IdleSeconds past the settle.
+/// floor comes to rest there. On the host, runs StartCommand once things settle. Any player pawn a
+/// connection owns that comes to rest logs `GAME:PLAYER_STANDING`, on the host and on the client.
+/// Logs `GAME:END` after idling IdleSeconds past the settle.
 /// </summary>
 public sealed class RealGameWatch : Component
 {
 	[Property] public int IdleSeconds { get; set; } = 15;
+	[Property] public string StartCommand { get; set; } = "";
 
 	const int SettledSeconds = 3;
 	const int StandingSeconds = 5;
+	const int ReportAfterStartSeconds = 10;
 	const float DropHeight = 64f;
 
 	TimeSince lastTick;
@@ -21,15 +25,18 @@ public sealed class RealGameWatch : Component
 	int settled;
 	int idle;
 	int standing;
+	int sinceStart = -1;
 	bool reportedSettled;
 	bool reportedStanding;
 	bool ended;
+	readonly Dictionary<PlayerController, int> ownedStanding = new();
+	readonly HashSet<PlayerController> ownedReported = new();
 
 	static void Mark( string what ) => Log.Info( $"GAME:{what}" );
 
 	protected override void OnStart()
 	{
-		Mark( $"START server={Application.IsDedicatedServer} idle={IdleSeconds}" );
+		Mark( $"START server={Application.IsDedicatedServer} host={Networking.IsHost} idle={IdleSeconds}" );
 	}
 
 	void ReportBodies( List<Rigidbody> bodies )
@@ -56,6 +63,34 @@ public sealed class RealGameWatch : Component
 		Mark( $"DROP at z={go.WorldPosition.z:0}" );
 	}
 
+	// What a round built: resources by extension and the scene's components by type.
+	void ReportContents()
+	{
+		var resources = ResourceLibrary.GetAll<GameResource>()
+			.GroupBy( r => System.IO.Path.GetExtension( r.ResourcePath ?? "" ).TrimStart( '.' ) )
+			.OrderBy( g => g.Key ).Select( g => $"{g.Key}={g.Count()}" );
+		Mark( $"RESOURCES {string.Join( " ", resources )}" );
+		// Scene.GetAllComponents<Component>() is empty: its type index has no entry for the base type.
+		var components = Scene.GetAllObjects( false ).SelectMany( o => o.Components.GetAll() )
+			.GroupBy( c => c.GetType().Name ).OrderByDescending( g => g.Count() ).Select( g => $"{g.Key}={g.Count()}" );
+		Mark( $"COMPONENTS {string.Join( " ", components )}" );
+		// Bodies made straight from code (e.g. Sdf2DChunk's terrain) have no Collider component.
+		var physics = Scene.PhysicsWorld.Bodies.ToList();
+		Mark( $"PHYSICS bodies={physics.Count} shapes={physics.Sum( b => b.ShapeCount )}" );
+	}
+
+	void TrackOwnedPlayers( List<PlayerController> players )
+	{
+		foreach ( var p in players.Where( p => p.Network.Owner is not null && !ownedReported.Contains( p ) ) )
+		{
+			var still = p.IsOnGround && p.Velocity.Length < 5;
+			ownedStanding[p] = still ? ownedStanding.GetValueOrDefault( p ) + 1 : 0;
+			if ( ownedStanding[p] < StandingSeconds ) continue;
+			ownedReported.Add( p );
+			Mark( $"PLAYER_STANDING owner={p.Network.Owner.DisplayName} local={!p.IsProxy} {Describe( p )}" );
+		}
+	}
+
 	protected override void OnFixedUpdate()
 	{
 		if ( ended || lastTick < 1 ) return;
@@ -75,6 +110,7 @@ public sealed class RealGameWatch : Component
 			+ $" connections={Connection.All.Count} " + string.Join( "; ", players.Select( Describe ) ) );
 
 		if ( ++ticks == 4 ) ReportBodies( bodies );
+		TrackOwnedPlayers( players );
 
 		// A body falling forever never sleeps; it is counted in `fallen`, not waited on.
 		settled = awake - below <= 0 ? settled + 1 : 0;
@@ -82,10 +118,19 @@ public sealed class RealGameWatch : Component
 		{
 			reportedSettled = true;
 			Mark( $"SETTLED bodies={bodies.Count} fallen={below}" );
-			DropController();
+			// A client's controller would be a local object nobody else sees: only the host drops one.
+			if ( Networking.IsHost ) DropController();
+			if ( Networking.IsHost && !string.IsNullOrWhiteSpace( StartCommand ) )
+			{
+				Mark( $"COMMAND {StartCommand}" );
+				ConsoleSystem.Run( StartCommand );
+				sinceStart = 0;
+			}
 		}
 
 		if ( !reportedSettled ) return;
+
+		if ( sinceStart >= 0 && ++sinceStart == ReportAfterStartSeconds ) ReportContents();
 
 		if ( dropped.IsValid() && !reportedStanding )
 		{
@@ -100,6 +145,7 @@ public sealed class RealGameWatch : Component
 		if ( ++idle >= IdleSeconds )
 		{
 			ended = true;
+			if ( sinceStart < ReportAfterStartSeconds ) ReportContents();
 			Mark( "END" );
 		}
 	}
