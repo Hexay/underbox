@@ -76,7 +76,7 @@ mod tests {
         let (w, h, data) = texture("dev/helper/testgrid_color.tga").unwrap();
         assert_eq!((w, h, data.len()), (GRID_SIZE, GRID_SIZE, (GRID_SIZE * GRID_SIZE * 4) as usize));
         assert!(texture("materials/dev/helper/testgrid_color.vtex_c").is_some());
-        assert!(texture("materials/default/default_color.tga").is_none());
+        assert_eq!(texture("materials/default/default_color.tga"), Some((1, 1, vec![187, 187, 187, 255])));
         assert_eq!(texture("materials/default/default_normal.tga"), Some((1, 1, vec![128, 128, 128, 255])));
         // A cell interior differs from its neighbour, and edges are darker than both.
         let at = |x: u32, y: u32| data[((y * GRID_SIZE + x) * 4) as usize];
