@@ -56,15 +56,17 @@ These values are our choice, since no source constrains them:
 - Light per froxel: ambient × `IndirectStrength`, the sun × `FogStrength`, and up to 16 local lights
   × `FogStrength` with a radial falloff; a spot also fades smoothly from its inner to its outer
   cone. `Scattering` scales the result.
-- The sun's term is shadowed: one tap of its shadow map (`lighting/shadow.rs`) per froxel, with a
-  1e-3 depth bias; points outside the map are lit. Only the native path has a map;
-  `fog_managed.rs` doesn't yet read managed's cascades (reverse-Z, matrices in `DirectionalLightCB`).
+- The sun's term is shadowed: a 4x4-texel tent (bilinear-weighted 3x3 PCF) of its shadow map per
+  froxel, with a 1e-3 depth bias; points outside the map are lit. A single tap banded at the
+  shadow's edge. The native path uses ours (`lighting/shadow.rs`); the managed path uses managed's
+  cascade 0 only (`shadow::managed_sun_shadow`: reverse-Z, world → uv in `DirectionalLightCB`
+  words 8..24), so fog past cascade 0 is unshadowed.
 - Temporal blend: each froxel's lighting (in-scattered rgb, density) is 0.3 this frame and 0.7
   the nearest froxel of last frame's grid at the same world point, reprojected through last
   frame's view. Points outside last frame's grid take this frame's alone. History is kept per
   target (the view's colour target, or managed's `OutScatteringTexture`) in `fog_march.rs`.
 
-Not done: shadowed in-scattering on the managed path, the baked indirect texture (`SetParams`'
+Not done: managed cascades past 0, the baked indirect texture (`SetParams`'
 second argument), local lights' shadows, and dithering (`g_vVolFogDitherScaleBias` stays zero).
 
 ## Outdoor frame's teal edges

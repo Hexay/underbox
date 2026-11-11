@@ -43,8 +43,18 @@ struct Light {
 @group(0) @binding(5) var lighting: texture_storage_3d<rgba16float, write>;
 @group(0) @binding(6) var sun_shadow_map: texture_depth_2d;
 
-// 1 where the sun reaches `world`; points outside the map count as lit. One tap per froxel: the
-// temporal blend and the slice integration soften the edge.
+fn shadow_tap(texel: vec2i, depth: f32) -> f32 {
+    let size = vec2i(textureDimensions(sun_shadow_map));
+    let stored = textureLoad(sun_shadow_map, clamp(texel, vec2i(0), size - 1), 0);
+    // counts.w: 1 a map where nearer is smaller, 2 a reverse-Z one (managed's cascades).
+    if p.counts.w == 2u {
+        return select(0.0, 1.0, depth >= stored - 1e-3);
+    }
+    return select(0.0, 1.0, depth <= stored + 1e-3);
+}
+
+// The fraction of the sun reaching `world`; points outside the map count as lit. A 4x4-texel tent
+// (bilinear weights over a 3x3 PCF), since a single tap bands at the shadow's edge.
 fn sun_visibility(world: vec3f) -> f32 {
     if p.counts.w == 0u {
         return 1.0;
@@ -53,8 +63,18 @@ fn sun_visibility(world: vec3f) -> f32 {
     if any(s.xy < vec2f(0.0)) || any(s.xy >= vec2f(1.0)) || s.z < 0.0 || s.z > 1.0 {
         return 1.0;
     }
-    let texel = vec2u(s.xy * vec2f(textureDimensions(sun_shadow_map)));
-    return select(0.0, 1.0, s.z <= textureLoad(sun_shadow_map, texel, 0) + 1e-3);
+    let at = s.xy * vec2f(textureDimensions(sun_shadow_map)) - 0.5;
+    let base = vec2i(floor(at));
+    let f = fract(at);
+    var wx = array<f32, 4>(1.0 - f.x, 1.0, 1.0, f.x);
+    var wy = array<f32, 4>(1.0 - f.y, 1.0, 1.0, f.y);
+    var lit = 0.0;
+    for (var j = 0; j < 4; j++) {
+        for (var i = 0; i < 4; i++) {
+            lit += wx[i] * wy[j] * shadow_tap(base + vec2i(i - 1, j - 1), s.z);
+        }
+    }
+    return lit / 9.0;
 }
 
 // `current` blended with the froxel last frame had at `world`, reprojected through its
