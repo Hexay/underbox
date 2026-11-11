@@ -15,11 +15,13 @@ pub mod dxc;
 mod formats;
 pub mod include;
 pub mod reflect;
+mod rematerialize;
 pub mod row_major;
 mod scan;
 pub mod shader;
 pub mod spirv;
 pub mod translate;
+mod word_buffers;
 
 // hassle-rs's `com` dependency calls the registry API without linking it.
 #[cfg(windows)]
