@@ -20,11 +20,14 @@ UNTIL=${UNTIL-frame: [^ ]+ #${STOP_FRAME:-300} }
 GRACE=${GRACE:-2}
 OUT=${OUT:-$ROOT/target/client}
 mkdir -p "$OUT"
+# see tools/boot-server.sh (truncate first)
+for f in client.out client.log frames.tsv; do : > "$OUT/$f"; done
 t0=$(date +%s.%N)
 lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
 sh "$ROOT/tools/submodules.sh"
-GAME=$(sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
+GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
+trap 'rm -f "$GAME/.underbox-lease.$$"' EXIT
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 sh "$ROOT/tools/install-engine2.sh" "$GAME"
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)

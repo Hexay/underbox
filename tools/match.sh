@@ -11,10 +11,18 @@ LOG=$OUT/server.log
 PORT=${PORT:-$(sh "$ROOT/tools/worktree-port.sh" 0)}
 mkdir -p "$OUT"
 
+rc=0
 OUT=$OUT UNTIL='MATCH:END' GRACE=1 sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- \
-    +game "$ROOT/corpus/orbmatch/.sbproj" +port "$PORT" > "$OUT/boot.txt" 2>&1 || true
+    +game "$ROOT/corpus/orbmatch/.sbproj" +port "$PORT" > "$OUT/boot.txt" 2>&1 || rc=$?
+if [ $rc -ne 0 ]; then
+    echo "FAIL boot (exit $rc) before the server ran:"; grep -vE '^[[:space:]]*(>>>|=|$)' "$OUT/boot.txt" | tail -n 4
+fi
+if ! grep -q 'MATCH:END' "$LOG" && grep -qE '^exit: ' "$OUT/boot.txt"; then
+    echo "FAIL server stopped early ($(grep -E '^exit: ' "$OUT/boot.txt"); $(grep -oE 'server [0-9.]+s' "$OUT/boot.txt"))"
+    grep -E 'DllNotFound|cannot open shared|FATAL|terminate called' "$LOG" | cut -c1-200 | head -n 3 || true
+fi
 
-fail=0
+fail=$((rc != 0))
 check() {
     if grep -qE "MATCH:$1" "$LOG"; then echo "PASS $2"; else echo "FAIL $2"; fail=1; fi
 }
