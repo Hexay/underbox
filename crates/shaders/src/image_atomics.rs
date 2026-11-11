@@ -2,11 +2,12 @@
 //! pointer class), which DXC emits for `Interlocked*` on a `RWTexture2D<uint>` (CMAA2's
 //! `InterlockedExchange( Cmaa2BlendHeads[quad], .. )`), and naga's own image atomics return no
 //! value. This pass moves such an image's texels into a storage buffer of words named
-//! `<image>_texel_words` (row-major, the image's width per row) and makes every texel access in
+//! `<image>_texel_words` (row-major, [`row_words`] per row) and makes every texel access in
 //! the module a real atomic on its word: atomics keep their op, image reads and writes become
-//! atomic loads and stores. The image stays bound for its size but is never written, so only
-//! shaders that reach it through this pass may share its texels; the renderer binds one buffer
-//! per texture under that name (engine2 `shading/texel_words.rs`).
+//! atomic loads and stores. The image stays bound for its size. Other modules reach the same
+//! texels through the image itself (CMAA2 clears its heads in one pass and walks them in
+//! another), so the renderer copies the image into the words before each dispatch and back
+//! after (engine2 `shading/texel_words.rs`); the row pitch is what a buffer-texture copy needs.
 //! A module whose image isn't a 2D `uint` one or has no name to bind by is returned unchanged.
 
 use crate::spirv::{HEADER_WORDS, inst, instructions, op, string};
@@ -35,6 +36,7 @@ const OP_IMAGE_QUERY_SIZE: u32 = 104;
 const OP_BITCAST: u32 = 124;
 const OP_IADD: u32 = 128;
 const OP_IMUL: u32 = 132;
+const OP_BITWISE_AND: u32 = 199;
 const OP_ATOMIC_LOAD: u32 = 227;
 const OP_ATOMIC_STORE: u32 = 228;
 const DECORATION_BLOCK: u32 = 2;
@@ -50,6 +52,14 @@ const SCOPE_DEVICE: u32 = 1;
 
 /// The suffix of the word buffer standing in for an image's texels.
 pub const TEXEL_WORDS: &str = "_texel_words";
+
+/// Words per row of an image `width` texels wide: rows padded to 256 bytes, wgpu's
+/// buffer-texture copy alignment.
+pub const fn row_words(width: u32) -> u32 {
+    (width + ROW_ALIGN) & !ROW_ALIGN
+}
+
+const ROW_ALIGN: u32 = 63;
 
 fn encode(s: &str) -> Vec<u32> {
     let mut bytes = s.as_bytes().to_vec();
@@ -112,6 +122,8 @@ struct Ids {
     uvec2: u32,
     zero: u32,
     scope: u32,
+    align: u32,
+    align_mask: u32,
     array: u32,
     block: u32,
     block_pointer: u32,
@@ -133,11 +145,14 @@ impl Lowering {
         self.out.extend(inst(opcode, operands));
     }
 
-    /// A pointer to the word of `coord`'s texel: y × width + x, the width that of `image` (loaded).
+    /// A pointer to the word of `coord`'s texel: y × [`row_words`] + x, of `image`'s (loaded) width.
     fn word(&mut self, ids: &Ids, m: &Moved, image: u32, coord: u32, result: Option<u32>) -> u32 {
-        let (size, width, c, x, y, row, at) = (self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh());
+        let (size, texels, padded, width) = (self.fresh(), self.fresh(), self.fresh(), self.fresh());
+        let (c, x, y, row, at) = (self.fresh(), self.fresh(), self.fresh(), self.fresh(), self.fresh());
         self.emit(OP_IMAGE_QUERY_SIZE, &[ids.uvec2, size, image]);
-        self.emit(OP_COMPOSITE_EXTRACT, &[ids.uint, width, size, 0]);
+        self.emit(OP_COMPOSITE_EXTRACT, &[ids.uint, texels, size, 0]);
+        self.emit(OP_IADD, &[ids.uint, padded, texels, ids.align]);
+        self.emit(OP_BITWISE_AND, &[ids.uint, width, padded, ids.align_mask]);
         // Coordinates may be signed (`int2`); the bits are the same.
         self.emit(OP_BITCAST, &[ids.uvec2, c, coord]);
         self.emit(OP_COMPOSITE_EXTRACT, &[ids.uint, x, c, 0]);
@@ -155,6 +170,8 @@ impl Lowering {
         }
         self.emit(OP_CONSTANT, &[ids.uint, ids.zero, 0]);
         self.emit(OP_CONSTANT, &[ids.uint, ids.scope, SCOPE_DEVICE]);
+        self.emit(OP_CONSTANT, &[ids.uint, ids.align, ROW_ALIGN]);
+        self.emit(OP_CONSTANT, &[ids.uint, ids.align_mask, !ROW_ALIGN]);
         self.emit(OP_TYPE_RUNTIME_ARRAY, &[ids.array, ids.uint]);
         self.emit(OP_TYPE_STRUCT, &[ids.block, ids.array]);
         self.emit(OP_TYPE_POINTER, &[ids.block_pointer, STORAGE_BUFFER, ids.block]);
@@ -186,7 +203,7 @@ pub fn lower_image_atomics(words: &[u32]) -> Vec<u32> {
     }
     let existing = s.vectors.iter().find(|(_, c)| **c == (uint, 2)).map(|(id, _)| *id);
     let uvec2 = existing.unwrap_or_else(|| l.fresh());
-    let ids = Ids { uint, uvec2, zero: l.fresh(), scope: l.fresh(), array: l.fresh(), block: l.fresh(), block_pointer: l.fresh(), word_pointer: l.fresh() };
+    let ids = Ids { uint, uvec2, zero: l.fresh(), scope: l.fresh(), align: l.fresh(), align_mask: l.fresh(), array: l.fresh(), block: l.fresh(), block_pointer: l.fresh(), word_pointer: l.fresh() };
     let find = |v: u32| moved.iter().position(|(id, _)| *id == v);
     let mut declared = false;
     for i in instructions(words) {

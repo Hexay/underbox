@@ -37,7 +37,7 @@ fn pipeline(gpu: &render::Gpu) -> &'static wgpu::ComputePipeline {
     })
 }
 
-fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, range): (f32, f32), counts: [u32; 2], history: Option<&History>) -> Vec<u8> {
+fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, range): (f32, f32), counts: [u32; 2], history: Option<&History>, shadow: Option<Mat4>) -> Vec<u8> {
     let view = View { view_proj, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
     let asymmetry = settings.anisotropy.clamp(-1.0, 1.0) * MAX_ASYMMETRY;
     let (sun_direction, sun_color) = sources.sun.unwrap_or((Vec3::Z, Vec3::ZERO));
@@ -49,10 +49,35 @@ fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, 
     out.extend(bytes(sources.ambient.extend(0.0).to_array()));
     out.extend(bytes(sun_direction.extend(0.0).to_array()));
     out.extend(bytes(sun_color.extend(0.0).to_array()));
-    out.extend([counts[0], counts[1], u32::from(history.is_some()), 0].iter().flat_map(|c| c.to_le_bytes()));
+    out.extend([counts[0], counts[1], u32::from(history.is_some()), u32::from(shadow.is_some())].iter().flat_map(|c| c.to_le_bytes()));
     out.extend(bytes(history.map_or(Mat4::IDENTITY, |h| h.world_to_clip).to_cols_array()));
     out.extend(bytes(history.map_or([1.0, 0.0, 1.0, 0.0], |h| [CURRENT_WEIGHT, h.near, h.range, 0.0])));
+    out.extend(bytes(shadow.unwrap_or(Mat4::IDENTITY).to_cols_array()));
     out
+}
+
+/// The sun's world → shadow-map transform and map, when it has one on the GPU.
+fn shadow_map(sources: &Sources) -> Option<(Mat4, Arc<crate::render::texture::Texture>)> {
+    let s = sources.shadow?;
+    Some((s.world_to_shadow, crate::render::texture::resolve(s.map).filter(|t| t.gpu.is_some())?))
+}
+
+/// Bound in place of a shadow map; the march never reads it (`counts.w` is 0).
+fn no_shadow(gpu: &render::Gpu) -> &'static wgpu::TextureView {
+    static NONE: OnceLock<wgpu::TextureView> = OnceLock::new();
+    NONE.get_or_init(|| {
+        let desc = wgpu::TextureDescriptor {
+            label: Some("no fog shadow"),
+            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        };
+        gpu.device.create_texture(&desc).create_view(&Default::default())
+    })
 }
 
 fn light_bytes(sources: &Sources) -> (Vec<u8>, u32) {
@@ -96,7 +121,9 @@ pub fn march(volumes: &[Volume], view_proj: Mat4, sources: &Sources, settings: &
     let mut histories = HISTORIES.lock().unwrap();
     let previous = (history != 0).then(|| histories.get(&history)).flatten();
     let (lights, light_count) = light_bytes(sources);
-    let uniform = params_bytes(view_proj, sources, settings, (near, range), [volumes.len() as u32, light_count], previous);
+    let shadow = shadow_map(sources);
+    let uniform = params_bytes(view_proj, sources, settings, (near, range), [volumes.len() as u32, light_count], previous, shadow.as_ref().map(|s| s.0));
+    let shadow_view = shadow.as_ref().and_then(|s| s.1.gpu.as_ref()).map_or_else(|| no_shadow(gpu), |t| &t.view);
     let volume_data = bytes(volumes.iter().flat_map(Volume::floats));
     let buffer = |label, usage, contents: &[u8]| gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some(label), contents, usage });
     let (uniform, volume_data, lights) = (buffer("fog params", wgpu::BufferUsages::UNIFORM, &uniform), buffer("fog volumes", wgpu::BufferUsages::STORAGE, &volume_data), buffer("fog lights", wgpu::BufferUsages::STORAGE, &lights));
@@ -116,6 +143,7 @@ pub fn march(volumes: &[Volume], view_proj: Mat4, sources: &Sources, settings: &
             entry(3, wgpu::BindingResource::TextureView(&view)),
             entry(4, wgpu::BindingResource::TextureView(previous_lighting)),
             entry(5, wgpu::BindingResource::TextureView(&lighting)),
+            entry(6, wgpu::BindingResource::TextureView(shadow_view)),
         ],
     });
     let mut encoder = gpu.device.create_command_encoder(&Default::default());

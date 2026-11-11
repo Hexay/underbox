@@ -51,6 +51,35 @@ impl Material {
         let vectors = p.vectors.iter().map(|(k, v)| (k.clone(), glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, v.vec.w))).collect();
         (p.textures.clone(), vectors)
     }
+
+    /// How a translucent material blends (its `F_TRANSLUCENT` / `F_ADDITIVE_BLEND` feature);
+    /// `None` for an opaque one.
+    pub fn blend(&self) -> Option<Blend> {
+        if self.feature("F_ADDITIVE_BLEND") || self.feature("F_ADDITIVE") {
+            Some(Blend::Additive)
+        } else {
+            self.feature("F_TRANSLUCENT").then_some(Blend::Alpha)
+        }
+    }
+
+    /// Whether the `.vmat` (or managed) turned feature `name` on.
+    pub fn feature(&self, name: &str) -> bool {
+        self.params.lock().unwrap().vectors.get(name).is_some_and(|v| v.vec.x != 0.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Blend {
+    Alpha,
+    Additive,
+}
+
+impl Blend {
+    pub fn state(self) -> render::wgpu::BlendState {
+        use render::wgpu::{BlendComponent, BlendFactor as F, BlendOperation as Op, BlendState};
+        let dst = if self == Blend::Additive { F::One } else { F::OneMinusSrcAlpha };
+        BlendState { color: BlendComponent { src_factor: F::SrcAlpha, dst_factor: dst, operation: Op::Add }, alpha: BlendComponent { src_factor: F::One, dst_factor: F::OneMinusSrcAlpha, operation: Op::Add } }
+    }
 }
 
 /// A strong handle the caller owns to the material at a resource path.
@@ -123,6 +152,10 @@ pub(crate) fn set_texture(h: Ref, name: &str, t: Texture) {
     replaced.into_iter().for_each(resource::destroy_handle);
 }
 
+pub(crate) fn set_vector(h: Ref, name: &str, v: Vector4) {
+    params(h, |p| p.vectors.insert(name.to_owned(), v));
+}
+
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::i_material2, Material);
     bind!(r, system::CREATE_RAW_MATERIAL, create_raw);
@@ -152,9 +185,7 @@ pub fn register(r: &mut Registry) {
         let shader = || (n == "shader").then(|| on(h, |mat| mat.shader.clone())).filter(|s| !s.is_empty());
         StrRet::from(params(h, |p| p.strings.get(&n).cloned()).or_else(shader).unwrap_or_else(|| string(d)))
     });
-    bind!(r, m::SET_1, |h, n, v| params(h, |p| {
-        p.vectors.insert(string(n), v);
-    }));
+    bind!(r, m::SET_1, |h, n, v| set_vector(h, &string(n), v));
     bind!(r, m::GET_VECTOR4, |h, n| params(h, |p| p.vectors.get(&string(n)).copied().unwrap_or_default()));
     bind!(r, m::SET_2, |h, n, t| set_texture(h, &string(n), t));
     bind!(r, m::GET_TEXTURE, |h, n| params(h, |p| p.textures.get(&string(n)).copied()).map_or(Texture::NULL, copy));
@@ -184,6 +215,10 @@ pub fn register(r: &mut Registry) {
 
 /// Attribute `t` of a material: its render attributes, else a vector param of that name.
 fn value(h: Ref, t: abi::StringToken) -> Option<f32> {
+    // Managed's `Material.Flags.IsTranslucent` reads this.
+    if t == abi::StringToken::of("translucent") {
+        return Some(on(h, |mat| f32::from(u8::from(mat.blend().is_some()))));
+    }
     let own = on(h, |mat| attributes::token_value(mat.attributes, t).map(|v| v.x));
     own.or_else(|| params(h, |p| p.vectors.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, v)| v.vec.x)))
 }

@@ -161,7 +161,8 @@ pub fn token_value(r: Ref, t: StringToken) -> Option<glam::Vec4> {
     })
 }
 
-/// Set `name` as native code would: an int, bool, combo, float or buffer value.
+/// Set `name` as native code would: an int, bool, combo, float, buffer, matrix, texture or int
+/// vector value.
 pub fn set(r: Ref, name: &str, value: Value) {
     let kind = match value {
         Value::Int(_) => Kind::Int,
@@ -170,6 +171,8 @@ pub fn set(r: Ref, name: &str, value: Value) {
         Value::Float(_) => Kind::Float,
         Value::Buffer(_) => Kind::Buffer,
         Value::Matrix(_) => Kind::Matrix,
+        Value::Texture(..) => Kind::Texture,
+        Value::IntVector4(_) => Kind::IntVector4,
         _ => return,
     };
     on(r, |a| a.set(kind, StringToken::of(name), value));
