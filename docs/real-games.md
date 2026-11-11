@@ -14,10 +14,10 @@ verify.sh). Each mode ends with PASS/FAIL lines quoting the log line that proves
 
 | Mode | Command | Takes | Passes when |
 |---|---|---|---|
-| server | `tools/game.sh /srv/agents/work/sandbox` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
-| join | `MODE=join tools/game.sh /srv/agents/work/sandbox` | ~1.5 min | the server's player and the joined client's own player both stand |
+| server | `tools/game.sh ../sandbox` | ~40 s | the game loads and compiles, a dropped controller stands, `GAME:END` |
+| join | `MODE=join tools/game.sh ../sandbox` | ~1.5 min | the server's player and the joined client's own player both stand |
 | host | `MODE=host [START_CMD=..] tools/game.sh <checkout>` | ~1.5 min | a headless client hosts the game to `GAME:END` |
-| grubs | `MODE=grubs tools/game.sh /srv/agents/work/grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
+| grubs | `MODE=grubs tools/game.sh ../grubs` | ~2 min | a round starts and terrain, Grubs and equipment exist |
 | render | `MODE=render tools/game.sh <checkout>` | ~1.5 min | `GAME:END`, last frame in `$OUT/frame.png` |
 | play | `MODE=play [PLAY_VIA=host] tools/game.sh <checkout>` | ~2 min | a client in an X11 window takes XTest input; see [Playing in a window](#playing-in-a-window) |
 | sound | `MODE=sound [START_CMD=..] tools/game.sh <checkout>` | ~1.5 min | voices start and audible blocks reach the device; see [Sound](#sound) |
@@ -36,7 +36,7 @@ Project quirks the scratch copy smooths over (`tools/game.sh`, `tools/game/prepa
 
 - Clients render on lavapipe. `UNDERBOX_RENDER=empty` fails a client at its swap chain ("Couldn't
   create the swap chain for GameWindow"), so it can't make a client headless.
-- Runs happen in a reflinked copy under `/srv/agents/cache/underbox-real-games/`. The copy gets
+- Runs happen in a reflinked scratch copy (`COPIES` in `tools/game.sh`). The copy gets
   `tools/game/RealGameWatch.cs` (a component logging `GAME:*` markers) and the startup scene, with
   `PackageReferences` and `MapList` emptied (`tools/game/prepare.py`).
 - Package downloads stay off: the game process gets `HTTP(S)_PROXY=http://127.0.0.1:9`. Every
