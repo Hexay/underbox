@@ -89,7 +89,8 @@ fn compiled_material_has_shader_params_and_textures() {
     assert_eq!(m.shader, "shaders/complex.shader");
     let names: Vec<_> = m.vectors.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(names, ["g_flModelTintAmount", "g_vColorTint"]);
-    assert_eq!(m.textures.len(), 1);
+    let attrs: Vec<_> = m.textures.iter().map(|(a, _)| a.as_str()).collect();
+    assert_eq!(attrs, ["g_tColor", "g_tNormal", "g_tAmbientOcclusion"], "real's defaults fill the unset ones");
     let t = crate::render::texture::resolve(m.textures[0].1).unwrap();
     assert!(!crate::resource::Resource::is_error(&*t), "made from the compiled texture");
 }
