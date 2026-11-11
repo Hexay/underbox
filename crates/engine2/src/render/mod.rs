@@ -25,6 +25,7 @@ pub mod samplers;
 pub mod scene;
 mod scene_utils;
 pub mod shading;
+pub mod sheet;
 pub mod skin;
 pub mod stats;
 pub(crate) mod submits;
@@ -59,6 +60,7 @@ pub fn register(r: &mut Registry) {
     readback::register(r);
     scene::register(r);
     scene_utils::register(r);
+    sheet::register(r);
     skin::register(r);
     bind!(r, abi::slots::image_loader::CONVERT_IMAGE_FORMAT, image_convert::convert);
     stats::register(r);

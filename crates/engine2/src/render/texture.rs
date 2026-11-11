@@ -26,6 +26,7 @@ pub struct Texture {
     pub gpu: Option<render::Texture>,
     error: bool,
     guid: Guid,
+    pub sheet: super::sheet::Sheet,
 }
 
 impl Resource for Texture {
@@ -66,8 +67,7 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = LOADED.find_or_insert(&name, || {
         if let Some(c) = crate::compiled::texture::load(&name) {
-            let gpu = gpu_texture(&name, &c.config, &c.data);
-            return Texture { desc: Box::new(desc_of(&c.config)), config: c.config, name: name.clone(), data: Mutex::new(c.data), gpu, error: false, guid };
+            return decoded(&name, c, guid);
         }
         let generated = super::texture_generated::texture(&name);
         let error = generated.is_none();
@@ -75,9 +75,16 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
         let mut config = TextureCreationConfig_t::default();
         (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (w as _, h as _, 1, 1);
         let gpu = gpu_texture(&name, &config, &data);
-        Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(data), gpu, error, guid }
+        Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(data), gpu, error, guid, sheet: Default::default() }
     });
     resource::new_handle(texture)
+}
+
+/// A compiled texture's pixels and sprite sheet as a texture.
+pub(crate) fn decoded(name: &str, c: crate::compiled::texture::Decoded, guid: Guid) -> Texture {
+    let gpu = gpu_texture(name, &c.config, &c.data);
+    let sheet = super::sheet::Sheet::new(c.sheet);
+    Texture { desc: Box::new(desc_of(&c.config)), config: c.config, name: name.into(), data: Mutex::new(c.data), gpu, error: false, guid, sheet }
 }
 
 pub fn resolve(t: Ref) -> Option<Arc<Texture>> {
@@ -142,6 +149,7 @@ pub(crate) fn create(name: Option<&CStr>, _anonymous: bool, config: TextureCreat
         data: Mutex::new(data.to_vec()),
         error: false,
         guid: Guid::default(),
+        sheet: Default::default(),
     };
     resource::new_handle(Arc::new(texture))
 }
@@ -191,11 +199,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, device_slots::COMPUTE_TEXTURE_MEMORY_SIZE, |t| on(t, |t| mem_size(&t.config) as u32));
     bind!(r, device_slots::IS_TEXTURE_RENDER_TARGET, |t| on(t, Texture::is_render_target));
     bind!(r, device_slots::CLEAR_TEXTURE, clear);
-    // Sequences are sprite-sheet animations, read from compiled textures (none load yet).
-    bind!(r, device_slots::GET_SEQUENCE_COUNT, |_| 0);
-    bind!(r, abi::slots::sheet_sequence_t::FRAME_COUNT, |_| 0);
-    bind!(r, abi::slots::sheet_sequence_frame_t::IMAGE_COUNT, |_| 0);
-    bind!(r, abi::slots::sheet_sequence_frame_t::GET_IMAGE, |_, _| Default::default());
     bind!(r, device_slots::GET_TEXTURE_LAST_USED, |_| 0);
     bind!(r, device_slots::MARK_TEXTURE_USED, |_, _| {});
     bind!(r, device_slots::GET_NUM_TEXTURE_LOADS_IN_FLIGHT, || 0);
