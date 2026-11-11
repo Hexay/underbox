@@ -37,9 +37,23 @@ pub enum Op {
     Sin,
     Cos,
     Nop,
-    /// An op we don't evaluate yet (2-way, n-way, eyelids, remap); its rule yields 0.
+    /// Controller n's negative half as 0..1.
+    TwoWay0(usize),
+    /// Controller n's positive half as 0..1.
+    TwoWay1(usize),
+    /// Controller n's value, weighted by a 4-point ramp over a popped controller.
+    NWay(usize),
+    /// DME eyelids; n is the lid split controller.
+    LowerEyelid(usize),
+    UpperEyelid(usize),
+    /// Pops value, then the in and out ranges; pushes the clamped remap.
+    Remap,
+    /// An op code we don't know; its rule yields 0.
     Unsupported(i64),
 }
+
+mod eval;
+pub use eval::{evaluate, remap_clamped};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
@@ -68,9 +82,15 @@ fn op(code: i64, data: i64) -> Op {
         9..=12 => Op::Nop,
         13 => Op::Max,
         14 => Op::Min,
+        15 => Op::TwoWay0(n),
+        16 => Op::TwoWay1(n),
+        17 => Op::NWay(n),
         18 => Op::Combo(n),
         19 => Op::Dominate(n),
+        20 => Op::LowerEyelid(n),
+        21 => Op::UpperEyelid(n),
         22 => Op::Sqrt,
+        23 => Op::Remap,
         24 => Op::Sin,
         25 => Op::Cos,
         26 => Op::Abs,
@@ -96,68 +116,6 @@ pub fn rules(o: &Object) -> Vec<Rule> {
         .collect()
 }
 
-/// Each of `descriptors` flex weights for `values` (one per controller). Without rules a
-/// descriptor follows the controller of the same name.
-pub fn evaluate(rules: &[Rule], controllers: &[Controller], descriptors: &[String], values: &[f32]) -> Vec<f32> {
-    let mut out = vec![0.0f32; descriptors.len()];
-    if rules.is_empty() {
-        for (d, name) in descriptors.iter().enumerate() {
-            out[d] = controllers.iter().position(|c| c.name.eq_ignore_ascii_case(name)).and_then(|c| values.get(c)).copied().unwrap_or(0.0);
-        }
-        return out;
-    }
-    for r in rules {
-        let value = run(&r.ops, values, &out);
-        if let Some(slot) = out.get_mut(r.flex) {
-            *slot = value;
-        }
-    }
-    out
-}
-
-fn run(ops: &[Op], values: &[f32], flex: &[f32]) -> f32 {
-    let mut stack: Vec<f32> = Vec::new();
-    let pop = |s: &mut Vec<f32>| s.pop().unwrap_or(0.0);
-    for &o in ops {
-        let v = match o {
-            Op::Const(c) => c,
-            Op::Fetch1(i) => values.get(i).copied().unwrap_or(0.0),
-            Op::Fetch2(i) => flex.get(i).copied().unwrap_or(0.0),
-            Op::Neg | Op::Sqrt | Op::Abs | Op::Sin | Op::Cos => {
-                let a = pop(&mut stack);
-                match o {
-                    Op::Neg => -a,
-                    Op::Sqrt => a.max(0.0).sqrt(),
-                    Op::Abs => a.abs(),
-                    Op::Sin => a.sin(),
-                    _ => a.cos(),
-                }
-            }
-            Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Max | Op::Min => {
-                let (b, a) = (pop(&mut stack), pop(&mut stack));
-                match o {
-                    Op::Add => a + b,
-                    Op::Sub => a - b,
-                    Op::Mul => a * b,
-                    Op::Div if b.abs() <= 1e-4 => 0.0,
-                    Op::Div => a / b,
-                    Op::Max => a.max(b),
-                    _ => a.min(b),
-                }
-            }
-            Op::Combo(n) => (0..n).map(|_| pop(&mut stack)).product(),
-            Op::Dominate(n) => {
-                let d: f32 = (0..n).map(|_| pop(&mut stack)).product();
-                pop(&mut stack) * (1.0 - d)
-            }
-            Op::Nop => continue,
-            Op::Unsupported(_) => return 0.0,
-        };
-        stack.push(v);
-    }
-    stack.pop().unwrap_or(0.0)
-}
-
 pub fn write_controllers(c: &[Controller]) -> Value {
     list(c.iter().map(|c| obj(vec![("m_szName", text(&c.name)), ("m_szType", text(&c.kind)), ("min", Value::Double(c.min.into())), ("max", Value::Double(c.max.into()))])))
 }
@@ -181,6 +139,12 @@ fn write_op(o: Op) -> Value {
         Op::Sin => ("SIN", 0),
         Op::Cos => ("COS", 0),
         Op::Nop => ("COMMA", 0),
+        Op::TwoWay0(n) => ("2WAY_0", n as i64),
+        Op::TwoWay1(n) => ("2WAY_1", n as i64),
+        Op::NWay(n) => ("NWAY", n as i64),
+        Op::LowerEyelid(n) => ("DME_LOWER_EYELID", n as i64),
+        Op::UpperEyelid(n) => ("DME_UPPER_EYELID", n as i64),
+        Op::Remap => ("REMAPVALCLAMPED", 0),
         Op::Unsupported(c) => return obj(vec![("m_OpCode", int_value(c)), ("m_Data", int_value(0))]),
     };
     obj(vec![("m_OpCode", text(&format!("FLEX_OP_{code}"))), ("m_Data", int_value(data))])
@@ -216,7 +180,15 @@ mod tests {
     #[test]
     fn without_rules_descriptors_follow_controllers_by_name() {
         assert_eq!(evaluate(&[], &[c("blink")], &["BLINK".to_owned(), "other".to_owned()], &[0.75]), [0.75, 0.0]);
-        let unsupported = [Rule { flex: 0, ops: vec![Op::Const(1.0), Op::Unsupported(17)] }];
+        let unsupported = [Rule { flex: 0, ops: vec![Op::Const(1.0), Op::Unsupported(99)] }];
         assert_eq!(evaluate(&unsupported, &[], &["x".to_owned()], &[]), [0.0]);
+    }
+
+    #[test]
+    fn every_op_code_parses_and_round_trips() {
+        let ops = vec![Op::TwoWay0(1), Op::TwoWay1(2), Op::NWay(3), Op::LowerEyelid(4), Op::UpperEyelid(5), Op::Remap];
+        let rules = vec![Rule { flex: 0, ops }];
+        assert_eq!(super::rules(&Object(vec![("m_FlexRules".into(), write_rules(&rules))])), rules);
+        assert_eq!(op(17, 3), Op::NWay(3));
     }
 }

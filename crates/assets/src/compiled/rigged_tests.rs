@@ -31,13 +31,21 @@ fn ragdoll_joints_round_trip_and_compounds_flatten() {
     let sphere = obj(vec![("m_vCenter", floats(&[1.0, 2.0, 3.0])), ("m_flRadius", Value::Double(2.0))]);
     let compound = obj(vec![("m_Capsules", list([capsule.clone()])), ("m_Spheres", list([sphere]))]);
     let desc = obj(vec![("m_nSurfacePropertyIndex", int_value(3)), ("m_nCollisionAttributeIndex", int_value(1)), ("m_Compound", compound)]);
-    let own = obj(vec![("m_Capsule", capsule)]);
+    let own = obj(vec![("m_Capsule", capsule.clone())]);
     let part = obj(vec![("m_rnShape", obj(vec![("m_capsules", list([own])), ("m_compounds", list([desc]))]))]);
     let Value::Object(agg) = obj(vec![("m_parts", list([part]))]) else { unreachable!() };
     let s = &super::physics::from_kv3(&agg).parts[0].shapes;
     assert_eq!(s.capsules.len(), 2, "the part's own capsule plus the compound's");
     assert_eq!((s.capsules[1].3.surface, s.capsules[1].3.attribute), (3, 1), "compound children take its ids");
     assert_eq!((s.spheres[0].0, s.spheres[0].1), ([1.0, 2.0, 3.0], 2.0));
+
+    // Per-child surfaces: ids run spheres first, then capsules.
+    let compound = obj(vec![("m_Capsules", list([capsule.clone()])), ("m_Spheres", list([obj(vec![("m_flRadius", Value::Double(1.0))])])), ("m_CompoundMaterialIndices", Value::Binary(vec![5, 7]))]);
+    let desc = obj(vec![("m_nSurfacePropertyIndex", int_value(3)), ("m_nCollisionAttributeIndex", int_value(1)), ("m_Compound", compound)]);
+    let part = obj(vec![("m_rnShape", obj(vec![("m_compounds", list([desc]))]))]);
+    let Value::Object(agg) = obj(vec![("m_parts", list([part]))]) else { unreachable!() };
+    let s = &super::physics::from_kv3(&agg).parts[0].shapes;
+    assert_eq!((s.spheres[0].2.surface, s.capsules[0].3.surface, s.capsules[0].3.attribute), (5, 7, 1));
 }
 
 #[test]

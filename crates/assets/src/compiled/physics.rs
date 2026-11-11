@@ -123,12 +123,30 @@ fn shapes(o: &Object) -> Shapes {
     objects(o, "m_meshes").for_each(|d| s.add_mesh(kv::object(d, "m_Mesh"), ids(d)));
     for d in objects(o, "m_compounds") {
         let (c, i) = (kv::object(d, "m_Compound"), ids(d));
-        objects(c, "m_Spheres").for_each(|x| s.add_sphere(x, i));
-        objects(c, "m_Capsules").for_each(|x| s.add_capsule(x, i));
-        s.hulls.extend(objects(c, "m_Hulls").map(|h| (vertices(h), i)));
-        objects(c, "m_Meshes").for_each(|x| s.add_mesh(x, i));
+        let materials = compound_materials(c);
+        // Child ids run over spheres, capsules, hulls, then meshes.
+        let mut child = 0usize;
+        let mut next = || {
+            child += 1;
+            materials.get(child - 1).map_or(i, |&m| Ids { surface: m, ..i })
+        };
+        objects(c, "m_Spheres").for_each(|x| s.add_sphere(x, next()));
+        objects(c, "m_Capsules").for_each(|x| s.add_capsule(x, next()));
+        for h in objects(c, "m_Hulls") {
+            s.hulls.push((vertices(h), next()));
+        }
+        objects(c, "m_Meshes").for_each(|x| s.add_mesh(x, next()));
     }
     s
+}
+
+/// A compound's `m_CompoundMaterialIndices`: each child shape's surface index (a byte blob or
+/// an int list).
+fn compound_materials(c: &Object) -> Vec<u32> {
+    match c.get("m_CompoundMaterialIndices") {
+        Some(Value::Binary(b)) => b.iter().map(|&m| u32::from(m)).collect(),
+        _ => kv::ints(c, "m_CompoundMaterialIndices").into_iter().map(|m| m as u32).collect(),
+    }
 }
 
 /// A bind pose: 3 rows of 4, or 12 floats in a row.
