@@ -19,7 +19,7 @@ Harness and rules: docs/differential.md.
 11. **Agreed already. Hinge velocity motors.** Every `HINGE brake` and `drive` marker matched real to
     four decimals before any change: max torque is in kg·in²/s², the target in rad/s, and the motor
     can't exceed its torque over a step. The zoo hoover's motors (speed 0, max 9.2 and 507) are
-    not what keeps it moving on real (see 14).
+    not what keeps it moving on real (the zoo hoover, below).
 12. **Fixed. Hinge springs.** Real solves a spring twice per substep (again after integrating
     positions, Box2D's relax pass); Rapier once. A model of both reproduces each engine to four
     decimals. Before: 5 Hz ζ 0.3 spun 14.16 rad/s after one step (real 13.43), an undamped 1 Hz
@@ -32,7 +32,7 @@ Harness and rules: docs/differential.md.
     (`joint::tests::hinge_friction_does_nothing`). Prismatic and ball-socket friction are unprobed.
 14. **Fixed. Joints give way to their own contacts.** Real's locked axes are soft: `OVERLAP` ends
     0.8 further apart and holds; `CAR` rises 0.75 and sleeps by step 50. Ours held the joint rigid
-    (0.02 apart, jittering; the car 0.04 up). Box2D's 60 Hz ζ 2 fits `OVERLAP` in Rapier but the
+    (0.04 apart, jittering; the car sank 0.04 instead). Box2D's 60 Hz ζ 2 fits `OVERLAP` in Rapier but the
     car creeps along at 5 u/s forever. After (locked-axis softness 80 Hz, ζ 40, `joint/build.rs`;
     `joint/soft_tests.rs`): `OVERLAP` 12.39 against real 12.40, `CAR` 8.769 against 8.747, asleep.
     Ours rises over 20 steps where real takes 5, rests 0.5 back along x, and sleeps by step 100
