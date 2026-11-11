@@ -68,7 +68,12 @@ WGSL, plus reflection and a disk cache. Decisions, each with its reason:
     spills cross-block values into locals and a pointer can't be one (atmosphere_sky, terrain).
 - Source rewrites before DXC: `compat` (Slang-isms, line-preserving) and `word_buffers`
   (`RWStructuredBuffer<S>` with `Interlocked*` on S's fields → a `uint` word buffer, since naga
-  can't make a struct member atomic; occlusion_cull_cs).
+  can't make a struct member atomic; occlusion_cull_cs), and `packed_buffers` (a structured buffer
+  whose element std430 would pad, e.g. a `float3` member, → a `uint` word buffer with packed
+  load/store helpers). Managed and native lay structured buffers out tightly (DX rules), but
+  `-fvk-use-gl-layout` gives them std430: sprite_cs read `SpriteData.Splots` from another field and
+  hung the GPU. The lit shaders' light, shadow, decal and DDGI buffers and the UI batches had the
+  same mismatch. `tests/packed_audit.rs` lists what it rewrites and keeps.
 
   Reflection reports the final (group, binding) of each name, and the renderer binds by name.
 - `isnan(x)` becomes `x != x` because WGSL has no `isnan` (`src/translate.rs`).
