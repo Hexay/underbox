@@ -63,8 +63,8 @@ fn jump_machine() -> (Definition, PoseId) {
     let completed = def.add_value(ValueNode::StateCompleted);
     let jump = clip(&mut def, "jump", false);
     let states = vec![
-        State { name: "Grounded".into(), pose: ground, transitions: vec![Transition { to: 1, condition: b_jump, duration: 0.2 }] },
-        State { name: "Jump".into(), pose: jump, transitions: vec![Transition { to: 0, condition: completed, duration: 0.0 }] },
+        State { name: "Grounded".into(), pose: ground, transitions: vec![Transition { to: 1, condition: b_jump, duration: 0.2 }], events: Default::default() },
+        State { name: "Jump".into(), pose: jump, transitions: vec![Transition { to: 0, condition: completed, duration: 0.0 }], events: Default::default() },
     ];
     let sm = def.add_pose(PoseNode::StateMachine { states, default: 0 });
     def.root = Some(sm);
@@ -102,8 +102,8 @@ fn time_in_state_and_value_math() {
     let b = clip(&mut def, "walk", true);
     let after = def.add_value(ValueNode::TimeInState { cmp: Cmp::Ge, seconds: 0.25 });
     let states = vec![
-        State { name: "A".into(), pose: a, transitions: vec![Transition { to: 1, condition: after, duration: 0.0 }] },
-        State { name: "B".into(), pose: b, transitions: vec![] },
+        State { name: "A".into(), pose: a, transitions: vec![Transition { to: 1, condition: after, duration: 0.0 }], events: Default::default() },
+        State { name: "B".into(), pose: b, transitions: vec![], events: Default::default() },
     ];
     let sm = def.add_pose(PoseNode::StateMachine { states, default: 0 });
     def.root = Some(sm);

@@ -10,12 +10,14 @@ mod ik_node;
 mod random;
 pub mod recording;
 mod smooth;
+pub mod tags;
 mod value;
 
 pub use eval::Instance;
 pub use eval_more::Rig;
 pub use smooth::ease;
 pub use recording::Recording;
+pub use tags::{StateEvents, TagStatus, TagTracker};
 
 use crate::params::{ParamDef, Value};
 use std::sync::Arc;
@@ -190,6 +192,8 @@ pub struct State {
     pub pose: PoseId,
     /// Checked in order; the first whose condition holds is taken.
     pub transitions: Vec<Transition>,
+    /// The tags it raises (see `tags`).
+    pub events: StateEvents,
 }
 
 #[derive(Debug, Clone, PartialEq)]

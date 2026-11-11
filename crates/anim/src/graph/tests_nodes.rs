@@ -98,8 +98,8 @@ fn random_variation_graph() -> Arc<Definition> {
     let pick = def.add_pose(PoseNode::Variation { seed, options, weights: None });
     let rest = clip(&mut def, "idle", true);
     let states = vec![
-        State { name: "pick".into(), pose: pick, transitions: vec![Transition { to: 1, condition: go, duration: 0.0 }] },
-        State { name: "rest".into(), pose: rest, transitions: vec![Transition { to: 0, condition: stay, duration: 0.0 }] },
+        State { name: "pick".into(), pose: pick, transitions: vec![Transition { to: 1, condition: go, duration: 0.0 }], events: Default::default() },
+        State { name: "rest".into(), pose: rest, transitions: vec![Transition { to: 0, condition: stay, duration: 0.0 }], events: Default::default() },
     ];
     def.root = Some(def.add_pose(PoseNode::StateMachine { states, default: 1 }));
     def.into_shared()

@@ -4,7 +4,7 @@
 
 use super::data::{self, ModelData};
 use super::graph;
-use anim::graph::{Instance, Recording};
+use anim::graph::{Instance, Recording, TagTracker};
 use anim::params::Params;
 use anim::sequence::Player;
 use anim::{Pose, Skeleton, Xform};
@@ -23,6 +23,8 @@ pub struct Graph2 {
     pub controller: NativeRef<class::CAnimGraph2Controller>,
     /// Belongs to the controller: replaced with it.
     pub recording: Recording,
+    /// Tag changes since the last `DispatchTagEvents`.
+    pub tags: TagTracker,
 }
 
 pub struct Graph1 {
@@ -147,7 +149,7 @@ impl AnimState {
         let mut instance = Instance::new(def, |slot| data.anim.clip(slot).cloned());
         instance.rig = Some(anim::graph::Rig { skeleton: Arc::new(data.anim.skeleton.clone()), world: Xform::IDENTITY });
         let controller = objects::create(super::controller::Handle(me));
-        self.graph2 = Some(Graph2 { resource, instance, controller, recording: Recording::default() });
+        self.graph2 = Some(Graph2 { resource, instance, controller, recording: Recording::default(), tags: TagTracker::default() });
         true
     }
 
@@ -183,6 +185,7 @@ impl AnimState {
                 let pose = g.instance.update(dt, &bind);
                 g.recording.record(dt, &g.instance.params, character);
                 self.pending.extend(g.instance.take_events());
+                g.tags.observe(&g.instance.active_tags());
                 pose
             }
             (_, Some(clip)) => {

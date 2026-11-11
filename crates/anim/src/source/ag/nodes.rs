@@ -1,5 +1,6 @@
 //! Per-class compilation of `.ag` nodes into graph value and pose nodes.
 
+use super::nodes_more::state_events;
 use super::{Compiler, Scope, f32_of, link, str_of};
 use crate::graph::{Cmp, MathOp, Operand, PoseId, PoseNode, State, Transition, ValueId, ValueNode};
 use crate::params::Value;
@@ -191,7 +192,7 @@ impl Compiler {
         let list = n.get("States").and_then(Json::as_array).cloned().unwrap_or_default();
         let index = |name: &str| list.iter().position(|s| str_of(s, "Name") == name);
         let mut states: Vec<State> =
-            list.iter().map(|s| State { name: str_of(s, "Name").to_owned(), pose: self.graph_result(s.get("Graph"), scope), transitions: Vec::new() }).collect();
+            list.iter().map(|s| State { name: str_of(s, "Name").to_owned(), pose: self.graph_result(s.get("Graph"), scope), transitions: Vec::new(), events: state_events(s) }).collect();
         for conduit in n.get("Conduits").and_then(Json::as_array).cloned().unwrap_or_default() {
             let (Some(from), Some(to)) = (index(str_of(&conduit, "From")), index(str_of(&conduit, "To"))) else { continue };
             let Some(graph) = conduit.get("Graph") else { continue };

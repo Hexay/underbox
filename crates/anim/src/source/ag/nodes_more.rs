@@ -2,12 +2,27 @@
 //! node `Compile` methods hand them to managed's GraphBuilder.
 
 use super::{Compiler, Scope, f32_of, link, str_of, vec3_str};
-use crate::graph::{Easing, LookAt, PoseNode, TwoBoneIk, ValueId, ValueNode, blend2d};
+use crate::graph::{Easing, LookAt, PoseNode, StateEvents, TwoBoneIk, ValueId, ValueNode, blend2d};
 use crate::params::{Target, Value};
 use serde_json::Value as Json;
 
 fn list(n: &Json, key: &str) -> Vec<Json> {
     n.get(key).and_then(Json::as_array).cloned().unwrap_or_default()
+}
+
+/// A state's `Events` and elapsed `TimedEvents` (the editor's `StateEvent`/`TimedStateEvent`).
+pub(super) fn state_events(s: &Json) -> StateEvents {
+    let flag = |e: &Json, k: &str, default: bool| e.get(k).and_then(Json::as_bool).unwrap_or(default);
+    let events = list(s, "Events");
+    let ids = |k: &str, default: bool| events.iter().filter(|e| flag(e, k, default) && !str_of(e, "Id").trim().is_empty()).map(|e| str_of(e, "Id").to_owned()).collect();
+    let is = |e: &Json, k: &str, name: &str, index: i64| matches!(e.get(k), Some(Json::String(s)) if s == name) || e.get(k).and_then(Json::as_i64) == Some(index);
+    let elapsed = list(s, "TimedEvents")
+        .iter()
+        .filter(|e| e.get("Type").is_none() || is(e, "Type", "TimeElapsed", 0))
+        .filter(|e| !str_of(e, "Id").trim().is_empty())
+        .map(|e| (str_of(e, "Id").to_owned(), f32_of(e, "Time", 0.0), is(e, "Operator", "LessThanEqual", 0)))
+        .collect();
+    StateEvents { entry: ids("IsEntry", true), exit: ids("IsExit", false), fully_in: ids("IsFullyInState", false), elapsed }
 }
 
 fn start(n: &Json) -> Option<f32> {

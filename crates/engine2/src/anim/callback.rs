@@ -31,6 +31,19 @@ pub fn animation_events(f: usize, events: &[anim::clip::Fired]) {
     }
 }
 
+/// `AnimTagEventCallback`: `void (char* name, int status)`, once per tag change.
+pub fn tag_events(f: usize, tags: &[(String, anim::graph::TagStatus)]) {
+    if f == 0 {
+        return;
+    }
+    // SAFETY: as above (SceneModel.Events.cs `DispatchTagEvents`).
+    let f: unsafe extern "C" fn(*const std::ffi::c_char, i32) = unsafe { std::mem::transmute(f) };
+    for (tag, status) in tags {
+        let name = std::ffi::CString::new(tag.replace('\0', "")).unwrap_or_default();
+        unsafe { f(name.as_ptr(), *status as i32) }
+    }
+}
+
 /// `LegacyAnimGraphChangedCallback`: `void (IntPtr)`; managed ignores the argument.
 pub fn graph1_changed(f: usize, object: *mut c_void) {
     if f != 0 {

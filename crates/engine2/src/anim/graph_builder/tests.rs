@@ -91,6 +91,14 @@ fn jump_machine() -> B {
     for child in [1, 2] {
         let s = add_node::<class::CStateNode_Definition>(b);
         field!(i16, c_state_node_definition::GET_M_CHILD_NODE_IDX, s, child);
+        if child == 2 {
+            push_int(list::<_, class::CUtlVector_StringID_>(s, "EntryEvents"), intern(b, "takeoff") as i64);
+            push_int(list::<_, class::CUtlVector_StringID_>(s, "ExitEvents"), intern(b, "landing") as i64);
+            let timed = push_item::<_, class::CStateNode_TimedEvent>(list::<_, class::CUtlVector_CStateNode_TimedEvent_>(s, "TimedElapsedEvents"));
+            items::set(timed, "ID", intern(b, "airborne") as i64);
+            items::set(timed, "ComparisonOperator", 1);
+            field!(f32, c_state_node_timed_event::GET_M_TIME_VALUE, timed, 0.1);
+        }
     }
     let t = add_node::<class::CTransitionNode_Definition>(b);
     field!(i16, c_transition_node_definition::GET_M_TARGET_STATE_NODE_IDX, t, 4);
@@ -130,6 +138,9 @@ fn state_machine_transitions_on_bool() {
     let [Transition { to: 1, condition, duration }] = states[0].transitions[..] else { panic!("{:?}", states[0].transitions) };
     assert_eq!((def.values[condition].clone(), duration), (ValueNode::Param(0), 0.25));
     assert!(states[1].transitions.is_empty());
+    let jump = &states[1].events;
+    assert_eq!((&jump.entry[..], &jump.exit[..], &jump.elapsed[..]), (&["takeoff".to_string()][..], &["landing".to_string()][..], &[("airborne".to_string(), 0.1, false)][..]));
+    assert_eq!(states[0].events, Default::default());
 }
 
 #[test]

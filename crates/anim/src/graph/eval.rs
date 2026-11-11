@@ -3,6 +3,7 @@
 
 use super::eval_more::Rig;
 use super::random::{self, Draws};
+use super::tags::MachineStep;
 use super::smooth::{self, Smooth};
 use super::value::{StateCtx, Values};
 use super::{Definition, PoseId, PoseNode, State};
@@ -50,6 +51,8 @@ pub struct Instance {
     /// Clip events passed since the last `take_events`.
     events: Vec<Fired>,
     pub(super) draws: Draws,
+    /// Tags raised by the last update (see `tags`).
+    pub(super) tags: Vec<String>,
 }
 
 impl Instance {
@@ -60,7 +63,7 @@ impl Instance {
         let nodes = vec![NodeState::Idle; def.poses.len()];
         let smooth = vec![Smooth::default(); def.values.len()];
         let draws = Draws::new(random::next_seed(), &def.values);
-        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new(), draws }
+        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new(), draws, tags: Vec::new() }
     }
 
     /// The clip events playing clips passed since the last call.
@@ -89,6 +92,7 @@ impl Instance {
 
     /// Advance by `dt` seconds and return the pose. `bind` is the skeleton's bind pose.
     pub fn update(&mut self, dt: f32, bind: &Pose) -> Pose {
+        self.tags.clear();
         let mut states = std::mem::take(&mut self.smooth);
         smooth::advance(&self.values(StateCtx::default()), &mut states, dt);
         self.smooth = states;
@@ -183,7 +187,8 @@ impl Instance {
             NodeState::Machine(m) => m,
             _ => Machine::default(),
         };
-        if !m.started || m.current >= states.len() {
+        let mut entered = !m.started || m.current >= states.len();
+        if entered {
             m = Machine { started: true, current: default.min(states.len().saturating_sub(1)), ..Machine::default() };
             if let Some(s) = states.get(m.current) {
                 self.reset(s.pose);
@@ -207,14 +212,20 @@ impl Instance {
         // Transitions see the state after this update; the new state starts at weight 0.
         let values = self.values(StateCtx { elapsed: m.elapsed, completed: m.finished });
         let taken = states[m.current].transitions.iter().find(|t| t.to != m.current && t.to < states.len() && values.bool(t.condition));
+        let mut left = None;
         if let Some(t) = taken.cloned() {
-            m = Machine { started: true, current: t.to, from: (t.duration > 0.0).then_some((m.current, 0.0, t.duration)), ..Machine::default() };
+            let old = m.current;
+            m = Machine { started: true, current: t.to, from: (t.duration > 0.0).then_some((old, 0.0, t.duration)), ..Machine::default() };
             self.reset(states[t.to].pose);
             let new = self.eval(states[t.to].pose, 0.0, bind);
             if m.from.is_none() {
                 pose = new.pose;
+                left = Some(old);
             }
+            entered = true;
         }
+        let step = MachineStep { current: m.current, elapsed: m.elapsed, blending_from: m.from.map(|f| f.0), entered, left };
+        self.raise_state_tags(states, &step);
         self.nodes[id] = NodeState::Machine(m);
         Out { pose, finished: m.finished }
     }
