@@ -1,4 +1,4 @@
-//! Body mass, centre and inertia with managed's overrides, plus per-body sleep settings.
+//! Body mass, centre and inertia with managed's overrides.
 //!
 //! Colliders are built massless; a body's mass properties are summed here from its shapes'
 //! densities ([`ShapeMeta`]) and handed to Rapier as the body's additional mass properties, so
@@ -7,7 +7,7 @@
 use crate::filter::ShapeMeta;
 use crate::world::World;
 use rapier3d::math::{Rotation, Vector};
-use rapier3d::prelude::{MassProperties, RigidBodyActivation, RigidBodyHandle};
+use rapier3d::prelude::{MassProperties, RigidBodyHandle};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BodyMass {
@@ -97,22 +97,6 @@ impl World {
         let was = self.set_mass_deferred(id, false);
         self.set_mass_deferred(id, was);
     }
-
-    /// Let the body sleep when slower than `threshold` (inches/s), or never.
-    pub fn set_auto_sleep(&mut self, id: RigidBodyHandle, enabled: bool, threshold: f32) {
-        let unit = self.raw().integration_parameters.length_unit;
-        let Some(rb) = self.body_mut(id) else { return };
-        let activation = rb.activation_mut();
-        if enabled {
-            let defaults = RigidBodyActivation::active();
-            activation.normalized_linear_threshold = if threshold > 0.0 { threshold / unit } else { defaults.normalized_linear_threshold };
-            activation.angular_threshold = defaults.angular_threshold;
-        } else {
-            let never = RigidBodyActivation::cannot_sleep();
-            activation.normalized_linear_threshold = never.normalized_linear_threshold;
-            activation.angular_threshold = never.angular_threshold;
-        }
-    }
 }
 
 #[cfg(test)]
@@ -156,22 +140,5 @@ mod tests {
         let before = world.body(body).unwrap().mass();
         world.build_mass(body);
         assert!(world.body(body).unwrap().mass() > before);
-    }
-
-    #[test]
-    fn auto_sleep_off_keeps_a_body_awake() {
-        let mut world = World::default();
-        let body = cube(&mut world);
-        world.set_auto_sleep(body, false, 0.0);
-        for _ in 0..300 {
-            world.step(1.0 / 60.0, 1);
-        }
-        assert!(!world.body(body).unwrap().is_sleeping());
-        world.set_auto_sleep(body, true, 5.0);
-        let slept = (0..300).any(|_| {
-            world.step(1.0 / 60.0, 1);
-            world.body(body).unwrap().is_sleeping()
-        });
-        assert!(slept);
     }
 }

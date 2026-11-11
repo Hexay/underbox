@@ -10,14 +10,18 @@ mod mass;
 mod rules;
 mod scrape;
 mod shape;
+mod sleep;
 mod trace;
 mod trace_against;
+mod trace_rules;
 mod world;
 
 #[cfg(test)]
 mod contacts_tests;
 #[cfg(test)]
 mod landing_tests;
+#[cfg(test)]
+mod rest_tests;
 
 pub use contacts::{ContactEvent, EventKind};
 pub use filter::{DEFAULT_DENSITY, ShapeMeta, function};
@@ -30,5 +34,6 @@ pub use rapier3d::prelude::{Collider, ColliderHandle as ShapeId, RigidBody, Rigi
 pub use rules::{CollisionRules, Rule};
 pub use scrape::Scrape;
 pub use shape::{Shape, Surface};
+pub use sleep::DEFAULT_SLEEP_THRESHOLD;
 pub use trace::{Hit, Sweep};
 pub use world::{Activity, BodyType, DEFAULT_GRAVITY, INCHES_PER_METRE, World};
