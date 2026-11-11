@@ -20,8 +20,9 @@ that file rather than porting it, so closed shaders and shaders with source shad
   Fog.hlsl's tests and paint the default cubemap over the frame.
 - `g_matViewToProjection` carries only `[3].w`, which Fog.hlsl reads to tell orthographic views
   from perspective ones.
-- Graphics programs compile at combo 0, so `volumetric_fog.fxc` gates on `g_bVolumetricFogEnabled`
-  at run time instead of `D_ENABLE_VOLUMETRIC_FOG`.
+- `volumetric_fog.fxc` also gates on `g_bVolumetricFogEnabled` at run time, so a draw that never
+  sets `D_ENABLE_VOLUMETRIC_FOG` (programs build at the combos the draw's attributes set) still
+  gets the grid.
 
 ## Volumetric grid
 
@@ -42,8 +43,9 @@ the view's own grid, or opaque black (no fog); the white default texture would w
 - The rebuilt world-to-clip spans the froxel corner rays with w as view depth, which is what
   managed's `g_mVolFogFromWorld` gives shading; its z only keeps it invertible.
 - Managed scales `Scattering` by 0.0022 for its shader; the stand-in undoes that.
-- Not on the managed path: point and spot lights' in-scattering (they live in managed's binned
-  light buffer), the second pass's temporal blend.
+- Local lights come from managed's `BinnedLightBufferV2`, read back from the GPU: the first
+  `NumLights.x + .y` (`ViewLightingConfigV2`) 156-byte `GpuLight`s, each colour × its fog
+  strength. A light with a cone (word 29 non-zero) is a spot (`fog_managed::lights_from`).
 
 These values are our choice, since no source constrains them:
 
@@ -52,10 +54,15 @@ These values are our choice, since no source constrains them:
 - `Anisotropy` scales a Henyey-Greenstein asymmetry of at most 0.6 (managed's default is 1, a
   singularity if taken literally). The phase is scaled so an isotropic medium scatters 1.
 - Light per froxel: ambient × `IndirectStrength`, the sun × `FogStrength`, and up to 16 local lights
-  × `FogStrength` with a radial falloff. `Scattering` scales the result.
+  × `FogStrength` with a radial falloff; a spot also fades smoothly from its inner to its outer
+  cone. `Scattering` scales the result.
+- Temporal blend: each froxel's lighting (in-scattered rgb, density) is 0.3 this frame and 0.7
+  the nearest froxel of last frame's grid at the same world point, reprojected through last
+  frame's view. Points outside last frame's grid take this frame's alone. History is kept per
+  target (the view's colour target, or managed's `OutScatteringTexture`) in `fog_march.rs`.
 
 Not done: shadowed in-scattering, the baked indirect texture (`SetParams`' second argument),
-temporal history and dithering (`g_vVolFogDitherScaleBias` stays zero).
+and dithering (`g_vVolFogDitherScaleBias` stays zero).
 
 ## Outdoor frame's teal edges
 

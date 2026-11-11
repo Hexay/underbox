@@ -83,6 +83,16 @@ and marks the GPU hung. While hung, waits only poll, read-backs return zeros and
 (every submit goes through it) drops its commands, so the client keeps ticking; the first poll that
 finds the queue drained clears the mark. `crates/render/tests/hang.rs` is the repro.
 
+### Slow first frames
+
+Pipeline builds, shader translations and GPU waits of a second or more log `wgpu: slow: <what>
+took N s` (`render::gpu_timed`). hud's first UI frame stalled ~16 s: perf showed it in unoptimized naga
+walking expression arenas while the engine re-read `ui_cssbox_batched`'s cached WGSL
+(`shading/stages.rs`, `shading/layout.rs`; libengine2 has no frame pointers, so the caller is
+unconfirmed), not in lavapipe. The workspace builds naga at `opt-level = 3` in dev; what's left is ~1.4 s of
+lavapipe's LLVM compiling that pipeline. To find the next one, `perf record -g -p <client>` during
+the gap.
+
 ## From scene objects to draw calls
 
 The scene system already keeps worlds and objects (`engine2/src/scene`). Drawing follows the
@@ -150,8 +160,10 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
 
 - `Program::new(gpu, label, wgsl, bind_group_layouts, entries)` takes one WGSL module;
   `Program::from_stages(gpu, label, vertex: Stage, fragment: Option<Stage>, layouts)` takes the
-  translator's separate vertex and pixel modules. One `Program` per (shader, static combo, dynamic
-  combo); spec constants are baked in before naga, so each combo is its own module.
+  translator's separate vertex and pixel modules. One `Program` per shader and each stage's
+  (static, dynamic) combo ids, taken from the combos the draw's attributes set (`SetComboValue`,
+  unset ones at their minimum; `shading::program`); spec constants are baked in before naga, so
+  each combo is its own module.
 - Bind by name from reflection, never by binding number: the SPIR-V passes renumber (bindless
   arrays move off set 1 binding 16; a texture sampled both ways gains `<name>_cmp`).
 - Pipelines are cached per `Program` and `PipelineKey` (target formats, vertex buffer layouts,
@@ -315,14 +327,12 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 1. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
    CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
-2. Fog's shadowed in-scattering, baked indirect, and the managed path's local lights and
-   temporal blend (docs/fog.md); `GetSheetInfo` and the shader sheet path (`sheet_sampling.fxc`
-   is a stub).
-3. CMAA2 still skips: its `InterlockedExchange` on `RWTexture2D<uint>` becomes
-   `OpImageTexelPointer`, which naga's SPIR-V front end rejects ("unsupported storage class").
-   Needs a SPIR-V pass to plain image load/store (racy but CMAA2 tolerates it) or a buffer.
-   Indirect dispatch itself works (`compute/indirect_tests.rs`).
-4. hud's first UI frame (~#15) stalls lavapipe for up to ~30 s, cause untriaged (pipeline
-   creation is the suspect); verify waits for frame 40.
-5. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
+2. Fog's shadowed in-scattering and baked indirect (docs/fog.md); `GetSheetInfo` and the shader
+   sheet path (`sheet_sampling.fxc` is a stub).
+3. CMAA2 runs (its texel atomics go through word buffers, `shading/texel_words.rs`), but on
+   threaded lavapipe its output changes frame to frame with the order its atomics land, by up to
+   ~70/255 on a few dozen edge pixels: more than a sum order explains, so look for an
+   order-dependent drop (the 32-item list walk, the groupshared item budget). It is stable with
+   `LP_NUM_THREADS=0`; `client-frame.sh` skips it (`UNDERBOX_SKIP_LAYERS=cmaa2_cs`).
+4. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.

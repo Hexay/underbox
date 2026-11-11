@@ -130,10 +130,9 @@ The round then:
 - sets the state to Playing.
 
 The frame shows the generated terrain with the sky behind it, untextured and with no Grub models
-(models are expected to be missing). The terrain is untextured because `gr_foreground.shader` and
-`gr_foreground_scorch.shader` get placeholders: a sampler in the bind group and a sampler feature
-fail wgpu validation (renderer lane). `new_water.shader` fails in DXC on a redefined
-`SrgbGammaToLinear`. Nothing in the round needed an engine fix.
+(models are expected to be missing). The terrain's shaders and the water now
+draw (see [Rendering](#rendering)); its rock textures are absent from the checkout. Nothing in the
+round needed an engine fix.
 
 ### Client frame
 
@@ -204,6 +203,17 @@ Fixed, in the order they showed up after spawn:
   declare). It draws with the `.shader_c`'s HLSL, as native does.
 - **`downsample_spd`** writes managed's Rg32Float pyramid: the program is rebuilt with the bound
   texture's storage format.
+- **Blue-white haze in the join frame** (host frames too): the physgun viewmodel's additive
+  sprites (`light_glow_03`, `particle_flare_7b`, `lightcookies_09`) have only `.vtex` JSON in
+  sbox-public, no image, so they sampled the white default as large hard squares a few units from
+  the eye. Core's `textures/particles/flares/` and `textures/lightcookies/` now get a generated
+  soft round glow (`render/texture_generated.rs`). Found with `UNDERBOX_LAYERS=probe`: only the
+  translucent layers changed.
+- **Combos from the draw:** graphics programs were always built at combo 0, so sprites'
+  additive `D_BLEND` drew alpha-blended (dark rims) and `D_TEXT` was ignored. Programs now build
+  at the combos the draw's attributes set (`shading::program`).
+- **CMAA2** blends: its image atomics are lowered to image read/write
+  (`shaders/src/image_atomics.rs`).
 
 What's left, and why:
 
@@ -211,7 +221,6 @@ What's left, and why:
   `skybox_day_01.vmat`, whose `.tga`/`.exr` aren't in the repo and no `.vtex_c` ships. The sky is
   our flat placeholder. Grubs' `rocks_a_*` textures are absent from its checkout too.
 - The one spotlight is the `studio_light_projector` prop's; the scene itself has only the sun.
-- CMAA2 dispatches indirectly now but its image atomics don't translate (docs/renderer.md, Next).
 
 ## Shaders
 
