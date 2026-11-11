@@ -42,8 +42,8 @@ changed files touch no `.def` or interop file. The pin hasn't moved.
 | Zoo, dedicated server | passes | 0 compile errors, no missing components, no stubs hit. 15 bodies: 12 settle, 3 fall forever. The origin trace hits the floor. `GAME:END` reached in about 37 s. |
 | Stand on the floor | passes (host side) | A PlayerController dropped from 64 units reports `GAME:STANDING on=Block v=0`. |
 | Client joins | passes | No patch, no download. The client finds `facepunch.sandbox` offline, gets the game code from the server and spawns. The server logs `GAME:PLAYER_STANDING owner=Player local=False Player@3,-1,0 on=Block v=0`. See [Join](#join). |
-| Joined client stands (client side) | blocked, renderer lane | The client's frames stop right after its player spawns: the same `sprite_cs` hang as [Client frame](#client-frame). |
-| Client renders the zoo | partly | Frames render until the player spawns. Then the GPU hangs in `sprite_cs`. See [Client frame](#client-frame). |
+| Joined client stands (client side) | passes | `MODE=join` passes; the client renders 592 frames after spawn. |
+| Client renders the zoo | passes, untextured | From the player's eye: floor, props, shadows, spotlight, sky. Error models and no textures (sources only). See [Rendering](#rendering). |
 | Shipped `.shader_c` | read | 26 of 28 files load from their embedded HLSL. Every VS and PS compiles with DXC. See [Shaders](#shaders). |
 | Grubs | partly | Code compiles. `beach.scene` loads on a server and on a host client. All 40 `.geq_c/.sdflayer_c/.surface_c/.vsnap_c` read. |
 | Grubs round | passes | `gr_ffa_next_state` starts Free For All: `Sdf2DChunk=100`, physics `bodies=5 shapes=50`, `Grub=2`, `Equipment=29`, with `geq=30 sdflayer=9` loaded. The terrain renders untextured. See [Grubs](#grubs). |
@@ -93,8 +93,7 @@ never reaches GNS. So GNS kept its 512 KB default send buffer, and the handshake
 engine2 now applies the same values to GNS when it starts (`net/mod.rs`) and logs refused sends.
 The gns test `reliable_burst_needs_a_bigger_send_buffer` covers it.
 
-The client still can't report standing on its own side, because it hangs after its player spawns
-(see [Client frame](#client-frame)).
+Since the `sprite_cs` fix, the client also reports standing on its own side (`MODE=join`).
 
 ## Grubs
 
