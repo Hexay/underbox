@@ -140,6 +140,52 @@ pub fn split_args(s: &str) -> Vec<&str> {
     out
 }
 
+/// Every ident occurrence of `word` (whole word) in `s`.
+pub fn occurrences<'a>(s: &'a str, word: &'a str) -> impl Iterator<Item = usize> + 'a {
+    s.match_indices(word).map(|(i, _)| i).filter(move |&i| (i == 0 || !is_ident(s.as_bytes()[i - 1])) && ident_at(s, i) == Some(word))
+}
+
+/// `<keyword> < T > B` at `i` (where `keyword` occurs): T, B and the span of T.
+pub fn buffer_declaration<'a>(s: &'a str, i: usize, keyword: &str) -> Option<(&'a str, &'a str, (usize, usize))> {
+    let lt = skip_trivia(s, i + keyword.len());
+    (s.as_bytes().get(lt) == Some(&b'<')).then_some(())?;
+    let at = skip_trivia(s, lt + 1);
+    let ty = ident_at(s, at)?;
+    let gt = skip_trivia(s, at + ty.len());
+    (s.as_bytes().get(gt) == Some(&b'>')).then_some(())?;
+    let name = ident_at(s, skip_trivia(s, gt + 1))?;
+    Some((ty, name, (at, at + ty.len())))
+}
+
+/// The `;` ending the statement that continues at `i`; `None` if a bracket closes first.
+pub fn statement_end(s: &str, mut i: usize) -> Option<usize> {
+    let b = s.as_bytes();
+    while i < b.len() {
+        match b[i] {
+            b';' => return Some(i),
+            b'(' | b'[' | b'{' => i = match_close(s, i, false)?,
+            b')' | b']' | b'}' => return None,
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// `=` at `i` (not `==`).
+pub fn is_assign(s: &str, i: usize) -> bool {
+    let b = s.as_bytes();
+    b.get(i) == Some(&b'=') && b.get(i + 1) != Some(&b'=')
+}
+
+/// A compound assignment or `++`/`--` at `i`.
+pub fn is_compound_assign(s: &str, i: usize) -> bool {
+    let b = s.as_bytes();
+    let op = |n: usize| b.get(i + n).copied();
+    matches!((op(0), op(1), op(2)), (Some(b'+' | b'-' | b'*' | b'/' | b'%' | b'&' | b'|' | b'^'), Some(b'='), _) | (Some(b'<'), Some(b'<'), Some(b'=')) | (Some(b'>'), Some(b'>'), Some(b'=')))
+        || matches!((op(0), op(1)), (Some(b'+'), Some(b'+')) | (Some(b'-'), Some(b'-')))
+}
+
 /// 1-based line of byte offset `i`.
 pub fn line_of(s: &str, i: usize) -> u32 {
     1 + s.as_bytes()[..i].iter().filter(|&&c| c == b'\n').count() as u32

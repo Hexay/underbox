@@ -140,7 +140,7 @@ impl VfxShader {
         let text = decl::extract(&text, &mut decls)?;
         let (mut annotations, mut macro_annotations) = (Vec::new(), Vec::new());
         let stripped = annotation::strip_keeping_macros(&text, &mut annotations, &mut macro_annotations);
-        let source = crate::word_buffers::rewrite(&crate::compat::rewrite(&stripped));
+        let source = crate::word_buffers::rewrite(&crate::packed_buffers::rewrite(&crate::compat::rewrite(&stripped)));
         let statics = ComboSet {
             combos: self.combos(&decls.static_combos)?,
             rules: decls.static_rules.iter().chain(&self.feature_rules).cloned().collect(),

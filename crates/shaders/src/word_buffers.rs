@@ -10,7 +10,7 @@
 //! A buffer used any other way (compound assignment to a non-`uint` field, passed whole) is left
 //! alone.
 
-use crate::scan::{blank_comments, ident_at, is_ident, match_close, skip_trivia};
+use crate::scan::{blank_comments, buffer_declaration, ident_at, is_assign, is_compound_assign, is_ident, match_close, occurrences, skip_trivia, statement_end};
 use std::collections::HashMap;
 
 /// A struct's fields as (name, `uint` | `int` | `float`).
@@ -26,11 +26,6 @@ pub fn rewrite(src: &str) -> String {
         }
     }
     out
-}
-
-/// Every ident occurrence of `word` (whole word) in `s`.
-fn occurrences<'a>(s: &'a str, word: &'a str) -> impl Iterator<Item = usize> + 'a {
-    s.match_indices(word).map(|(i, _)| i).filter(move |&i| (i == 0 || !is_ident(s.as_bytes()[i - 1])) && ident_at(s, i) == Some(word))
 }
 
 fn scalar(ty: &str) -> Option<&'static str> {
@@ -89,43 +84,8 @@ fn candidates(s: &str, structs: &HashMap<String, Fields>) -> Vec<(String, String
     out
 }
 
-/// `RWStructuredBuffer < S > B` at `i`: S, B and the span of `S`.
 fn declaration(s: &str, i: usize) -> Option<(&str, &str, (usize, usize))> {
-    let lt = skip_trivia(s, i + "RWStructuredBuffer".len());
-    (s.as_bytes().get(lt) == Some(&b'<')).then_some(())?;
-    let at = skip_trivia(s, lt + 1);
-    let ty = ident_at(s, at)?;
-    let gt = skip_trivia(s, at + ty.len());
-    (s.as_bytes().get(gt) == Some(&b'>')).then_some(())?;
-    let name = ident_at(s, skip_trivia(s, gt + 1))?;
-    Some((ty, name, (at, at + ty.len())))
-}
-
-/// Past the `;` ending the statement that continues at `i`, and the `;`'s index.
-fn statement_end(s: &str, mut i: usize) -> Option<usize> {
-    let b = s.as_bytes();
-    while i < b.len() {
-        match b[i] {
-            b';' => return Some(i),
-            b'(' | b'[' | b'{' => i = match_close(s, i, false)?,
-            b')' | b']' | b'}' => return None,
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
-fn is_assign(s: &str, i: usize) -> bool {
-    let b = s.as_bytes();
-    b.get(i) == Some(&b'=') && b.get(i + 1) != Some(&b'=')
-}
-
-fn is_compound_assign(s: &str, i: usize) -> bool {
-    let b = s.as_bytes();
-    let op = |n: usize| b.get(i + n).copied();
-    matches!((op(0), op(1), op(2)), (Some(b'+' | b'-' | b'*' | b'/' | b'%' | b'&' | b'|' | b'^'), Some(b'='), _) | (Some(b'<'), Some(b'<'), Some(b'=')) | (Some(b'>'), Some(b'>'), Some(b'=')))
-        || matches!((op(0), op(1)), (Some(b'+'), Some(b'+')) | (Some(b'-'), Some(b'-')))
+    buffer_declaration(s, i, "RWStructuredBuffer")
 }
 
 fn helpers(buffer: &str, ty: &str, fields: &Fields) -> String {

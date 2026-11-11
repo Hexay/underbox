@@ -18,6 +18,8 @@ pub mod expr;
 mod formats;
 mod image_coords;
 pub mod include;
+pub mod packed_buffers;
+mod packed_layout;
 pub mod reflect;
 mod rematerialize;
 pub mod row_major;

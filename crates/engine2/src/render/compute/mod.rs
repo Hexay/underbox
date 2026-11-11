@@ -60,6 +60,9 @@ impl Inputs {
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
+#[cfg(test)]
+#[path = "packed_tests.rs"]
+mod packed_tests;
 
 pub fn register(r: &mut Registry) {
     bind!(r, tools::COMPUTE, |c, attrs, mode, x, y, z| dispatch(c, attrs, mode, [x, y, z]));
