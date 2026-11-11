@@ -1,10 +1,11 @@
 //! Models from compiled `.vmdl_c` files (see `assets::compiled::model`): meshes with their draw
-//! calls and materials, mesh groups, LOD masks and distances, skins, physics and the skeleton.
+//! calls, materials and morph targets, mesh groups, LOD masks and distances, skins, physics, key
+//! values (game data) and the skeleton.
 //! Per-draw tint (`m_vTintColor`) has nowhere to go in `DrawCall` and is dropped.
 
 use super::content::{Content, MaterialGroup, ModelMesh};
 use crate::mesh::material_ref::MaterialRef;
-use crate::mesh::render_mesh::{DrawCall, RenderMesh};
+use crate::mesh::render_mesh::{DrawCall, Morph, MorphDelta, RenderMesh};
 use crate::mesh::vertex::Vertex;
 use crate::model::physics::compiled as physics;
 use abi::structs::BBox;
@@ -62,7 +63,12 @@ impl Materials {
     }
 }
 
-fn render_mesh(name: &str, m: &mesh::Mesh, materials: &mut Materials) -> Arc<RenderMesh> {
+fn morph(t: &assets::compiled::morph::Target) -> Morph {
+    let deltas = t.deltas.iter().map(|&(vertex, position, normal)| MorphDelta { vertex: vertex as i32, position, normal }).collect();
+    Morph { name: t.name.clone(), deltas }
+}
+
+fn render_mesh(name: &str, m: &mesh::Mesh, targets: &[assets::compiled::morph::Target], materials: &mut Materials) -> Arc<RenderMesh> {
     let vertices: Vec<Vertex> = m.vertices.iter().map(vertex).collect();
     let rm = RenderMesh::from_vertices(name, &vertices, &m.indices);
     {
@@ -80,6 +86,7 @@ fn render_mesh(name: &str, m: &mesh::Mesh, materials: &mut Materials) -> Arc<Ren
             })
             .collect();
         s.material = s.draw_calls.first().and_then(|d| d.material.clone());
+        s.morphs = targets.iter().map(morph).collect();
         s.bounds = m.bounds.map(|(lo, hi)| BBox { mins: crate::math::vec3(lo[0], lo[1], lo[2]), maxs: crate::math::vec3(hi[0], hi[1], hi[2]) });
     }
     rm
@@ -91,7 +98,7 @@ pub fn content(m: &model::Model) -> Content {
     let meshes = m
         .meshes
         .iter()
-        .map(|mm| ModelMesh { mesh: render_mesh(&mm.name, &mm.mesh, &mut materials), group_mask: mm.group_mask, lod_mask: mm.lod_mask as u8 })
+        .map(|mm| ModelMesh { mesh: render_mesh(&mm.name, &mm.mesh, &mm.targets, &mut materials), group_mask: mm.group_mask, lod_mask: mm.lod_mask as u8 })
         .collect();
     let material_groups = m
         .material_groups

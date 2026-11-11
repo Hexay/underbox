@@ -37,5 +37,9 @@ fn compiled_key_values_are_game_data() {
     let m = crate::model::get(r).unwrap();
     let prop = m.content.game_data.as_ref().and_then(|d| d.member("prop_data")).expect("prop_data");
     assert!(prop.member("health").is_some());
-    assert_eq!(m.content.meshes[0].mesh.vertices().len(), 24);
+    let mesh = &m.content.meshes[0].mesh;
+    assert_eq!(mesh.vertices().len(), 24);
+    let morphs = mesh.state().morphs.clone();
+    assert_eq!(morphs.iter().map(|x| (x.name.as_str(), x.deltas.len())).collect::<Vec<_>>(), [("smile", 4), ("blink", 1)]);
+    assert!((morphs[0].deltas[0].position[2] - fixture::SMILE_LIFT).abs() < 1e-2);
 }
