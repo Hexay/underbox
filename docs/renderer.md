@@ -122,7 +122,10 @@ native model one to one, so managed's pipeline code runs unchanged:
    destroy what they're handed, which used to empty the object.
 7. Morphs (`draw/morph.rs`): an object's flex controller values run through each mesh's flex
    rules; targets named like a weighted descriptor move a cached CPU copy of the vertex buffer.
-   Native-path objects only: managed's `QueueModelMeshMorph`/skinning slots are still stubs.
+   GPU skinning and managed's morph/skinning slots: docs/skinning.md.
+8. Dynamic objects (`scene/dynamic.rs`) draw their vertices as one call (`draw/dynamic.rs`), with
+   gizmo lines and points expanded first (docs/skinning.md); aggregates draw each fragment as a
+   draw call of their model's first mesh.
 
 Contexts and views execute eagerly on the queue, so `Begin/FinishRenderingViews` only bracket the
 frame (Finish prunes dead GPU meshes) and async readbacks complete inside the call. Display lists
@@ -152,8 +155,8 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
   tools_sprite, ui, sky, ...) draw with a stand-in (`shading/standin.shader`, map in
   `standin.rs`): `g_tColor` × tint × vertex tint × the view's lighting (below), or unlit. Sky
   samples the sky material's `SkyTexture` cube along the view ray (`standin_sky.shader`); the
-  gizmo shaders, whose geometry shaders naga can't take, draw unlit in vertex colour
-  (`standin_gizmo.shader`, primitives as submitted). Pixel bindings that collide with a different
+  gizmo shaders' geometry shaders are emulated (`standin_gizmo_*.shader`, docs/skinning.md).
+  Pixel bindings that collide with a different
   vertex binding are moved apart after translation (`shading/stages.rs`).
 - Binder precedence per uniform block (`shading/bind.rs`): managed's `SetConstantBufferData` bytes
   by block name, the view block, the lighting blocks, then member-wise attributes → material →
@@ -168,7 +171,7 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
 - Bindless (`render/bindless.rs`): `GetTextureViewIndex` hands out linear/sRGB index pairs from
   1 (`GetTexture2DSrgb` adds 1); `g_bindless_*` arrays (with `TEXTURE_BINDING_ARRAY`) hold the
   real textures of each array's shape, the default elsewhere, partially bound up to the highest
-  index. Samplers are still defaults. naga can't compare-sample an array, so the stand-in reads
+  index; samplers are managed's sampler states (docs/skinning.md). naga can't compare-sample an array, so the stand-in reads
   managed's shadow maps through slots (`shading/shadow_slots.rs`). `render::Gpu` also takes
   `SUBGROUP` (wave ops in the lit shaders) and the adapter's per-stage binding limits.
 - `SystemInfo.SetGpu` and `GetVideoMemoryInfo` report the largest Vulkan device-local heap
@@ -210,7 +213,8 @@ Compute, lighting and shadows (ours and managed's): docs/lighting.md.
 - `tools/client-frame.sh` boots the client on `corpus/showroom` (camera, sun, three dev boxes on
   a plane), checks the last frames settled on one hash and compares it with
   `corpus/showroom/golden.tsv` per adapter (`UNDERBOX_BLESS=1` records); `target/client-frame/frame.png`.
-  `MANAGED=1` does the same through managed's scene renderer (`golden-managed.tsv`).
+  `MANAGED=1` does the same through managed's scene renderer (`golden-managed.tsv`); `CORPUS=x`
+  picks another scene (`mapworld`, `skinned`).
 
 ## Windows and input (SDL)
 
@@ -287,8 +291,7 @@ windows, framebuffers, properties and window events on the offscreen driver.
 
 1. `BindVertexShader`/`BindPixelShader` (no `RenderShaderHandle_t` yet); `ctx::SET_DYNAMIC_
    CONSTANT_BUFFER_DATA` binds by register slot and has no caller in sbox-public.
-2. Managed's GPU skinning and morphs (`DispatchModelMeshSkinning`, `QueueModelMeshMorph`,
-   `GenerateMorphs`, vertex cache): all answer "none", so managed draws bind poses; bindless
-   samplers; geometry-shader emulation for the gizmos.
+2. Draw the 3D skybox world (the world lane stores it); apply the tonemap and volumetric fog
+   parameters managed sets (docs/skinning.md); gizmo lines from GPU buffers.
 3. Translucent and depth-prepass layers, MSAA, cube and stereo renders, GPU timestamps, mip
    generation.

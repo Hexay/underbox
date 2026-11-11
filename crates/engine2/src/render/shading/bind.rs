@@ -9,7 +9,7 @@ use super::program::{self, Layouts, Shading};
 use super::shadow_slots;
 use super::view::{self, View};
 use crate::render::lighting::{self, Lighting, shadow};
-use crate::render::{attributes, bindless, buffers as gpu_buffers, texture};
+use crate::render::{attributes, bindless, buffers as gpu_buffers, samplers, texture};
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
 use render::wgpu::{self, BindingType as B};
@@ -135,6 +135,14 @@ pub fn sample_type_fits(format: wgpu::TextureFormat, want: wgpu::TextureSampleTy
     }
 }
 
+/// A bindless sampler array: element `i` is the sampler state managed registered at index `i`
+/// (render/samplers.rs), else the default; comparison arrays keep the default.
+fn bindless_samplers(gpu: &render::Gpu, b: &Binding, kind: wgpu::SamplerBindingType) -> Vec<wgpu::Sampler> {
+    let fallback = defaults::sampler(gpu, kind, None);
+    let real = |i| samplers::desc(i).filter(|_| kind != wgpu::SamplerBindingType::Comparison).map(|d| samplers::sampler(gpu, &d, kind));
+    (0..program::array_len(b) as usize).map(|i| real(i).unwrap_or_else(|| fallback.clone())).collect()
+}
+
 /// A bindless texture array: element `i` is the texture managed's index `i` names
 /// (render/bindless.rs) when it has the declared shape, else the default.
 fn bindless_views(gpu: &render::Gpu, b: &Binding, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Vec<wgpu::TextureView> {
@@ -192,12 +200,15 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
         B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, b, view_dimension, sample_type)),
-        B::Sampler(kind) if b.count.is_some() => Resource::Samplers(vec![defaults::sampler(gpu, kind, None); program::array_len(b) as usize]),
+        B::Sampler(kind) if b.count.is_some() => Resource::Samplers(bindless_samplers(gpu, b, kind)),
         B::Texture { sample_type, view_dimension, .. } => {
             Resource::View(texture_view(s, inputs, b).unwrap_or_else(|| defaults::texture(gpu, view_dimension, sample_type)))
         }
         B::StorageTexture { format, view_dimension: wgpu::TextureViewDimension::D2, .. } => Resource::View(storage_view(s, inputs, b, format)?),
-        B::Sampler(kind) => Resource::Sampler(defaults::sampler(gpu, kind, s.attributes.get(&b.name).and_then(|a| a.compare))),
+        B::Sampler(kind) => {
+            let set = (kind != wgpu::SamplerBindingType::Comparison).then(|| inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::sampler(*a, n)))).flatten();
+            Resource::Sampler(set.map_or_else(|| defaults::sampler(gpu, kind, s.attributes.get(&b.name).and_then(|a| a.compare)), |d| samplers::sampler(gpu, &d, kind)))
+        }
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),
     })
 }

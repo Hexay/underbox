@@ -10,7 +10,6 @@ use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools
 use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
 use abi::{NativeRef, PtrHandle, RawPtr, Registry, bind, class};
 use std::ffi::c_void;
-use std::sync::Mutex;
 
 /// Copy `rect` of the context's colour (or depth) target into `dst` at its origin.
 fn copy_from_target(c: context::Ref, dst: texture::Ref, rect: Option<[u32; 4]>, depth: bool) -> bool {
@@ -109,19 +108,6 @@ fn material_bind_counts(bind: RawPtr<c_void>, full: RawPtr<c_void>, similar: Raw
     }
 }
 
-/// Distinct sampler descriptions get consecutive ids; the index is the id less one.
-fn sampler(desc: abi::structs::CSamplerStateDesc) -> PtrHandle<abi::handle::SamplerStateHandle_t> {
-    static SAMPLERS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
-    // SAFETY: CSamplerStateDesc is a plain repr(C) struct of scalars.
-    let bytes = unsafe { std::slice::from_raw_parts((&raw const desc).cast::<u8>(), size_of_val(&desc)) }.to_vec();
-    let mut s = SAMPLERS.lock().unwrap();
-    let i = s.iter().position(|d| *d == bytes).unwrap_or_else(|| {
-        s.push(bytes);
-        s.len() - 1
-    });
-    PtrHandle::new(i + 1)
-}
-
 fn light_probe_volume(mins: RawPtr<c_void>, maxs: RawPtr<c_void>, priority: RawPtr<c_void>) -> i32 {
     // SAFETY: managed passes two Vector3s and an int it hasn't initialised (ReadLightProbeVolume).
     unsafe {
@@ -192,7 +178,7 @@ pub fn register(r: &mut Registry) {
     // TODO: mip generation and uint clears need compute or a blit pass.
     bind!(r, ctx::GENERATE_MIP_MAPS, |_, _| {});
     bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, _, _| {});
-    bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, sampler);
+    bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, |d| PtrHandle::<abi::handle::SamplerStateHandle_t>::new(crate::render::samplers::find_or_create(d)));
     bind!(r, dev::GET_SAMPLER_INDEX, |h| h.value as i32 - 1);
     bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));
     bind!(r, dev::GET_SHEET_META_DATA_TEXTURE, || NativeRef::NULL);

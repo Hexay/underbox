@@ -180,6 +180,14 @@ pub fn texture_mip(r: Ref, name: &str) -> Option<(NativeRef<class::CTextureBase>
     token_texture(r, StringToken::of(name))
 }
 
+/// The sampler state named `name` (with parents).
+pub fn sampler(r: Ref, name: &str) -> Option<CSamplerStateDesc> {
+    on(r, |a| match a.get(Kind::Sampler, StringToken::of(name)) {
+        Some(Value::Sampler(s)) => Some(s),
+        _ => None,
+    })
+}
+
 /// [`texture_mip`] by token.
 pub fn token_texture(r: Ref, name: StringToken) -> Option<(NativeRef<class::CTextureBase>, u32)> {
     on(r, |a| match a.get(Kind::Texture, name) {

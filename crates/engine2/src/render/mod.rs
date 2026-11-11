@@ -20,6 +20,7 @@ pub mod material;
 pub mod material_mode;
 mod material_source;
 pub mod readback;
+pub mod samplers;
 pub mod scene;
 mod scene_utils;
 pub mod shading;
