@@ -2,8 +2,8 @@
 # Run a client command in an X window on the virtual display xvfb-run gave us, and drive it with XTest
 # (tools/game/xinput.py) once the client's live log matches PLAY_TRIGGER.
 # usage: xvfb-run -a -s '-screen 0 WxHx24' sh tools/game/play.sh <out> <client command...>
-# PLAY_STEPS: xinput.py steps (default: focus the window, hold W for 6 s, then turn right). Long, since a
-# lavapipe client runs at a few frames a second.
+# PLAY_STEPS: xinput.py steps (default: focus the window, hold W for 6 s, turn right, then save the screen
+# as X shows it to $OUT/screen.ppm). Long, since a lavapipe client runs at a few frames a second.
 # Writes $OUT/xinput.log; the client command is expected to write $OUT/client.logpath (boot-client.sh).
 set -eu
 HERE=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -11,7 +11,7 @@ OUT=$1
 shift
 : "${DISPLAY:?play.sh runs under xvfb-run}"
 TRIGGER=${PLAY_TRIGGER:-GAME:SETTLED}
-STEPS=${PLAY_STEPS:-center focus wait:1 hold:w:6 wait:1 move:600:0:4 wait:1}
+STEPS=${PLAY_STEPS:-center focus wait:1 hold:w:6 wait:1 move:600:0:4 wait:1 shot:$OUT/screen.ppm}
 WAIT=${PLAY_WAIT:-900}
 rm -f "$OUT/client.logpath"
 : > "$OUT/xinput.log"

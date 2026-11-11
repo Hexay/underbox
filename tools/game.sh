@@ -88,7 +88,8 @@ CLIENT_UNTIL='GAME:END'
 if [ "$MODE" = play ]; then
     command -v xvfb-run > /dev/null || { echo "game.sh: MODE=play needs xvfb-run (apt install xvfb)" >&2; exit 2; }
     [ "$PLAY_VIA" = host ] && export PLAY_TRIGGER=${PLAY_TRIGGER:-GAME:SETTLED} || export PLAY_TRIGGER=${PLAY_TRIGGER:-GAME:PLAYER_STANDING .*local=True}
-    CLIENT_UNTIL='GAME:CAMERA_TURNED|GAME:END|Kicked|Disconnected'
+    # The grace covers the rest of the mouse move and the screenshot after it (tools/game/play.sh).
+    CLIENT_UNTIL='GAME:CAMERA_TURNED|GAME:END|Kicked|Disconnected' CLIENT_GRACE=10
 fi
 
 # run_client <env assignments...> <command...>: in play, inside a window on a virtual display with XTest input.
@@ -102,7 +103,7 @@ run_client() {
 
 host_client() {
     # shellcheck disable=SC2086
-    run_client OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL="$CLIENT_UNTIL" GRACE=3 SHADOW_QUALITY="${SHADOW_QUALITY:-2}" \
+    run_client OUT="$OUT" FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 UNTIL="$CLIENT_UNTIL" GRACE="${CLIENT_GRACE:-3}" SHADOW_QUALITY="${SHADOW_QUALITY:-2}" \
         sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" ${CLIENT_ARGS:-}
 }
 
@@ -115,7 +116,7 @@ join_client() {
     python3 -I -m http.server --bind 127.0.0.1 --directory "$OUT/serve" "$hport" > "$OUT/http.log" 2>&1 &
     http=$!
     until='GAME:PLAYER_STANDING .*local=True|wasn.t found|Unable to download|Kicked|Disconnected' grace=3
-    [ "$MODE" = play ] && until=$CLIENT_UNTIL'|wasn.t found|Unable to download' grace=8
+    [ "$MODE" = play ] && until=$CLIENT_UNTIL'|wasn.t found|Unable to download' grace=$CLIENT_GRACE
     # shellcheck disable=SC2086
     run_client NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 SEED="$OUT/seed" OUT="$OUT" GRACE=$grace UNTIL="$until" \
         FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- +connect "127.0.0.1:$PORT" ${CLIENT_ARGS:-}
@@ -123,7 +124,7 @@ join_client() {
 }
 
 t0=$(date +%s)
-rm -rf "$OUT/frames" "$OUT/frame.png"; mkdir -p "$OUT/frames"
+rm -rf "$OUT/frames" "$OUT/frame.png" "$OUT/screen.ppm" "$OUT/screen.png"; mkdir -p "$OUT/frames"
 if [ "$SERVER_SIDE" = 0 ]; then
     host_client
     LOG=$OUT/client.log
@@ -136,7 +137,7 @@ else
     # join: the server stops once the joined player stands, with time for the client to see it too.
     case $MODE in
         join) until='GAME:END|GAME:PLAYER_STANDING' grace=20 ;;
-        play) until='GAME:END|GAME:PLAYER_TURNED|\] disconnected' grace=5 ;;
+        play) until='GAME:END|GAME:PLAYER_TURNED|\] disconnected' grace=12 ;;
         *) until='GAME:END' grace=3 ;;
     esac
     OUT=$OUT UNTIL=$until GRACE=$grace \
@@ -164,4 +165,6 @@ echo "== summary"
 . "$ROOT/tools/game/checks.sh"
 [ -f "$OUT/frames/GameWindow.ppm" ] && python3 -I "$ROOT/tools/ppm2png.py" "$OUT/frames/GameWindow.ppm" "$OUT/frame.png" > /dev/null &&
     echo "== frame: $OUT/frame.png"
+[ "$MODE" = play ] && [ -f "$OUT/screen.ppm" ] && python3 -I "$ROOT/tools/ppm2png.py" "$OUT/screen.ppm" "$OUT/screen.png" > /dev/null &&
+    echo "== screen (as X shows it): $OUT/screen.png"
 if [ "$FAILED" = 0 ]; then echo "RESULT: PASS"; else echo "RESULT: FAIL (logs: $OUT)"; exit 1; fi

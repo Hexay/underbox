@@ -7,6 +7,7 @@ usage: xinput.py <display> <step>...
   click:<button>           press and release a pointer button (1 left, 3 right)
   center                   put the pointer at the screen's centre
   focus                    give the window under the pointer the input focus (there's no window manager)
+  shot:<path.ppm>          save the screen as the X server shows it
   wait:<seconds>
 Prints one line per step.
 """
@@ -41,6 +42,37 @@ XTST.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int,
 XTST.XTestFakeButtonEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
 XTST.XTestFakeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
 XTST.XTestFakeRelativeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
+
+
+class XImage(ctypes.Structure):
+    # Leading fields of Xlib's XImage, up to the channel masks.
+    _fields_ = [(n, ctypes.c_int) for n in ("width", "height", "xoffset", "format")] + [("data", ctypes.c_void_p)] + [
+        (n, ctypes.c_int) for n in ("byte_order", "bitmap_unit", "bitmap_bit_order", "bitmap_pad", "depth",
+                                    "bytes_per_line", "bits_per_pixel")] + [
+        (n, ctypes.c_ulong) for n in ("red_mask", "green_mask", "blue_mask")]
+
+
+X11.XGetImage.restype = ctypes.POINTER(XImage)
+X11.XGetImage.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_int, ctypes.c_uint, ctypes.c_uint,
+                          ctypes.c_ulong, ctypes.c_int]
+
+
+def screenshot(dpy, path):
+    """The whole screen as it is displayed, as a binary PPM (32 bpp TrueColor visuals only)."""
+    w, h = X11.XDisplayWidth(dpy, 0), X11.XDisplayHeight(dpy, 0)
+    img = X11.XGetImage(dpy, X11.XDefaultRootWindow(dpy), 0, 0, w, h, 0xFFFFFFFF, 2).contents  # ZPixmap
+    if img.bits_per_pixel != 32:
+        sys.exit(f"xinput: shot needs a 32 bpp screen, not {img.bits_per_pixel}")
+    raw = ctypes.string_at(img.data, img.bytes_per_line * h)
+    shifts = [m.bit_length() - 8 for m in (img.red_mask, img.green_mask, img.blue_mask)]
+    out = bytearray(w * h * 3)
+    for y in range(h):
+        row = memoryview(raw)[y * img.bytes_per_line:y * img.bytes_per_line + w * 4].cast("I")
+        for x, p in enumerate(row):
+            o = (y * w + x) * 3
+            out[o], out[o + 1], out[o + 2] = (p >> shifts[0]) & 255, (p >> shifts[1]) & 255, (p >> shifts[2]) & 255
+    with open(path, "wb") as f:
+        f.write(b"P6\n%d %d\n255\n" % (w, h) + bytes(out))
 
 
 def keycode(dpy, name):
@@ -87,6 +119,8 @@ def run(dpy, step):
             sys.exit("xinput: no window under the pointer")
         X11.XSetInputFocus(dpy, child.value, 1, 0)  # RevertToPointerRoot, CurrentTime
         step = f"focus:0x{child.value:x}"
+    elif kind == "shot":
+        screenshot(dpy, args[0])
     elif kind == "wait":
         time.sleep(float(args[0]))
     else:
