@@ -56,6 +56,8 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
     let state = RasterState { topology: topology(call.prim.into()), ..state };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
     let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj, Default::default()));
+    // Placeholders cull like native's default material, or an error cube around the eye fills the frame.
+    let state = if shaded.is_none() { RasterState { cull: Some(render::wgpu::Face::Back), ..state } } else { state };
     Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
 }
 
@@ -143,3 +145,7 @@ fn each_call(model: &Model, mesh_groups: u64, material: Option<&Arc<MaterialRef>
         }
     }
 }
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod tests;

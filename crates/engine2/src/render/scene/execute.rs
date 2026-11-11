@@ -97,6 +97,10 @@ pub fn run(v: view::Ref) {
     immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
     for l in layers {
         run_layer(&view, v, ctx, l);
+        if let Some(layer) = layer::get(l) {
+            let t = target(&view, l, &layer.state.lock().unwrap());
+            super::trace::probe(v.addr(), &layer, &t);
+        }
     }
     context::release(ctx);
 }
@@ -121,6 +125,9 @@ fn setup(ctx: context::Ref, v: view::Ref, l: layer::Ref, color: texture::Ref) ->
 
 fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
     let Some(layer) = layer::get(l) else { return };
+    if super::trace::skipped(&layer.name) {
+        return;
+    }
     let (t, clear_color, required, excluded, match_id) = {
         let s = layer.state.lock().unwrap();
         (target(view, l, &s), s.clear_color.vec, s.required, s.excluded, s.match_id)
@@ -219,7 +226,10 @@ fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::c
         match obj.kind {
             ObjectKind::ManagedSceneObject => managed.push(obj.handle.id()),
             _ if f.translucent => {}
-            _ => draws.extend(model_draw::object(&s, &deform, view.view_proj)),
+            _ => {
+                super::trace::object(&s);
+                draws.extend(model_draw::object(&s, &deform, view.view_proj));
+            }
         }
     }
     (draws, managed)
