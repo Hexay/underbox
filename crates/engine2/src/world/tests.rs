@@ -164,6 +164,53 @@ fn aggregate_fragments_and_lod_overrides_place() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
+static REJECT: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+extern "C" fn reject_one(handle: i32) -> u8 {
+    u8::from(handle != REJECT.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// Scene-world mesh traces over the aggregate map: the whole crate (top at z 32) and its top
+/// fragment at the origin; its sides-and-bottom fragment at x 100 (open on top: the bottom is hit).
+#[test]
+fn scene_world_mesh_traces_hit_placed_models() {
+    use super::mesh_trace::hits;
+    let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!("underbox_mapworld_trace_{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("maps")).unwrap();
+    std::fs::write(dir.join("maps/aggtrace.vpk"), world::fixture::aggregate_map("aggtrace").single()).unwrap();
+    crate::fs::add_search_path("GAME", dir.to_str().unwrap(), true);
+    let w = scene();
+    let r = create_world("maps/aggtrace.vpk", w, crate::math::identity());
+    let objects = placed(w);
+    let down = |x: f32| {
+        let mut i = abi::structs::MeshTraceInput::default();
+        (i.start, i.end) = (crate::math::vec3(x, 0.0, 100.0), crate::math::vec3(x, 0.0, -100.0));
+        i
+    };
+    let with = |edit: &dyn Fn(&mut abi::structs::MeshTraceInput)| {
+        let mut i = down(0.0);
+        edit(&mut i);
+        i
+    };
+    let handle = |o: object::Ref| object::get(o).unwrap().handle.id::<abi::class::CSceneObject>().id;
+    let summary = |input| hits(w, &input).iter().map(|h| (h.sceneobject_handle, h.position.vec.z, h.normal.vec.z)).collect::<Vec<_>>();
+    assert_eq!(summary(down(100.0)), [(handle(objects[1]), 0.0, 1.0)], "the bottom, facing the ray");
+    let at_origin = summary(down(0.0));
+    assert_eq!(at_origin.iter().map(|h| (h.1, h.2)).collect::<Vec<_>>(), [(32.0, 1.0); 2]);
+    object::with(objects[2], |s| s.tags = vec![77]);
+    assert_eq!(summary(with(&|i| i.tag_exclude[0] = 77)), [(handle(objects[0]), 32.0, 1.0)]);
+    assert_eq!(summary(with(&|i| i.tag_require[0] = 77)), [(handle(objects[2]), 32.0, 1.0)]);
+    REJECT.store(handle(objects[0]), std::sync::atomic::Ordering::Relaxed);
+    let filtered = with(&|i| i.filter_delegate = reject_one as *const () as usize);
+    assert_eq!(summary(filtered), [(handle(objects[2]), 32.0, 1.0)], "the filter delegate drops a handle");
+    assert!(hits(w, &down(500.0)).is_empty());
+    reference::release(r);
+    reference::service();
+    crate::fs::remove_search_path("GAME", dir.to_str().unwrap());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 /// corpus/mapworld ships the fixture pak; `UNDERBOX_BLESS=1` rewrites it after a fixture change.
 #[test]
 fn corpus_pak_matches_the_fixture() {

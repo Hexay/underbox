@@ -4,6 +4,7 @@
 //! reads the map's visibility (see [`pvs`]).
 
 mod entity;
+pub mod mesh_trace;
 mod placement;
 pub mod pvs;
 pub mod reference;
@@ -93,4 +94,5 @@ pub fn register(r: &mut Registry) {
     });
     entity::register(r);
     pvs::register(r);
+    mesh_trace::register(r);
 }
