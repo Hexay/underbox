@@ -62,13 +62,10 @@ pub fn texture(gpu: &render::Gpu, dim: D, sample: TextureSampleType) -> wgpu::Te
     TEXTURES.lock().unwrap().entry((dim, sample)).or_insert_with(|| create(gpu, dim, sample)).clone()
 }
 
-/// `r_max_anisotropy` of the Low texture quality profile (core/cfg/quality_profiles.json), the
-/// preset real auto-detects on the CPU device. TODO: read the convar once native convars exist.
-const MAX_ANISOTROPY: u16 = 4;
-
-/// The default sampler for a binding of `kind`; `anisotropic` for a vfx `Filter( ANISO )`.
+/// The default sampler for a binding of `kind`; `anisotropic` for a vfx `Filter( ANISO )`, up to
+/// `r_max_anisotropy`.
 pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu::CompareFunction>, anisotropic: bool) -> wgpu::Sampler {
-    let anisotropy = if anisotropic && kind == SamplerBindingType::Filtering { MAX_ANISOTROPY } else { 1 };
+    let anisotropy = if anisotropic && kind == SamplerBindingType::Filtering { crate::render::convars::max_anisotropy() } else { 1 };
     let mut cache = SAMPLERS.lock().unwrap();
     cache
         .entry((kind, compare, anisotropy))
