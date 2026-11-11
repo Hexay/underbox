@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 pub type Ref = NativeRef<class::IPhysicsBody>;
 
 /// managed's `PhysicsBodyCreationFlags`.
-const GRAVITY: u32 = 1 << 0;
-const AUTO_SLEEP: u32 = 1 << 1;
-const AWAKE: u32 = 1 << 2;
+pub(super) const GRAVITY: u32 = 1 << 0;
+pub(super) const AUTO_SLEEP: u32 = 1 << 1;
+pub(super) const AWAKE: u32 = 1 << 2;
 const BULLET: u32 = 1 << 3;
 const OVERRIDE_MASS_CENTER: u32 = 1 << 4;
 

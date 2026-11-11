@@ -63,6 +63,8 @@ pub struct World {
     pub(crate) mass: HashMap<RigidBodyHandle, BodyMass>,
     pub(crate) contacts: Contacts,
     pub(crate) joints: Joints,
+    /// Auto-sleeping bodies' thresholds (inches/s); see `sleep.rs`.
+    pub(crate) sleep_thresholds: HashMap<RigidBodyHandle, f32>,
     awake: HashSet<RigidBodyHandle>,
     activity: Vec<Activity>,
 }
@@ -75,6 +77,9 @@ impl Default for World {
         // speculative margin fitted better but kept bodies near animated ones awake (zoo chairs).
         inner.integration_parameters.num_internal_pgs_iterations = 2;
         inner.integration_parameters.num_internal_stabilization_iterations = 3;
+        // Fitted to real's resting depths: 0.0086 on the ground, stacks as in rest_tests.rs.
+        inner.integration_parameters.static_contact_softness.natural_frequency = 50.0;
+        inner.integration_parameters.contact_softness.natural_frequency = 25.0;
         inner.gravity = DEFAULT_GRAVITY;
         Self {
             inner,
@@ -85,6 +90,7 @@ impl Default for World {
             mass: HashMap::new(),
             contacts: Contacts::default(),
             joints: Joints::default(),
+            sleep_thresholds: HashMap::new(),
             awake: HashSet::new(),
             activity: Vec::new(),
         }
@@ -133,6 +139,7 @@ impl World {
         self.inner.integration_parameters.dt = dt;
         self.inner.integration_parameters.num_solver_iterations = substeps.max(MIN_SUBSTEPS) as usize;
         self.drive_joints();
+        self.arm_sleep();
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
         self.inner.step_with_events(&hooks, &());
         self.clamp_speeds();
@@ -188,6 +195,7 @@ impl World {
         let body = RigidBodyBuilder::new(kind.rapier()).pose(pose).can_sleep(self.sleeping);
         let id = self.inner.insert_body(body);
         self.mass.insert(id, BodyMass::default());
+        self.set_auto_sleep(id, self.sleeping, crate::sleep::DEFAULT_SLEEP_THRESHOLD);
         id
     }
 
@@ -201,6 +209,7 @@ impl World {
         }
         self.inner.remove_body_with_colliders(id, true);
         self.mass.remove(&id);
+        self.sleep_thresholds.remove(&id);
         self.awake.remove(&id);
         let joints = &self.inner.impulse_joints;
         self.joints.entries.retain(|h, _| joints.contains(*h));
