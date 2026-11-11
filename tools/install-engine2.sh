@@ -31,3 +31,14 @@ sh "$ROOT/tools/nuget-file.sh" SkiaSharp.NativeAssets.Linux 3.116.0 runtimes/lin
 # The client shapes text with HarfBuzzSharp (SkiaSharp.HarfBuzz 3.116.0 pulls 8.3.0).
 sh "$ROOT/tools/nuget-file.sh" HarfBuzzSharp.NativeAssets.Linux 8.3.0 runtimes/linux-x64/native/libHarfBuzzSharp.so \
     "$NATIVE/libHarfBuzzSharp.so"
+# s&box's DLLImportResolver can miss an assembly under load, and .NET's fallback then probes only
+# the game dir and bin/managed. Symlinks share the inode, so the loader never maps a second copy.
+if [ -d "$GAME/bin/managed" ]; then
+    for f in libSkiaSharp libHarfBuzzSharp; do ln -sfn "../linuxsteamrt64/$f.so" "$GAME/bin/managed/$f.so"; done
+    ln -sfn ../linuxsteamrt64/libsteam_api.so "$GAME/bin/managed/libsteam_api64.so"
+fi
+
+for f in libengine2 libvfx_vulkan libfilesystem_stdio libsteam_api libSkiaSharp libHarfBuzzSharp; do
+    [ "$(od -An -tx1 -N4 "$NATIVE/$f.so" 2>/dev/null | tr -d ' ')" = 7f454c46 ] ||
+        { echo "install-engine2: $NATIVE/$f.so is missing or not ELF; refusing to boot" >&2; exit 3; }
+done

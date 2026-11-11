@@ -4,7 +4,7 @@
 # Stops GRACE (default 2) seconds after a log line matches UNTIL, else at max-seconds. UNTIL defaults
 # to 'Server is idle' for a plain boot and to none (run to max-seconds) when server args are given.
 # Log: $OUT/server.log (default target/boot). Each stub slot logs once, on its first call.
-# Runs in this worktree's private game dir (tools/game-dir.sh); no lock needed around it.
+# Runs in a game dir copy no other boot touches (tools/game-dir.sh); no lock needed around it.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 SECS=${1:-60}
@@ -20,11 +20,15 @@ for fd in /proc/$$/fd/[3-9]; do
 done
 OUT=${OUT:-$ROOT/target/boot}
 mkdir -p "$OUT"
+# Before anything can fail: callers grep this log, and a stale one passes their checks. Also before
+# the fork: the watcher's tail can open the log before the job's redirect truncates it.
+: > "$OUT/server.log"
 t0=$(date +%s.%N)
 lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 
 sh "$ROOT/tools/submodules.sh"
-GAME=$(sh "$ROOT/tools/game-dir.sh" "$SBOX")
+GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX")
+trap 'rm -f "$GAME/.underbox-lease.$$"' EXIT
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
 sh "$ROOT/tools/install-engine2.sh" "$GAME"

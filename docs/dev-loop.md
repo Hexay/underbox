@@ -28,14 +28,26 @@
 
 `sbox-public/game` holds the shared managed build: `game-dir.sh` builds the server or client launcher there and
 ReadyToRun-compiles `game/bin/managed` (`tools/r2r-managed.sh`), both under the boot lock. Each
-worktree then boots in its own reflinked copy, `/srv/agents/cache/underbox-game/<worktree>-<hash>`,
-re-copied (about 0.5 s, no extra disk; `logs/` is skipped) when a managed dll or `.underbox-*`
-stamp in the shared dir is newer than the copy. With nothing to do, no lock is taken. A copy can be
-deleted any time. Ports come from `tools/worktree-port.sh`, so servers don't collide either.
+boot then runs in a reflinked copy, `/srv/agents/cache/underbox-game/<worktree>-<hash>.vXXXXXX`
+(about 0.5 s, no extra disk; `logs/` is skipped); `<worktree>-<hash>.current` names the newest. A
+boot reuses that copy unless a managed dll or `.underbox-*` stamp in the shared dir is newer, or
+another live boot uses it; then it gets a fresh one. Only shared work (a build, R2R, a copy from
+the shared dir) takes the boot lock; the per-worktree `.lock` is held for well under a second.
+
+A copy in use is never changed or deleted. A boot leases its copy (`.underbox-lease.<pid>`) before
+building engine2, and a copy is deleted only once no live lease and no process cwd is in it. A
+running server keeps loading by path (`libvfx_vulkan.so`, `getcwd`): re-copying under it used to
+load a second libengine2, which aborts in protobuf ("File already exists in database"), or fail
+in `GetCwd`. Unused copies can be deleted any time.
 
 A script that changes the shared build (a dotnet build into `game/`) runs under `boot-lock.sh`;
-copies pick the change up on their next boot. One boot per worktree at a time: a re-copy swaps
-the directory under a running one.
+boots pick the change up on their next start. Ports come from `tools/worktree-port.sh`, so
+servers in different worktrees don't collide; two servers in one worktree still share a port.
+
+`install-engine2.sh` installs NuGet natives via `nuget-file.sh` (cached in
+`~/.cache/underbox/nuget`, written by rename), links them into `bin/managed` for .NET's fallback
+probe (s&box's DLLImportResolver can miss an assembly), and exits 3 naming any required native
+that is missing or not ELF. `match.sh` prints that line instead of an opaque DllNotFound.
 
 ## Incremental
 
