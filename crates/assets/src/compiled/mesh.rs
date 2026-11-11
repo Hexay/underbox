@@ -134,11 +134,15 @@ pub fn write(mesh: &Mesh, packing: vbib::Packing) -> Vec<u8> {
 
 /// A standalone `.vmesh_c`: buffers from its VBIB block, else KV3 buffers in DATA.
 pub fn read(file: &[u8]) -> Result<Mesh, Error> {
-    let data = super::kv3_block(file, b"DATA", "DATA")?;
-    let data = data.as_object().ok_or_else(|| format("mesh DATA isn't an object"))?;
+    read_with_data(file).map(|(m, _)| m)
+}
+
+/// As [`read`], with the DATA object (attachments, hitboxes and the morph set live there).
+pub fn read_with_data(file: &[u8]) -> Result<(Mesh, Object), Error> {
+    let Value::Object(data) = super::kv3_block(file, b"DATA", "DATA")? else { return Err(format("mesh DATA isn't an object")) };
     let buffers = match crate::container::block(file, b"VBIB")? {
         Some(b) => vbib::read(b)?,
-        None => vbib::from_kv3(data, file)?,
+        None => vbib::from_kv3(&data, file)?,
     };
-    build(data, &buffers)
+    Ok((build(&data, &buffers)?, data))
 }

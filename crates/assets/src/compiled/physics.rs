@@ -1,6 +1,6 @@
 //! Physics aggregates (`VPhysXAggregateData_t`): a `.vphys_c` DATA block, or a model's PHYS block.
-//! Parts with their spheres, capsules, hulls and triangle meshes, bind poses, surfaces and
-//! collision attributes. Hull and mesh BVH/topology fields are skipped: consumers rebuild them.
+//! Parts with their spheres, capsules, hulls, triangle meshes and compounds, bind poses, surfaces,
+//! collision attributes and joints ([`super::joint`]). Hull and mesh BVH/topology fields are skipped: consumers rebuild them.
 
 use super::kv::{self, array, float, float_or, floats, int, int_value, list, obj, objects, text, vec3};
 use super::{Error, format};
@@ -56,6 +56,7 @@ pub struct Aggregate {
     pub surfaces: Vec<u32>,
     /// Each collision attribute's interaction tags.
     pub attributes: Vec<Vec<String>>,
+    pub joints: Vec<super::joint::Joint>,
 }
 
 fn ids(o: &Object) -> Ids {
@@ -96,22 +97,36 @@ fn materials(o: &Object, triangles: usize) -> Vec<u32> {
     }
 }
 
+impl Shapes {
+    fn add_sphere(&mut self, sphere: &Object, ids: Ids) {
+        self.spheres.push((vec3(sphere, "m_vCenter"), float(sphere, "m_flRadius"), ids));
+    }
+
+    fn add_capsule(&mut self, c: &Object, ids: Ids) {
+        let ends = array(c, "m_vCenter");
+        self.capsules.push((kv::floats_of(ends.first()), kv::floats_of(ends.get(1)), float(c, "m_flRadius"), ids));
+    }
+
+    fn add_mesh(&mut self, m: &Object, ids: Ids) {
+        let triangles = triangles(m);
+        self.meshes.push(TriMesh { vertices: vertices(m), materials: materials(m, triangles.len()), triangles, ids });
+    }
+}
+
+/// A part's `m_rnShape`. Compounds (`m_compounds[].m_Compound`) are flattened into the other
+/// lists, their children taking the compound's surface and attribute.
 fn shapes(o: &Object) -> Shapes {
     let mut s = Shapes::default();
-    for d in objects(o, "m_spheres") {
-        let sphere = kv::object(d, "m_Sphere");
-        s.spheres.push((vec3(sphere, "m_vCenter"), float(sphere, "m_flRadius"), ids(d)));
-    }
-    for d in objects(o, "m_capsules") {
-        let c = kv::object(d, "m_Capsule");
-        let ends = array(c, "m_vCenter");
-        s.capsules.push((kv::floats_of(ends.first()), kv::floats_of(ends.get(1)), float(c, "m_flRadius"), ids(d)));
-    }
+    objects(o, "m_spheres").for_each(|d| s.add_sphere(kv::object(d, "m_Sphere"), ids(d)));
+    objects(o, "m_capsules").for_each(|d| s.add_capsule(kv::object(d, "m_Capsule"), ids(d)));
     s.hulls = objects(o, "m_hulls").map(|d| (vertices(kv::object(d, "m_Hull")), ids(d))).collect();
-    for d in objects(o, "m_meshes") {
-        let m = kv::object(d, "m_Mesh");
-        let triangles = triangles(m);
-        s.meshes.push(TriMesh { vertices: vertices(m), materials: materials(m, triangles.len()), triangles, ids: ids(d) });
+    objects(o, "m_meshes").for_each(|d| s.add_mesh(kv::object(d, "m_Mesh"), ids(d)));
+    for d in objects(o, "m_compounds") {
+        let (c, i) = (kv::object(d, "m_Compound"), ids(d));
+        objects(c, "m_Spheres").for_each(|x| s.add_sphere(x, i));
+        objects(c, "m_Capsules").for_each(|x| s.add_capsule(x, i));
+        s.hulls.extend(objects(c, "m_Hulls").map(|h| (vertices(h), i)));
+        objects(c, "m_Meshes").for_each(|x| s.add_mesh(x, i));
     }
     s
 }
@@ -150,7 +165,7 @@ pub fn from_kv3(o: &Object) -> Aggregate {
     let attributes = objects(o, "m_collisionAttributes")
         .map(|a| if a.get("m_InteractAsStrings").is_some() { kv::strings(a, "m_InteractAsStrings") } else { kv::strings(a, "m_PhysicsTagStrings") })
         .collect();
-    Aggregate { parts, surfaces: kv::ints(o, "m_surfacePropertyHashes").into_iter().map(|h| h as u32).collect(), attributes }
+    Aggregate { parts, surfaces: kv::ints(o, "m_surfacePropertyHashes").into_iter().map(|h| h as u32).collect(), attributes, joints: super::joint::read(o) }
 }
 
 /// A `.vphys_c` file.
@@ -212,7 +227,7 @@ pub fn write_kv3(a: &Aggregate) -> Value {
         ("m_boneParents", parents),
         ("m_surfacePropertyHashes", list(a.surfaces.iter().map(|&h| int_value(h)))),
         ("m_collisionAttributes", list(attributes)),
-        ("m_joints", list([])),
+        ("m_joints", super::joint::write(&a.joints)),
     ])
 }
 

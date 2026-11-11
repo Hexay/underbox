@@ -1,6 +1,10 @@
 //! Reading compiled resource files for managed (`EngineGlue.ReadCompiledResourceFile*`), and the
-//! compiled texture and material loaders the render path can call ([`texture`], [`material`]).
+//! compiled texture and material loaders the render path can call ([`texture`], [`material`]),
+//! and compiled models' animation data ([`anim`]).
 
+pub mod anim;
+#[cfg(test)]
+mod anim_tests;
 pub mod material;
 #[cfg(test)]
 mod tests;

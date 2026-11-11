@@ -132,7 +132,5 @@ pub fn register(r: &mut Registry) {
     bind!(r, m::GET_ANIMATION_NAME, |model, i| StrRet::from(idx(i).and_then(|i| data::of(model).anim.animation_names().nth(i).map(str::to_owned))));
     bind!(r, m::GET_SEQUENCE_NAMES, sequence_names);
     bind!(r, m::GET_ANIMATION_GRAPH_NAME, |model| StrRet::from(data::of(model).anim.graph.clone()));
-    bind!(r, m::NUM_FLEX_CONTROLLERS, |_| 0);
-    bind!(r, m::HAS_ANIMATION_DRIVEN_FLEXES, |_| false);
     bind!(r, m::GET_NUM_WEIGHTLISTS, |_| 0);
 }

@@ -15,11 +15,24 @@ pub struct Clip {
     pub delta: bool,
     pub interpolate: bool,
     pub hidden: bool,
+    /// `morphs[f][controller]` over the model's flex controllers ([`crate::ModelAnim::flex`]);
+    /// empty when the clip drives no morphs.
+    pub morphs: Vec<Vec<f32>>,
 }
 
 impl Clip {
     pub fn new(name: &str, fps: f32) -> Self {
-        Self { name: name.to_owned(), fps, frames: Vec::new(), looping: false, delta: false, interpolate: true, hidden: false }
+        Self { name: name.to_owned(), fps, frames: Vec::new(), looping: false, delta: false, interpolate: true, hidden: false, morphs: Vec::new() }
+    }
+
+    /// Each flex controller's value at `time`; `None` when the clip drives no morphs.
+    pub fn morphs_at(&self, time: f32) -> Option<Vec<f32>> {
+        let last = self.morphs.len().checked_sub(1)?;
+        let f = self.frame_at(time);
+        let i = (f.floor() as usize).min(last);
+        let j = (i + 1).min(last);
+        let t = if self.interpolate { f - i as f32 } else { 0.0 };
+        Some(self.morphs[i].iter().zip(&self.morphs[j]).map(|(a, b)| a + (b - a) * t).collect())
     }
 
     /// Seconds from the first frame to the last: a looping clip's last frame repeats its first.
@@ -115,6 +128,14 @@ mod tests {
         c.interpolate = false;
         let p = c.sample(0.15, &Pose::zero(1));
         assert_eq!(p.0[0].pos.x, 10.0);
+    }
+
+    #[test]
+    fn morph_tracks_interpolate() {
+        let mut c = walk();
+        assert_eq!(c.morphs_at(0.1), None);
+        c.morphs = vec![vec![0.0], vec![1.0], vec![1.0]];
+        assert_eq!(c.morphs_at(0.05), Some(vec![0.5]));
     }
 
     #[test]

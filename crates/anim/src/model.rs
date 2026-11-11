@@ -96,6 +96,8 @@ pub struct ModelAnim {
     /// Names of clips the source lists but whose keys we couldn't build (missing FBX).
     pub clip_names: Vec<String>,
     pub graph: Option<String>,
+    /// Flex controller names, in the order clips' morph tracks use.
+    pub flex: Vec<String>,
 }
 
 impl ModelAnim {

@@ -9,6 +9,7 @@ mod controller;
 mod controller_debug;
 mod conv;
 pub mod data;
+pub mod flex;
 mod graph;
 mod graph_builder;
 mod model_slots;
@@ -28,6 +29,7 @@ pub fn register(r: &mut abi::Registry) {
     controller_debug::register(r);
     bone_slots::register(r);
     playback_slots::register(r);
+    flex::register(r);
     builder::register(r);
     resources::register(r);
     abi::bind!(r, abi::slots::g_p_animation_system_utils::MAINTAIN_DECODE_CACHES, || {});

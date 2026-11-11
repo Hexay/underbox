@@ -13,11 +13,12 @@ use std::sync::{Arc, Once};
 const WORLD_PHYSICS: &str = "maps/compiledtest/world_physics.vphys";
 
 /// One game folder with the fixture files for every test here, on the search paths.
-fn game_dir() -> PathBuf {
+pub(super) fn game_dir() -> PathBuf {
     static MOUNT: Once = Once::new();
     let dir = std::env::temp_dir().join(format!("underbox_compiled_{}", std::process::id()));
     MOUNT.call_once(|| {
         let mut files = fixture::crate_files();
+        files.extend(fixture::rigged_files());
         files.push((format!("{WORLD_PHYSICS}_c"), assets::compiled::physics::write(&fixture::world_physics(256.0, &[]))));
         for (path, bytes) in files {
             let file = dir.join(path);
@@ -70,6 +71,24 @@ fn compiled_material_has_shader_params_and_textures() {
     assert_eq!(m.textures.len(), 1);
     let t = crate::render::texture::resolve(m.textures[0].1).unwrap();
     assert!(!crate::resource::Resource::is_error(&*t), "made from the compiled texture");
+}
+
+#[test]
+fn compiled_ragdoll_spawns_jointed_bodies() {
+    crate::handles::fake_managed();
+    game_dir();
+    let r = crate::model::load(Some(&std::ffi::CString::new(fixture::RIGGED).unwrap()), abi::Guid::default());
+    let data = crate::model::get(r).and_then(|m| m.content.physics.clone()).expect("ragdoll");
+    let joints: Vec<_> = (0..data.joints.len()).filter_map(|i| data.joint(i)).collect();
+    assert_eq!(joints.iter().map(|j| (j.kind, j.body1, j.body2)).collect::<Vec<_>>(), [(4, 0, 1), (3, 1, 2)]);
+    assert!(joints[0].enable_swing_limit && joints[0].enable_twist_limit && joints[0].swing_limit == [0.0, 0.5]);
+    assert_eq!((joints[1].twist_limit, joints[1].angular_frequency), ([-0.75, 0.75], 4.0));
+    let w = new_world();
+    let doll = aggregate::spawn(w, data, identity(), 1).unwrap();
+    let a = aggregate::get(doll).unwrap();
+    assert_eq!((a.bodies.len(), a.joints.lock().unwrap().len()), (3, 2));
+    assert_eq!(a.bodies.iter().map(|(bone, _)| bone.as_str()).collect::<Vec<_>>(), ["root", "spine", "head"]);
+    aggregate::destroy(doll);
 }
 
 fn new_world() -> world::Ref {

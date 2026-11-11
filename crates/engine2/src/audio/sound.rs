@@ -14,8 +14,15 @@ use std::sync::{Arc, LazyLock, Mutex};
 pub type SfxRef = NativeRef<class::CSfxTable>;
 type SoundRef = NativeRef<class::VSound_t>;
 
+/// Where a precached sound decodes from.
+enum Origin {
+    File(PathBuf),
+    /// A `.vsnd_c` resource path.
+    Compiled(String),
+}
+
 enum Load {
-    Pending(Option<PathBuf>),
+    Pending(Option<Origin>),
     Ready(Source),
     Failed,
 }
@@ -33,8 +40,13 @@ impl Sfx {
     /// The decoded source, decoding it now if it hasn't been.
     pub fn source(&self) -> Option<Source> {
         let mut load = self.load.lock().unwrap();
-        if let Load::Pending(path) = &*load {
-            *load = path.as_ref().and_then(|p| decode_file(p)).map_or(Load::Failed, |pcm| Load::Ready(Source::Pcm(Arc::new(pcm))));
+        if let Load::Pending(origin) = &*load {
+            let pcm = match origin {
+                Some(Origin::File(p)) => decode_file(p),
+                Some(Origin::Compiled(p)) => super::compiled::decode(p),
+                None => None,
+            };
+            *load = pcm.map_or(Load::Failed, |pcm| Load::Ready(Source::Pcm(Arc::new(pcm))));
         }
         match &*load {
             Load::Ready(s) => Some(s.clone()),
@@ -60,11 +72,12 @@ fn decode_file(path: &std::path::Path) -> Option<Pcm> {
         .ok()
 }
 
-/// A `.vsnd` resource path's source file: the same path with an audio extension.
-/// TODO: compiled `.vsnd_c`.
-fn resolve(name: &str) -> Option<PathBuf> {
+/// A `.vsnd` resource path's source file (the same path with an audio extension), else its
+/// compiled `.vsnd_c`.
+fn resolve(name: &str) -> Option<Origin> {
     let stem = name.strip_suffix(".vsnd").or_else(|| name.strip_suffix(".vsnd_c")).unwrap_or(name);
-    audio::decode::SOURCE_EXTENSIONS.iter().find_map(|ext| crate::fs::resolve(&format!("{stem}.{ext}"), "GAME"))
+    let file = audio::decode::SOURCE_EXTENSIONS.iter().find_map(|ext| crate::fs::resolve(&format!("{stem}.{ext}"), "GAME"));
+    file.map(Origin::File).or_else(|| super::compiled::path(stem).map(Origin::Compiled))
 }
 
 /// Tables live as long as the process (managed has no slot to free one), so one per name.
@@ -79,7 +92,7 @@ fn precache(name: Option<&CStr>) -> SfxRef {
     }
     let path = resolve(&name);
     if path.is_none() {
-        abi::rt::log::warn(&format!("sound {name}: no source file"));
+        abi::rt::log::warn(&format!("sound {name}: no source or compiled file"));
     }
     let r = objects::create_shared(Arc::new(Sfx { name, load: Mutex::new(Load::Pending(path)) }));
     cache.insert(key, r);
