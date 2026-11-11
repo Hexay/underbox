@@ -28,7 +28,7 @@ pub fn on_present(gpu: &render::Gpu, name: &str, n: u64, color: &render::Texture
     let Some(mut frame) = color.read_region(gpu, 0, [0, 0, color.desc.width, color.desc.height]) else { return };
     // A window's surface is often BGRA; dumps and hashes are RGBA.
     if matches!(color.desc.format, render::wgpu::TextureFormat::Bgra8Unorm | render::wgpu::TextureFormat::Bgra8UnormSrgb) {
-        frame.pixels.chunks_exact_mut(4).for_each(|p| p.swap(0, 2));
+        frame.pixels.as_chunks_mut::<4>().0.iter_mut().for_each(|p| p.swap(0, 2));
     }
     let hash = frame.hash();
     abi::rt::log::log(abi::rt::log::Level::Info, &format!("frame: {name} #{n} {}x{} {hash}", frame.width, frame.height));

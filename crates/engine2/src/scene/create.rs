@@ -8,7 +8,14 @@ use abi::{Registry, bind, class};
 
 pub fn register(r: &mut Registry) {
     use class::{CDecalSceneObject as Decal, CEnvMapSceneObject as EnvMap};
-    bind!(r, system::CREATE_ENV_MAP, |w, _projection| object::create::<EnvMap, _>(w, Kind::EnvMapSceneObject, State::default()));
+    bind!(r, system::CREATE_ENV_MAP, |w, _projection| {
+        let (native, env) = object::create_native::<EnvMap, _>(w, Kind::EnvMapSceneObject, State::default(), None);
+        // Native starts every env map on a default cubemap: managed's SceneCubemap.Texture setter
+        // reads the old one back through Texture.FromNative, which throws on null (EnvmapProbe).
+        let default = crate::render::texture::load(Some(c"textures/cubemaps/default2.vtex"), Default::default());
+        abi::rt::fields::set::<_, { abi::slots::c_env_map_scene_object::GET_M_H_ENV_MAP_TEXTURE.index }>(native.as_raw().cast(), default);
+        env
+    });
     bind!(r, system::CREATE_LIGHT_PROBE_VOLUME, |w| {
         object::create::<class::CSceneLightProbeVolumeObject, _>(w, Kind::SceneLightProbeVolumeObject, State::default())
     });
