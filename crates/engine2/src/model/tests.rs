@@ -62,12 +62,22 @@ fn body_parts_come_from_mesh_group_names() {
     };
     let m = super::get(super::create_runtime("models/test/parts.vmdl", content)).unwrap();
     let parts = parts::parts(&m);
-    let summary: Vec<_> = parts.iter().map(|p| (p.name.as_str(), p.groups.clone())).collect();
-    assert_eq!(summary, vec![("body", vec![0, 1]), ("head", vec![2])]);
-    assert_eq!(parts::group_name(&m, 0).as_deref(), Some("default"), "a model without skins has one");
+    let summary: Vec<_> = parts.iter().map(|p| (p.name.as_str(), p.choices.iter().map(|c| c.1).collect::<Vec<_>>())).collect();
+    assert_eq!(summary, vec![("body", vec![1, 2]), ("head", vec![4])]);
+    assert_eq!(parts::group_name(&m, 0), None, "a model without skins has none");
     assert_eq!(parts::max_lod(&m), 1);
     assert_eq!(parts::lod_for_screen_size(&m, 10.0, 1.0), 1);
     assert_eq!(parts::lod_for_screen_size(&m, 100.0, 1.0), 0);
+}
+
+#[test]
+fn a_file_model_without_mesh_groups_has_one_body_part() {
+    let content = || Content { meshes: vec![ModelMesh { mesh: quad(0.0), group_mask: 1, lod_mask: ALL_LODS }], ..Default::default() };
+    let m = super::get(super::create_runtime("models/dev/box.vmdl", content())).unwrap();
+    let summary: Vec<_> = parts::parts(&m).into_iter().map(|p| (p.name, p.choices)).collect();
+    assert_eq!(summary, vec![("Body".to_owned(), vec![("box".to_owned(), u64::MAX)])]);
+    let procedural = super::get(super::create_runtime(&format!("{}0", super::RUNTIME_PREFIX), content())).unwrap();
+    assert!(parts::parts(&procedural).is_empty());
 }
 
 #[test]

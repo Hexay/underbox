@@ -84,7 +84,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, m::GET_BONE_TRANSFORM, bone_transform);
     bind!(r, m::BONE_POS_PARENT_SPACE, |model, i| to_v3(local_bone(model, i).pos));
     bind!(r, m::BONE_ROT_PARENT_SPACE, |model, i| to_rot(local_bone(model, i).rot));
-    bind!(r, m::GET_SKELETON_NAME, |model| StrRet::from(crate::model::name(model)));
+    // A model names a skeleton only when it references a `.vnmskel`; no core model does.
+    bind!(r, m::GET_SKELETON_NAME, |_| StrRet::from(String::new()));
 
     bind!(r, m::GET_NUM_ATTACHMENTS, |model| data::of(model).anim.attachments.len() as i32);
     bind!(r, m::GET_ATTACHMENT, |model, i| idx(i).map(|i| data::of(model).attachment_ref(i)).unwrap_or_default());

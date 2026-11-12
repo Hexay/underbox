@@ -74,6 +74,7 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let model = LOADED.find_or_insert(&name, || {
         if let Some(m) = compiled::read(&name) {
+            let guid = crate::resource_guid::or_path(guid, &source_path(&name));
             return Model { name: name.clone(), content: compiled::content(&m), error: false, guid };
         }
         let (mut content, error) = match compile(&name) {
@@ -83,6 +84,7 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
         if error || source_path(&name) == ERROR_MODEL {
             content.physics = physics::error::physics();
         }
+        let guid = if error { guid } else { crate::resource_guid::or_path(guid, &source_path(&name)) };
         Model { name: name.clone(), content, error, guid }
     });
     resource::new_handle(model)
@@ -106,9 +108,17 @@ pub fn get(r: Ref) -> Option<Arc<Model>> {
     resource::resolve::<_, Model>(r)
 }
 
-/// A live model's resource name.
+/// A live model's name, unique per model: the key for its animation data.
 pub fn name(r: Ref) -> Option<String> {
     on(r, |m| Some(m.name.clone()))
+}
+
+/// Unnamed `CModelBuilder` models are keyed `{RUNTIME_PREFIX}N`; real names them all alike.
+pub const RUNTIME_PREFIX: &str = "__runtime_model_";
+
+/// The resource name managed sees.
+fn resource_name(r: Ref) -> Option<String> {
+    name(r).map(|n| if n.starts_with(RUNTIME_PREFIX) { "sbox_procedural_model.vmdl".to_owned() } else { n })
 }
 
 /// A model's render bounds; zero for a dead handle.
@@ -144,9 +154,9 @@ fn total_counts(m: &Model) -> (i32, i32, i32) {
 
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::c_model, Model);
-    bind!(r, glue::GET_MODEL, load);
-    bind!(r, glue::GET_MODEL_RESOURCE_NAME, |r| StrRet::from(name(r)));
-    bind!(r, m::GET_MODEL_NAME, |r| StrRet::from(name(r)));
+    bind!(r, glue::GET_MODEL, |p, g| crate::resource_loaded::flushed(load(p, g)));
+    bind!(r, glue::GET_MODEL_RESOURCE_NAME, |r| StrRet::from(resource_name(r)));
+    bind!(r, m::GET_MODEL_NAME, |r| StrRet::from(resource_name(r)));
     bind!(r, m::GET_NUM_MESHES, |r| on(r, |m| m.content.meshes.len() as i32));
     bind!(r, m::GET_MESH_NAME, |r, i| StrRet::from(on(r, |m| m.content.mesh(i).map(|x| x.mesh.name.clone()))));
     bind!(r, m::GET_MESH_INFO, |r, i, vc, tc, draws, lods, tt, lo, hi| mesh_info(r, i, [vc, tc, draws, lods, tt], lo, hi));

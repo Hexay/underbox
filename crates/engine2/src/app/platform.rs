@@ -18,6 +18,13 @@ pub fn game_root() -> String {
     if root.is_empty() { ".".into() } else { root.clone() }
 }
 
+fn with_trailing_slash(mut dir: String) -> String {
+    if !dir.ends_with('/') {
+        dir.push('/');
+    }
+    dir
+}
+
 /// The command line managed handed `SourceEnginePreInit`.
 pub fn command_line() -> String {
     COMMAND_LINE.read().unwrap().clone()
@@ -30,7 +37,7 @@ fn string(s: Option<&CStr>) -> String {
 pub fn register(r: &mut Registry) {
     bind!(r, global::PLAT_SET_MODULE_FILENAME, |s| *MODULE_FILENAME.write().unwrap() = string(s));
     bind!(r, global::PLAT_SET_CURRENT_DIRECTORY, |s| *GAME_ROOT.write().unwrap() = string(s));
-    bind!(r, global::GET_GAME_ROOT_FOLDER, || StrRet::from(game_root()));
+    bind!(r, global::GET_GAME_ROOT_FOLDER, || StrRet::from(with_trailing_slash(game_root())));
     bind!(r, global::GET_GAME_SEARCH_PATH, || StrRet::from(game_root()));
 
     bind!(r, global::PLAT_GET_CURRENT_FRAME, || FRAME.load(Ordering::Relaxed));
@@ -39,8 +46,9 @@ pub fn register(r: &mut Registry) {
         FRAME.fetch_add(d as u64, Ordering::Relaxed);
     });
 
-    // A build of the public source is a development build, never Facepunch's retail one.
-    bind!(r, global::IS_RETAIL, || false);
+    // Real's shipped engine2 reports retail; managed then skips core shader hotload and queues
+    // analytics, which only post once logged in to the backend.
+    bind!(r, global::IS_RETAIL, || true);
     bind!(r, global::PLAT_IS_RUNNING_ON_CUSTOMER_MACHINE, || false);
     bind!(r, global::PLAT_SET_NO_ASSERT, || {});
     bind!(r, global::HAS_LAUNCH_PARAMETER, |p| has_launch_parameter(&string(p)));
@@ -58,12 +66,14 @@ pub fn register(r: &mut Registry) {
     bind!(r, global::SOURCE_ENGINE_INIT_STARTUP_WINDOW, |_| window::video::ensure());
     bind!(r, global::SOURCE_ENGINE_PRE_INIT, |cmd, _app| {
         *COMMAND_LINE.write().unwrap() = string(cmd);
+        crate::resource_loaded::set_main_thread();
         crate::fs::compile_core();
         // Managed's SteamClient.Init reads the flat interfaces right after this returns.
         let config = dict::current_config();
         if !config.dedicated_server {
             platform::get().start_client(config.steam_app_id);
         }
+        crate::resource_loaded::flush();
         true
     });
     // Before managed's Bootstrap.Init applies the quality profiles, which drop unknown names.
@@ -71,10 +81,12 @@ pub fn register(r: &mut Registry) {
         crate::render::convars::define();
         crate::convar::announce_all();
         crate::render::device::report_to_managed();
+        crate::resource_loaded::flush();
         true
     });
     // False asks managed's EngineLoop to quit. A client renders and presents its frame here.
     bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| {
+        crate::resource_loaded::flush();
         crate::render::game_window::frame();
         !crate::engine_glue::exit_requested()
     });

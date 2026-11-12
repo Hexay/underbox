@@ -100,12 +100,21 @@ reaches about 10,200 ticks for its 250 scene ticks. Everything before the first 
 ## First divergences
 
 Probe and showroom, calibrated against a second real run (2026-11-12). None was in the
-differential docs before.
+differential docs before. "Fixed" means the slot no longer diverges in a re-run probe tap.
 
-1. **Boot (both scenes).** Real's `IsRetail` returns 1, ours 0. `GetGameRootFolder` ends in `/` on
-   real and not on ours. During `SourceEnginePreInit` real calls `Resource.OnResourceLoaded` for
-   its error resources (`shaders/error.shader`, `materials/error.vmat`, `models/dev/error.vmesh`,
-   …); ours never fires that callback.
+1. **Boot (both scenes). Fixed** but for the preloads. `IsRetail` is 1 on ours too (managed then
+   skips core shader hotload and queues analytics, which post only when logged in), and
+   `GetGameRootFolder` ends in `/`. `Resource.OnResourceLoaded(name, file, size)`: real fires it for
+   every compiled resource file it reads, named without `_c`, with the whole file in memory (a
+   `.vtex` only its first 128 KiB; the rest streams), on the main thread: inside the getter that
+   loads it (`Glue_Resources_GetModel/GetMaterial/GetTexture`, `CreateRawMaterial`), during
+   `SourceEnginePreInit`/`SourceEngineInit` for its preloads, and during `SourceEngineFrame` for
+   `LoadResourceInManifest` loads and their dependencies. Ours (`crates/engine2/src/resource_loaded.rs`)
+   queues every `_c` read through `fs::read` or the shader loader and fires the queue from those
+   same slots, never from a `[nogc]` one. Still different: real preloads its error and UI
+   resources (`shaders/error.shader`, `materials/error.vmat`, `models/dev/error.vmesh`, dozens of
+   shaders) and a manifest's dependencies (`.sound` → `.vsnd`), which ours loads lazily or not at
+   all on a server, and sizes differ wherever ours compiled the file itself.
 2. **Physics world gravity (both).** A new world's `GetGravity` is (0, 0, −850) on real and −800 on
    ours (`physics::DEFAULT_GRAVITY`). The scene sets −850 straight after, so the step is unaffected,
    but a private `PhysicsWorld` keeps the default.
@@ -116,12 +125,23 @@ differential docs before.
 4. **Tick 1 (probe).** The sliding box's first step: real gives it vz = +1.5, ours −0.006, and
    its position 0.03 higher. This is the "vertical pop" in docs/differential.md (4). The resting
    bodies' sub-0.01 drifts follow.
-5. **GUIDs (showroom).** `CModel.GetGuid` and `IMaterial2.GetGuid` return all zeros on ours, and
-   `ResourceSystem.ResolvePathToGuid` fails (returns 0, GUID zero) for core GameResources such as
-   `ammo/9mm.ammo_c`, which real resolves.
-6. **Showroom content.** `PrecacheSound` of a missing `.vsnd` returns a handle on ours and null on
-   real. `CSceneLightObject.GetRadius` is 200 on ours and 0 on real for the same light.
-   `CModel.GetNumMaterialGroups` is 1 on ours and 0 on real.
+5. **GUIDs (showroom). Fixed.** A resource's GUID is its compiled file's `GUID` block (16 bytes,
+   .NET `Guid` byte order), which the resource compiler copies from the source's `.meta`
+   (`"guid"`); real's `box.vmdl` "GUID" is whatever that meta holds, pointer-like bytes and all.
+   `ResolvePathToGuid` and every handle's `GetGuid` read it (`resource_guid.rs`), falling back to
+   the `.meta` when ours compiled the file without the block. Raw and procedural resources stay zero
+   on both.
+6. **Showroom content. Fixed.** On a dedicated server real's `PrecacheSound` returns null for every
+   sound, present or not, though it still loads the file; ours returns null there and for a missing
+   file anywhere. A new light's radius is 0 (managed sets it for point and spot lights).
+   `GetNumMaterialGroups` counts `m_materialGroups`: 0 for the dev models.
+7. **Model metadata (probe `MODEL`). Fixed.** A file model without mesh groups has one body part,
+   `Body`, whose one choice is the file's stem with mask `u64::MAX`; a procedural one has none.
+   `GetSkeletonName` is "" (no core model references a `.vnmskel`). A model's own physics is named
+   `embedded_physics.vphys`. Unnamed `CModelBuilder` models are `sbox_procedural_model.vmdl` to
+   managed (ours keys their animation data by a unique internal name). Still different: an empty
+   `CModelBuilder` model has 0 meshes on real and our stand-in mesh on ours, and models compiled
+   from the dev `.vmdl` sources have no physics on ours (`GetPhysicsContainer` null).
 
 Noise that calibration doesn't remove: `ConVar.GetName` during registration pairs convars by
 position, so different registration orders read as `return`. The per-frame `PerformanceTrace` and

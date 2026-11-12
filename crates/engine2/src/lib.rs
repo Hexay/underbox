@@ -17,6 +17,8 @@ pub mod physics;
 mod physics2d;
 pub mod render;
 pub mod resource;
+mod resource_guid;
+mod resource_loaded;
 mod compress;
 mod net;
 mod resource_system;

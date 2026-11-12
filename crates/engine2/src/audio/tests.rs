@@ -96,12 +96,9 @@ fn vsound_handles_describe_the_sound() {
 }
 
 #[test]
-fn a_missing_sound_fails_to_load_instead_of_crashing() {
+fn a_missing_sound_precaches_to_null() {
     let table = unsafe { slot!(system::PRECACHE_SOUND: unsafe extern "C" fn(*const c_char) -> P)(c"sounds/nowhere.vsnd".as_ptr()) };
-    assert!(!table.is_null());
-    assert!(mixer(table).is_null());
-    assert_ne!(unsafe { slot!(sfx::FAILED_RESOURCE_LOAD: unsafe extern "C" fn(P) -> i32)(table) }, 0);
-    assert_eq!(unsafe { slot!(sfx::GET_CACHE_STATUS: unsafe extern "C" fn(P) -> i32)(table) }, 2);
+    assert!(table.is_null());
 }
 
 #[test]

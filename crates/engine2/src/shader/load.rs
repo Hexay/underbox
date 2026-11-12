@@ -82,7 +82,8 @@ fn compiled_path(path: &str) -> String {
 pub(super) fn from_resource_file(v: &Vfx, path: &str, flags: u32) -> bool {
     let compiled = compiled_path(path);
     let Some(file) = locate(&compiled) else { return false };
-    let result = std::fs::read(&file).map_err(|e| e.to_string()).and_then(|b| apply(v, &b, Some(&file), flags));
+    let bytes = std::fs::read(&file).inspect(|b| crate::resource_loaded::read(&compiled, b));
+    let result = bytes.map_err(|e| e.to_string()).and_then(|b| apply(v, &b, Some(&file), flags));
     result.inspect_err(|e| if e != "out of date" { warn(&format!("{}: {e}", file.display())) }).is_ok()
 }
 

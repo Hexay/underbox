@@ -90,11 +90,15 @@ fn precache(name: Option<&CStr>) -> SfxRef {
     if let Some(r) = cache.get(&key).filter(|r| objects::get::<_, Sfx>(**r).is_some()) {
         return *r;
     }
-    let path = resolve(&name);
-    if path.is_none() {
-        abi::rt::log::warn(&format!("sound {name}: no source or compiled file"));
+    // Real returns null for a missing file, and for every sound on a dedicated server (tap, 2026-11-12).
+    if crate::app::dict::current_config().dedicated_server {
+        return SfxRef::null();
     }
-    let r = objects::create_shared(Arc::new(Sfx { name, load: Mutex::new(Load::Pending(path)) }));
+    let Some(path) = resolve(&name) else {
+        abi::rt::log::warn(&format!("sound {name}: no source or compiled file"));
+        return SfxRef::null();
+    };
+    let r = objects::create_shared(Arc::new(Sfx { name, load: Mutex::new(Load::Pending(Some(path))) }));
     cache.insert(key, r);
     r
 }

@@ -101,6 +101,7 @@ fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = string(path);
     let material = LOADED.find_or_insert(&name, || match super::material_source::load(&name) {
         Some(src) => {
+            let guid = crate::resource_guid::or_path(guid, &crate::compiled::material::compiled_path(&name));
             let material = new(name.clone(), src.shader, false, guid);
             let mut p = material.params.lock().unwrap();
             p.vectors.extend(src.vectors);
@@ -161,8 +162,8 @@ pub(crate) fn set_vector(h: Ref, name: &str, v: Vector4) {
 
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::i_material2, Material);
-    bind!(r, system::CREATE_RAW_MATERIAL, create_raw);
-    bind!(r, glue::GET_MATERIAL, load);
+    bind!(r, system::CREATE_RAW_MATERIAL, |n, s, a| crate::resource_loaded::flushed(create_raw(n, s, a)));
+    bind!(r, glue::GET_MATERIAL, |p, g| crate::resource_loaded::flushed(load(p, g)));
     bind!(r, system::FIND_OR_CREATE_MATERIAL_FROM_RESOURCE, |path| load(path, Guid::default()));
     bind!(r, system::CREATE_PROCEDURAL_MATERIAL_COPY, |src, _kind, _recreate| resource::copy_handle::<_, Material>(src));
     bind!(r, system::FRAME_UPDATE, || {});
