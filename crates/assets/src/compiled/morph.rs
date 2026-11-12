@@ -176,11 +176,13 @@ pub fn write(m: &MorphSet) -> Value {
     obj(vec![
         ("m_nWidth", int_value(m.width as i64)),
         ("m_nHeight", int_value(m.height as i64)),
+        ("m_nLookupType", text("LOOKUP_TYPE_VERTEX_ID")),
+        ("m_nEncodingType", text("ENCODING_TYPE_OBJECT_SPACE")),
         ("m_bundleTypes", list(m.bundle_types.iter().map(kind))),
         ("m_morphDatas", list(m.morphs.iter().map(|(n, rects)| obj(vec![("m_name", text(n)), ("m_morphRectDatas", list(rects.iter().map(rect)))])))),
+        ("m_pTextureAtlas", resource(&m.atlas)),
         ("m_FlexDesc", list(m.descriptors.iter().map(|d| obj(vec![("m_szFacs", text(d))])))),
         ("m_FlexControllers", flex::write_controllers(&m.controllers)),
         ("m_FlexRules", flex::write_rules(&m.rules)),
-        ("m_pTextureAtlas", resource(&m.atlas)),
     ])
 }

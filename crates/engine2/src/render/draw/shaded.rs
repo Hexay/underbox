@@ -11,7 +11,7 @@ use crate::render::lighting::Lighting;
 use crate::render::{attributes, device, texture};
 use glam::{Mat4, Vec4};
 use render::wgpu;
-use render::{BufferKind, PipelineKey, VertexBufferKey};
+use render::{BufferKind, PipelineKey, RasterState, VertexBufferKey};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
@@ -49,6 +49,20 @@ pub fn resolve(material: Arc<Material>, layout: &Layout, instance: binding::Inst
     let mut values: HashMap<String, Vec4> = extra.into_iter().map(|(k, v)| (k.to_owned(), Vec4::splat(v))).collect();
     values.insert("UncompressedTangentFrame".into(), Vec4::splat(f32::from(u8::from(inputs.uncompressed_normals))));
     Some(Shaded { shading, vertex: inputs.keys, material, values, instance, view_proj, context })
+}
+
+impl Shaded {
+    /// `base` under the program's declared render states. The material stand-in culls back faces
+    /// unless the material sets `F_RENDER_BACKFACES`, as the closed shaders it replaces do
+    /// (vr_common_ps_code.fxc's `MATERIAL_CONTROLLED_BACKFACES`).
+    pub fn raster_state(&self, base: RasterState, reverse_z: bool) -> RasterState {
+        let base = if self.shading.label == shading::standin::PATH {
+            RasterState { cull: (!self.material.feature("F_RENDER_BACKFACES")).then_some(wgpu::Face::Back), ..base }
+        } else {
+            base
+        };
+        self.shading.render_state.apply(base, reverse_z)
+    }
 }
 
 /// Slot 1 (attribute defaults, stride 0) and slot 2 (instance ids from 0) for every shaded draw.

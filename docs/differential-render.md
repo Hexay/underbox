@@ -106,12 +106,23 @@ Ranked divergences:
     blend indices (root, spine) the vertex followed the root, with (spine, head) the spine, so
     real used the first weight only. Not the bone flags (real's compiler adds 0x80 to bones a
     mesh weights; ours now does too, no change) but the morph set: without it real blends exactly
-    as ours does. Real's mesh carrying our morph set skins by its first weight, and through
-    managed's renderer a morphed second mesh isn't drawn at all, so the puppet now has no morphs
-    (morphs stay covered by the rigged fixture's headless tests). Why our morph set does that is
-    open: there's no real compiled morph model to compare with. Before: 1.26 / 1.23 / 0.83, 0.983
-    (managed 1.32 / 1.29 / 0.56, 0.983). Left: ours draws the open puppet's inside faces, which
-    real culls.
+    as ours does. Before: 1.26 / 1.23 / 0.83, 0.983 (managed 1.32 / 1.29 / 0.56, 0.983). The
+    morph set's cause is 15; the open puppet's inside faces 14.
+14. **Fixed. Inside faces of the bowed puppet** (skinned). Ours drew them, real culls them. Our
+    material stand-in declared no `CullMode`, so it drew both sides; real's closed shaders cull
+    back faces unless the material sets `F_RENDER_BACKFACES` (vr_common_ps_code.fxc's
+    `MATERIAL_CONTROLLED_BACKFACES`). The stand-in now does the same (`Shaded::raster_state`).
+    Native 0.26 / 0.59 / 0.65, 0.9955 → 0.15 / 0.28 / 0.46, 0.9990; managed 0.57 / 0.62 /
+    0.39, 0.9958 → 0.46 / 0.31 / 0.20, 0.9992.
+15. **Fixed natively, content. Morphed meshes skinned by their first weight on real.** Real's
+    citizen model (fetched for this) names each mesh's atlas in CTRL as well as in MRPH:
+    `embedded_meshes[].morph_texture`. Ours wrote it only in MRPH; with the CTRL entry real
+    blends every weight. Bisected on the skinned scene's third puppet, `puppet_morphed` (smile
+    ramps over "bow"): without `morph_texture` 0.68 / 0.70 / 0.73, 0.9907 (its sides follow the
+    spine fully); with it 0.17 / 0.31 / 0.47, 0.9984. MRPH's `m_nLookupType` and
+    `m_nEncodingType`, which ours now writes as real does, made no difference. **Open:** through
+    managed's renderer real still draws no morphed puppet at all (managed 0.97 / 1.25 / 1.09,
+    0.9887), and logs nothing about it.
 13. **Fixed. Real's compiled models went dark on ours.** Real's core models store `NORMAL` as
     `R10G10B10A2_UNORM` (format 24), which ours didn't decode at all (zero normals). skinning_cs
     shows only the split (x, y, z 10 bits, w 2); `vs_decompress.fxc` is closed, so the decode was
@@ -133,11 +144,11 @@ placement and softness, box shading within 1–6.
 
 ## Follow-up lanes
 
-- **Rendering:** the puppet's inside faces (12). `render/convars.rs` defines the
+- **Rendering:** `render/convars.rs` defines the
   texture quality group's convars with real's defaults (`r_max_anisotropy` 4,
   `r_texture_stream_max_resolution` -1, `r_texture_stream_resolution_bias_min` 1.0). Nothing
   reads the streaming two yet, and managed sampler states don't clamp to `r_max_anisotropy`
   (`render/samplers.rs`), though real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
-- **Content:** what in our morph set makes real skin by the first weight and drop a morphed
-  second mesh under managed (12). Needs a real compiled model with morphs.
+- **Content:** why real's managed renderer draws no morphed puppet (15). Next: does real draw
+  its own citizen under `MANAGED=1` on lavapipe? If not, it's real's, not our content.
 - **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.

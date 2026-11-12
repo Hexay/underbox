@@ -179,7 +179,16 @@ pub fn write(m: &Model, packing: Packing) -> Vec<u8> {
             blocks.push((*b"MRPH", super::kv3(&morph::write(s))));
             first + 2
         });
-        entries.push(obj(vec![("name", text(&mm.name)), ("mesh_index", int_value(i as i64)), ("data_block", int_value(first)), ("vbib_block", int_value(first + 1)), ("morph_block", int_value(morph_block))]));
+        let atlas = mm.morph.as_ref().map_or("", |s| s.atlas.as_str());
+        entries.push(obj(vec![
+            ("name", text(&mm.name)),
+            ("mesh_index", int_value(i as i64)),
+            ("data_block", int_value(first)),
+            ("vbib_block", int_value(first + 1)),
+            ("morph_block", int_value(morph_block)),
+            // Without it real skins a morphed mesh by its first blend weight (research/resources.md).
+            ("morph_texture", resource(atlas)),
+        ]));
     }
     let mut ctrl = vec![("embedded_meshes", list(entries))];
     if let Some(p) = &m.physics {

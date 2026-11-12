@@ -135,7 +135,7 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
     }
     targets.scissor = target.scissor.filter(|s| s.w > 0 && s.h > 0).map(|s| [s.x.max(0) as u32, s.y.max(0) as u32, s.w as u32, s.h as u32]);
     let state = |d: &Draw| {
-        let s = d.shaded.as_ref().map_or(d.state, |s| s.shading.render_state.apply(d.state, target.reverse_z));
+        let s = d.shaded.as_ref().map_or(d.state, |s| s.raster_state(d.state, target.reverse_z));
         RasterState { depth_write: s.depth_write && targets.depth.is_some(), ..s }
     };
     let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
