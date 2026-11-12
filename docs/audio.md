@@ -30,11 +30,26 @@ feeder thread (native): while queue < mix-ahead: callback MixOneBuffer
     managed: AudioSampler.Sample -> CAudioMixer.ReadToBuffer (native resample)
              Mixer graph -> CDirectEffect / CBinauralEffect / CReverbEffect / processors
              MultiChannelBuffer.SendToOutput -> g_pAudioDevice.SendOutput (native queue)
-device thread (cpal or null clock): pulls interleaved f32 from the queue, silence on underrun
+device thread (cpal or a clock): pulls interleaved f32 from the queue; if it's short, calls
+    MixOneBuffer itself first; silence only if managed sends nothing
 ```
 
-The feeder starts on the first `MuteDevice` (managed: "calling MuteDevice actually starts the
-audio system"). Mix-ahead is 4 blocks, or `SetMixAhead` seconds while loading.
+Native pulls; managed never pushes on its own. The feeder starts on the first `MuteDevice`
+(managed: "calling MuteDevice actually starts the audio system"). Mix-ahead is 4 blocks, or
+`SetMixAhead` seconds while loading. `MixingThread`'s contract is that the feeder mixes ahead and
+the device callback mixes "when it falls behind" (real engine2 drives an
+`SDL_OpenAudioDeviceStream`), so `Queue::pull` mixes on the device's thread until it has what it
+was asked for. Managed's mix lock serializes the two callers. A device thread that stalls and then
+catches up therefore plays sound, not silence. The device swap (`SetActiveAudioDevice`) stops both
+callers before it takes `DEVICE`'s write lock, because a mix's `SendOutput` reads `DEVICE`.
+
+Underruns (short pulls after the first block) are counted on the queue; engine2 logs a warning
+(`audio device ... underran`) from the next `SendOutput` and `OutputDebugInfo` prints the totals.
+
+The disk device writes its file on its own thread. Written from the clock, a busy disk blocked
+playback for 20 to 450 ms a write, and the catch-up then drained the queue faster than the feeder
+mixed. Those were the underruns in docs/differential-audio.md. Managed's mix never stalled outside
+loading: its slowest blocks, 15 to 31 ms, all came during loading, under the 0.5 s loading mix-ahead.
 
 ## Devices
 
@@ -48,7 +63,9 @@ audio system"). Mix-ahead is 4 blocks, or `SetMixAhead` seconds while loading.
 - Otherwise cpal's default output (feature `audio-device` in engine2, on by default), falling back to
   no device if none opens. The device runs at 44100 Hz when it can; otherwise the queue is resampled.
 
-Tests drive `audio::output::Queue` directly: push blocks, pull frames, compare buffers.
+Tests drive `audio::output::Queue` directly: push blocks, pull frames, compare buffers; a slow
+mixer and a blocking file stand in for managed and a busy disk (`crates/audio/src/output/tests.rs`).
+End to end: `tools/diff/run.sh sound ours` fails on any underrun in the capture.
 
 ## Sounds
 

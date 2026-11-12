@@ -8,6 +8,7 @@ use abi::structs::AudioDeviceDesc;
 use abi::{Registry, StrRet, bind};
 use audio::output::{Queue, Worker};
 use std::ffi::CStr;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -116,27 +117,52 @@ fn with<R: Default>(f: impl FnOnce(&Device) -> R) -> R {
     device().map(|d| f(&d)).unwrap_or_default()
 }
 
-/// Start the feeder that calls managed's `MixOneBuffer` (once).
+/// Hand managed's `MixOneBuffer` to the queue (the device mixes through it when it runs short)
+/// and start the feeder that keeps it mixed ahead (once).
 fn start_mixing(d: &Device) {
     let mut feeder = d.feeder.lock().unwrap();
     if feeder.is_none() {
-        *feeder = Some(audio::output::spawn_feeder(d.queue.clone(), abi::callbacks::sandbox_audio_mixing_thread::mix_one_buffer));
+        d.queue.set_mixer(Some(Arc::new(abi::callbacks::sandbox_audio_mixing_thread::mix_one_buffer)));
+        *feeder = Some(audio::output::spawn_feeder(d.queue.clone()));
     }
 }
+
+/// Stop every call into managed's mixer, waiting out one in progress. True if it was mixing.
+fn stop_mixing(d: &Device) -> bool {
+    let feeder = d.feeder.lock().unwrap().take();
+    let mixing = feeder.is_some();
+    drop(feeder);
+    d.queue.set_mixer(None);
+    mixing
+}
+
+/// Underrun frames already logged.
+static UNDERRUNS_LOGGED: AtomicU64 = AtomicU64::new(0);
 
 fn send_output(buffers: DevRef) {
     let blocks = mix::read_all(buffers);
     super::stats::output_sent(&blocks);
-    with(|d| d.queue.push(&blocks));
+    with(|d| {
+        d.queue.push(&blocks);
+        let (runs, frames) = d.queue.underruns();
+        let before = UNDERRUNS_LOGGED.swap(frames, Relaxed);
+        if frames > before {
+            let ms = |f: u64| f as f64 * 1000.0 / audio::RATE as f64;
+            abi::rt::log::warn(&format!("audio device {} underran: {:.1} ms of silence ({runs} underruns, {:.1} ms in all)", d.name, ms(frames - before), ms(frames)));
+        }
+    });
 }
 
 fn set_active(id: Option<&CStr>) {
     let id = id.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     *ACTIVE.lock().unwrap() = id.clone();
+    let Some(old) = DEVICE.read().unwrap().clone() else { return };
+    // Outside DEVICE's lock: the feeder and the device thread mix, and a mix's SendOutput reads DEVICE.
+    let mixing = stop_mixing(&old);
     let mut slot = DEVICE.write().unwrap();
-    let Some(old) = slot.take() else { return };
-    let mixing = old.feeder.lock().unwrap().take().is_some();
+    slot.take();
     drop(old);
+    UNDERRUNS_LOGGED.store(0, Relaxed);
     *slot = open(mode(), &id).map(Arc::new);
     if let (Some(d), true) = (slot.as_ref(), mixing) {
         start_mixing(d);
@@ -172,7 +198,7 @@ pub fn register(r: &mut Registry) {
         })
     });
     bind!(r, dev::OUTPUT_DEBUG_INFO, || {
-        let info = device().map_or_else(|| "no audio device".into(), |d| format!("audio device {}: {} channels, {} frames queued, {} ahead", d.name, d.queue.channels, d.queue.queued_frames(), d.queue.ahead_frames()));
+        let info = device().map_or_else(|| "no audio device".into(), |d| format!("audio device {}: {} channels, {} frames queued, {} ahead, underruns {:?} (count, frames)", d.name, d.queue.channels, d.queue.queued_frames(), d.queue.ahead_frames(), d.queue.underruns()));
         abi::rt::log::log(abi::rt::log::Level::Info, &info);
     });
     bind!(r, dev::SET_MIX_AHEAD, |seconds| with(|d| d.queue.set_ahead_seconds(seconds)));

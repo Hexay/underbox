@@ -11,7 +11,7 @@ Compare the final mixed audio of our engine2 and Facepunch's on one scripted sce
 | --- | --- |
 | `tools/diff/run.sh sound [both\|ours\|real]` | Runs `tools/diff/sound-run.sh`: corpus/sound on each engine through `tools/boot-client.sh`, captures, compares. Out: `target/diff/sound/` |
 | `corpus/sound` | Camera at the origin facing +x, `SoundScript` (`Code/SoundScript.cs`) |
-| `tools/diff/sound.py <ours.raw> [<real.raw>]` | Measures each capture; with two, ranks the divergences |
+| `tools/diff/sound.py <ours.raw> [<real.raw>]` | Measures each capture; with one, fails on underruns; with two, ranks the divergences |
 | `fixture::tone_files` (`crates/assets/src/compiled/fixture/tones.rs`) | The sounds, compiled `.vsnd_c` (v4 binary header, the layout real's own v5 files use), committed under `corpus/sound/Assets/sounds/compiled/`; `UNDERBOX_BLESS=1` rewrites them |
 
 ### Capture
@@ -128,9 +128,9 @@ Two runs (`sound.py run1.raw run2.raw`). Levels, balance and frequency are ident
 
 A sine at peak 0.5 is −9.03 dB RMS, so levels, distance, volume and pitch come out as managed
 defines them. No event has a reverb tail (−120 dB): nothing in the scene sets up reverb. Onsets
-are within 0.6 ms of the schedule, except for underruns: the device ran dry and played silence
-for 81 ms before `ahead200` in one run, 836 ms before `right200` in the other, and one block
-(11.6 ms) inside the loop in the first. The managed mixer stalled for longer than the 4-block
-(46 ms) mix-ahead. The loop's stop is timed on the main thread, so a stall before it shortens the
-loop (1439 ms, then 661 ms). Real's first run had none. Real's binaural effect is Steam Audio's
-HRTF (`snd_steamaudio` on), ours is managed's pan law, so `left200`/`right200` balance differs (2).
+are within 0.6 ms of the schedule. Earlier captures had underruns (81 ms before `ahead200`, 836 ms
+before `right200`, dropouts inside sounds). The cause was our disk device blocking on its file writes,
+not the managed mixer; fixed, see docs/audio.md "Per frame". `run.sh sound ours` now fails on any
+underrun (a dropout inside a sound, or an onset more than 2 ms off the schedule). Real's binaural
+effect is Steam Audio's HRTF (`snd_steamaudio` on), ours is managed's pan law, so
+`left200`/`right200` balance differs ([Real vs ours](#real-vs-ours), 2).
