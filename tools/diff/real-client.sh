@@ -1,7 +1,6 @@
 #!/bin/sh
 # Boot Facepunch's real engine2 client on a corpus scene under Xvfb + lavapipe and grab the window.
 # usage: [MANAGED=1] tools/diff/real-client.sh <corpus> <out-dir> [max-s=240] [artifact-root]
-# REAL_VK_ICD=<lvp_icd json> picks another lavapipe (Mesa 26.0.8's JIT crashes drawing real's UI).
 # PROJECT=<.sbproj> boots that project instead of corpus/<corpus> (tools/diff/frame.sh's game copies).
 # MANAGED=1 draws through managed's scene renderer (+r_managed_scene 1), as tools/client-frame.sh.
 # Waits for `game.load success`, then GRACE (default 20) s, then grabs Xvfb's framebuffer every
@@ -27,6 +26,10 @@ rm -rf "$OUT"; mkdir -p "$OUT/fb"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
 LEASED=$GAME
 GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$ART" $$ +game "$PROJ")
+# Friends on by default: without them real's FrameStart throws before SimulateUI (no HUD).
+# The stand-in only checks that the variable exists, so an empty value must unset it.
+if [ -n "${UNDERBOX_STANDIN_FRIENDS-1}" ]; then export UNDERBOX_STANDIN_FRIENDS=${UNDERBOX_STANDIN_FRIENDS:-1}; else unset UNDERBOX_STANDIN_FRIENDS; fi
+. "$ROOT/tools/diff/real-env.sh"
 # As tools/client-frame.sh pins ours.
 python3 -I "$ROOT/tools/video-setting.py" "$GAME" shadow.quality "${SHADOW_QUALITY:-2}"
 python3 -I "$ROOT/tools/video-setting.py" "$GAME" volumetricfog.quality "${FOG_QUALITY:-2}"
@@ -39,10 +42,8 @@ trap 'rm -f "$LEASED/.underbox-lease.$$"; [ -z "$CLIENT" ] || kill -TERM $CLIENT
 printf 'pcm.!default { type null }\n' > "$OUT/asound.conf"
 LOG=$GAME/logs/dotnet.log
 rm -f "$LOG"
-(cd "$GAME" && DISPLAY=$D SDL_VIDEO_DRIVER=x11 VK_ICD_FILENAMES=${REAL_VK_ICD:-/usr/share/vulkan/icd.d/lvp_icd.json} \
-    ALSA_CONFIG_PATH="$OUT/asound.conf" HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 \
-    http_proxy=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9 NO_PROXY= no_proxy= timeout -s TERM -k 10 "$SECS" \
-    dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1
+(cd "$GAME" && DISPLAY=$D ALSA_CONFIG_PATH="$OUT/asound.conf" LD_PRELOAD=$STANDIN timeout -s TERM -k 10 "$SECS" \
+    $NOWEB dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1
     echo "real-client: exit $?" >> "$OUT/client.out") &
 CLIENT=$!
 

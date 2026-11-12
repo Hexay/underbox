@@ -31,6 +31,8 @@ UNITS = {"db_l": 1.0, "db_r": 1.0, "balance": 1.0, "hz": 2.0, "onset_ms": 5.0, "
 FLOOR_DB = -120.0
 # Onsets land within 0.6 ms of the schedule; one block (11.6 ms) of silence is far outside this.
 ONSET_TOLERANCE_MS = 2.0
+# How far from where it's due a burst may start and still be that event's.
+MATCH_S = 0.5
 
 
 def load(path):
@@ -91,9 +93,10 @@ def frequency(x, a, b):
     return (len(ups) - 1) * RATE / (ups[-1] - ups[0]) if len(ups) > 2 else 0.0
 
 
-def bursts(l, r, level=0.01, hop=441, quiet_s=0.3):
+def bursts(l, r, level=0.05, hop=441, quiet_s=0.3):
     """(start, end) sample spans where either channel's block peak exceeds `level`, joined across
-    gaps shorter than `quiet_s` (the schedule leaves at least 0.5 s between sounds)."""
+    gaps shorter than `quiet_s` (the schedule leaves at least 0.5 s between sounds). `level` (-26 dB
+    peak) sits well below the quietest event (ahead800, -20 dB RMS) and skips faint noise."""
     spans = []
     for a in range(0, len(l), hop):
         if peak(l, r, a, a + hop) > level:
@@ -104,17 +107,36 @@ def bursts(l, r, level=0.01, hop=441, quiet_s=0.3):
     return spans
 
 
+def anchor(spans):
+    """The schedule's first burst: the first with another burst 1 s after it. Real's menu can play
+    a sound just before the schedule starts."""
+    for i in range(len(spans) - 1):
+        if abs(spans[i + 1][0] - spans[i][0] - RATE) < 0.05 * RATE:
+            return i
+    return 0
+
+
+def match(spans, prev, start):
+    """The burst nearest where the event is due (the previous matched onset plus the schedule's
+    gap), within MATCH_S; None if there is none (merged with another sound, or very late)."""
+    due = prev[0] + (start - prev[1]) * RATE
+    best = min(range(len(spans)), key=lambda j: abs(spans[j][0] - due))
+    return best if abs(spans[best][0] - due) < MATCH_S * RATE else None
+
+
 def measure(path):
-    """Events matched to bursts in order, so a device underrun between sounds delays one onset
-    instead of shifting every later window."""
+    """Each event's burst is found from the previous event's onset, so a device underrun between
+    sounds delays one onset instead of shifting every later window."""
     l, r = load(path)
     spans = bursts(l, r)
     if not spans:
         return None, len(l) / RATE
     out = {"bursts": len(spans)}
+    first = anchor(spans)
     prev = None
-    for i, (name, start, length) in enumerate(EVENTS):
-        if i >= len(spans):
+    for name, start, length in EVENTS:
+        i = first if prev is None else match(spans, prev, start)
+        if i is None:
             out[name] = {"missing": 1}
             continue
         a, b = spans[i][0] - 441, spans[i][1]

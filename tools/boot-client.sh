@@ -45,11 +45,7 @@ if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
         read -r d < "$OUT/xvfb.fifo"
         export DISPLAY=:$d
     fi
-    export VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/lvp_icd.json} SDL_VIDEO_DRIVER=x11
-    STANDIN=$(sh "$ROOT/tools/diff/standin.sh")
-    [ -z "${UNDERBOX_STANDIN_FRIENDS:-}" ] || sh "$ROOT/tools/diff/standin.sh" --shim "$GAME/bin/linuxsteamrt64"
-    # libsteam_api dlopens a bare "steamclient.so" before trying ~/.steam.
-    export LD_LIBRARY_PATH=$GAME/bin/linuxsteamrt64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+    . "$ROOT/tools/diff/real-env.sh"
 else
     sh "$ROOT/tools/install-engine2.sh" "$GAME"
 fi
@@ -76,7 +72,7 @@ export UNDERBOX_AUDIO=${UNDERBOX_AUDIO:-null}
 cd "$GAME"
 # No display here: SDL falls back to its offscreen driver; force it so a stray DISPLAY can't win.
 SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES:-log} ALSA_CONFIG_PATH="$OUT/asound.conf" \
-    LD_PRELOAD=${STANDIN:-} timeout -s TERM -k 10 "$SECS" dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
+    LD_PRELOAD=${STANDIN:-} timeout -s TERM -k 10 "$SECS" ${NOWEB:-} dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
 CLIENT=$!
 if [ -n "$UNTIL" ]; then
     # The kill sits inside the pipeline's last stage: the pipeline itself only ends when tail does.
