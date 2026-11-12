@@ -244,8 +244,8 @@ mod tests {
         }
         drop(clock);
         let bytes = sink.0.lock().unwrap().clone();
-        let first: Vec<f32> = bytes[..BLOCK * 8].chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
-        assert!(first.chunks_exact(2).all(|f| f == [0.5, -0.25]));
+        let first: Vec<f32> = bytes[..BLOCK * 8].as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
+        assert!(first.as_chunks::<2>().0.iter().all(|f| *f == [0.5, -0.25]));
         assert_eq!(bytes.len() % (BLOCK * 8), 0, "whole blocks, silence after the queue ran dry");
     }
 
