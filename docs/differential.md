@@ -89,6 +89,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/lavapipe.sh` | Builds a user-local lavapipe from a pinned Mesa commit into `$UNDERBOX_CACHE/mesa-lvp` (once, about 10 min) |
 | `tools/diff/frame.py <ours.ppm> <real.xwd> <out>` | Per-channel mean abs error, % pixels over a threshold, luma means, 8×8-block SSIM |
 | `tools/diff/run.sh sound [both\|ours\|real]` | corpus/sound's mixed audio per engine (`sound-run.sh`, `sound.py`); docs/differential-audio.md |
+| `tools/diff/run.sh state <corpus\|game> [both\|ours\|real]` | Every object, component and body at fixed ticks (`state.sh`, `StateDump.cs`, `state.py`); docs/differential-state.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the
@@ -278,6 +279,8 @@ segfaulted about 15 s in while drawing the menu UI, before the game loaded.
   relative-turn extent (`r·√2`, 18) is not reproduced.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Rendering:** docs/differential-render.md.
+- **Scene state** (triggers on static bodies, scene object bounds, body and shape queries, model
+  metadata): docs/differential-state.md.
 - **Audio:** real scales `PlayFile`'s delay by pitch, plays 2D sounds about 3.3 dB quieter and pans
   through Steam Audio (docs/differential-audio.md, "Real vs ours").
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

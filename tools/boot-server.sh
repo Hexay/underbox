@@ -30,7 +30,7 @@ lap() { printf '%s %.1fs' "$1" "$(echo "$(date +%s.%N) - $t0" | bc)"; }
 sh "$ROOT/tools/submodules.sh"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX")
 LEASED=$GAME
-trap 'rm -f "$LEASED/.underbox-lease.$$"' EXIT
+trap 'rm -f "$LEASED/.underbox-lease.$$"; for f in ${SEEDED:-}; do rm -f "$GAME/$f"; done' EXIT
 T_PREP=$(lap prepare); t0=$(date +%s.%N)
 
 if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
@@ -40,6 +40,12 @@ if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
     export LD_LIBRARY_PATH=$GAME/bin/linuxsteamrt64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 else
     sh "$ROOT/tools/install-engine2.sh" "$GAME"
+fi
+# SEED=<dir>: as tools/boot-client.sh.
+SEEDED=
+if [ -n "${SEED:-}" ]; then
+    SEEDED=$(cd "$SEED" && find . -type f)
+    cp -a "$SEED/." "$GAME/"
 fi
 T_CARGO=$(lap cargo); t0=$(date +%s.%N)
 

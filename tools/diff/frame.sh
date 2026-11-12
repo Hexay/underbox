@@ -35,21 +35,10 @@ mkdir -p "$OUT"
 [ -n "$ART" ] || ART=$(ls -td "$REAL_ENGINE2_CACHE"/*/game/bin/linuxsteamrt64 2>/dev/null | head -n 1 | sed 's#/game/bin/linuxsteamrt64$##')
 [ -n "$ART" ] || { echo "frame: no real engine2; run tools/diff/fetch.sh" >&2; exit 3; }
 
-seed() {
-    s=$REAL_ENGINE2_RUNS/content3-$(basename -- "$ART")
-    if [ ! -f "$s/.done" ]; then
-        rm -rf "$s"; mkdir -p "$s"
-        (cd "$ART/game" && find core -type f \( -name '*.vtex_c' -o -name '*.vmat_c' -o -name '*.vmdl_c' -o -name '*.vmesh_c' \) |
-            cpio -pdl --quiet "$s")
-        touch "$s/.done"
-    fi
-    echo "$s"
-}
-
 ours() {
     echo "== $CORPUS on ours"
     s=
-    [ "${CONTENT:-real}" = source ] || s=$(seed)
+    [ "${CONTENT:-real}" = source ] || s=$(sh "$ROOT/tools/diff/seed.sh" "$ART")
     SEED=$s CORPUS=$CORPUS OUT="$OUT/ours" sh "$ROOT/tools/client-frame.sh" > "$OUT/ours.txt" 2>&1 || true
     tail -n 3 "$OUT/ours.txt"
 }
