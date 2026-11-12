@@ -35,6 +35,7 @@ find "$SRC" -mindepth 1 -maxdepth 1 ! -name logs ! -name '.underbox-lease.*' -ex
 mkdir -p "$G/logs"
 rm -rf "$G/bin/linuxsteamrt64"
 cp -a --reflink=auto "$ART/game/bin/linuxsteamrt64" "$G/bin/"
+[ -z "${UNDERBOX_TAP_DIR:-}" ] || sh "$ROOT/tools/diff/tap-install.sh" "$G/bin/linuxsteamrt64"
 if [ "${REAL_CORE:-1}" = 1 ]; then
     cp -a --reflink=auto "$ART/game/core/." "$G/core/"
     [ ! -d "$ART/game/addons" ] || cp -a --reflink=auto "$ART/game/addons/." "$G/addons/"

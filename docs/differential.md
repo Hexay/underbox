@@ -89,6 +89,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/lavapipe.sh` | Builds a user-local lavapipe from a pinned Mesa commit into `$UNDERBOX_CACHE/mesa-lvp` (once, about 10 min) |
 | `tools/diff/frame.py <ours.ppm> <real.xwd> <out>` | Per-channel mean abs error, % pixels over a threshold, luma means, 8×8-block SSIM |
 | `tools/diff/run.sh sound [both\|ours\|real]` | corpus/sound's mixed audio per engine (`sound-run.sh`, `sound.py`); docs/differential-audio.md |
+| `tools/diff/run.sh tap <probe\|corpus\|game> [both\|ours\|real]` | Every interop call on each engine through the call tap, compared per tick and slot; docs/differential-tap.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the

@@ -102,6 +102,7 @@ sh tools/verify.sh               # the full gate: tests, clippy, boots, golden f
 | --- | --- |
 | `crates/engine2` | the library: `igen_engine` and `CreateInterface` exports, glue per engine class |
 | `crates/abi`, `abi-spec`, `abi/`, `tools/abigen`, `tools/interop-dump` | the slot table and struct layouts, generated from sbox-public (`tools/regen.sh`) |
+| `crates/tap` | a libengine2 that logs every interop call and forwards it to real's or ours (docs/differential-tap.md) |
 | `crates/render`, `shaders`, `window` | wgpu renderer, HLSL to SPIR-V to WGSL translation, SDL3 windows and input |
 | `crates/assets`, `kv`, `world`, `objects` | Source 2 resources, KeyValues3, VPK and maps |
 | `crates/physics`, `box2d-sys`, `anim`, `audio` | Rapier and Box2D v3 physics, animation graphs, audio mixer |

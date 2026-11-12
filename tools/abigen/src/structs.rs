@@ -44,6 +44,38 @@ impl<'a> Structs<'a> {
         self.by_managed.get(managed).map(|l| l.size)
     }
 
+    /// Each Rust struct name with its primitive fields, nested structs and fixed buffers flattened:
+    /// (offset, Rust primitive). Enums are left out; they cross as their underlying integer.
+    pub fn flattened(&self) -> Vec<(&str, Vec<(usize, &'static str)>)> {
+        let mut out: Vec<_> = self
+            .by_managed
+            .values()
+            .filter(|l| l.underlying.is_none())
+            .map(|l| {
+                let mut prims = Vec::new();
+                self.flatten_into(l, 0, &mut prims);
+                (self.rust_names[l.managed.as_str()].as_str(), prims)
+            })
+            .collect();
+        out.sort_by_key(|(name, _)| *name);
+        out
+    }
+
+    fn flatten_into(&self, l: &Layout, base: usize, out: &mut Vec<(usize, &'static str)>) {
+        for f in &l.fields {
+            let ty = f.ty.strip_prefix("enum:").unwrap_or(&f.ty);
+            let nested = self.by_managed.get(ty);
+            let underlying = nested.and_then(|n| n.underlying.as_deref()).unwrap_or(ty);
+            for k in 0..f.count {
+                if let Some((rust, size)) = primitive(underlying) {
+                    out.push((base + f.offset + k * size, rust));
+                } else if let Some(n) = nested {
+                    self.flatten_into(n, base + f.offset + k * n.size, out);
+                }
+            }
+        }
+    }
+
     pub fn emit(&self) -> Result<String, String> {
         let mut out = String::from(HEADER);
         let mut layouts: Vec<_> = self.by_managed.values().filter(|l| l.underlying.is_none()).collect();
