@@ -5,7 +5,7 @@
 # Client args default to `-mcp +game corpus/orbmatch/.sbproj`. Stops GRACE (default 2) s after a
 # log line matches UNTIL (default: presented frame STOP_FRAME, 300), else at max-s; with SETTLE=n, not
 # before the last n presented frames also share a hash (tools/settle-watch.py). FRAMES=<dir>
-# also dumps PPMs (UNDERBOX_FRAMES_EVERY=n keeps every n-th). Runs in this worktree's game dir (tools/game-dir.sh);
+# also dumps PPMs; FRAMES= (empty) turns capture off (UNDERBOX_FRAMES_EVERY=n keeps every n-th). Runs in this worktree's game dir (tools/game-dir.sh);
 # SEED=<dir> overlays that dir's files for one boot. UNDERBOX_REAL_ENGINE2=<artifact root> boots
 # Facepunch's natives instead, on Xvfb with the Steam stand-in (docs/interop.md).
 # Logs: $OUT/client.log (managed's logs/dotnet.log), $OUT/client.out (stdout/stderr), $OUT/frames.tsv
@@ -72,7 +72,7 @@ printf 'pcm.!default { type null }\n' > "$OUT/asound.conf"
 export UNDERBOX_AUDIO=${UNDERBOX_AUDIO:-null}
 cd "$GAME"
 # No display here: SDL falls back to its offscreen driver; force it so a stray DISPLAY can't win.
-SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES:-log} ALSA_CONFIG_PATH="$OUT/asound.conf" \
+SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES-log} ALSA_CONFIG_PATH="$OUT/asound.conf" \
     LD_PRELOAD=${STANDIN:-} timeout -s TERM -k 10 "$SECS" dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
 CLIENT=$!
 if [ -n "$UNTIL" ]; then
