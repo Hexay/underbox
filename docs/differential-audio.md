@@ -2,8 +2,8 @@
 
 Compare the final mixed audio of our engine2 and Facepunch's on one scripted scene
 (docs/differential.md has the rules and the other lanes). **Status: runs on both engines** with
-`tools/diff/lavapipe.sh` built once ([Getting real to mix](#getting-real-to-mix)); first results in
-[Real vs ours](#real-vs-ours).
+`tools/diff/lavapipe.sh` built once ([Getting real to mix](#getting-real-to-mix)); every level
+matches, see [Real vs ours](#real-vs-ours).
 
 ## Harness
 
@@ -26,8 +26,8 @@ the same format from a clock that drains one block per block of wall time
 
 ### Scene
 
-`SoundScript` loads the sounds in `OnStart` and waits until they are playable (`LoadAsync`) and a
-second has passed, then makes every `PlayFile` call at once with a `delay`, so onsets are
+`SoundScript` loads the sounds in `OnStart`, waits until they are playable (`LoadAsync`), then a
+second more (so the 0.5 s loading mix-ahead has drained), then makes every `PlayFile` call at once with a `delay`, so onsets are
 sample-accurate and don't depend on frame timing. Real loads sound data asynchronously, and
 `PlayFile` drops the delay while the sound has no mixer yet (`SoundHandle.sampler` null), so
 without the wait every sound started together. Only the loop's stop is timed by the main thread.
@@ -41,7 +41,7 @@ Sounds: mono PCM16 at 44100 Hz, peak 0.5, 5 ms ramps.
 | 3 | `ahead200` | same | 200 units +x |
 | 4 | `ahead800` | same | 800 units +x |
 | 5 | `vol0.5` | same | 2D, volume 0.5 |
-| 6 | `pitch1.5` | same | 2D, pitch 1.5 (660 Hz, 0.33 s) |
+| 6 | `pitch1.5` | same | 2D, pitch 1.5 (660 Hz, 0.33 s); `delay` 9 s, which the sampler counts down at 1.5x |
 | 7 | `noise` | LCG white noise, 0.3 s | 2D |
 | 8 | `loop` | 330 Hz, 1 s, loops | 2D, stopped 9.5 s after the start |
 
@@ -84,31 +84,43 @@ web API (`unshare -rn` is not permitted here); skipping the menu (no switch for 
 
 ## Real vs ours
 
-`run.sh sound both` after the underrun fix (`target/diff/sound/report.txt`). Both captures have no
-dropouts, and every event found on both is within 1.0 ms of the schedule: ours passes the
-single-capture check (0 underruns). Real's only flag there is `pitch1.5` missing (1), not silence.
+`run.sh sound both` (`target/diff/sound/report.txt`). No dropouts on either, every onset within
+1 ms of the schedule. Real's figures are the same in every run; "before" is ours with managed's
+pan law and a delay counted at the unpitched rate.
 
-| Event | Ours L / R dB | Real L / R dB | Real Hz |
+| Event | Ours before L / R dB | Ours now = real L / R dB | Hz |
 | --- | --- | --- | --- |
 | `ui` | −9.19 / −9.19 | −12.50 / −12.33 | 440.0 |
 | `left200` | −9.03 / −89.03 | −9.35 / −13.97 | 440.0 |
 | `right200` | −89.03 / −9.03 | −13.95 / −9.01 | 440.0 |
 | `ahead200` | −9.03 / −9.03 | −12.50 / −12.33 | 440.0 |
-| `ahead800` | −20.48 / −20.48 | −12.31 / −11.97 (with `pitch1.5`) | 617.2 (mixed) |
+| `ahead800` | −20.48 / −20.48 (real merged with `pitch1.5`) | −23.95 / −23.78 | 440.0 |
 | `vol0.5` | −15.05 / −15.05 | −18.52 / −18.35 | 440.0 |
-| `pitch1.5` | −9.03 / −9.03 (660 Hz) | missing (1) | |
+| `pitch1.5` | −9.03 / −9.03 (real: missing) | −11.65 / −11.30 | 660.0 |
 | `noise` | −10.78 / −10.78 | −13.62 / −11.57 | |
-| `loop` | −9.03 / −9.03, 1520 ms | −10.65 / −10.76, 1424 ms | 330.0 |
+| `loop` | −9.03 / −9.03 | −10.65 / −10.76 | 330.0 |
 
-1. **Pitch scales the delay on real.** `pitch1.5` (delay 6 s) starts at 4.0 s on real, on top of
-   `ahead800`: the sampler consumes `DelayOrSkipSamples` in source samples at the pitched rate
-   (6 / 1.5 = 4). Ours waits 6 s. So `ahead800` alone can't be measured on real yet.
-2. **Panning:** real's 3D sounds go through Steam Audio (about 4.7 dB between ears at 200 units to
-   the side); ours uses managed's fallback pan law (80 dB, hard). Expected, see below.
-3. **Level:** real is about 3.3 dB quieter for 2D and ahead sounds (`ui`, `ahead200`, `vol0.5`);
-   the loop only 1.6 dB, the noise 2.8 dB on the left and 0.8 dB on the right.
-4. **Loop length:** real's loop ends about 100 ms sooner (stopped from the main thread at 9.5 s on
-   both). Not looked into.
+Every level now matches to 0.01 dB; the only divergence `sound.py` reports is the loop's length.
+
+1. **Level and panning: Steam Audio's HRTF.** Real's `CBinauralEffect` is Steam Audio's binaural
+   effect with its default HRTF, loaded with RMS normalization (docs/audio.md, Effects). Its
+   on-axis gain at 440 Hz is −3.47/−3.30 dB, the drop on `ui`, `ahead200` and `vol0.5`. Managed's
+   own gains are the same on both engines: `ListenLocal` voices take the binaural effect with a
+   nearest lookup and spatial blend 0.1, which Steam Audio ignores for mono input, so 2D sounds
+   get the full on-axis HRTF. A probe of 30° to 135° at 200 and 400 units, with and without
+   occlusion, matched within 0.02 dB once RMS normalization was on; without it, ILDs already
+   matched and only a gain equal in both ears differed (−1.2 to −2.7 dB).
+2. **Distance:** `ahead800` is 11.45 dB under `ahead200` on both (managed's falloff).
+3. **Pitch-scaled delay is native:** managed passes `delay * SampleRate` frames to
+   `DelayOrSkipSamples`; real's sampler counts them down at the pitched rate. Ours does too now
+   (`audio::sampler`), and the scene asks for 9 s to start `pitch1.5` at 6 s.
+4. **Loop length is main-thread timing, not native.** Not converged by design of the scene: the
+   stop is a frame-timed `Stop()`, so the loop's length is `stop time − 8 s` (logged as
+   `SOUND:STOP loop at`) plus the difference in queue latency between `Play` and `Stop`. Over five
+   real runs the length was 1424 to 1609 ms (stop logged at 9.504 to 9.572 s); ours 1470 to 1520.
+   The ~100 ms short loop came from real finishing its async load after the 1 s lead, so `Play` ran
+   at once while the 0.5 s loading mix-ahead was still queued; the lead now counts from load
+   completion. A sample-accurate stop would need an API managed doesn't have.
 5. Real's menu plays a sound (110 Hz or lower, −48 to −34 dB) about 1 s before `ui`.
    `sound.py` starts the schedule at the first burst with another burst 1 s after it, and finds
    each later event's burst near where it's due, so that sound or a merged slot doesn't shift the
@@ -116,25 +128,7 @@ single-capture check (0 underruns). Real's only flag there is `pitch1.5` missing
 
 ## Ours
 
-Two runs (`sound.py run1.raw run2.raw`). Levels, balance and frequency are identical in both:
-
-| Event | L / R dB | Hz | Note |
-| --- | --- | --- | --- |
-| `ui` | −9.19 / −9.19 | 440.0 | 0.16 dB under the 3D sounds, in both runs |
-| `left200` | −9.03 / −89.03 | 440.0 | managed's fallback pan law, hard left |
-| `right200` | −89.03 / −9.03 | 440.0 | |
-| `ahead200` | −9.03 / −9.03 | 440.0 | |
-| `ahead800` | −20.48 / −20.48 | 440.0 | 11.45 dB below 200 units |
-| `vol0.5` | −15.05 / −15.05 | 440.0 | −6.02 dB |
-| `pitch1.5` | −9.03 / −9.03 | 660.0 | |
-| `noise` | −10.78 / −10.78 | | |
-| `loop` | −9.03 / −9.03 | 330.0 | |
-
-A sine at peak 0.5 is −9.03 dB RMS, so levels, distance, volume and pitch come out as managed
-defines them. No event has a reverb tail (−120 dB): nothing in the scene sets up reverb. Onsets
-are within 0.6 ms of the schedule. Earlier captures had underruns (81 ms before `ahead200`, 836 ms
-before `right200`, dropouts inside sounds). The cause was our disk device blocking on its file writes,
-not the managed mixer; fixed, see docs/audio.md "Per frame". `run.sh sound ours` now fails on any
-underrun (a dropout inside a sound, or an onset more than 2 ms off the schedule). Real's binaural
-effect is Steam Audio's HRTF (`snd_steamaudio` on), ours is managed's pan law, so
-`left200`/`right200` balance differs ([Real vs ours](#real-vs-ours), 2).
+No event has a reverb tail (−120 dB): nothing in the scene sets up reverb. Earlier captures had
+underruns; the cause was our disk device blocking on its file writes, not the managed mixer
+(docs/audio.md "Per frame"). `run.sh sound ours` fails on any underrun (a dropout inside a sound, or
+an onset more than 2 ms off the schedule).

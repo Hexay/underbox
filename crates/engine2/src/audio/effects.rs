@@ -25,12 +25,12 @@ fn control_name(token: StringToken) -> Option<&'static str> {
 }
 
 pub fn register(r: &mut Registry) {
-    bind!(r, binaural::CREATE, || objects::create(Mutex::new(Binaural::default())));
+    bind!(r, binaural::CREATE, || Binaural::new().map_or(NativeRef::null(), |b| objects::create(Mutex::new(b))));
     bind!(r, binaural::DISPOSE, |r| {
         objects::destroy(r);
     });
-    bind!(r, binaural::APPLY, |r, dir: Vector3, blend, _nearest: bool, i, o| {
-        apply(r, i, o, |b: &mut Binaural, src, out| b.apply([dir.vec.x, dir.vec.y, dir.vec.z], blend, src, out))
+    bind!(r, binaural::APPLY, |r, dir: Vector3, blend, nearest: bool, i, o| {
+        apply(r, i, o, |b: &mut Binaural, src, out| b.apply([dir.vec.x, dir.vec.y, dir.vec.z], blend, nearest, src, out))
     });
 
     bind!(r, direct::CREATE, || objects::create(Mutex::new(Direct::default())));

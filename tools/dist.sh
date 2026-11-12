@@ -17,7 +17,8 @@ rm -rf "$OUT"
 UNDERBOX_ENGINE2=$SO sh "$ROOT/tools/install-engine2.sh" "$OUT"
 cp "$ROOT/LICENSE" "$ROOT/NOTICE" "$OUT/"
 mkdir -p "$OUT/licenses"
-for d in "$ROOT"/third_party/*/; do n=$(basename -- "$d"); cp "$d/LICENSE" "$OUT/licenses/$n.LICENSE"; done
+for d in "$ROOT"/third_party/*/; do n=$(basename -- "$d"); if [ -f "$d/LICENSE" ]; then cp "$d/LICENSE" "$OUT/licenses/$n.LICENSE"; fi; done
+cp "$ROOT"/licenses/* "$OUT/licenses/"
 dirty=$(git -C "$ROOT" diff --quiet HEAD -- || echo "-dirty")
 {
     echo "version: $(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/crates/engine2/Cargo.toml")"
