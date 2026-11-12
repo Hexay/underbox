@@ -50,18 +50,10 @@ boot() {
             sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" > "$OUT/$run.txt" 2>&1 || true
         log=$dir/client.log
     fi
+    if grep '^FAIL: the game downloaded' "$OUT/$run.txt"; then exit 4; fi
     grep -o 'STATE:{.*' "$log" | cut -c7- > "$OUT/$run.jsonl" || true
     echo "$run: $(wc -l < "$OUT/$run.jsonl") lines; $(grep -c 'STATE:TICK' "$log" || true) dumps; $(grep -q 'STATE:END' "$log" && echo ended || echo 'NO STATE:END')"
 }
-
-# Build with the network reachable, then cut it off as tools/game.sh does: a game's package references
-# (sandbox's map, its cloud models) must never be fetched, on either engine.
-sh "$ROOT/tools/submodules.sh"
-if [ "$SIDE" = server ]; then UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX"; else UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client; fi > /dev/null
-env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p assets --bin assetc -j4
-env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
-export HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9
-export http_proxy=$HTTP_PROXY https_proxy=$HTTPS_PROXY all_proxy=$ALL_PROXY NO_PROXY= no_proxy=
 
 need_real() { [ -n "$ART" ] || { echo "state: no real engine2; run tools/diff/fetch.sh" >&2; exit 3; }; }
 case $WHICH in

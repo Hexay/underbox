@@ -49,6 +49,7 @@ if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
 else
     sh "$ROOT/tools/install-engine2.sh" "$GAME"
 fi
+. "$ROOT/tools/diff/noweb.sh"
 # SEED=<dir>: files laid out like the game dir, copied in for this boot and removed after it.
 SEEDED=
 if [ -n "${SEED:-}" ]; then
@@ -72,7 +73,7 @@ export UNDERBOX_AUDIO=${UNDERBOX_AUDIO:-null}
 cd "$GAME"
 # No display here: SDL falls back to its offscreen driver; force it so a stray DISPLAY can't win.
 SDL_VIDEO_DRIVER=${SDL_VIDEO_DRIVER:-offscreen} UNDERBOX_FRAMES=${FRAMES:-log} ALSA_CONFIG_PATH="$OUT/asound.conf" \
-    LD_PRELOAD=${STANDIN:-} timeout -s TERM -k 10 "$SECS" ${NOWEB:-} dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
+    LD_PRELOAD=${STANDIN:-} timeout -s TERM -k 10 "$SECS" dotnet sbox.dll "$@" > "$OUT/client.out" 2>&1 &
 CLIENT=$!
 if [ -n "$UNTIL" ]; then
     # The kill sits inside the pipeline's last stage: the pipeline itself only ends when tail does.
@@ -97,3 +98,4 @@ awk '{ n[$2]++; if (!($2 in first)) first[$2] = $1 } END { for (h in n) print n[
     sort -t'#' -k2,2n | sed 's/^/  /' | head -n 12
 echo "== tail"; tail -n 6 "$OUT/client.log" | cut -c1-200; tail -n 3 "$OUT/client.out" | cut -c1-200
 echo "== timing: $T_PREP, $T_CARGO, $T_CLIENT${UNTIL:+ (until /$UNTIL/)}"
+no_downloads "$GAME" "$SEEDED" || exit 4

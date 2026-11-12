@@ -41,6 +41,7 @@ if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
 else
     sh "$ROOT/tools/install-engine2.sh" "$GAME"
 fi
+. "$ROOT/tools/diff/noweb.sh"
 # SEED=<dir>: as tools/boot-client.sh.
 SEEDED=
 if [ -n "${SEED:-}" ]; then
@@ -67,3 +68,4 @@ echo "== stub slots hit: $(grep -cE '^\[Warn\] stub:' "$OUT/server.log" || true)
 echo "== errors"; grep -iE 'exception|error|fatal' "$OUT/server.log" | grep -v '^\[Warn\] stub' | head -n 15 || true
 echo "== tail"; tail -n 8 "$OUT/server.log"
 echo "== timing: $T_PREP, $T_CARGO, $T_SERVER${UNTIL:+ (until /$UNTIL/)}"
+no_downloads "$GAME" "$SEEDED" || exit 4

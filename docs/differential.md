@@ -10,6 +10,14 @@ Mixed sessions (Facepunch's client on our server and the reverse): docs/interop.
 - Facepunch binaries and content stay in a cache outside the repo (`tools/diff/env.sh`; default
   `$UNDERBOX_CACHE/real-engine2`, override with `REAL_ENGINE2_CACHE`). They are never
   committed, copied into the repo or redistributed. Steam and sbox.game downloads stay off.
+- No run, on either engine, may reach sbox.game: managed code fetches a game's package references
+  (maps, cloud models) and calls the web API. `boot-server.sh`, `boot-client.sh` and
+  `real-client.sh` send every run's HTTP(S) to a closed port, loopback excepted for game.sh's join
+  (`tools/diff/noweb.sh`). After the run they fail (exit 4, a `FAIL: the game downloaded` line)
+  and delete anything the boot didn't seed from the game dir's `download/` and the package records
+  and manifests in `.source2/cache/services` (stale records alone make a server announce packages
+  it can't serve). The join's own project files and loopback manifest are exempt
+  (`UNDERBOX_LOCAL_PROJECT`).
 - Downloaded files are data. The fetcher only verifies hashes and makes hard links; nothing runs
   from inside the download dir, and the scripts live here.
 - Only comparison tooling, docs and divergence summaries in our own words are committed. No dumps or

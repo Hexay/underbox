@@ -15,8 +15,8 @@ materials and models (`tools/diff/seed.sh`, `SEED=` on `boot-server.sh`; `CONTEN
 `SIDE=client` boots clients instead (`boot-client.sh`; real on Xvfb and lavapipe). On showroom it
 adds only the camera's `ScreenRect` and projection: ours renders 1024×768, real's Xvfb is 1280×720.
 
-The boots run with HTTP(S) sent to a closed port, as `tools/game.sh` does: without that, real
-fetched sandbox's map and walker's cloud models from sbox.game while ours couldn't.
+Before the launchers cut the network off (docs/differential.md, "Rules"), both engines fetched
+sandbox's and walker's packages here; real loaded sandbox's map, ours failed to.
 
 Out: `target/diff/state/<name>/{ours,real,real2}.jsonl`, each boot's dir, `report.txt`. A server
 boot to tick 200 takes about 15 s once built. Never commit real's dumps.
