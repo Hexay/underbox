@@ -109,7 +109,7 @@ fn target(view: &SceneView, l: layer::Ref) -> Target {
     let (color, depth) = layer::targets(l);
     let vp = layer::viewport(l);
     let viewport = if vp.m_n_width > 0 && vp.m_n_height > 0 { vp } else { view.viewport };
-    Target { color, depth, viewport, ..Default::default() }
+    Target { color, depth, viewport, srgb_write: layer::srgb_output(l), ..Default::default() }
 }
 
 fn setup(ctx: context::Ref, v: view::Ref, l: layer::Ref, color: texture::Ref) -> ManagedRenderSetup_t {
@@ -155,9 +155,11 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             super::trace::layer(v.addr(), &layer, &t, &draws);
             draw::execute(&t, &immediate::lighting(ctx), Load::default(), &draws);
             if custom_objects_callable() {
-                for id in managed {
+                for (id, world) in managed {
+                    immediate::set_object(ctx, world);
                     custom::render_object(setup(ctx, v, l, t.color), id);
                 }
+                immediate::set_object(ctx, Mat4::IDENTITY);
             }
         }
         Kind::Procedural(callback) if callback != 0 => {

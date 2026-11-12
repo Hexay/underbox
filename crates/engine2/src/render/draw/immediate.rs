@@ -51,12 +51,15 @@ pub struct DrawState {
     pub model_call: Option<super::draw_call::ModelCall>,
     /// Stream 1: a GPU buffer of instance ids and its byte offset.
     pub instance_stream: Option<(gpu_buffers::Handle, u32)>,
+    /// The managed scene object being rendered (`SceneCustomObject.RenderObject`): its world
+    /// transform is the draws' instance transform (`GetTransformMatrix`), as native sets it.
+    pub object: Mat4,
 }
 
 impl Default for DrawState {
     fn default() -> Self {
         let lighting = Arc::new(Lighting::fallback());
-        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting, render_state: None, slots: Vec::new(), model_call: None, instance_stream: None }
+        DrawState { layout: None, vertices: None, indices: None, view_proj: Mat4::IDENTITY, lighting, render_state: None, slots: Vec::new(), model_call: None, instance_stream: None, object: Mat4::IDENTITY }
     }
 }
 
@@ -98,17 +101,22 @@ fn set_render_state(c: Ctx, attrs: attributes::Ref, mode: material_mode::Ref, l:
     device::gpu().is_some()
 }
 
+/// Set the instance transform of `c`'s draws ([`DrawState::object`]).
+pub fn set_object(c: Ctx, world: Mat4) {
+    with(c, |s| s.object = world);
+}
+
 /// The `SetRenderState` material's program for a draw of `layout` on `c`, bound with its
 /// attributes, the context's and the `BindTexture` slots; `None` draws the placeholder.
 fn render_state_shading(c: Ctx, layout: &Layout) -> Option<Shaded> {
     let ctx = context::get(c)?;
-    let (state, slots, view_proj) = {
+    let (state, slots, view_proj, world) = {
         let s = ctx.draw.lock().unwrap();
-        (s.render_state, s.slots.clone(), s.view_proj)
+        (s.render_state, s.slots.clone(), s.view_proj, s.object)
     };
     let (attrs, mode) = state?;
     let bindings = ContextBindings { attributes: vec![attrs, ctx.attributes], slots, instance_ids: None };
-    shaded::resolve(material_mode::material(mode)?, layout, Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }, view_proj, bindings)
+    shaded::resolve(material_mode::material(mode)?, layout, Instance { world, tint: [1.0; 4] }, view_proj, bindings)
 }
 
 /// `RenderTools.Draw`: managed's vertex (and optional u16 index) arrays, uploaded per call.

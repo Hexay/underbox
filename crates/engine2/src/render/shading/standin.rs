@@ -20,7 +20,11 @@ pub const ALL_PATHS: [&str; 4] = [PATH, SKY_PATH, GIZMO_LINE_PATH, GIZMO_SPRITE_
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Lit,
+    /// `generic.shader`: lit, its colour tint already linear (real's error models draw gold).
+    Generic,
     Unlit,
+    /// `error.shader` (native's error material): the lit stand-in with a red checker for albedo.
+    Error,
     Sky,
     GizmoLine,
     GizmoSprite,
@@ -28,12 +32,12 @@ pub enum Kind {
 
 const MAPPED: &[(&str, Kind)] = &[
     ("complex", Kind::Lit),
-    ("generic", Kind::Lit),
+    ("generic", Kind::Generic),
     ("simple", Kind::Lit),
     ("skin", Kind::Lit),
     ("eyeball", Kind::Lit),
     ("static_overlay", Kind::Lit),
-    ("error", Kind::Lit),
+    ("error", Kind::Error),
     ("tools_generic", Kind::Lit),
     ("tools_solid", Kind::Lit),
     ("unlit", Kind::Unlit),
@@ -63,7 +67,7 @@ impl Kind {
     /// The program's cache key.
     pub fn path(self) -> &'static str {
         match self {
-            Kind::Lit | Kind::Unlit => PATH,
+            Kind::Lit | Kind::Generic | Kind::Unlit | Kind::Error => PATH,
             Kind::Sky => SKY_PATH,
             Kind::GizmoLine => GIZMO_LINE_PATH,
             Kind::GizmoSprite => GIZMO_SPRITE_PATH,
@@ -81,7 +85,9 @@ impl Kind {
         static DEBUG: std::sync::LazyLock<f32> = std::sync::LazyLock::new(|| std::env::var("UNDERBOX_STANDIN_DEBUG").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0));
         match self {
             Kind::Lit => vec![("StandinUnlit", 0.0), ("StandinDebug", *DEBUG)],
+            Kind::Generic => vec![("StandinUnlit", 0.0), ("StandinLinearTint", 1.0), ("StandinDebug", *DEBUG)],
             Kind::Unlit => vec![("StandinUnlit", 1.0), ("StandinDebug", *DEBUG)],
+            Kind::Error => vec![("StandinUnlit", 0.0), ("StandinError", 1.0), ("StandinDebug", *DEBUG)],
             Kind::Sky | Kind::GizmoLine | Kind::GizmoSprite => Vec::new(),
         }
     }
