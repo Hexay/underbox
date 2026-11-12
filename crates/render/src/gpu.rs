@@ -210,7 +210,7 @@ impl Gpu {
         self.flush_batch(false);
     }
 
-    /// [`Gpu::flush`] at the end of a frame: the next frame's uploads reuse the upload buffer.
+    /// [`Gpu::flush`] at the end of this thread's frame: its next uploads reuse its upload buffer.
     pub fn end_frame(&self) {
         self.flush_batch(true);
         self.bind_groups.end_frame();
@@ -225,7 +225,7 @@ impl Gpu {
         });
     }
 
-    /// `bytes` zero-padded to `size` in this frame's upload buffer, aligned for any binding.
+    /// `bytes` zero-padded to `size` in this thread's upload buffer, aligned for any binding.
     pub fn upload(&self, bytes: &[u8], size: u64) -> Slice {
         let l = self.device.limits();
         let align = u64::from(l.min_uniform_buffer_offset_alignment.max(l.min_storage_buffer_offset_alignment));
@@ -237,8 +237,7 @@ impl Gpu {
         if data.is_empty() {
             return;
         }
-        let src = self.batch.upload(&self.device, &self.queue, data, 0, wgpu::COPY_BUFFER_ALIGNMENT);
-        self.batch.copy(&self.device, &src, dst, offset, src.size);
+        self.batch.write(&self.device, &self.queue, dst, offset, data);
     }
 
     /// Whether the last wait timed out and the queue hasn't drained since.
