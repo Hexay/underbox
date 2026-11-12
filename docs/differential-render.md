@@ -208,26 +208,39 @@ were held (the error-model road cone fell a frame-timed distance).
 | First (ours with HUD) | 59.1 / 58.1 / 57.4, SSIM 0.301; luma ours 20.4, real 73.8 |
 | After 7–9, HUD hidden | 56.8 / 60.2 / 56.1, SSIM 0.336; luma ours 19.7, real 73.9 |
 | Same, `Sharpen` stripped from both (scratch copy) | 16.6 / 23.1 / 25.8, SSIM 0.749; luma ours 73.6, real 73.9 |
+| After 1 and 3 (sRGB layer output, hoisted globals) | 13.9 / 20.1 / 23.1, SSIM 0.770; luma ours 72.9 |
+| After 2, text placed (checker, identity matrices, instance transform) | 11.3 / 9.3 / 12.0, SSIM 0.790; luma ours 71.5 |
+| After 4–5 (keyframed trigger, linear `generic` tint) | 6.6 / 4.8 / 4.9, SSIM 0.920; luma ours 71.7 |
 
 Ranked divergences:
 
-1. **Open, ours: `Sharpen` darkens the whole frame** (luma 19.7 against 73.9; without it 73.6).
-   It blits at `Stage.AfterPostProcess`, onto the 8-bit target after `ResolveHDRToFinalSDR`, and
-   samples `ColorBuffer` with `SrgbRead( true )`; ours writes the decoded values back unencoded,
-   so the frame comes out linear. Real writes through the target's sRGB encode. Bisected by
-   stripping Sharpen, Vignette, Bloom and the tonemapper one at a time.
-2. **Open, ours: the error material draws as plain lit grey.** Real's `materials/error.vmat`
-   (`shaders/error.shader`, closed) is a fine red/black checker; ours maps `error` to the lit
-   stand-in, and a missing `.vmat` gets an empty material (`material.rs`).
-3. **Open, ours: walker's world text is missing** ("FLAMING MOES", a `TextRenderer`). It draws
-   `ui_text` with `D_WORLDPANEL` 1, and that variant doesn't compile from sbox-public's source:
-   `ui/pixel.hlsl` includes `ui/scissor.hlsl`, which reads `BoxSize`, before declaring it.
-   Real's compiled shader has it. A fix hoists annotated globals (as vfx's cbuffer does).
-4. **Open: error models lie flat on ours.** The coins (rolled 180°) show their `ERROR` letters
-   upright on real and flat, half sunk, on ours; their tint is redder on ours.
-5. **Open: floor.** Ours draws an extra slab right of the map and a sunlit band where real's
-   floor is evenly lit. Not bisected; the trigger volumes' `toolstrigger` meshes are the first
-   suspects (real hides tool materials in game).
+1. **Fixed, ours: `Sharpen` darkened the whole frame** (luma 19.7 against 73.9). It blits at
+   `Stage.AfterPostProcess` onto the 8-bit target, and native writes a layer whose
+   `SetOutput` colour space is sRGB through the target's sRGB view; ours wrote linear. Render
+   and procedural layers and `RestoreRenderTargets` now carry `srgb_write`
+   (`layer::srgb_output`), and an 8-bit target attaches its sRGB twin
+   (`Texture::srgb_target_view`). Corpus goldens unchanged.
+2. **Fixed, ours: the error material drew as plain lit grey.** `error.shader` (closed) maps to
+   `standin::Kind::Error`: a world-space checker of 2-unit cells, its two reds fitted to real's
+   run lengths and levels; a missing `.vmat` gets `error.shader` too.
+3. **Fixed, ours: world text was missing** ("FLAMING MOES", `ui_text` with `D_WORLDPANEL` 1):
+   `ui/scissor.hlsl` reads `BoxSize` before `ui/pixel.hlsl` declares it. vfx moves annotated
+   globals into a cbuffer ahead of the code; `shaders::hoist` moves a global read above its
+   declaration to the top. The draw sets no `LayerMat` or `TransformMat`; unset matrix
+   attributes default to identity (`bind::uniform_value`), and a custom object's immediate draws
+   take its world transform as the instance transform (`immediate::set_object`), as native's
+   `GetTransformMatrix`.
+4. **Fixed, physics: the floor moved on real, not on ours.** Top-down frames (camera
+   `32,0,700`, angles `89,0,0`) show real's floor centred on `TeleportTarget` (4,200,4): the
+   keyframed `TriggerTeleport` box rests on the static floor and real teleports the floor's
+   root. Ours reported trigger pairs only with a dynamic body; a keyframed trigger now reports
+   static colliders too (`shape::pair_types`, `contacts::reports`). That also explains the
+   coins: rolled 180°, their error models hang below the old floor, half sunk on ours.
+   Unverified: a static trigger over a keyframed collider (walker's map under `MapInstance`)
+   stays silent, as before.
+5. **Fixed, ours: error models were redder.** `materialforerrormodel.vmat` (`generic.shader`)
+   tints by `[0.753 0.251 0]`; real's gold fits a linear tint, so `generic` maps to
+   `Kind::Generic`, which skips the stand-in's gamma decode.
 6. **Fixed, harness: real crashed creating walker's lobby** (above).
 7. **Fixed. A pass sampling its own target dropped whole submits.** The bindless array bound
    every texture, the depth prepass's normals target included, and wgpu rejects an attachment
@@ -245,8 +258,7 @@ Ranked divergences:
 
 ## Follow-up lanes
 
-- **Walker (above):** the Sharpen encode (1), the error shader (2), `ui_text` world panels (3),
-  error-model pose (4), floor (5), the HUD with `KEEP_HUD=true` (10).
+- **Walker (above):** the HUD with `KEEP_HUD=true` (10).
 
 - **Rendering:** `render/convars.rs` defines the
   texture quality group's convars with real's defaults (`r_max_anisotropy` 4,
