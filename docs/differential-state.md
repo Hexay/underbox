@@ -54,11 +54,12 @@ everywhere except skinned (6: real's `RootMotion` on a server is uninitialized, 
 
 Ranked by reach. Before → after where fixed.
 
-1. **Walker: real's static trigger teleports static bodies.** At tick 5 real moves `Box[0]` (a
-   static MeshComponent) and `coin01 (25)` (a SphereCollider without a Rigidbody) to the teleport
-   target (4, 200, 4); the road cone above `Box[0]` then falls (vz −51). Ours leaves them, as
-   docs/walker.md's fix chose (triggers report only pairs with a dynamic body). So real's triggers
-   do see static and keyframed bodies. Open: which pairs exactly.
+1. **Walker: real's trigger teleports a keyframed coin.** At tick 5 real moves `coin01 (25)` (a
+   SphereCollider without a Rigidbody, so keyframed) to the teleport target (4, 200, 4); ours
+   leaves it at (−120, −200, 4.5). Before the keyframed-trigger fix (docs/differential-render.md,
+   walker 4) real also moved `Box[0]`, the floor, and the road cone on it fell (vz −51) on real
+   only; both now match. This settles that fix's "unverified" case: the trigger does report a
+   keyframed collider on real.
 2. **`SceneObject.Bounds` is model-local on ours** (every renderer, every scene). Real returns the
    model's bounds through the object's transform (showroom's scaled, rotated boxes); ours stores
    the model's bounds at creation and never transforms them (`scene/create.rs`,
@@ -88,7 +89,7 @@ Known already and seen again: the sliding box's vertical pop (docs/differential.
 
 ## Follow-up lanes
 
-- Triggers against static and keyframed bodies (1), then walker past tick 5.
+- Triggers against keyframed colliders (1), then walker past tick 5.
 - World-space scene object bounds (2) and skinned bounds (3): culling and lighting read them.
 - Physics query surface (4–7) and compiled model metadata (8, 9).
 - `SIDE=client`: one window size on both, then camera, post-processing and render-only state.
