@@ -14,15 +14,20 @@ pub enum Work<'a> {
     Indirect(&'a render::wgpu::Buffer, u64),
 }
 
-/// Run `shader` over `work`; `Err` when it doesn't translate or bind.
+/// Run `shader` over `work` outside any view; `Err` when it doesn't translate or bind.
 pub fn dispatch(gpu: &render::Gpu, shader: &str, attrs: &[attributes::Ref], work: Work) -> Result<(), String> {
+    dispatch_in(gpu, shader, attrs, work, &View::default(), &Lighting::default())
+}
+
+/// [`dispatch`] inside a view: per-view constants and the lighting blocks come from `view` and
+/// `lighting` where the attributes don't carry them (clustered_light_culling_cs bins these lights).
+pub fn dispatch_in(gpu: &render::Gpu, shader: &str, attrs: &[attributes::Ref], work: Work, view: &View, lighting: &Lighting) -> Result<(), String> {
     if crate::render::scene::trace::skipped(shader.rsplit('/').next().unwrap_or(shader).trim_end_matches(".shader")) {
         return Ok(());
     }
     let program = shading::compute(gpu, shader, attrs)?;
-    let view = View::default();
-    let (lighting, textures) = (Lighting::default(), HashMap::new());
-    let inputs = bind::Inputs { view: &view, lighting: &lighting, instances: &[], textures: &textures, values: &[], attributes: attrs, slots: &[], targets: &[] };
+    let textures = HashMap::new();
+    let inputs = bind::Inputs { view, lighting, instances: &[], textures: &textures, values: &[], attributes: attrs, slots: &[], targets: &[] };
     let groups = gpu.checked(|| bind::bind_groups(gpu, &program, &inputs)).and_then(|g| g)?;
     let words = texel_words::Synced::load(gpu, &program, &inputs);
     let ran = gpu.checked(|| match work {

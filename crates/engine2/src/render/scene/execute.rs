@@ -152,7 +152,11 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             if layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 {
                 return;
             }
-            let (draws, managed) = collect(view, &Filter::of(l, required, excluded, match_id));
+            let (mut draws, managed) = collect(view, &Filter::of(l, required, excluded, match_id));
+            // Beneath each object's own attributes, as for managed draws: the cluster lists and grid live on the view.
+            if let Some(c) = context::get(ctx) {
+                draws.iter_mut().filter_map(|d| d.shaded.as_mut()).for_each(|s| s.context.attributes.push(c.attributes));
+            }
             super::trace::layer(v.addr(), &layer, &t, &draws);
             draw::execute(&t, &immediate::lighting(ctx), Load::default(), &draws);
             if custom_objects_callable() {

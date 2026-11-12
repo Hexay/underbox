@@ -48,26 +48,30 @@ static void submitted(Device* d, VkQueue q, const std::vector<VkCommandBuffer>& 
     }
 }
 
+static void before_submit(Device* d, const std::vector<VkCommandBuffer>& cbs) {
+    if (g_dir.empty()) return;
+    Lock l(mu());
+    uploads_submitted(d, cbs);
+}
+
 VkResult hk_QueueSubmit(VkQueue q, uint32_t n, const VkSubmitInfo* s, VkFence f) {
     Device* d = device(q);
+    std::vector<VkCommandBuffer> cbs;
+    for (uint32_t i = 0; i < n; i++) cbs.insert(cbs.end(), s[i].pCommandBuffers, s[i].pCommandBuffers + s[i].commandBufferCount);
+    before_submit(d, cbs);
     VkResult r = d->QueueSubmit(q, n, s, f);
-    if (recording().load() && r == VK_SUCCESS) {
-        std::vector<VkCommandBuffer> cbs;
-        for (uint32_t i = 0; i < n; i++) cbs.insert(cbs.end(), s[i].pCommandBuffers, s[i].pCommandBuffers + s[i].commandBufferCount);
-        submitted(d, q, cbs);
-    }
+    if (recording().load() && r == VK_SUCCESS) submitted(d, q, cbs);
     return r;
 }
 
 VkResult hk_QueueSubmit2(VkQueue q, uint32_t n, const VkSubmitInfo2* s, VkFence f) {
     Device* d = device(q);
+    std::vector<VkCommandBuffer> cbs;
+    for (uint32_t i = 0; i < n; i++)
+        for (uint32_t k = 0; k < s[i].commandBufferInfoCount; k++) cbs.push_back(s[i].pCommandBufferInfos[k].commandBuffer);
+    before_submit(d, cbs);
     VkResult r = d->QueueSubmit2(q, n, s, f);
-    if (recording().load() && r == VK_SUCCESS) {
-        std::vector<VkCommandBuffer> cbs;
-        for (uint32_t i = 0; i < n; i++)
-            for (uint32_t k = 0; k < s[i].commandBufferInfoCount; k++) cbs.push_back(s[i].pCommandBufferInfos[k].commandBuffer);
-        submitted(d, q, cbs);
-    }
+    if (recording().load() && r == VK_SUCCESS) submitted(d, q, cbs);
     return r;
 }
 

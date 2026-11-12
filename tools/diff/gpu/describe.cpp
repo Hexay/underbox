@@ -17,17 +17,15 @@ std::string image_obj(uint64_t image) {
     if (i.swapchain) o.n("swapchain", 1);
     std::string n = name_of(image);
     if (!n.empty()) o.str("name", n);
+    // Content: the hash of the finest uploaded mip (hmip when that isn't mip 0) and the smallest mip's bytes.
+    auto& c = i.content;
+    if (!c.mipHash.empty()) {
+        o.str("hash", hex(c.mipHash.begin()->second));
+        if (c.mipHash.begin()->first) o.n("hmip", c.mipHash.begin()->first);
+        o.n("upmips", (double)c.mipHash.size());
+    }
+    if (!c.sample.empty()) o.n("smip", c.sampleMip).str("sample", hexbytes(c.sample.data(), c.sample.size()));
     return o.done();
-}
-
-std::string image_short(uint64_t image) {
-    auto it = objs().images.find(image);
-    if (it == objs().images.end()) return q("?");
-    auto& i = it->second;
-    std::string s = nm(i.fmt) + " " + std::to_string(i.ext.width) + "x" + std::to_string(i.ext.height);
-    if (i.ext.depth > 1) s += "x" + std::to_string(i.ext.depth);
-    s += " m" + std::to_string(i.mips) + " l" + std::to_string(i.layers);
-    return q(s);
 }
 
 std::string view_obj(VkImageView v) {

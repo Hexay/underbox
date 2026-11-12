@@ -51,6 +51,7 @@ static void open_pass(CmdRec& r, std::shared_ptr<PassRec> p) {
 VkResult hk_BeginCommandBuffer(VkCommandBuffer cb, const VkCommandBufferBeginInfo* bi) {
     {
         Lock l(mu());
+        uploads_begin(cb);
         if (recording()) cmds()[h64(cb)] = CmdRec{};
         else cmds().erase(h64(cb));
     }

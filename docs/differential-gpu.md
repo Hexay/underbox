@@ -19,7 +19,7 @@ Captures and dumps stay out of the repo (real's are Facepunch output).
 
 ## How it works
 
-- **A capture layer of our own**, `tools/diff/gpu/` (C++, about 1.9k lines), built by
+- **A capture layer of our own**, `tools/diff/gpu/` (C++, about 2.3k lines), built by
   `tools/diff/gpu-layer.sh` into `$UNDERBOX_CACHE/underbox-gpu-layer/<source hash>/` in about 10 s and
   enabled with `VK_ADD_LAYER_PATH` and `VK_INSTANCE_LAYERS`. LunarG's api_dump writes every call as text,
   loses the creation info of objects made before the frame once limited to it, and can't show buffer
@@ -39,14 +39,26 @@ Captures and dumps stay out of the repo (real's are Facepunch output).
   applied over it. Descriptor sets are tracked through writes, copies, templates and push descriptors and
   resolved at submit. After each submit of the frame the layer waits for the queue and reads uniform
   buffers, index buffers and indirect arguments straight from memory: lavapipe's memory is all host
-  visible. Arrays over 16 descriptors (bindless) are listed once per frame with their fill.
+  visible. Arrays over 16 descriptors (bindless) are listed once per frame with every filled slot.
+  Storage buffers are read too (up to 512 KiB), and instance-rate vertex streams.
+- **Textures.** The layer hashes every image upload (`gpu/uploads.cpp`): per mip, the sum of CRC-32s
+  of its block rows, each seeded by (layer, z, row, x), so neither region split nor row pitch matters.
+  Ours labels textures with their resource path; real's are named by hashing mip 0 of every seeded core
+  `.vtex_c` of the same size the same way (`gpu_vtex.py`; real uploads block-compressed data as
+  stored). Flat defaults share content across many files and list as `name (+N same)`. A draw's
+  textures (`gpu_tex.py`) are those bound directly plus the bindless slots its constants select:
+  `FIELDS` lists those fields, found with `gpu.py fields <frame.jsonl> [core]` (fields whose values
+  are always filled slots) and checked against the public structs. Real: `DirectionalLightCB` +288
+  (cascades) and +312 (contact shadows), `ProjectedShadows[]` +64, `ProjectedCubeShadows[]` +396,
+  `GPUDecal` words 10 and 11 (low 16 bits); ours: its decal buffer's same words. Draws then compare
+  texture sets by name (else format, size, mips), and same-named textures by format.
 - **Matching** (`tools/diff/gpu_diff.py`) never uses handles. A draw's mesh is its index count, its
   vertex span and a hash of its indices relative to their minimum: both engines draw real's seeded
   `.vmdl_c`, so the same mesh hashes the same (showroom's box is `b9c596af`, its plane `f624d74f`,
   on both). Passes align in order by role (colour attachment count, depth, render area) plus the set of
   meshes drawn, then by role alone. Within a pass, meshes compare by instance totals (engines batch
-  differently), and the first draw of each mesh is paired for state, vertex formats, textures and
-  samplers by identity (format, size, mips), and uniforms paired by size and compared per float.
+  differently), and the first draw of each mesh is paired for state, vertex formats, textures (above)
+  and samplers, and uniforms paired by size and compared per float.
 - **Render-target dumps.** `DUMP=<n>[:<draw>]` names pass `P<n>` of that side's listing (submit order)
   and optionally a draw in it. A lead frame learns the pass's attachment signature; later frames copy the
   attachments out at the end of every pass with that signature and drop their draws after `<draw>`;
@@ -59,7 +71,7 @@ engine uses them here). Command buffers recorded more than the lead ahead show a
 has two per frame, its first and last submit, still unrecorded with a lead of 3. An indirect count buffer isn't
 read; up to the maximum count is listed.
 
-## Findings (showroom and skinned, ours vs real)
+## Findings (showroom, skinned and decals, ours vs real)
 
 Real renderer differences. Pixel metrics already agree closely (docs/differential-render.md), so most
 are structure, not output. Fixed items say what changed and what is left.
@@ -97,11 +109,12 @@ are structure, not output. Fixed items say what changed and what is left.
 6. **Constants ours left zero (fixed).** The 592-byte buffer now matches byte for byte: native's
    default wind (also what `GetSceneWorldWind` returns), the camera as
    `g_vHighPrecisionLightingOffsetWs`, and infinite fog culling bounds. Real's 80-byte cluster block
-   comes from managed's `ClusteredCullingLayer` on the view's attributes; layers' attributes now
-   inherit the view's, so a shader that declares it gets managed's grid, identical to real's. The
-   80-byte buffer still paired against it on the main draw is the material stand-in's own globals
-   (the stand-in reads no clusters). The 304-byte buffer is byte-identical. The 4128-byte light array
-   holds NaN in real's unused slots, 0 on ours.
+   comes from managed's `ClusteredCullingLayer` on the view's attributes. The material stand-in now
+   walks the clusters as real's forward shading does (`ClusterCulling.hlsl`; lights and decals from
+   the pixel's cluster), and scene draws in a render layer take the view's attributes beneath their
+   own (`scene/execute.rs`), so its main-draw 80-byte block is byte-identical to real's (24×16×48,
+   near 10, far 10000, 1024×768) and it reads managed's 73728-byte cluster lists. The 304-byte buffer
+   is byte-identical. The 4128-byte light array holds NaN in real's unused slots, 0 on ours.
 7. **Morph targets.** Real composites morphs in a 2048×1024 `R16G16B16A16Sfloat` pass of two additive
    draws before shadows; ours has no such pass (compute).
 8. **Final output (mostly fixed).** A pass that neither clears nor draws isn't recorded (showroom:
@@ -112,12 +125,23 @@ are structure, not output. Fixed items say what changed and what is left.
    writes as ordered copies out of it, command buffers submitted together at present. Showroom 13
    (was 335), skinned 18 (was 745); real 16 and 14. The anti-aliasing composite has the depth test
    off on both sides; real's state still carries `GreaterOrEqual`, which wgpu can't set on a
-   disabled test (it leaves `Never`), so `gpu_diff.py` ignores the op there. Left: the swap chain image is ours' own texture, copied to the
-   surface at present. Engine textures are long-lived handles that binds, views, bindless entries
-   and readbacks keep, while a wgpu surface texture lives for one frame and can't back one.
-9. **Bindless.** Real's array holds 1252 views (every loaded texture); ours 5 per set, with material
-   textures bound directly. Per-draw texture lists therefore can't be compared on real's side yet: its
-   material textures are indexed from uniforms.
+   disabled test (it leaves `Never`), so `gpu_diff.py` ignores the op there. Left: the swap chain
+   image is ours' own texture, copied to the surface at present. Engine textures are long-lived
+   handles that binds, views, bindless entries and readbacks keep, while a wgpu surface texture
+   lives for one frame and can't back one.
+9. **Textures per draw.** Real binds material textures directly too (box: `primary_white_color`,
+   plane: `testgrid_color`, the same files as ours); its one bindless array (about 1250 views, every
+   loaded texture) serves shadow maps, the contact-shadow mask and decals. Ours fills a few dozen slots per
+   view dimension and binds shadow maps directly; its copies of real's shadow indices select 1×1
+   defaults. Decal textures pair by name on both (decals: star, ring, splotch, arrow, spark). Left:
+   - Formats: ours decodes block-compressed textures to `R8G8B8A8Unorm`; real keeps them as stored
+     (`Bc1RgbSrgbBlock` testgrid, primary_white and skinned's crate, `Bc7SrgbBlock` default normal,
+     `Bc3SrgbBlock` decal shapes).
+   - Real's main draw also reads `default_ao` (BC4 16²), `default_bentnormal` (BC5 4²),
+     `ggx_integrate_brdf_lut_schlick` (256²), a 512×3072 `R16G16B16A16Unorm` table, the
+     1024×768 `R32G32Sfloat` depth chain (10 mips), a 1×1 cube, a 2×2 texture and the 1024×768 R8
+     contact mask (ours skips that dispatch, item 2); the stand-in reads none of them.
+   - Ours' depth prepass binds the stand-in's full set; real's binds no textures (item 4).
 
-Next steps: decode real's bindless indices from its per-draw constants so material textures compare per
-draw; name real's shaders (their SPIR-V carries no source string) by matching stage interfaces.
+Next steps: name real's shaders (their SPIR-V carries no source string) by matching stage interfaces;
+upload block-compressed textures as stored where the device supports the format.

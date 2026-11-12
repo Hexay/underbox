@@ -128,7 +128,7 @@ void hk_CmdSetColorBlendEquationEXT(VkCommandBuffer cb, uint32_t first, uint32_t
     device(cb)->CmdSetColorBlendEquationEXT(cb, first, n, e);
 }
 
-static void xfer(VkCommandBuffer cb, const char* op, uint64_t dst) {
+void gpu::xfer(VkCommandBuffer cb, const char* op, uint64_t dst) {
     with(cb, [&](CmdRec& r) { r.ev.push_back({Event::Xfer, op, nullptr, nullptr, {}, dst}); });
 }
 
@@ -148,10 +148,6 @@ void hk_CmdClearDepthStencilImage(VkCommandBuffer cb, VkImage i, VkImageLayout l
 void hk_CmdCopyBuffer(VkCommandBuffer cb, VkBuffer s, VkBuffer d, uint32_t n, const VkBufferCopy* rg) {
     xfer(cb, "copyBuffer", h64(d));
     device(cb)->CmdCopyBuffer(cb, s, d, n, rg);
-}
-void hk_CmdCopyBufferToImage(VkCommandBuffer cb, VkBuffer s, VkImage d, VkImageLayout l, uint32_t n, const VkBufferImageCopy* rg) {
-    xfer(cb, "copyBufferToImage", h64(d));
-    device(cb)->CmdCopyBufferToImage(cb, s, d, l, n, rg);
 }
 void hk_CmdCopyImage(VkCommandBuffer cb, VkImage s, VkImageLayout sl, VkImage d, VkImageLayout dl, uint32_t n, const VkImageCopy* rg) {
     xfer(cb, "copyImage", h64(d));
@@ -178,10 +174,6 @@ void hk_CmdFillBuffer(VkCommandBuffer cb, VkBuffer d, VkDeviceSize o, VkDeviceSi
     device(cb)->CmdFillBuffer(cb, d, o, n, v);
 }
 void hk_CmdCopyBuffer2(VkCommandBuffer cb, const VkCopyBufferInfo2* i) { xfer(cb, "copyBuffer", h64(i->dstBuffer)); device(cb)->CmdCopyBuffer2(cb, i); }
-void hk_CmdCopyBufferToImage2(VkCommandBuffer cb, const VkCopyBufferToImageInfo2* i) {
-    xfer(cb, "copyBufferToImage", h64(i->dstImage));
-    device(cb)->CmdCopyBufferToImage2(cb, i);
-}
 void hk_CmdCopyImage2(VkCommandBuffer cb, const VkCopyImageInfo2* i) { xfer(cb, "copyImage", h64(i->dstImage)); device(cb)->CmdCopyImage2(cb, i); }
 void hk_CmdCopyImageToBuffer2(VkCommandBuffer cb, const VkCopyImageToBufferInfo2* i) {
     xfer(cb, "copyImageToBuffer", h64(i->srcImage));
