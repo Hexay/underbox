@@ -81,6 +81,30 @@
       ]
     },
     {
+      "__guid": "c4f2a6b9-7fd0-47e0-a2b1-f39e6f708192",
+      "Flags": 0,
+      "Name": "Morphed",
+      "Position": "50,0,0",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.SkinnedModelRenderer",
+          "__guid": "d5036bca-80e1-48f1-b3c2-04af708192a3",
+          "BodyGroups": 18446744073709551615,
+          "CreateBoneObjects": false,
+          "Model": "models/compiled/puppet_morphed.vmdl",
+          "PlaybackRate": 1,
+          "RenderType": "On",
+          "Sequence": {
+            "Name": "bow",
+            "Looping": false
+          },
+          "Tint": "1,0.8,0.6,1",
+          "UseAnimGraph": false
+        }
+      ]
+    },
+    {
       "__guid": "c4f2a6b9-7fd3-47e0-82cb-f39e6f708192",
       "Flags": 0,
       "Name": "Camera",
