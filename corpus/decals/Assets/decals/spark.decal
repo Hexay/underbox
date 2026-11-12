@@ -1,0 +1,14 @@
+{
+  "ColorTexture": "textures/shapes/spark1.vtex",
+  "NormalTexture": null,
+  "RoughMetalOcclusionTexture": null,
+  "HeightTexture": null,
+  "ParallaxStrength": 0,
+  "Tint": "1,0.8,0.3,1",
+  "BlendMode": "Additive",
+  "ColorMix": 1,
+  "Width": 40,
+  "Height": 40,
+  "__references": [],
+  "__version": 0
+}

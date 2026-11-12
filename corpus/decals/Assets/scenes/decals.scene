@@ -1,0 +1,225 @@
+{
+  "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0001",
+  "GameObjects": [
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0002",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0003",
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": true,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0004",
+      "Flags": 0,
+      "Name": "Floor",
+      "Scale": "4,4,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0005",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.75,0.75,0.72,1"
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0006",
+      "Flags": 0,
+      "Name": "Box",
+      "Position": "40,0,25",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0007",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.85,0.85,0.85,1"
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0008",
+      "Flags": 0,
+      "Name": "Side Box",
+      "Position": "-10,90,25",
+      "Rotation": "0,0,0.2588,0.9659",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0009",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.6,0.7,0.85,1"
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0010",
+      "Flags": 0,
+      "Name": "Floor Star",
+      "Position": "-70,-60,0",
+      "Rotation": "0,0.7071068,0,0.7071068",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.Decal",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0011",
+          "__version": 3,
+          "Decals": [ "decals/star.decal" ],
+          "Size": "1,1",
+          "Depth": 16,
+          "Rotation": 0,
+          "Scale": 1,
+          "LifeTime": 0,
+          "Parallax": 0
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0012",
+      "Flags": 0,
+      "Name": "Floor Ring",
+      "Position": "-100,20,0",
+      "Rotation": "0,0.7071068,0,0.7071068",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.Decal",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0013",
+          "__version": 3,
+          "Decals": [ "decals/ring.decal" ],
+          "Size": "1,1",
+          "Depth": 16,
+          "Rotation": 30,
+          "Scale": 1,
+          "LifeTime": 0,
+          "Parallax": 0
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0014",
+      "Flags": 0,
+      "Name": "Floor Splotch",
+      "Position": "-20,-10,0",
+      "Rotation": "0,0.7071068,0,0.7071068",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.Decal",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0015",
+          "__version": 3,
+          "Decals": [ "decals/splotch.decal" ],
+          "Size": "1,1",
+          "Depth": 16,
+          "Rotation": 0,
+          "Scale": 1,
+          "LifeTime": 0,
+          "Parallax": 0
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0016",
+      "Flags": 0,
+      "Name": "Box Arrow",
+      "Position": "15,8,28",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.Decal",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0017",
+          "__version": 3,
+          "Decals": [ "decals/arrow.decal" ],
+          "Size": "1,1",
+          "Depth": 16,
+          "Rotation": 0,
+          "Scale": 1,
+          "LifeTime": 0,
+          "Parallax": 0
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0018",
+      "Flags": 0,
+      "Name": "Edge Spark",
+      "Position": "15,-14,50",
+      "Rotation": "0,0.3826834,0,0.9238795",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.Decal",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0019",
+          "__version": 3,
+          "Decals": [ "decals/spark.decal" ],
+          "Size": "1,1",
+          "Depth": 40,
+          "Rotation": 0,
+          "Scale": 1,
+          "LifeTime": 0,
+          "Parallax": 0
+        }
+      ]
+    },
+    {
+      "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0020",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,130",
+      "Rotation": "0,0.2215,0,0.9751",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "8e3b6f21-5d4c-4b9f-8a2e-3c7d9f1b0021",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

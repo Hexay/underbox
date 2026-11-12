@@ -1,0 +1,14 @@
+{
+  "ColorTexture": "textures/shapes/ring1.vtex",
+  "NormalTexture": null,
+  "RoughMetalOcclusionTexture": null,
+  "HeightTexture": null,
+  "ParallaxStrength": 0,
+  "Tint": "0.2,0.45,1,1",
+  "BlendMode": "Alpha",
+  "ColorMix": 1,
+  "Width": 80,
+  "Height": 80,
+  "__references": [],
+  "__version": 0
+}

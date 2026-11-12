@@ -10,6 +10,7 @@
 //! matches real within 0.2 per channel only so; the camera's ambient left a seam between faces).
 
 mod blocks;
+pub mod decals;
 pub mod local_shadow;
 pub mod shadow;
 
@@ -66,6 +67,8 @@ pub struct Lighting {
     pub view_fog: Option<std::sync::Arc<crate::render::fog::ViewFog>>,
     /// The view's rendered froxels, when any volume shows (render/fog_volume.rs).
     pub fog_volume: Option<std::sync::Arc<crate::render::fog_volume::Frustum>>,
+    /// The worlds' clustered decals (decals.rs).
+    pub decals: Option<std::sync::Arc<decals::Decals>>,
 }
 
 impl Lighting {
@@ -90,17 +93,25 @@ impl Lighting {
     /// The rendering lights of `worlds` and the camera's `ambient` (managed's `ambientColor`).
     pub fn of_worlds(worlds: &[world::Ref], ambient: Vec4) -> Lighting {
         let mut out = Lighting { ambient, ..Default::default() };
-        for obj in object::in_worlds(worlds) {
+        let mut found = Vec::new();
+        for (r, obj) in object::refs_in_worlds(worlds) {
             let (rendering, p) = {
                 let s = obj.state.lock().unwrap();
                 (s.rendering, s.transform.position.vec)
             };
+            if rendering && obj.kind == crate::handles::Kind::DecalSceneObject {
+                found.push(decals::Decal::read(r.as_raw().cast(), &obj));
+                continue;
+            }
             let Some(l) = obj.light.as_ref().filter(|_| rendering) else { continue };
             let l = from_scene(&l.lock().unwrap(), Vec3::new(p.x, p.y, p.z));
             match l.kind {
                 kind::DIRECTIONAL if out.sun.is_none() => out.sun = Some(l),
                 _ => out.lights.push(l),
             }
+        }
+        if !found.is_empty() {
+            out.decals = Some(std::sync::Arc::new(decals::Decals::pack(found)));
         }
         out
     }

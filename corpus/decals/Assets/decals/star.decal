@@ -1,0 +1,14 @@
+{
+  "ColorTexture": "textures/shapes/star1.vtex",
+  "NormalTexture": null,
+  "RoughMetalOcclusionTexture": null,
+  "HeightTexture": null,
+  "ParallaxStrength": 0,
+  "Tint": "1,0.35,0.1,1",
+  "BlendMode": "Alpha",
+  "ColorMix": 1,
+  "Width": 64,
+  "Height": 64,
+  "__references": [],
+  "__version": 0
+}

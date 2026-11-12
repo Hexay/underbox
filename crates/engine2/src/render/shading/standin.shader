@@ -223,6 +223,8 @@ PS
 
 	//@lighting
 
+	//@decals
+
 	PS_OUTPUT MainPs( PS_INPUT i )
 	{
 		PS_OUTPUT o;
@@ -235,16 +237,24 @@ PS
 		float3 vNormalWs = normalize( i.vNormalWs );
 		Surface s;
 		s.vPositionWs = i.vPositionWs;
-		s.vNormalWs = vNormalWs;
 		s.vToCameraWs = CalculatePositionToCameraDirWs( i.vPositionWs );
 		// Before any branch: derivatives (BRDF.hlsl's AdjustRoughnessByGeometricNormal).
 		float3 vDx = ddx( vNormalWs ), vDy = ddy( vNormalWs );
 		float flGeometric = pow( saturate( max( dot( vDx, vDx ), dot( vDy, vDy ) ) ), 0.333 );
-		float flRoughness = pow( g_tNormal.Sample( g_sStandin, i.vTexCoord ).b, g_flRoughnessScaleFactor );
-		s.flRoughness = max( flRoughness, flGeometric );
-		s.vSpecularColor = lerp( float3( 0.04, 0.04, 0.04 ), vColor, g_flMetalness );
+		DecalSurface m;
+		m.vAlbedo = vColor;
+		m.vNormalWs = vNormalWs;
+		m.flRoughness = pow( g_tNormal.Sample( g_sStandin, i.vTexCoord ).b, g_flRoughnessScaleFactor );
+		m.flMetalness = g_flMetalness;
+		m.vEmission = 0.0;
+		if ( g_flStandinUnlit == 0.0 )
+			ApplyDecals( i.vPositionWs, m );
+		vColor = m.vAlbedo;
+		s.vNormalWs = m.vNormalWs;
+		s.flRoughness = max( m.flRoughness, flGeometric );
+		s.vSpecularColor = lerp( float3( 0.04, 0.04, 0.04 ), vColor, m.flMetalness );
 		DirectLight d = Direct( s );
-		float3 vLit = vColor * ( 1.0 - g_flMetalness ) * ( AmbientLightColor.rgb + d.vDiffuse ) + d.vSpecular;
+		float3 vLit = vColor * ( 1.0 - m.flMetalness ) * ( AmbientLightColor.rgb + d.vDiffuse ) + d.vSpecular + m.vEmission;
 		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), lerp( vLit, vColor, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * vInstanceTint.a );
 		if ( g_flStandinDebug == 1.0 )
 			o.vColor = float4( SunVisibility( i.vPositionWs, vNormalWs ).xxx, 1.0 );

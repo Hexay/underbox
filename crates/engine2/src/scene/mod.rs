@@ -3,6 +3,7 @@
 
 pub mod aggregate;
 mod create;
+mod decal;
 pub mod dynamic;
 pub mod light;
 pub mod object;
@@ -15,6 +16,7 @@ pub fn register(r: &mut abi::Registry) {
     world::register(r);
     object_slots::register(r);
     create::register(r);
+    decal::register(r);
     aggregate::register(r);
     dynamic::register(r);
     light::register(r);

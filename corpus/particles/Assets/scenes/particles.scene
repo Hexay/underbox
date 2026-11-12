@@ -1,0 +1,247 @@
+{
+  "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1001",
+  "GameObjects": [
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1002",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1003",
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": true,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1004",
+      "Flags": 0,
+      "Name": "Floor",
+      "Scale": "4,4,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1005",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/plane.vmdl",
+          "RenderType": "On",
+          "Tint": "0.35,0.38,0.42,1"
+        }
+      ]
+    },
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1006",
+      "Flags": 0,
+      "Name": "Box",
+      "Position": "40,0,25",
+      "Rotation": "0,0,0.2588,0.9659",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1007",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.8,0.8,0.8,1"
+        }
+      ]
+    },
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1010",
+      "Flags": 0,
+      "Name": "Glow",
+      "Position": "120,0,40",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ParticleEffect",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1011",
+          "__version": 3,
+          "Lifetime": 100000,
+          "MaxParticles": 64
+        },
+        {
+          "__type": "GridEmitter",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1012",
+          "Burst": 18,
+          "Loop": false,
+          "Duration": 1,
+          "Columns": 6,
+          "Spacing": 34,
+          "Size": 40,
+          "SizeStep": 1,
+          "Brightness": 1.5
+        },
+        {
+          "__type": "Sandbox.ParticleSpriteRenderer",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1013",
+          "__version": 2,
+          "Additive": true,
+          "Alignment": "LookAtCamera",
+          "SortMode": "Unsorted",
+          "Scale": 1,
+          "Sprite": {
+            "$compiler": "embed",
+            "$source": null,
+            "data": {
+              "Animations": [
+                {
+                  "Name": "Default",
+                  "FrameRate": 15,
+                  "Origin": "0.5,0.5",
+                  "LoopMode": "Loop",
+                  "LoopStart": -1,
+                  "LoopEnd": -1,
+                  "Frames": [ { "Texture": "textures/particles/particle_glow_01.vtex", "BroadcastMessages": [] } ]
+                }
+              ],
+              "__references": null
+            },
+            "compiled": null
+          }
+        }
+      ]
+    },
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1020",
+      "Flags": 0,
+      "Name": "Blended",
+      "Position": "-20,-60,30",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ParticleEffect",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1021",
+          "__version": 3,
+          "Lifetime": 100000,
+          "MaxParticles": 64
+        },
+        {
+          "__type": "GridEmitter",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1022",
+          "Burst": 8,
+          "Loop": false,
+          "Duration": 1,
+          "Columns": 4,
+          "Spacing": 26,
+          "Size": 30,
+          "RollStep": 20,
+          "Alpha": 0.75
+        },
+        {
+          "__type": "Sandbox.ParticleSpriteRenderer",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1023",
+          "__version": 2,
+          "Additive": false,
+          "Alignment": "RotateToCamera",
+          "SortMode": "ByDistance",
+          "Scale": 1,
+          "Sprite": {
+            "$compiler": "embed",
+            "$source": null,
+            "data": {
+              "Animations": [
+                {
+                  "Name": "Default",
+                  "FrameRate": 15,
+                  "Origin": "0.5,0.5",
+                  "LoopMode": "Loop",
+                  "LoopStart": -1,
+                  "LoopEnd": -1,
+                  "Frames": [ { "Texture": "textures/shapes/star1.vtex", "BroadcastMessages": [] } ]
+                }
+              ],
+              "__references": null
+            },
+            "compiled": null
+          }
+        }
+      ]
+    },
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1030",
+      "Flags": 0,
+      "Name": "Cubes",
+      "Position": "-40,70,10",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ParticleEffect",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1031",
+          "__version": 3,
+          "Lifetime": 100000,
+          "MaxParticles": 64
+        },
+        {
+          "__type": "GridEmitter",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1032",
+          "Burst": 6,
+          "Loop": false,
+          "Duration": 1,
+          "Columns": 3,
+          "Spacing": 22,
+          "Size": 0.25,
+          "SizeStep": 0.02,
+          "RollStep": 15
+        },
+        {
+          "__type": "Sandbox.ParticleModelRenderer",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1033",
+          "__version": 1,
+          "CastShadows": true,
+          "Choices": [ { "Model": "models/dev/box.vmdl" } ],
+          "Scale": 1
+        }
+      ]
+    },
+    {
+      "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1040",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-260,0,130",
+      "Rotation": "0,0.2215,0,0.9751",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "7d2a5e10-4c3b-4a8e-9f1d-2b6c8e0a1041",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

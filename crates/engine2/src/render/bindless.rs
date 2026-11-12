@@ -21,10 +21,12 @@ static TABLE: LazyLock<Mutex<Table>> = LazyLock::new(Default::default);
 /// `RENDER_SRGB`, the colour space that names a pair's sRGB view.
 pub const SRGB: u8 = 1;
 
-/// The index of `t`'s linear (or `srgb`) view: stable for the texture's lifetime; -1 for null.
+/// The index of `t`'s linear (or `srgb`) view: stable for the texture's lifetime; 0 for null, which
+/// shaders read as "no texture" (Decals.hlsl tests `> 0`; -1 masked to 16 bits indexed far out of
+/// the array and crashed lavapipe).
 pub fn index(t: texture::Ref, srgb: bool) -> i32 {
     if t.is_null() {
-        return -1;
+        return 0;
     }
     let mut table = TABLE.lock().unwrap();
     let Table { pairs, by_addr } = &mut *table;
@@ -79,6 +81,6 @@ mod tests {
         assert_eq!(at(la as u32).map(|(t, s)| (t.addr(), s)), Some((a.addr(), false)));
         assert_eq!(at(sa as u32).map(|(t, s)| (t.addr(), s)), Some((a.addr(), true)));
         assert!(at(0).is_none());
-        assert_eq!(index(texture::Ref::default(), false), -1);
+        assert_eq!(index(texture::Ref::default(), false), 0);
     }
 }
