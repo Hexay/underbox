@@ -137,7 +137,7 @@ fn draw_dynamic(c: Ctx, prim: i64, l: layout::Ref, vertices: RawPtr<c_void>, n: 
     let range = 0..if ib.is_some() { n_indices as u32 } else { n as u32 };
     let state = RasterState { topology: topology(prim), ..Default::default() };
     let shaded = render_state_shading(c, &layout);
-    let mut draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded };
+    let mut draw = Draw { vertices: vb, vertex_offset: 0, vertex, indices: ib, range, base_vertex: 0, instances: 1, uniforms: uniforms(c, Mat4::IDENTITY, [1.0; 4]), state, shaded, transforms: None };
     expand_gizmo(gpu, &mut draw, prim, &layout);
     submit(c, &[draw]);
 }
@@ -189,7 +189,7 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
     let state = RasterState { topology: topology(prim), ..Default::default() };
     // Empty without a position: only a material program can draw it (draw_bound).
     let vertex = gpu_mesh::vertex_keys(&layout).unwrap_or_default();
-    Some((Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None }, layout))
+    Some((Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None, transforms: None }, layout))
 }
 
 fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {

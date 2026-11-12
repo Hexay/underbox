@@ -68,10 +68,16 @@ Real renderer differences, not fixed in this lane. Pixel metrics already agree c
    to 1 and tests `LessOrEqual`. The per-view constants (1088 bytes) differ in 106 of 272 floats, the
    projection terms among them. Anything that reads depth or the view constants (fog, SSAO, decals)
    sees other values on ours.
-2. **Shadow maps.** Real draws three 2048² sun cascades, back faces culled, with dynamic depth bias
-   (constant −1, slope −1.5), each caster once with three instances; ours draws two cleared plus six
-   loaded 2048² passes (the six are likely the lamp's cube faces in one atlas) with culling off, no
-   bias, one draw per caster. Real renders local-light shadows into seven separate 512² passes.
+2. **Shadow maps (fixed).** Real lets managed's `ShadowMapper` plan every shadow view
+   (callbacks 38–42, then `g_pSceneSystem_AddShadowView`); ours now does the same
+   (docs/lighting.md), so the passes match: three 2048² D32 cascades and 512² D16 local maps
+   (showroom: six lamp cube faces, one spot), clear 0, `GreaterOrEqual`, back faces culled, bias
+   constant −1 / slope −1.5, each caster mesh one instanced draw. Cascade 0's depth dump matches
+   real's, and `DirectionalLightCB` differs only in bindless indices and a tiny sun direction
+   difference. Left: casters take ours' 64-byte view-projection and a 64-byte instance matrix
+   stream instead of real's 1088-byte view constants and shared instance format, and draw order
+   within a pass differs. Ours' contact-shadow compute (`screen_space_shadows_cs`) now skips its
+   dispatch, since its R8 mask isn't storage-writable on ours; the stand-in doesn't read the mask.
 3. **Depth format and stencil.** Real's main depth is `D32SfloatS8Uint` with stencil test on in the
    opaque pass; ours is `D32Sfloat`, stencil off.
 4. **Depth prepass.** Real's is depth only, three passes of indirect draws after its GPU occlusion cull

@@ -1,4 +1,4 @@
-	// Spliced into standin.shader's PS (standin.rs). Managed's scene renderer: a light's
+	// Spliced into standin.shader's PS (standin.rs). Managed's shadow mapper: a light's
 	// ShadowMapIndex is an element of ProjectedShadows (spot) or ProjectedCubeShadows (point), whose
 	// maps are bindless (reverse Z). Both are read as words: ProjectedShadow.hlsl's and
 	// ProjectedShadowCube.hlsl's structs, matrices transposed by managed. The maps come in slots

@@ -60,9 +60,9 @@ These values are our choice, since no source constrains them:
   cone. `Scattering` scales the result.
 - The sun's term is shadowed: a 4x4-texel tent (bilinear-weighted 3x3 PCF) of its shadow map per
   froxel, with a 1e-3 depth bias; points outside the map are lit. A single tap banded at the
-  shadow's edge. The native path uses ours (`lighting/shadow.rs`); the managed path uses managed's
-  cascade 0 only (`shadow::managed_sun_shadow`: reverse-Z, world → uv in `DirectionalLightCB`
-  words 8..24), so fog past cascade 0 is unshadowed.
+  shadow's edge. Both paths use managed's cascade 0 only (`shadow::managed_sun_shadow`: reverse-Z,
+  world → uv in `DirectionalLightCB` words 8..24; docs/lighting.md), so fog past cascade 0 is
+  unshadowed.
 - Temporal blend: each froxel's lighting (in-scattered rgb, density) is 0.3 this frame and 0.7
   the nearest froxel of last frame's grid at the same world point, reprojected through last
   frame's view. Points outside last frame's grid take this frame's alone. History is kept per

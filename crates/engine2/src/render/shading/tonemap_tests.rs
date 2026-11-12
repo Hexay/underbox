@@ -54,6 +54,7 @@ fn tonemapped_with(exposure: f32, variant: &shaders::Variant) -> Option<[u8; 4]>
         // What RenderTools.Draw gives every immediate draw: depth tested and written.
         state: RasterState::default(),
         shaded: Some(shaded),
+        transforms: None,
     };
     let (color, depth) = (texture::create_target("tonemap", 8, 8, 0), texture::create_target("tonemap depth", 8, 8, 62));
     let lighting = Lighting { tone_map: Some(exposure), ..Default::default() };

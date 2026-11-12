@@ -10,7 +10,7 @@ use crate::render::draw::shaded::{self, ContextBindings};
 use crate::render::draw::{self, Draw, Target, immediate};
 use crate::render::material::Material;
 use crate::render::shading::bind::Instance;
-use crate::render::lighting::{Lighting, local_shadow, shadow};
+use crate::render::lighting::{Lighting, shadow};
 use crate::render::{context, device, fog_volume, texture};
 use crate::scene::object::{IS_OPAQUE, IS_TRANSLUCENT};
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
@@ -89,8 +89,7 @@ pub fn run(v: view::Ref) {
     (lighting.tone_map, lighting.fog, lighting.view_fog) = (view.environment.tone_map, view.environment.fog.clone(), view.environment.view_fog.clone());
     // Child views (the 3D skybox) are lit without shadow maps or froxels, as native's.
     if !child {
-        shadow::render(&mut lighting, &worlds, view.view_proj);
-        local_shadow::render(&mut lighting, &worlds);
+        shadow::render(&mut lighting, v);
         let volumetric = lighting.view_fog.as_ref().and_then(|f| f.volumetric);
         lighting.fog_volume = volumetric.and_then(|p| fog_volume::render(&worlds, view.view_proj, &lighting, &p, view.color.addr()));
     }
@@ -220,6 +219,7 @@ pub(crate) fn sky(tint: [f32; 4], material: Option<Arc<Material>>, view_proj: Ma
         uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::from_translation(Vec3::ZERO), tint: flat },
         state: RasterState { depth_write: false, ..Default::default() },
         shaded,
+        transforms: None,
     })
 }
 

@@ -11,6 +11,7 @@
 
 mod blit;
 mod buffer;
+mod caster;
 mod compute;
 mod forward;
 mod frame;
@@ -26,6 +27,7 @@ mod texture;
 
 pub use blit::{Blitter, Transfer};
 pub use buffer::{Buffer, BufferKind};
+pub use caster::Caster;
 pub use compute::ComputeProgram;
 pub use forward::{Camera, DrawItem, ForwardPass};
 pub use frame::{Comparison, Frame};

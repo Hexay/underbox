@@ -3,6 +3,7 @@
 //! holds the RenderTools / IRenderContext draw slots. Draws with a material shade through
 //! [`shaded`]; the rest, and any that fail to bind, use the placeholder.
 
+pub mod caster;
 pub mod draw_call;
 pub mod dynamic;
 pub mod gpu_mesh;
@@ -36,6 +37,9 @@ pub struct Draw {
     pub state: RasterState,
     /// Drawn with its material's program when that binds; `vertex` and `uniforms` otherwise.
     pub shaded: Option<shaded::Shaded>,
+    /// A shadow caster's instance stream of world matrices: drawn by the caster program through
+    /// `uniforms.mvp` (caster.rs).
+    pub transforms: Option<Arc<render::Buffer>>,
 }
 
 /// Where draws go: textures (null for none), viewport (zero size = whole target), scissor.
@@ -144,11 +148,14 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
     let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
     let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color_format(), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
     let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &[target.color, target.depth]))).collect();
+    let caster_groups: Vec<_> = draws.iter().map(|d| casting(d).map(|(c, _)| [c.bind_group(gpu, d.uniforms.mvp)])).collect();
     let (defaults, ids) = shaded::streams(gpu);
     let draws: Vec<_> = draws
         .iter()
         .zip(&bound)
-        .map(|(d, groups)| {
+        .zip(&caster_groups)
+        .map(|((d, groups), caster_group)| {
+            let as_caster = casting(d).zip(caster_group.as_ref()).map(|((c, t), g)| Shaded { program: &c.program, bind_groups: g, buffers: vec![(&t.buffer, 0)] });
             let material = d.shaded.as_ref().zip(groups.as_ref());
             MeshDraw {
                 vertices: (&d.vertices.buffer, d.vertex_offset),
@@ -162,12 +169,17 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
                 shaded: material.map(|(s, groups)| {
                     let ids = s.context.instance_ids.as_ref().map_or((&ids.buffer, 0), |(b, offset)| (&b.buffer, *offset));
                     Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![(&defaults.buffer, 0), ids] }
-                }),
+                }).or(as_caster),
             }
         })
         .collect();
     let load = Load { color: load.color.filter(|_| targets.color.is_some()), depth: load.depth.filter(|_| targets.depth.is_some()) };
     pass::execute(gpu, placeholder, &targets, load, &draws);
+}
+
+/// The caster program and instance stream of a shadow caster draw (caster.rs).
+fn casting(d: &Draw) -> Option<(&'static render::Caster, &Arc<render::Buffer>)> {
+    Some((caster::program()?, d.transforms.as_ref().filter(|_| d.shaded.is_none())?))
 }
 
 /// The per-view constants' viewport and target size for a pass (its view-projection is per draw).

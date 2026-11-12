@@ -57,7 +57,7 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
     let uniforms = DrawUniforms { tint: call.tinted(uniforms.tint), ..uniforms };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
     let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj, Default::default()));
-    Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded })
+    Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded, transforms: None })
 }
 
 /// What shapes an object's draws, read before its state is locked: morph weights and, for an

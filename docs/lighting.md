@@ -26,10 +26,21 @@ sun, the rest are binned) plus the camera's `ambientColor`; worlds without light
 fixed sun so unlit test scenes keep their goldens. It fills `ViewLightingConfigV2`,
 `DirectionalLightCB`, `ClusteredLightingConstants` (one cluster holding every light) and
 `BinnedLightBufferV2` in s&box's layouts, read back from the WGSL (`shading/layout.rs`).
-Falloff is packed as native does (see `blocks.rs` module docs). Sun shadows: one 2048² depth map
-fitted to the view frustum and texel-snapped (`lighting/shadow.rs`), sampled by the stand-in with
-3×3 PCF as `g_tUnderboxSunShadow`. Point and spot shadows: a 4×4 atlas of 512² tiles, six per
-point light and one per spot (`lighting/local_shadow.rs`), named by sentinel `ShadowMapIndex`.
+Falloff is packed as native does (see `blocks.rs` module docs).
+
+Shadows come from managed's shadow mapper on both paths, as on real. A native view drives it the
+way native's light binner does (`lighting/shadow.rs`, ShadowMapperCallbacks.cs): `InitForView`,
+`DoDirectionalLight` for the sun, `FindOrCreateShadowMaps` per shadowed point and spot light (its
+return value is the light's `ShadowMapIndex`; screen size from the view camera), `UploadToGPU`,
+`SetShaderAttributes`. The mapper fits the cascades (3 at High, 2048², split ratio 0.91, spheres
+shrunk 4 texels for selection, 4096 units of caster pull-back), sizes the local maps
+(`GetDesiredResolution`: 512² D16 for showroom's lights, cube maps one slice per face) and asks
+for each shadow view through `AddShadowView` (`scene/shadow_view.rs`). That draws at once: the
+parent's casters inside the shadow frustum, depth only, back faces culled, managed's bias, every
+caster of one mesh as one instanced draw of the caster program (`draw/caster.rs`,
+`render::Caster`). What `SetShaderAttributes` writes binds for every draw of the view
+(`Lighting::shadow_attributes`). Without managed (unit tests) nothing casts. Depth convention:
+`render/depth.rs` (shadow maps are reverse Z, `depth::SHADOW`).
 
 `BinnedLightBufferV2` is native's 156-byte scalar `GPULight` (39 words, `blocks.rs`
 `gpu_light`); WGSL can't declare scalar layout, so the stand-in reads it as `uint`s. A light's
@@ -40,15 +51,18 @@ floor matches between them to within a unit per channel.
 
 ## Managed shadows
 
-Managed's scene renderer (`r_managed_scene`) is reverse-Z: its maps clear to 0 and compare
-`GREATER_EQUAL`; the stand-in tells its sun cascades from ours by `ShadowMapIndex` (ours is the
-sentinel `0x7FFFFF00`). Shadow draws carry managed's rasterizer bias (`DrawModelDrawCall` slots →
-`RasterState.depth_bias`). All three kinds cast in a boot (`MANAGED=1 tools/client-frame.sh`).
+Managed's maps are reverse-Z: they clear to 0 and compare `GREATER_EQUAL`. Under managed's scene
+renderer (`r_managed_scene`) its own `ShadowSystem` renders them with `DrawModelDrawCall`, whose
+bias reaches `RasterState.depth_bias`. All three kinds cast in a boot (`MANAGED=1 tools/client-frame.sh`).
+The stand-in samples the maps the same way on both paths:
 
 Sun: the stand-in (`standin_sun_shadows.hlsl`) picks the first cascade whose sphere
 (`g_DirectionalLightCascadeSpheres`, radius²) holds the point, with that cascade's bias; cascade
 `n`'s map is the bindless index in `DirectionalLightCB` and binds as `g_tUnderboxSunShadow`
-(0) or `g_tUnderboxSunShadow1..3` (`shadow::cascade_of`, `shadow::managed_cascade`).
+(0) or `g_tUnderboxSunShadow1..3` (`shadow::cascade_of`, `shadow::managed_cascade`). Filtering is
+core's (`Shadows/ShadowFiltering.hlsl`) at High's filter quality 3: a 16-tap tent over 8×8 texels
+shaped by the cascade's hardness, a normal offset of the kernel radius plus one texel, and a blend
+into the next cascade over the outer 10% of each sphere's radius².
 `draw/managed_shadow_tests.rs` replays the boot's order headless with two cascades.
 
 Point and spot: the stand-in reads `ProjectedCubeShadows`/`ProjectedShadows` as words
