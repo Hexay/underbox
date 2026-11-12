@@ -85,7 +85,13 @@ std::string hex(uint64_t v);
 // Everything below is guarded by mu().
 std::mutex& mu();
 
-struct ImageInfo { VkImageType type; VkFormat fmt; VkExtent3D ext; uint32_t mips, layers; VkSampleCountFlagBits samples; bool swapchain = false; };
+// Content of uploaded mips (uploads.cpp): per mip an order-independent sum of row hashes; sample holds the
+// smallest uploaded mip's layer-0 bytes when they are few.
+struct ImageContent { std::map<uint32_t, uint64_t> mipHash; uint32_t sampleMip = UINT32_MAX; std::vector<uint8_t> sample; };
+struct ImageInfo {
+    VkImageType type; VkFormat fmt; VkExtent3D ext; uint32_t mips, layers; VkSampleCountFlagBits samples; bool swapchain = false;
+    ImageContent content{};
+};
 struct ViewInfo { VkImage image; VkFormat fmt; VkImageViewType type; VkImageSubresourceRange range; };
 struct BufferInfo { VkDeviceSize size; VkBufferUsageFlags usage; VkDeviceMemory mem = VK_NULL_HANDLE; VkDeviceSize memOffset = 0; };
 struct MemInfo { VkDeviceSize size; uint32_t type; void* mapped = nullptr; VkDeviceSize mapOffset = 0; };

@@ -52,7 +52,6 @@ inline std::string hexbytes(const uint8_t* p, size_t n) {
 
 // describe.cpp
 std::string image_obj(uint64_t image);
-std::string image_short(uint64_t image);
 std::string view_obj(VkImageView v);
 std::string sampler_obj(VkSampler s);
 std::string state_obj(const PipeInfo& p, const Dyn& y);

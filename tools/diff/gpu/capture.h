@@ -120,6 +120,13 @@ template <class F> void with(VkCommandBuffer cb, F f) {
     if (CmdRec* r = rec(cb)) f(*r);
 }
 
+void xfer(VkCommandBuffer cb, const char* op, uint64_t dst);
+
+// Texture uploads (uploads.cpp), tracked whether or not recording is on (mu held).
+void uploads_begin(VkCommandBuffer cb);
+void uploads_record(VkCommandBuffer cb, VkBuffer buf, VkImage img, std::vector<VkBufferImageCopy> rg);
+void uploads_submitted(Device* d, const std::vector<VkCommandBuffer>& cbs);
+
 // Render-target dumps (dump.cpp).
 void dump_new_frame();
 // Called for each pass in submit order: learns the target in lead frames, marks it when capturing.

@@ -58,7 +58,8 @@
 		return flCone * vCone.z * saturate( 1.0 / flDot - l.FalloffBias );
 	}
 
-	DirectLight Direct( Surface s )
+	// Local lights are the pixel's cluster's (Cluster::Query); a per-lane walk, since ClusterForEach needs wave ops.
+	DirectLight Direct( Surface s, uint nCluster )
 	{
 		DirectLight o;
 		o.vDiffuse = 0.0;
@@ -69,9 +70,10 @@
 			if ( flVisibility > 0.0 )
 				AddLight( o, s, -g_DirectionalLightDirection.xyz, g_DirectionalLightColor.rgb * flVisibility );
 		}
-		for ( int n = 0; n < NumLights.x; n++ )
+		ClusterRange r = Cluster::Query( ClusterItemType_Light, nCluster );
+		for ( uint k = 0; k < r.Count; k++ )
 		{
-			BinnedLight l = LoadLight( n );
+			BinnedLight l = LoadLight( Cluster::LoadItem( r, k ) );
 			float3 vDir;
 			float flMask = BinnedLightMask( l, s.vPositionWs, vDir );
 			if ( flMask > 0.0 && dot( s.vNormalWs, vDir ) > 0.0 )

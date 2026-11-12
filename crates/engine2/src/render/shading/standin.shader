@@ -44,6 +44,8 @@ struct PS_INPUT
 
 	#if ( PROGRAM == VFX_PROGRAM_VS )
 		float4 vPositionPs : SV_Position;
+	#else
+		float4 vPositionSs : SV_Position;
 	#endif
 };
 
@@ -185,6 +187,8 @@ PS
 
 	//@managed_shadows
 	#include "common/classes/Fog.hlsl"
+	// Local lights and decals come from managed's cluster lists (ClusteredCullingLayer), as in vr_lighting.fxc.
+	#include "common/classes/ClusterCulling.hlsl"
 
 	float LocalVisibility( BinnedLight l, float3 vPositionWs, float3 vNormalWs )
 	{
@@ -216,6 +220,7 @@ PS
 		// Before any branch: derivatives (BRDF.hlsl's AdjustRoughnessByGeometricNormal).
 		float3 vDx = ddx( vNormalWs ), vDy = ddy( vNormalWs );
 		float flGeometric = pow( saturate( max( dot( vDx, vDx ), dot( vDy, vDy ) ) ), 0.333 );
+		uint nCluster = Cluster::Index( i.vPositionSs );
 		DecalSurface m;
 		m.vAlbedo = vColor;
 		m.vNormalWs = vNormalWs;
@@ -223,12 +228,12 @@ PS
 		m.flMetalness = g_flMetalness;
 		m.vEmission = 0.0;
 		if ( g_flStandinUnlit == 0.0 )
-			ApplyDecals( i.vPositionWs, m );
+			ApplyDecals( i.vPositionWs, m, nCluster );
 		vColor = m.vAlbedo;
 		s.vNormalWs = m.vNormalWs;
 		s.flRoughness = max( m.flRoughness, flGeometric );
 		s.vSpecularColor = lerp( float3( 0.04, 0.04, 0.04 ), vColor, m.flMetalness );
-		DirectLight d = Direct( s );
+		DirectLight d = Direct( s, nCluster );
 		float3 vLit = vColor * ( 1.0 - m.flMetalness ) * ( AmbientLightColor.rgb + d.vDiffuse ) + d.vSpecular + m.vEmission;
 		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), lerp( vLit, vColor, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * vInstanceTint.a );
 		if ( g_flStandinDebug == 1.0 )

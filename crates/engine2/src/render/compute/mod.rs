@@ -8,6 +8,9 @@ mod pvs_cull;
 
 pub(crate) use occlusion::words;
 
+use crate::render::draw::immediate;
+use crate::render::lighting::Lighting;
+use crate::render::shading::view::View;
 use crate::render::{attributes, buffers, context, device, material_mode};
 use abi::slots::render_tools as tools;
 use abi::{Registry, bind};
@@ -51,7 +54,8 @@ fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, s
         (Size::Indirect(_, offset), Some(args)) => Ok(gpu::Work::Indirect(&args.buffer, u64::from(offset))),
         (Size::Indirect(..), None) => Err("no indirect args buffer".to_owned()),
     };
-    match work.and_then(|work| gpu::dispatch(gpu, shader, &layers, work)) {
+    let (view, lighting) = view_of(c);
+    match work.and_then(|work| gpu::dispatch_in(gpu, shader, &layers, work, &view, &lighting)) {
         Ok(()) => {}
         Err(e) if occlusion => {
             warn_once(shader, &format!("on the CPU ({e})"));
@@ -62,6 +66,20 @@ fn dispatch(c: context::Ref, attrs: attributes::Ref, mode: material_mode::Ref, s
     if occlusion {
         pvs_cull::release(attrs, given);
     }
+}
+
+/// The view a dispatch on `c` runs in: the scene view's camera and lighting, and the bound target's viewport.
+fn view_of(c: context::Ref) -> (View, std::sync::Arc<Lighting>) {
+    let vp = context::target(c).viewport;
+    let size = [vp.m_n_width.max(1) as f32, vp.m_n_height.max(1) as f32];
+    let view = View {
+        view_proj: immediate::view_proj(c),
+        viewport: [vp.m_n_top_left_x as f32, vp.m_n_top_left_y as f32, size[0], size[1]],
+        target: size,
+        depth_range: [vp.min_z.max(0.0), if vp.max_z > vp.min_z { vp.max_z } else { 1.0 }],
+        ..View::default()
+    };
+    (view, immediate::lighting(c))
 }
 
 /// A dispatch's attributes, read the way the shader reads them.
