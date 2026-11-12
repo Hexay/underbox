@@ -25,8 +25,8 @@ fn unit(a: [f32; 3]) -> [f32; 3] {
 fn geometry(mesh: &super::mesh::Mesh) -> Vec<([f32; 3], [f32; 3])> {
     let v = &mesh.vertices;
     let mut out = vec![([0.0f32; 3], [0.0f32; 3]); v.len()];
-    for t in mesh.indices.chunks_exact(3) {
-        let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
+    for t in mesh.indices.as_chunks::<3>().0 {
+        let [a, b, c] = t.map(|i| i as usize);
         let (e1, e2) = (sub(v[b].position, v[a].position), sub(v[c].position, v[a].position));
         let uv = |i: usize, k: usize| v[i].uv[0][k] - v[a].uv[0][k];
         let r = uv(b, 0) * uv(c, 1) - uv(c, 0) * uv(b, 1);
