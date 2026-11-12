@@ -2,7 +2,6 @@
 //! render, hence the twin): the shader, int (except static `F_*` combos), float and vector params
 //! as vectors (scalars in x, as `.vmat` source gives them), and textures made from their `.vtex_c`.
 
-use super::texture;
 use crate::math::vec4;
 use crate::render::texture::Ref as TextureRef;
 use abi::structs::Vector4;
@@ -30,11 +29,7 @@ pub fn vectors(m: &Material) -> Vec<(String, [f32; 4])> {
 
 /// A texture handle for a compiled texture path; the error texture when it won't decode.
 fn texture_ref(path: &str) -> TextureRef {
-    let name = CString::new(path).ok();
-    match texture::load(path) {
-        Some(mut t) => crate::render::texture::create(name.as_deref(), false, t.config, &mut t.data),
-        None => crate::render::texture::load(name.as_deref(), abi::Guid::default()),
-    }
+    crate::render::texture::load(CString::new(path).ok().as_deref(), abi::Guid::default())
 }
 
 /// The compiled material at `path`; `None` without a readable `.vmat_c`.

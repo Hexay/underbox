@@ -199,6 +199,8 @@ PS
 
 	//@lighting
 
+	//@indirect
+
 	//@decals
 
 	PS_OUTPUT MainPs( PS_INPUT i )
@@ -220,6 +222,7 @@ PS
 		// Before any branch: derivatives (BRDF.hlsl's AdjustRoughnessByGeometricNormal).
 		float3 vDx = ddx( vNormalWs ), vDy = ddy( vNormalWs );
 		float flGeometric = pow( saturate( max( dot( vDx, vDx ), dot( vDy, vDy ) ) ), 0.333 );
+		float3 vBentNormalWs = BentNormalWs( vNormalWs, i.vPositionWs, i.vTexCoord );
 		uint nCluster = Cluster::Index( i.vPositionSs );
 		DecalSurface m;
 		m.vAlbedo = vColor;
@@ -233,11 +236,16 @@ PS
 		s.vNormalWs = m.vNormalWs;
 		s.flRoughness = max( m.flRoughness, flGeometric );
 		s.vSpecularColor = lerp( float3( 0.04, 0.04, 0.04 ), vColor, m.flMetalness );
+		s.vPositionSs = i.vPositionSs;
 		DirectLight d = Direct( s, nCluster );
-		float3 vLit = vColor * ( 1.0 - m.flMetalness ) * ( AmbientLightColor.rgb + d.vDiffuse ) + d.vSpecular + m.vEmission;
+		Surface sIndirect = s;
+		if ( g_flStandinBentNormals != 0.0 )
+			sIndirect.vNormalWs = vBentNormalWs;
+		float3 vAmbient = AmbientLightColor.rgb * AmbientOcclusion( i.vTexCoord );
+		float3 vLit = vColor * ( 1.0 - m.flMetalness ) * ( vAmbient + d.vDiffuse ) + d.vSpecular + EnvMapSpecular( sIndirect, nCluster ) + m.vEmission;
 		o.vColor = float4( Fog::Apply( i.vPositionWs, float2( 0.0, 0.0 ), lerp( vLit, vColor, g_flStandinUnlit ) ), vAlbedo.a * g_flOpacityScale * vInstanceTint.a );
 		if ( g_flStandinDebug == 1.0 )
-			o.vColor = float4( SunVisibility( i.vPositionWs, vNormalWs ).xxx, 1.0 );
+			o.vColor = float4( SunVisibility( i.vPositionWs, vNormalWs, i.vPositionSs ).xxx, 1.0 );
 		else if ( g_flStandinDebug == 2.0 )
 			o.vColor = float4( mul( g_DirectionalLightWorldToShadowViewMatrices[0], float4( i.vPositionWs, 1.0 ) ).xyz, 1.0 );
 		return o;

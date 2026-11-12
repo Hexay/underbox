@@ -81,7 +81,7 @@ pub fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<(abi::HandleId<a
         let mine = model_draw::object(&s, &deform, view.view_proj).into_iter().filter(|d| model_draw::translucent(d) == (f.pass == Pass::Translucent));
         match f.pass {
             Pass::Opaque => opaque.extend(mine),
-            Pass::DepthPrepass => opaque.extend(mine.map(depth_prepass)),
+            Pass::DepthPrepass => opaque.extend(mine.map(|d| crate::render::draw::caster::single(depth_prepass(d), view.view_proj))),
             Pass::Translucent => {
                 let p = s.transform.position.vec;
                 sorted.push((eye.distance_squared(Vec3::new(p.x, p.y, p.z)), mine.map(model_draw::as_translucent).collect()));

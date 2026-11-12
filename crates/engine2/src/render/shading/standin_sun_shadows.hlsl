@@ -7,6 +7,9 @@
 	Texture2D g_tUnderboxSunShadow1 < Attribute( "g_tUnderboxSunShadow1" ); >;
 	Texture2D g_tUnderboxSunShadow2 < Attribute( "g_tUnderboxSunShadow2" ); >;
 	Texture2D g_tUnderboxSunShadow3 < Attribute( "g_tUnderboxSunShadow3" ); >;
+	#include "math_general.fxc"
+	#include "common/classes/Bindless.hlsl"
+	#include "common/utils/MSAAUtils.hlsl"
 	SamplerComparisonState g_sUnderboxReverseShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( GREATER_EQUAL ); >;
 
 	#define UNDERBOX_SUN_TAPS 4
@@ -62,7 +65,19 @@
 		return CascadeVisibility( g_tUnderboxSunShadow, vShadow, flBias, flHardness );
 	}
 
-	float SunVisibility( float3 vPositionWs, float3 vNormalWs )
+	bool DisableScreenSpaceShadows < Attribute( "DisableScreenSpaceShadows" ); Default( 0 ); >;
+
+	// Managed's contact-shadow mask by bindless index (DirectionalLightShadow.hlsl SampleScreenSpaceShadow); 1 = lit.
+	float ScreenSpaceShadow( float4 vPositionSs )
+	{
+		if ( DisableScreenSpaceShadows || g_DirectionalLightScreenSpaceShadowIndex == 0 )
+			return 1.0;
+		Texture2D tMask = g_bindless_Texture2D[ NonUniformResourceIndex( g_DirectionalLightScreenSpaceShadowIndex ) ];
+		vPositionSs.xy -= g_vViewportOffset.xy;
+		return MSAAUtils::SampleRed( tMask, vPositionSs );
+	}
+
+	float SunCascadesVisibility( float3 vPositionWs, float3 vNormalWs )
 	{
 		int n = SunCascade( vPositionWs );
 		if ( n < 0 )
@@ -76,4 +91,9 @@
 			flVisibility = lerp( flNext, flVisibility, flWeight );
 		}
 		return flVisibility;
+	}
+
+	float SunVisibility( float3 vPositionWs, float3 vNormalWs, float4 vPositionSs )
+	{
+		return SunCascadesVisibility( vPositionWs, vNormalWs ) * ScreenSpaceShadow( vPositionSs );
 	}

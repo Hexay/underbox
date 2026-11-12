@@ -10,6 +10,15 @@ pub fn to_wgpu(format: i32) -> Option<F> {
         0 | 42 | 55 | 81 => F::Rgba8Unorm,
         // BGRA8888, LINEAR_BGRA8888, LE_BGRA8888, BGRA8888_LINEAR.
         12 | 45 | 52 | 82 => F::Bgra8Unorm,
+        // DXT1, DXT5, ATI2N, ATI1N, BC6H, BC7: block-compressed, uploaded as stored (compiled/texture.rs).
+        13 => F::Bc1RgbaUnorm,
+        15 => F::Bc3RgbaUnorm,
+        36 => F::Bc5RgUnorm,
+        37 => F::Bc4RUnorm,
+        85 => F::Bc6hRgbUfloat,
+        86 => F::Bc7RgbaUnorm,
+        // A8: the contact-shadow mask (ContactShadowLayer), R8 on real.
+        8 => F::R8Unorm,
         24 => F::Rgba16Float,
         27 => F::R32Float,
         29 => F::Rgba32Float,
@@ -35,7 +44,10 @@ mod tests {
     #[test]
     fn mapped_sizes_match_image_layouts() {
         for format in 0..100 {
-            let (Some(f), Some(crate::render::image::Layout::Pixel { bytes })) = (to_wgpu(format), crate::render::image::layout(format.into())) else { continue };
+            let (Some(f), Some(layout)) = (to_wgpu(format), crate::render::image::layout(format.into())) else { continue };
+            let bytes = match layout {
+                crate::render::image::Layout::Pixel { bytes } | crate::render::image::Layout::Block4x4 { bytes } => bytes,
+            };
             if let Some(size) = f.block_copy_size(None) {
                 assert_eq!(size, bytes, "format {format} -> {f:?}");
             }

@@ -78,10 +78,11 @@ pub fn write_kv3(m: &Material) -> Value {
 /// What real's compiler binds for complex-shader textures a `.vmat` leaves out (as in real's core
 /// `materials/default.vmat_c`): unbound, real engine2 draws its missing-texture checker instead.
 /// The `29ae19a3` default colour it binds as transmissive is transparent as `g_tColor`.
-const DEFAULT_TEXTURES: [(&str, &str); 3] = [
+const DEFAULT_TEXTURES: [(&str, &str); 4] = [
     ("g_tColor", "materials/default/default_color_tga_380558b.generated.vtex"),
     ("g_tNormal", "materials/default/default_normal_tga_5c878876.generated.vtex"),
     ("g_tAmbientOcclusion", "materials/default/default_ao_tga_7449568e.generated.vtex"),
+    ("g_tBentNormal", "materials/default/default_bentnormal_tga_8334dba4.generated.vtex"),
 ];
 
 /// `textures` plus each of real's defaults it lacks.

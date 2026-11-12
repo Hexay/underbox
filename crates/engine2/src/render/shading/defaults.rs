@@ -1,5 +1,6 @@
 //! Stand-ins a material program binds when the draw doesn't supply a resource: a 1×1 texture per
-//! (view dimension, sample type) — white for float textures, zero otherwise — and default
+//! (view dimension, sample type) — white for float textures, zero otherwise, and transparent
+//! black for cubes as real's `SCENE_TXTR_BLACK_CUBE_1x1` (sRGB) — and default
 //! samplers (trilinear wrap, anisotropic where the vfx asks for `ANISO`; comparison samplers compare with the vfx `ComparisonFunc`,
 //! greater-equal by default, as reverse-Z maps want).
 
@@ -11,11 +12,12 @@ static TEXTURES: LazyLock<Mutex<HashMap<(D, TextureSampleType), wgpu::TextureVie
 type SamplerKey = (SamplerBindingType, Option<wgpu::CompareFunction>, u16);
 static SAMPLERS: LazyLock<Mutex<HashMap<SamplerKey, wgpu::Sampler>>> = LazyLock::new(Default::default);
 
-fn format(sample: TextureSampleType) -> (wgpu::TextureFormat, u32) {
+fn format(sample: TextureSampleType, cube: bool) -> (wgpu::TextureFormat, u32) {
     match sample {
         TextureSampleType::Depth => (wgpu::TextureFormat::Depth32Float, 4),
         TextureSampleType::Uint => (wgpu::TextureFormat::Rgba32Uint, 16),
         TextureSampleType::Sint => (wgpu::TextureFormat::Rgba32Sint, 16),
+        TextureSampleType::Float { .. } if cube => (wgpu::TextureFormat::Rgba8UnormSrgb, 4),
         TextureSampleType::Float { .. } => (wgpu::TextureFormat::Rgba8Unorm, 4),
     }
 }
@@ -30,7 +32,8 @@ fn create(gpu: &render::Gpu, dim: D, sample: TextureSampleType) -> wgpu::Texture
         D::D3 => wgpu::TextureDimension::D3,
         _ => wgpu::TextureDimension::D2,
     };
-    let (format, texel) = format(sample);
+    let cube = layers == 6;
+    let (format, texel) = format(sample, cube);
     let depth = sample == TextureSampleType::Depth;
     let usage = wgpu::TextureUsages::TEXTURE_BINDING | if depth { wgpu::TextureUsages::RENDER_ATTACHMENT } else { wgpu::TextureUsages::COPY_DST };
     let size = wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: layers };
@@ -38,7 +41,7 @@ fn create(gpu: &render::Gpu, dim: D, sample: TextureSampleType) -> wgpu::Texture
     if depth {
         clear_depth(gpu, &texture, layers);
     } else {
-        let white = matches!(sample, TextureSampleType::Float { .. });
+        let white = matches!(sample, TextureSampleType::Float { .. }) && !cube;
         let bytes = vec![if white { 255u8 } else { 0 }; (texel * layers) as usize];
         let layout = wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(texel), rows_per_image: Some(1) };
         gpu.queue.write_texture(texture.as_image_copy(), &bytes, layout, size);

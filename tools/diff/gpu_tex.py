@@ -15,17 +15,19 @@ import gpu_vtex
 # (engine, source, element stride, byte offset, 16-bit half, what). "ub<size>" is a uniform buffer of that
 # size; "sb<count>x<stride>" a storage buffer of count elements (managed's capacities; ours' copies carry 4
 # extra bytes); "s<set>b<binding>" whatever storage buffer sits there (ours sizes its decal buffer to the
-# decal count). Ours' copies of the shadow indices select default 1x1 slots: its stand-in binds shadow maps
-# directly, so they apply to real only.
+# decal count). Ours' copies of the shadow-map indices select default 1x1 slots: its stand-in binds shadow
+# maps directly, so they apply to real only. Both read the contact-shadow mask by index.
 DECAL = [(".lo", 40, "decal color"), (".lo", 44, "decal rma")]  # GPUDecal words 10 and 11
 FIELDS = [
     ("real", "ub416", 0, 288 + 4 * k, "", f"sun cascade {k}") for k in range(4)
 ] + [
-    ("real", "ub416", 0, 312, "", "contact shadows"),  # DirectionalLightCB.g_DirectionalLightScreenSpaceShadowIndex
+    (side, "ub416", 0, 312, "", "contact shadows")  # DirectionalLightCB.g_DirectionalLightScreenSpaceShadowIndex
+    for side in ("real", "ours")
+] + [
     ("real", "sb512x76", 76, 64, "", "spot shadow"),  # ProjectedShadows[].ShadowMapTextureIndex
     ("real", "sb256x408", 408, 396, "", "point shadow"),  # ProjectedCubeShadows[].ShadowMapTextureCubeIndex
 ] + [("real", "sb2048x64", 64, off, half, what) for half, off, what in DECAL] + [
-    ("ours", "s0b30", 64, off, half, what) for half, off, what in DECAL]  # the stand-in's DecalsBuffer
+    ("ours", "s0b40", 64, off, half, what) for half, off, what in DECAL]  # the stand-in's DecalsBuffer
 SENTINELS = (0, 0xFFFF, 0xFFFFFFFF)
 STORAGE_SCAN = 64 * 1024  # bytes of a storage buffer `gpu.py fields` searches
 
@@ -151,7 +153,7 @@ def name(fr, core=None):
     unnamed = []
     for i in images(fr):
         if TEXTURE_NAME.search(i.get("name", "")):
-            i["texture"] = i["name"]
+            i["texture"] = gpu_vtex.source_name(i["name"])
         elif i.get("hash") and not i.get("hmip"):
             unnamed.append(i)
     wanted = {(i["w"], i["h"], i.get("l", 1), i["m"]) for i in unnamed}

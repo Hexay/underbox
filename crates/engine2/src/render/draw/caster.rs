@@ -46,35 +46,71 @@ fn vertex_keys(depth: &Shading, mesh: &VertexBufferKey) -> Option<Vec<VertexBuff
     vertex::inputs(&depth.vertex_inputs, &layout).map(|i| i.keys)
 }
 
+/// What a draw becomes on the depth program.
+enum OnDepth {
+    /// A rigid draw: an instance of a caster batch with these vertex inputs.
+    Instance(Box<Draw>, Vec<VertexBufferKey>, Instance),
+    /// A vertex-cache draw already switched to the depth program, or one it can't take.
+    Done(Box<Draw>),
+}
+
+/// A vertex-cache draw keeps its bindings and switches program; a placeholder draw becomes a
+/// transform-buffer instance; any other stays as it is.
+fn on_depth(depth: &Arc<Shading>, mut d: Draw) -> OnDepth {
+    let keys = d.vertex.first().and_then(|k| vertex_keys(depth, k));
+    let cached = vertex_cached(&d);
+    match (d.shaded.take(), keys) {
+        (Some(s), Some(keys)) if cached => OnDepth::Done(Box::new(Draw { shaded: Some(super::shaded::Shaded { shading: depth.clone(), vertex: keys, ..s }), ..d })),
+        (None, Some(keys)) => {
+            let instance = Instance { world: d.uniforms.model, tint: d.uniforms.tint };
+            OnDepth::Instance(Box::new(d), keys, instance)
+        }
+        (shaded, _) => OnDepth::Done(Box::new(Draw { shaded, ..d })),
+    }
+}
+
+fn batch(d: Draw, vertex: Vec<VertexBufferKey>, instances: Vec<Instance>, view_proj: Mat4) -> Draw {
+    let uniforms = render::pass::DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..d.uniforms };
+    Draw { instances: instances.len() as u32, uniforms, vertex, caster: Some(instances), ..d }
+}
+
 /// `draws` seen through `view_proj` as casters: same-mesh rigid draws merged into instanced
 /// draws, vertex-cache draws on the depth program, in real's opaque order ([`sort_opaque`]).
 pub fn instanced(draws: Vec<Draw>, view_proj: Mat4) -> Vec<Draw> {
     let Some(depth) = program() else { return draws };
     let mut groups: Vec<(Draw, Vec<VertexBufferKey>, Vec<Instance>)> = Vec::new();
     let mut out = Vec::new();
-    for mut d in draws {
-        let keys = d.vertex.first().and_then(|k| vertex_keys(&depth, k));
-        let cached = vertex_cached(&d);
-        match (d.shaded.take(), keys) {
-            (Some(s), Some(keys)) if cached => {
-                out.push(Draw { shaded: Some(super::shaded::Shaded { shading: depth.clone(), vertex: keys, ..s }), ..d });
-            }
-            (None, Some(keys)) => {
-                let instance = Instance { world: d.uniforms.model, tint: d.uniforms.tint };
-                match groups.iter_mut().find(|(g, _, _)| same_mesh(g, &d)) {
-                    Some((_, _, instances)) => instances.push(instance),
-                    None => groups.push((d, keys, vec![instance])),
-                }
-            }
-            (shaded, _) => out.push(Draw { shaded, ..d }),
+    for d in draws {
+        match on_depth(&depth, d) {
+            OnDepth::Instance(d, keys, instance) => match groups.iter_mut().find(|(g, _, _)| same_mesh(g, &d)) {
+                Some((_, _, instances)) => instances.push(instance),
+                None => groups.push((*d, keys, vec![instance])),
+            },
+            OnDepth::Done(d) => out.push(*d),
         }
     }
-    let uniforms = |d: &Draw| render::pass::DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..d.uniforms };
-    let batch = |(d, vertex, instances): (Draw, Vec<VertexBufferKey>, Vec<Instance>)| Draw { instances: instances.len() as u32, uniforms: uniforms(&d), vertex, caster: Some(instances), ..d };
-    let mut all: Vec<Draw> = groups.into_iter().map(batch).collect();
+    let mut all: Vec<Draw> = groups.into_iter().map(|(d, vertex, instances)| batch(d, vertex, instances, view_proj)).collect();
     all.extend(out);
     sort_opaque(&mut all);
     all
+}
+
+/// A rigid material draw on the depth program as a transform-buffer instance of its own, for the
+/// main view's depth prepass, which binds no material textures (real's binds none). Vertex-cache
+/// draws keep their material program: on the depth program their prepass depth comes out in rest
+/// pose (skinned's open crates). Placeholder draws bind no material textures as they are.
+pub fn single(d: Draw, view_proj: Mat4) -> Draw {
+    let Some(depth) = program() else { return d };
+    if d.shaded.is_none() || vertex_cached(&d) {
+        return d;
+    }
+    match d.vertex.first().and_then(|k| vertex_keys(&depth, k)) {
+        Some(keys) => {
+            let instance = Instance { world: d.uniforms.model, tint: d.uniforms.tint };
+            batch(Draw { shaded: None, ..d }, keys, vec![instance], view_proj)
+        }
+        None => d,
+    }
 }
 
 /// A caster batch's bind groups for the depth program, its pipeline for `key` built.

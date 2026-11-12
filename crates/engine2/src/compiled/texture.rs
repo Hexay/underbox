@@ -43,9 +43,63 @@ fn decode_level(t: &vtex::Texture, level: usize, layers: usize) -> Option<(Vec<u
     Some((data, width, height, format))
 }
 
-/// The texture's mips decoded; `None` for formats we don't decode. A level that fails to decode
-/// ends the chain there.
+/// The `ImageFormat` of a block format the GPU samples as stored.
+fn block_format(format: vtex::Format) -> Option<i32> {
+    Some(match format {
+        vtex::Format::DXT1 => 13,
+        vtex::Format::DXT5 => 15,
+        vtex::Format::ATI2N => 36,
+        vtex::Format::ATI1N => 37,
+        vtex::Format::BC6H => 85,
+        vtex::Format::BC7 => 86,
+        _ => return None,
+    })
+}
+
+/// A block-compressed texture's mips as stored, as real engine2 uploads them, when the device
+/// samples BC. wgpu wants whole blocks at mip 0, and VRF pads 2 or 3 layers to 4, so those decode.
+/// TODO: wgpu has no RGB-only BC1, so a 3-colour block's index 3 samples alpha 0 where real's reads 1;
+/// only blended BC1 materials would show it (decoding instead costs testgrid's exact texels).
+fn stored(t: &vtex::Texture) -> Option<Decoded> {
+    let format = block_format(t.format)?;
+    let (width, height, depth) = t.level_size(0);
+    let layers = depth * t.faces();
+    let bc = crate::render::device::gpu().is_some_and(|g| g.supports_bc());
+    if !bc || t.flags & vtex::flags::VOLUME != 0 || !width.is_multiple_of(4) || !height.is_multiple_of(4) || (2..4).contains(&layers) {
+        return None;
+    }
+    let level = |l: usize| (0..layers).map(|i| t.surface(l, i / t.faces(), i % t.faces())).collect::<Option<Vec<_>>>().map(|s| s.concat());
+    let data = level(0)?;
+    let smaller = (1..t.levels.len()).map(level).collect::<Option<Vec<_>>>()?.concat();
+    let config = config(t, width, height, layers, t.levels.len() as i16, format);
+    Some(Decoded { config, data, smaller, sheet: t.sheet.clone() })
+}
+
+fn config(t: &vtex::Texture, width: usize, height: usize, layers: usize, mips: i16, format: i32) -> TextureCreationConfig_t {
+    let image_file = t.format.is_image_file();
+    let mut config = TextureCreationConfig_t::default();
+    (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (width as i16, height as i16, layers as i16, mips);
+    config.m_n_image_format = format;
+    // As managed's builders describe them: a cube's depth counts cubes, not faces.
+    if t.is_cube() && !image_file {
+        config.m_n_depth = (layers / 6) as i16;
+        config.m_n_flags |= crate::render::texture::TSPEC_CUBE_TEXTURE;
+    }
+    if layers > 1 && !t.is_cube() && t.flags & vtex::flags::VOLUME == 0 {
+        config.m_n_flags |= crate::render::texture::TSPEC_TEXTURE_ARRAY;
+    }
+    if let Some((w, h)) = t.display {
+        (config.m_n_display_rect_width, config.m_n_display_rect_height) = (w as i16, h as i16);
+    }
+    config
+}
+
+/// The texture's mips as the GPU takes them: stored block data where the device samples it,
+/// else decoded; `None` for formats we don't decode. A level that fails to decode ends the chain there.
 pub fn decode(t: &vtex::Texture) -> Option<Decoded> {
+    if let Some(stored) = stored(t) {
+        return Some(stored);
+    }
     let (_, _, depth) = t.level_size(0);
     let image_file = t.format.is_image_file();
     let layers = if image_file { 1 } else { depth * t.faces() };
@@ -62,21 +116,7 @@ pub fn decode(t: &vtex::Texture) -> Option<Decoded> {
         }
         mips += 1;
     }
-    let mut config = TextureCreationConfig_t::default();
-    (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (width as i16, height as i16, layers as i16, mips);
-    config.m_n_image_format = format;
-    // As managed's builders describe them: a cube's depth counts cubes, not faces.
-    if t.is_cube() && !image_file {
-        config.m_n_depth = (layers / 6) as i16;
-        config.m_n_flags |= crate::render::texture::TSPEC_CUBE_TEXTURE;
-    }
-    if layers > 1 && !t.is_cube() && t.flags & vtex::flags::VOLUME == 0 {
-        config.m_n_flags |= crate::render::texture::TSPEC_TEXTURE_ARRAY;
-    }
-    if let Some((w, h)) = t.display {
-        (config.m_n_display_rect_width, config.m_n_display_rect_height) = (w as i16, h as i16);
-    }
-    Some(Decoded { config, data, smaller, sheet: t.sheet.clone() })
+    Some(Decoded { config: config(t, width, height, layers, mips, format), data, smaller, sheet: t.sheet.clone() })
 }
 
 /// Image files a material source may name instead of a `.vtex`.

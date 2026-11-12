@@ -43,14 +43,16 @@ Captures and dumps stay out of the repo (real's are Facepunch output).
   Storage buffers are read too (up to 512 KiB), and instance-rate vertex streams.
 - **Textures.** The layer hashes every image upload (`gpu/uploads.cpp`): per mip, the sum of CRC-32s
   of its block rows, each seeded by (layer, z, row, x), so neither region split nor row pitch matters.
-  Ours labels textures with their resource path; real's are named by hashing mip 0 of every seeded core
+  Ours labels textures with their resource path (a generated one by its source: `x_tga_<hash>.generated.vtex`
+  is `x.tga`); real's are named by hashing mip 0 of every seeded core
   `.vtex_c` of the same size the same way (`gpu_vtex.py`; real uploads block-compressed data as
   stored). Flat defaults share content across many files and list as `name (+N same)`. A draw's
   textures (`gpu_tex.py`) are those bound directly plus the bindless slots its constants select:
   `FIELDS` lists those fields, found with `gpu.py fields <frame.jsonl> [core]` (fields whose values
   are always filled slots) and checked against the public structs. Real: `DirectionalLightCB` +288
   (cascades) and +312 (contact shadows), `ProjectedShadows[]` +64, `ProjectedCubeShadows[]` +396,
-  `GPUDecal` words 10 and 11 (low 16 bits); ours: its decal buffer's same words. Draws then compare
+  `GPUDecal` words 10 and 11 (low 16 bits); ours: the same contact-shadow field and its decal
+  buffer's same words (its binding moves when the stand-in's resources change). Draws then compare
   texture sets by name (else format, size, mips), and same-named textures by format.
 - **Matching** (`tools/diff/gpu_diff.py`) never uses handles. A draw's mesh is its index count, its
   vertex span and a hash of its indices relative to their minimum: both engines draw real's seeded
@@ -96,9 +98,8 @@ are structure, not output. Fixed items say what changed and what is left.
    formats (position, instance id, blend indices); skinned casters read the vertex cache. Order in
    every opaque pass is real's (`draw::sort_opaque`): rigid before vertex-cached, then larger index
    count first, stable otherwise. It isn't distance: on fog the ground is nearest yet real draws the
-   box first. Left: 67 of the cascades' 272 constant floats differ (ours' cascade fit). Ours'
-   contact-shadow compute (`screen_space_shadows_cs`) now skips its
-   dispatch, since its R8 mask isn't storage-writable on ours; the stand-in doesn't read the mask.
+   box first. Left: 67 of the cascades' 272 constant floats differ (ours' cascade fit). Contact
+   shadows (`screen_space_shadows_cs`) run and the stand-in reads their mask (item 9).
 3. **Depth format and stencil.** Real's main depth is `D32SfloatS8Uint` with stencil test on in the
    opaque pass; ours is `D32Sfloat`, stencil off.
 4. **Depth prepass.** Real's is depth only, three passes of indirect draws after its GPU occlusion cull
@@ -133,15 +134,32 @@ are structure, not output. Fixed items say what changed and what is left.
    plane: `testgrid_color`, the same files as ours); its one bindless array (about 1250 views, every
    loaded texture) serves shadow maps, the contact-shadow mask and decals. Ours fills a few dozen slots per
    view dimension and binds shadow maps directly; its copies of real's shadow indices select 1×1
-   defaults. Decal textures pair by name on both (decals: star, ring, splotch, arrow, spark). Left:
-   - Formats: ours decodes block-compressed textures to `R8G8B8A8Unorm`; real keeps them as stored
-     (`Bc1RgbSrgbBlock` testgrid, primary_white and skinned's crate, `Bc7SrgbBlock` default normal,
-     `Bc3SrgbBlock` decal shapes).
-   - Real's main draw also reads `default_ao` (BC4 16²), `default_bentnormal` (BC5 4²),
-     `ggx_integrate_brdf_lut_schlick` (256²), a 512×3072 `R16G16B16A16Unorm` table, the
-     1024×768 `R32G32Sfloat` depth chain (10 mips), a 1×1 cube, a 2×2 texture and the 1024×768 R8
-     contact mask (ours skips that dispatch, item 2); the stand-in reads none of them.
-   - Ours' depth prepass binds the stand-in's full set; real's binds no textures (item 4).
+   defaults. Decal textures pair by name on both (decals: star, ring, splotch, arrow, spark).
+   Fixed:
+   - Block-compressed textures upload as stored where the device samples BC (lavapipe does), mips
+     included, created sRGB with a linear view as real's (`compiled/texture.rs` `stored`, decode
+     the fallback). wgpu has no RGB-only BC1, so BC1 shows `Bc1RgbaSrgbBlock` against real's
+     `Bc1RgbSrgbBlock`. Textures a `.vmat_c` names now load through the same path (they were
+     linear images with mip 0 only).
+   - The stand-in reads what real's main draw does: `g_tAmbientOcclusion` (ambient), `g_tBentNormal`
+     (indirect normal under `F_USE_BENT_NORMALS`; complex's default set gains `default_bentnormal`,
+     as real's core `default.vmat_c`), the cluster env maps times `BRDFLookup`
+     (vr_lighting.fxc's specular loop; no corpus scene has env maps), and the contact mask by
+     `g_DirectionalLightScreenSpaceShadowIndex` through `MSAAUtils::SampleRed`, which binds
+     `g_tDepthChain`. The LUT is core's `ggx_integrate_brdf_lut_schlick.vtex` that managed's
+     `ViewSetup.SetLookups` loads, not GPU-generated. The chain is `R32G32Sfloat` behind a
+     filtering sampler: `FLOAT32_FILTERABLE`.
+   - Contact shadows run: managed makes the mask `ImageFormat.A8`, now `R8Unorm` with storage.
+   - Defaults as real's: an unset cube is a 1×1 transparent-black sRGB cube; no fog volume is a
+     2×2×2 opaque-black sRGB image through a linear view.
+   - Rigid prepass draws go through the depth stand-in, binding no textures as real's. Vertex-cache
+     draws keep their material program: on the depth program their prepass depth came out in rest
+     pose (skinned's open crates drew closed lids in the clear colour).
 
-Next steps: name real's shaders (their SPIR-V carries no source string) by matching stage interfaces;
-upload block-compressed textures as stored where the device supports the format.
+   Left: real's main draw reads a 512×3072 `R16G16B16A16Unorm` table (almost certainly
+   vr_lighting.fxc's `BlueNoise`, read only under `D_OPAQUE_FADE`; not in core, so not
+   reproducible) and one unidentified texture (4×4 BC7 black on showroom, 32×32 RGBA on skinned's
+   crate). Skinned's prepass still binds the stand-in's set. gpu_tex names project textures by
+   label only, so skinned's crate doesn't pair by name.
+
+Next steps: name real's shaders (their SPIR-V carries no source string) by matching stage interfaces.
