@@ -67,6 +67,10 @@ These values are our choice, since no source constrains them:
   the nearest froxel of last frame's grid at the same world point, reprojected through last
   frame's view. Points outside last frame's grid take this frame's alone. History is kept per
   target (the view's colour target, or managed's `OutScatteringTexture`) in `fog_march.rs`.
+  History within 1/256 of this frame's value is replaced by it: the history is half precision,
+  and a rounded 0.3/0.7 blend stalls anywhere within about 1.7 ulps of its target. Without the
+  snap a still view settled on a value set by the frames before it, which vary with machine
+  load, and the fog golden flipped 1 LSB between runs.
 
 Not done: managed cascades past 0, the baked indirect texture (`SetParams`'
 second argument), local lights' shadows, and dithering (`g_vVolFogDitherScaleBias` stays zero).

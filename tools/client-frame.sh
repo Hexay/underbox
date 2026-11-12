@@ -11,7 +11,7 @@
 # golden-managed.tsv, frame in target/client-frame-managed.
 # Shadow and volumetric fog quality are pinned to High (SHADOW_QUALITY, FOG_QUALITY, like managed's
 # benchmark rung): this machine would detect Low, which turns the fog volume off. UNDERBOX_BLESS=1 records the hash; an adapter without a recorded hash is skipped (exit 0).
-# An adapter may list several hashes: fog's temporal volume settles on one of two frames 1 LSB apart.
+# An adapter may list several hashes; the frame should be deterministic (fog's history snaps, docs/fog.md).
 # Don't wrap this in flock: boot-client.sh runs in this worktree's own game dir (docs/dev-loop.md).
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
