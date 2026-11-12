@@ -171,22 +171,27 @@ pub fn build(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: 
 }
 
 /// [`build`] with each program at its own variant: stages declare their own combos, so one id
-/// pair decodes differently per stage.
+/// pair decodes differently per stage. A shader without a `PS` builds a depth-only program.
 pub fn build_with(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, label: &str, variant: &dyn Fn(&shaders::Program) -> Variant) -> Result<Shading, String> {
     let at = |s: Stage| shader.program_for(s).map_or_else(Variant::default, variant);
     let vs = stage(compiler, shader, Stage::Vs, &at(Stage::Vs))?;
-    let mut ps = stage(compiler, shader, Stage::Ps, &at(Stage::Ps))?;
-    super::stages::separate(&vs, &mut ps)?;
-    let bindings = merged(gpu, &[&vs, &ps])?;
+    let ps = match shader.program_for(Stage::Ps) {
+        Some(_) => {
+            let mut ps = stage(compiler, shader, Stage::Ps, &at(Stage::Ps))?;
+            super::stages::separate(&vs, &mut ps)?;
+            Some(ps)
+        }
+        None => None,
+    };
+    let stages: Vec<&CompiledStage> = std::iter::once(&vs).chain(ps.as_ref()).collect();
+    let bindings = merged(gpu, &stages)?;
     let program = gpu.checked(|| {
         let vertex = render::Stage::new(gpu, label, &vs.wgsl, &vs.reflection.entry);
-        let fragment = render::Stage::new(gpu, label, &ps.wgsl, &ps.reflection.entry);
-        render::Program::from_stages(gpu, label, vertex, Some(fragment), layouts(gpu, label, &[&vs, &ps]))
+        let fragment = ps.as_ref().map(|ps| render::Stage::new(gpu, label, &ps.wgsl, &ps.reflection.entry));
+        render::Program::from_stages(gpu, label, vertex, fragment, layouts(gpu, label, &stages))
     })?;
-    let mut blocks = layout::uniform_blocks(&vs.wgsl);
-    blocks.extend(layout::uniform_blocks(&ps.wgsl));
-    let mut storage = layout::storage_elements(&vs.wgsl);
-    storage.extend(layout::storage_elements(&ps.wgsl));
+    let blocks = stages.iter().flat_map(|s| layout::uniform_blocks(&s.wgsl)).collect();
+    let storage = stages.iter().flat_map(|s| layout::storage_elements(&s.wgsl)).collect();
     Ok(Shading { label: label.into(), program, bindings, vertex_inputs: vs.reflection.vertex_inputs, blocks, storage, attributes: attributes(shader), render_state: super::render_state::of(shader, variant) })
 }
 

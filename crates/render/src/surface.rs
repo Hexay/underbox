@@ -107,6 +107,7 @@ impl Surface {
         let (w, h) = (self.config.width.min(frame.desc.width), self.config.height.min(frame.desc.height));
         encoder.copy_texture_to_texture(frame.texture.as_image_copy(), image.texture.as_image_copy(), crate::texture::extent(w, h));
         gpu.submit(encoder.finish());
+        gpu.flush();
         gpu.queue.present(image);
         true
     }

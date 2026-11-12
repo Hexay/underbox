@@ -89,7 +89,7 @@ pub fn bind(gpu: &render::Gpu, d: &Shaded, view: &View, lighting: &Lighting, key
     built.inspect_err(|e| warn_once(&d.shading.label, e)).ok()
 }
 
-fn warn_once(label: &str, e: &str) {
+pub(crate) fn warn_once(label: &str, e: &str) {
     static WARNED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
     if WARNED.lock().unwrap().insert(label.to_owned()) {
         let e: Vec<_> = e.lines().map(str::trim).filter(|l| !l.is_empty()).collect();

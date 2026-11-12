@@ -1,5 +1,6 @@
 //! The wgpu instance, adapter, device and queue.
 
+use crate::batch::{Batch, Slice};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -24,6 +25,7 @@ pub struct Gpu {
     pub(crate) adapter: wgpu::Adapter,
     hung: AtomicBool,
     wait_timeout_ms: AtomicU64,
+    batch: Batch,
 }
 
 #[derive(Debug)]
@@ -99,6 +101,7 @@ impl Gpu {
             adapter,
             hung: AtomicBool::new(false),
             wait_timeout_ms: AtomicU64::new(default_wait_timeout_ms()),
+            batch: Batch::default(),
         })
     }
 
@@ -148,6 +151,7 @@ impl Gpu {
             }
             return drained;
         }
+        self.flush();
         let timeout = Duration::from_millis(self.wait_timeout_ms.load(Ordering::Relaxed));
         match timed(|| "waiting for the GPU".into(), || self.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: Some(timeout) })) {
             Ok(_) => true,
@@ -159,13 +163,46 @@ impl Gpu {
         }
     }
 
-    /// Submit `commands`, or drop them while the GPU is hung: on lavapipe a submit behind a
-    /// running shader blocks until it ends, which would wedge the caller after all.
+    /// Queue `commands` for the next [`Gpu::flush`] (crate::batch).
     pub fn submit(&self, commands: wgpu::CommandBuffer) {
-        if self.is_hung() && !self.wait_idle() {
+        self.batch.push(commands);
+    }
+
+    /// Write the staged uploads and submit everything queued, or drop it while the GPU is hung:
+    /// on lavapipe a submit behind a running shader blocks until it ends, which would wedge the
+    /// caller after all.
+    pub fn flush(&self) {
+        self.flush_batch(false);
+    }
+
+    /// [`Gpu::flush`] at the end of a frame: the next frame's uploads reuse the upload buffer.
+    pub fn end_frame(&self) {
+        self.flush_batch(true);
+    }
+
+    fn flush_batch(&self, end_frame: bool) {
+        self.batch.drain(&self.queue, end_frame, |commands| {
+            if (self.is_hung() && !self.wait_idle()) || commands.is_empty() {
+                return;
+            }
+            self.queue.submit(commands);
+        });
+    }
+
+    /// `bytes` zero-padded to `size` in this frame's upload buffer, aligned for any binding.
+    pub fn upload(&self, bytes: &[u8], size: u64) -> Slice {
+        let l = self.device.limits();
+        let align = u64::from(l.min_uniform_buffer_offset_alignment.max(l.min_storage_buffer_offset_alignment));
+        self.batch.upload(&self.device, &self.queue, bytes, size, align)
+    }
+
+    /// Write `data` into `dst` at `offset` (4-byte aligned), ordered with the queued command buffers.
+    pub fn write_buffer(&self, dst: &wgpu::Buffer, offset: u64, data: &[u8]) {
+        if data.is_empty() {
             return;
         }
-        self.queue.submit([commands]);
+        let src = self.batch.upload(&self.device, &self.queue, data, 0, wgpu::COPY_BUFFER_ALIGNMENT);
+        self.batch.copy(&self.device, &src, dst, offset, src.size);
     }
 
     /// Whether the last wait timed out and the queue hasn't drained since.

@@ -15,6 +15,7 @@ pub mod screen_rect;
 pub mod shaded;
 
 use crate::render::lighting::Lighting;
+use crate::render::shading::bind::Instance;
 use crate::render::shading::view::View;
 use crate::render::{device, texture};
 use abi::structs::{NativeRect, RenderViewport};
@@ -37,9 +38,20 @@ pub struct Draw {
     pub state: RasterState,
     /// Drawn with its material's program when that binds; `vertex` and `uniforms` otherwise.
     pub shaded: Option<shaded::Shaded>,
-    /// A shadow caster's instance stream of world matrices: drawn by the caster program through
-    /// `uniforms.mvp` (caster.rs).
-    pub transforms: Option<Arc<render::Buffer>>,
+    /// A shadow caster batch's instances: drawn by the depth-only program through `uniforms.mvp`
+    /// (caster.rs).
+    pub caster: Option<Vec<Instance>>,
+}
+
+/// Whether `d` draws from the skinning vertex cache: only its material program's bindings read it.
+pub fn vertex_cached(d: &Draw) -> bool {
+    d.shaded.as_ref().is_some_and(|s| !s.context.attributes.is_empty())
+}
+
+/// Opaque and shadow draws in real's order, as its captures show it (docs/differential-gpu.md):
+/// rigid before vertex-cache draws, larger meshes first, object order otherwise.
+pub fn sort_opaque(draws: &mut [Draw]) {
+    draws.sort_by_key(|d| (vertex_cached(d), std::cmp::Reverse(d.range.len())));
 }
 
 /// Where draws go: textures (null for none), viewport (zero size = whole target), scissor.
@@ -145,15 +157,21 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
     };
     let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
     let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color_format(), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
-    let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &[target.color, target.depth]))).collect();
-    let caster_groups: Vec<_> = draws.iter().map(|d| casting(d).map(|(c, _)| [c.bind_group(gpu, d.uniforms.mvp)])).collect();
+    let targets_of = [target.color, target.depth];
+    let depth = draws.iter().any(|d| d.caster.is_some()).then(caster::program).flatten();
+    let bind = |d: &Draw| match (&d.shaded, &d.caster, &depth) {
+        (Some(s), _, _) => shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &targets_of),
+        (None, Some(instances), Some(depth)) => caster::bind(gpu, depth, instances, &view.with_view_proj(d.uniforms.mvp), &key(d, &d.vertex), &targets_of),
+        _ => None,
+    };
+    let bound: Vec<_> = draws.iter().map(bind).collect();
     let (defaults, ids) = shaded::streams(gpu);
     let draws: Vec<_> = draws
         .iter()
         .zip(&bound)
-        .zip(&caster_groups)
-        .map(|((d, groups), caster_group)| {
-            let as_caster = casting(d).zip(caster_group.as_ref()).map(|((c, t), g)| Shaded { program: &c.program, bind_groups: g, buffers: vec![(&t.buffer, 0)] });
+        .map(|(d, groups)| {
+            let as_caster = depth.as_ref().zip(groups.as_ref()).filter(|_| d.shaded.is_none() && d.caster.is_some());
+            let as_caster = as_caster.map(|(c, g)| Shaded { program: &c.program, bind_groups: g, buffers: vec![(&defaults.buffer, 0), (&ids.buffer, 0)] });
             let material = d.shaded.as_ref().zip(groups.as_ref());
             MeshDraw {
                 vertices: (&d.vertices.buffer, d.vertex_offset),
@@ -173,11 +191,6 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
         .collect();
     let load = Load { color: load.color.filter(|_| targets.color.is_some()), depth: load.depth.filter(|_| targets.depth.is_some()) };
     pass::execute(gpu, placeholder, &targets, load, &draws);
-}
-
-/// The caster program and instance stream of a shadow caster draw (caster.rs).
-fn casting(d: &Draw) -> Option<(&'static render::Caster, &Arc<render::Buffer>)> {
-    Some((caster::program()?, d.transforms.as_ref().filter(|_| d.shaded.is_none())?))
 }
 
 /// The per-view constants' viewport and target size for a pass (its view-projection is per draw).

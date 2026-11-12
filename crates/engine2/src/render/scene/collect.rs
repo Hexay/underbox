@@ -45,6 +45,7 @@ impl Filter {
 /// with their world transforms.
 pub fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<(abi::HandleId<abi::class::CManagedSceneObject>, glam::Mat4)>) {
     let (mut draws, mut managed) = (Vec::new(), Vec::new());
+    let mut opaque = Vec::new();
     let mut sorted: Vec<(f32, Vec<Draw>)> = Vec::new();
     let sky_layer = f.match_id == StringToken::of("SkyBox").0;
     let eye = view.camera.origin;
@@ -79,14 +80,16 @@ pub fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<(abi::HandleId<a
         super::trace::object(&s);
         let mine = model_draw::object(&s, &deform, view.view_proj).into_iter().filter(|d| model_draw::translucent(d) == (f.pass == Pass::Translucent));
         match f.pass {
-            Pass::Opaque => draws.extend(mine),
-            Pass::DepthPrepass => draws.extend(mine.map(depth_prepass)),
+            Pass::Opaque => opaque.extend(mine),
+            Pass::DepthPrepass => opaque.extend(mine.map(depth_prepass)),
             Pass::Translucent => {
                 let p = s.transform.position.vec;
                 sorted.push((eye.distance_squared(Vec3::new(p.x, p.y, p.z)), mine.map(model_draw::as_translucent).collect()));
             }
         }
     }
+    crate::render::draw::sort_opaque(&mut opaque);
+    draws.extend(opaque);
     sorted.sort_by(|a, b| b.0.total_cmp(&a.0));
     draws.extend(sorted.into_iter().flat_map(|(_, d)| d));
     (draws, managed)

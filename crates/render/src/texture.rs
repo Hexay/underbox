@@ -150,6 +150,8 @@ impl Texture {
     pub fn upload(&self, gpu: &Gpu, data: &[u8]) {
         let (Some(texel), Some(layer)) = (self.texel_size(), self.layer_size()) else { return };
         let layers = if data.len() == layer * self.desc.layers.max(1) as usize { self.desc.layers.max(1) } else { 1 };
+        // Queue writes land before the next submit: queued passes that read the old texels go first.
+        gpu.flush();
         gpu.queue.write_texture(
             self.texture.as_image_copy(),
             data,
@@ -164,6 +166,7 @@ impl Texture {
         let Some(texel) = self.texel_size() else { return 0 };
         let layers = self.desc.layers.max(1);
         let mut at = 0;
+        gpu.flush();
         for mip in 1..self.desc.mips.max(1) {
             let (w, h) = self.mip_size(mip);
             let len = (w * h * texel * layers) as usize;

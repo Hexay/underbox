@@ -90,22 +90,19 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         return;
     }
     let stride = DRAW_UNIFORM_SIZE.next_multiple_of(u64::from(gpu.device.limits().min_uniform_buffer_offset_alignment));
-    let uniforms = gpu.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("draw uniforms"),
-        size: stride * draws.len().max(1) as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    for (i, d) in draws.iter().enumerate() {
-        gpu.queue.write_buffer(&uniforms, stride * i as u64, bytemuck::cast_slice(&d.uniforms.bytes()));
+    let mut bytes = vec![0u8; (stride as usize) * draws.len().max(1)];
+    for (i, d) in draws.iter().enumerate().filter(|(_, d)| d.shaded.is_none()) {
+        let at = stride as usize * i;
+        bytes[at..at + DRAW_UNIFORM_SIZE as usize].copy_from_slice(bytemuck::cast_slice(&d.uniforms.bytes()));
     }
+    let uniforms = gpu.upload(&bytes, 0);
     let program = &placeholder.program;
     let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("draw uniforms"),
         layout: &program.bind_group_layouts[0],
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &uniforms, offset: 0, size: wgpu::BufferSize::new(DRAW_UNIFORM_SIZE) }),
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &uniforms.buffer, offset: uniforms.offset, size: wgpu::BufferSize::new(DRAW_UNIFORM_SIZE) }),
         }],
     });
     let store = wgpu::StoreOp::Store;

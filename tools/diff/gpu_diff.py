@@ -109,6 +109,9 @@ def uniforms(ours, real, uo, ur, w, divs):
 def compare_draw(ours, real, do, dr, w, divs):
     so, sr = do.get("state", {}), dr.get("state", {})
     for f in STATE:
+        # With the depth test off on both, the compare op is unused (wgpu then leaves it Never).
+        if f == "dcmp" and not so.get("dtest") and not sr.get("dtest"):
+            continue
         if so.get(f) != sr.get(f):
             divs.add("state", (f, str(so.get(f)), str(sr.get(f))), w, f"{f} ours {so.get(f)} real {sr.get(f)}")
     bo, br = so.get("blend", []), sr.get("blend", [])

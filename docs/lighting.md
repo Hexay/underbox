@@ -37,8 +37,8 @@ shrunk 4 texels for selection, 4096 units of caster pull-back), sizes the local 
 (`GetDesiredResolution`: 512² D16 for showroom's lights, cube maps one slice per face) and asks
 for each shadow view through `AddShadowView` (`scene/shadow_view.rs`). That draws at once: the
 parent's casters inside the shadow frustum, depth only, back faces culled, managed's bias, every
-caster of one mesh as one instanced draw of the caster program (`draw/caster.rs`,
-`render::Caster`). What `SetShaderAttributes` writes binds for every draw of the view
+caster of one mesh as one instanced draw of the depth-only stand-in (`draw/caster.rs`,
+`shading/standin_depth.shader`). What `SetShaderAttributes` writes binds for every draw of the view
 (`Lighting::shadow_attributes`). Without managed (unit tests) nothing casts. Depth convention:
 `render/depth.rs` (shadow maps are reverse Z, `depth::SHADOW`).
 
