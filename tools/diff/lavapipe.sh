@@ -4,7 +4,7 @@
 # `apt-get download` .debs (SHA512 checked) unpacked into a sysroot; runtime libs are the system's.
 # Why: Mesa 26.0's llvmpipe reads an SSBO descriptor through lane 0 when the exec mask is empty, which
 # segfaults real's batched UI shader (docs/differential.md, "Real's UI on lavapipe").
-# Out: $UNDERBOX_CACHE/mesa-lvp/{src,sysroot,build,install}; about 1.5 GB, 10 min with -j6.
+# Out: $UNDERBOX_CACHE/mesa-lvp/{src,sysroot,build,install}; about 0.7 GB, 10 min with -j6.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$ROOT/tools/cache-dir.sh"
