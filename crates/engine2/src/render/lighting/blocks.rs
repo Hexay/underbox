@@ -8,7 +8,7 @@
 //! `FalloffBias = 1 / (r²·q)` so `saturate(1 / (q·d²) - bias)` reaches 0 at the radius. Map lights
 //! carry Hammer's colour × 10000 with q = 1, so 1 at 100 units; components carry q = 1e-4.
 
-use super::{Light, Lighting, local_shadow, shadow};
+use super::{Light, Lighting, decals, local_shadow, shadow};
 use crate::render::shading::layout::{Block, Value};
 use crate::render::texture;
 use glam::{Vec3, Vec4};
@@ -76,8 +76,9 @@ impl Lighting {
     /// A member of one of [`BLOCKS`]; `None` for other blocks and members.
     pub fn constant(&self, block: &str, name: &str) -> Option<Value> {
         let n = self.lights.len() as f32;
+        let decals = self.decal_count() as f32;
         match (block, name) {
-            ("ViewLightingConfigV2", "NumLights") => v(n, 0.0, 0.0, 0.0),
+            ("ViewLightingConfigV2", "NumLights") => v(n, 0.0, 0.0, decals),
             ("ViewLightingConfigV2", "AmbientLightColor") => Some(Value::Vec(self.ambient)),
             ("DirectionalLightCB", _) => self.sun_constant(name),
             (local_shadow::BLOCK, local_shadow::MATRICES) => self.local.as_ref().map(|l| Value::Array(l.tiles.iter().copied().map(Value::Mat).collect())),
@@ -85,7 +86,7 @@ impl Lighting {
             ("ClusteredLightingConstants", "ClusterInvCounts") => v(1.0, 1.0, 1.0, 0.0),
             ("ClusteredLightingConstants", "ClusterZParams") => v(1.0, 0.0, 1e-3, 1e9),
             ("ClusteredLightingConstants", "ClusterScreenParams") => v(1.0, 1.0, 1.0, 1.0),
-            ("ClusteredLightingConstants", "ClusterCapacitiesVec") => v(n.max(1.0), 0.0, 0.0, 0.0),
+            ("ClusteredLightingConstants", "ClusterCapacitiesVec") => v(n.max(1.0), 0.0, decals, 0.0),
             _ => None,
         }
     }
@@ -127,9 +128,17 @@ impl Lighting {
             }
             "ClusterLightCounts" => element.fill_elements(1, |_, _| s(n as f32)),
             "ClusterLightIndices" => element.fill_elements(n, |i, _| s(i as f32)),
-            "ClusterEnvMapCounts" | "ClusterDecalCounts" | "ClusterEnvMapIndices" | "ClusterDecalIndices" => element.fill_elements(1, |_, _| None),
+            "ClusterDecalCounts" => element.fill_elements(1, |_, _| s(self.decal_count() as f32)),
+            "ClusterDecalIndices" => element.fill_elements(self.decal_count().max(1), |i, _| s(i as f32)),
+            "DecalsBuffer" => decals::Decals::bytes(self.decals.as_ref().map_or(&[][..], |d| &d.gpu)),
+            "DecalsExtraDataBuffer" => decals::Decals::bytes(self.decals.as_ref().map_or(&[][..], |d| &d.extra)),
+            "ClusterEnvMapCounts" | "ClusterEnvMapIndices" => element.fill_elements(1, |_, _| None),
             _ => return None,
         })
+    }
+
+    fn decal_count(&self) -> usize {
+        self.decals.as_ref().map_or(0, |d| d.count)
     }
 }
 

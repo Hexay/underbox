@@ -141,6 +141,36 @@ Ranked divergences:
     (`real_core_tangent_frames_match_their_geometry`, with `UNDERBOX_REAL_CORE`). `frame.sh` now
     seeds real's `.vmdl_c` and `.vmesh_c`.
 
+16. **Fixed. Decals weren't drawn on ours** (decals). `CDecalSceneObject` was bookkeeping only and
+    the cluster's decal count was 0. Now `render/lighting/decals.rs` packs every rendering decal as
+    native's `GPUDecal` and `GPUDecalExtraData` (managed's `LightBinnerFeature.Decals.cs` documents
+    the packing: negated position, conjugate rotation, reciprocal scale, RGBE tint, sRGB colour
+    index), sets `NumLights.w`, and the stand-in resolves them as Decals.hlsl does, every decal per
+    pixel instead of the cluster walk (`shading/standin_decals.hlsl`). Before: 55.2 / 60.8 / 51.1,
+    SSIM 0.754.
+17. **Fixed. Managed decals drew a black frame** (decals, `MANAGED=1`). Two causes. The decal's
+    texture getters returned null for unset textures and managed's `Texture.FromNative` threw every
+    frame; they now hand out an empty handle or a copy (`scene/decal.rs`). And `GetTextureViewIndex`
+    gave -1 for a null texture, which managed packs into 16 bits as 65535: the RMO sample read far
+    outside the bindless array and lavapipe never finished the frame. Null is now 0, which every
+    shader reads as "none" (`render/bindless.rs`). Before: 114 / 120 / 139, SSIM 0.0006.
+18. **Agreeing. Particles** (particles). Additive glow sprites, sorted alpha-blended sprites with
+    roll, and model particles (`ParticleModelRenderer`, shadowed) all match through managed's
+    sprite compute path. The stock emitters draw from an unseeded random (`ParticleRandom` is
+    seeded only by SceneLab), so the scene's `GridEmitter` (corpus code) emits a fixed grid with no
+    velocity; real gives pixel-identical frames run to run on both scenes. Left: particle cubes'
+    shadow edges and 1-LSB rings in the glows. A sheeted particle texture
+    (`particle_debris_02`) draws nothing on either engine.
+19. **Low. Decal edges.** Interiors match exactly (the star, ring, multiply splotch and additive
+    spark); the alpha boundary sits up to a pixel apart. Not pursued.
+
+After 16–17:
+
+| Scene | Native | Managed |
+| --- | --- | --- |
+| particles | 0.29 / 0.47 / 0.21, 0.9983 | 0.27 / 0.45 / 0.18, 0.9986 |
+| decals | 0.20 / 0.31 / 0.51, 0.9971 | 0.19 / 0.28 / 0.50, 0.9976 |
+
 Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
 and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
 bisecting them: research/resources.md "What real engine2 accepts". `real-game.sh` now runs
@@ -159,3 +189,6 @@ placement and softness, box shading within 1–6.
 - **Content:** why real's managed renderer draws no morphed puppet (15). Next: does real draw
   its own citizen under `MANAGED=1` on lavapipe? If not, it's real's, not our content.
 - **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.
+- **Decals (16):** normal and height (parallax) maps, sheeted decal textures
+  (`GetSheetSequenceTextureData`), and the exclusion mask aren't applied; the corpus uses none.
+  Decal edges (19).

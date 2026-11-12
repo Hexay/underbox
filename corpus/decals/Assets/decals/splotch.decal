@@ -1,0 +1,14 @@
+{
+  "ColorTexture": "textures/shapes/splotch1.vtex",
+  "NormalTexture": null,
+  "RoughMetalOcclusionTexture": null,
+  "HeightTexture": null,
+  "ParallaxStrength": 0,
+  "Tint": "0.5,0.3,0.6,1",
+  "BlendMode": "Multiply",
+  "ColorMix": 1,
+  "Width": 72,
+  "Height": 72,
+  "__references": [],
+  "__version": 0
+}
