@@ -85,7 +85,7 @@ fn camera_draws_model_over_sky() {
     }
     let depth = read(swap_chain::targets(sc).unwrap().1);
     let d = |x, y| f32::from_le_bytes(depth.texel(x, y).try_into().unwrap());
-    assert!(d(32, 32) < 1.0 && d(0, 0) == 1.0, "cube writes depth, the sky doesn't");
+    assert!(d(32, 32) > 0.0 && d(0, 0) == 0.0, "cube writes depth, the sky doesn't (reverse Z)");
     let golden = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/golden/frames.tsv");
     a.check_golden(&golden, "camera_draws_model_over_sky", &device::gpu().unwrap().describe());
 }

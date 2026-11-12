@@ -38,7 +38,7 @@ fn view_proj_matches_the_froxel_rays() {
     let clip = vp * (eye + Vec3::new(100.0, -50.0, 20.0)).extend(1.0);
     assert!((clip.w - 100.0).abs() < 1e-3, "{clip}");
     assert!((clip.x / clip.w - 0.5).abs() < 1e-5 && (clip.y / clip.w - 0.3).abs() < 1e-5, "{clip}");
-    let view = crate::render::shading::view::View { view_proj: vp, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
+    let view = crate::render::shading::view::View { view_proj: vp, ..Default::default() };
     assert!(view.camera_position().truncate().distance(eye) < 1e-2, "{}", view.camera_position());
     assert!(view.camera_axes().0.truncate().distance(Vec3::X) < 1e-4);
 }

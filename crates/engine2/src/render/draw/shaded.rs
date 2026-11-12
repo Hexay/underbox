@@ -55,13 +55,13 @@ impl Shaded {
     /// `base` under the program's declared render states. The material stand-in culls back faces
     /// unless the material sets `F_RENDER_BACKFACES`, as the closed shaders it replaces do
     /// (vr_common_ps_code.fxc's `MATERIAL_CONTROLLED_BACKFACES`).
-    pub fn raster_state(&self, base: RasterState, reverse_z: bool) -> RasterState {
+    pub fn raster_state(&self, base: RasterState) -> RasterState {
         let base = if self.shading.label == shading::standin::PATH {
             RasterState { cull: (!self.material.feature("F_RENDER_BACKFACES")).then_some(wgpu::Face::Back), ..base }
         } else {
             base
         };
-        self.shading.render_state.apply(base, reverse_z)
+        self.shading.render_state.apply(base)
     }
 }
 

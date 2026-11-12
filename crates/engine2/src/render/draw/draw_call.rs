@@ -22,7 +22,6 @@ use abi::{Registry, bind};
 use glam::Mat4;
 use render::RasterState;
 use render::pass::DrawUniforms;
-use render::wgpu::CompareFunction;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -74,8 +73,7 @@ fn draw_model(c: context::Ref, attrs: attributes::Ref, material: Arc<Material>, 
     dc.material = None;
     let view_proj = immediate::view_proj(c);
     let uniforms = DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, tint: [1.0; 4] };
-    let depth_compare = if context::reverse_z(c) { CompareFunction::GreaterEqual } else { CompareFunction::LessEqual };
-    let raster = RasterState { depth_compare, depth_bias: (bias.0, bias.1.to_bits()), ..Default::default() };
+    let raster = RasterState { depth_bias: (bias.0, bias.1.to_bits()), ..Default::default() };
     let ids = gpu_buffers::get(ids);
     let mut draws = Vec::new();
     for sub in subs.iter().filter(|s| s.count > 0) {
@@ -117,7 +115,7 @@ fn trace(c: context::Ref, b: &ContextBindings, n: u32) {
     });
     let transforms = b.attributes.iter().find_map(|a| attributes::buffer(*a, "g_TransformBuffer")).and_then(|h| gpu_buffers::get(gpu_buffers::Handle::new(h)));
     let transforms = transforms.map(|t| t.read(gpu, 0, t.size()));
-    crate::render::scene::trace::draw_call(&context::target(c), context::reverse_z(c), &ids, transforms.as_deref());
+    crate::render::scene::trace::draw_call(&context::target(c), &ids, transforms.as_deref());
 }
 
 fn slot(first: i32) -> u32 {

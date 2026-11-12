@@ -47,17 +47,6 @@ fn compare(v: &Value) -> Option<C> {
     })
 }
 
-/// Declared depth functions are written for native's reverse-Z.
-fn forward(c: C) -> C {
-    match c {
-        C::Less => C::Greater,
-        C::LessEqual => C::GreaterEqual,
-        C::Greater => C::Less,
-        C::GreaterEqual => C::LessEqual,
-        c => c,
-    }
-}
-
 fn factor(v: &Value) -> Option<F> {
     Some(match sym(v)? {
         "ZERO" => F::Zero,
@@ -172,11 +161,12 @@ impl Overrides {
         }
     }
 
-    /// `s` with the declared states; `reverse_z` targets take declared depth functions as is.
-    pub fn apply(&self, s: RasterState, reverse_z: bool) -> RasterState {
+    /// `s` with the declared states. Declared depth functions are written for native's reverse Z,
+    /// which every view uses.
+    pub fn apply(&self, s: RasterState) -> RasterState {
         let mut s = s;
         if let Some(c) = self.get("DepthFunc").and_then(compare) {
-            s.depth_compare = if reverse_z { c } else { forward(c) };
+            s.depth_compare = c;
         }
         if let Some(write) = self.flag("DepthWriteEnable") {
             s.depth_write = write;

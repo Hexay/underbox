@@ -226,7 +226,7 @@ PS
 			for ( int x = -1; x <= 1; x++ )
 			{
 				float2 uv = clamp( vShadow.xy + float2( x, y ) * flTexel, vMin + flTexel, vMin + flTile - flTexel );
-				flSum += g_tUnderboxLocalShadow.SampleCmpLevelZero( g_sUnderboxSunShadow, uv, vShadow.z - 0.0002 );
+				flSum += g_tUnderboxLocalShadow.SampleCmpLevelZero( g_sUnderboxReverseShadow, uv, vShadow.z + 0.0002 );
 			}
 		return flSum / 9.0;
 	}

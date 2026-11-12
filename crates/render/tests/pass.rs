@@ -75,7 +75,18 @@ fn depth_only_pass_writes_depth() {
     let depth = Texture::new(gpu, TextureDesc::depth("d", SIZE, SIZE));
     let (v, i) = quad(gpu);
     let targets = Targets { depth: Some(&depth), ..Default::default() };
-    pass::execute(gpu, &placeholder, &targets, Load { color: None, depth: Some(1.0) }, &[draw(&v, &i, [1.0; 4])]);
+    pass::execute(gpu, &placeholder, &targets, Load { color: None, depth: Some(0.0) }, &[draw(&v, &i, [1.0; 4])]);
     let frame = depth.read_back(gpu);
     assert_eq!(f32::from_le_bytes(frame.texel(5, 5).try_into().unwrap()), 0.5);
+}
+
+#[test]
+fn a_pass_that_neither_clears_nor_draws_is_skipped() {
+    let gpu = gpu();
+    let placeholder = Placeholder::new(gpu);
+    let color = Texture::new(gpu, TextureDesc::render_target("c", SIZE, SIZE, wgpu::TextureFormat::Rgba8Unorm));
+    let targets = Targets { color: Some(&color), ..Default::default() };
+    pass::execute(gpu, &placeholder, &targets, Load { color: Some(wgpu::Color::RED), depth: None }, &[]);
+    pass::execute(gpu, &placeholder, &targets, Load::default(), &[]);
+    assert_eq!(color.read_back(gpu).texel(1, 1), &[255, 0, 0, 255][..], "an empty clear still clears");
 }

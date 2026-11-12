@@ -16,6 +16,7 @@ pub mod standin;
 pub mod texel_words;
 pub mod vertex;
 pub mod view;
+pub mod view_space;
 #[cfg(test)]
 mod coverage;
 #[cfg(test)]

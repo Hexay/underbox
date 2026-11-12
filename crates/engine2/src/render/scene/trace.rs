@@ -30,9 +30,9 @@ pub(crate) fn describe(t: texture::Ref) -> String {
     }
 }
 
-/// One line per `DrawModelDrawCall` (the first 8 per pair of targets): targets, viewport, depth
-/// mode, instance ids and the transform each reads.
-pub fn draw_call(t: &Target, reverse_z: bool, ids: &[u32], transforms: Option<&[u8]>) {
+/// One line per `DrawModelDrawCall` (the first 8 per pair of targets): targets, viewport,
+/// instance ids and the transform each reads.
+pub fn draw_call(t: &Target, ids: &[u32], transforms: Option<&[u8]>) {
     static SEEN: LazyLock<std::sync::Mutex<std::collections::HashMap<String, u32>>> = LazyLock::new(Default::default);
     let targets = format!("{} / {}", describe(t.color), describe(t.depth));
     let n = {
@@ -48,7 +48,7 @@ pub fn draw_call(t: &Target, reverse_z: bool, ids: &[u32], transforms: Option<&[
     let at: Vec<String> = ids.iter().map(|&id| transforms.map_or("-".into(), |b| { let o = id as usize * 16; format!("{id}@({:.0},{:.0},{:.0})", f(b, o + 3), f(b, o + 7), f(b, o + 11)) })).collect();
     let v = t.viewport;
     let msg = format!(
-        "draw call: -> {targets} viewport {}x{}+{}+{} z {}..{} reverse_z {reverse_z} instances [{}] transforms {}",
+        "draw call: -> {targets} viewport {}x{}+{}+{} z {}..{} instances [{}] transforms {}",
         v.m_n_width, v.m_n_height, v.m_n_top_left_x, v.m_n_top_left_y, v.min_z, v.max_z, at.join(" "), transforms.map_or(0, <[u8]>::len)
     );
     abi::rt::log::log(abi::rt::log::Level::Info, &msg);
@@ -59,7 +59,7 @@ pub fn view(view: usize, view_proj: glam::Mat4) {
     if !enabled() {
         return;
     }
-    let v = crate::render::shading::view::View { view_proj, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
+    let v = crate::render::shading::view::View { view_proj, ..Default::default() };
     let (eye, forward) = (v.camera_position(), v.camera_axes().0);
     abi::rt::log::log(abi::rt::log::Level::Info, &format!("view: {view:#x} eye ({:.0},{:.0},{:.0}) forward ({:.2},{:.2},{:.2})", eye.x, eye.y, eye.z, forward.x, forward.y, forward.z));
 }

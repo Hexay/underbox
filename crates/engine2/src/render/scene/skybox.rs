@@ -4,18 +4,18 @@
 //! Managed's `Skybox3DPipeline` adds its layers (callback 35); without it the view gets sky and
 //! opaque layers.
 //!
-//! Skybox depth is squeezed into `[DEPTH_NEAR, 1]` so it lands behind everything the parent
-//! drew but still sorts against itself (native's skybox range, in our forward depth).
+//! As native's, the skybox's viewport depth range is `[0, camera::MIN_Z]`, below the main
+//! world's, so it lands behind everything the parent drew but still sorts against itself.
 
-use super::{field, layer, setup, view};
+use super::{camera::MIN_Z, field, layer, setup, view};
 use crate::render::texture;
 use crate::scene::world::{self, Skybox};
 use abi::callbacks::sandbox_rendering_render_pipeline as pipeline;
 use abi::slots::{c_render_pipeline_setup as s, i_scene_view as v};
+use abi::structs::RenderViewport;
 use abi::{NativeRef, StringToken};
 use glam::{Mat4, Vec3, Vec4};
 
-const DEPTH_NEAR: f32 = 0.9999;
 const SKYBOX_LAYERS_CALLBACK: usize = 35;
 
 /// Main-world position of skybox-space `q` is `scale * (q - origin)` (`SkyboxToWorld`).
@@ -24,9 +24,9 @@ fn skybox_to_world(sky: &Skybox) -> Mat4 {
     Mat4::from_scale(Vec3::splat(sky.scale)) * Mat4::from_translation(-origin)
 }
 
-/// Clip-space z moved into `[DEPTH_NEAR, 1]`.
-fn squeeze_depth() -> Mat4 {
-    Mat4::from_cols(Vec4::X, Vec4::Y, Vec4::new(0.0, 0.0, 1.0 - DEPTH_NEAR, 0.0), Vec4::new(0.0, 0.0, DEPTH_NEAR, 1.0))
+/// `vp` with the skybox's depth range.
+fn skybox_viewport(vp: RenderViewport) -> RenderViewport {
+    RenderViewport { min_z: 0.0, max_z: MIN_Z, ..vp }
 }
 
 /// The first of `worlds` with a skybox to draw, unless `r_3d_skybox` is off.
@@ -44,11 +44,11 @@ fn child_view(parent: view::Ref, p: &view::SceneView, sky: &Skybox, color: textu
     camera.near /= sky.scale;
     camera.far /= sky.scale;
     camera.ortho = camera.ortho.map(|(w, h)| (w / sky.scale, h / sky.scale));
-    let view_proj = squeeze_depth() * p.view_proj * skybox_to_world(sky);
+    let view_proj = p.view_proj * skybox_to_world(sky);
     let desc = view::Desc {
         camera,
         proj: Some(view_proj * camera.view().inverse()),
-        viewport: p.viewport,
+        viewport: skybox_viewport(p.viewport),
         swap_chain: p.swap_chain,
         color,
         depth,
@@ -82,15 +82,16 @@ pub fn add(parent: view::Ref, color: texture::Ref, depth: texture::Ref, managed:
     let worlds = p.state.lock().unwrap().worlds.clone();
     let Some(sky) = skybox_of(&worlds) else { return false };
     let child = child_view(parent, &p, &sky, color, depth);
+    let vp = skybox_viewport(p.viewport);
     if let Some(parent_setup) = managed.filter(|_| abi::rt::callbacks::is_set(SKYBOX_LAYERS_CALLBACK)) {
         let attributes = field!(get NativeRef<abi::class::CRenderAttributes>, s::GET_M_P_ATTRIBUTES, parent_setup.addr());
-        let desc = setup::Desc { attributes, viewport: p.viewport, clear_flags: 0, clear_color: Default::default(), tools_view: false };
+        let desc = setup::Desc { attributes, viewport: vp, clear_flags: 0, clear_color: Default::default(), tools_view: false };
         let child_setup = setup::create(child, &desc);
         pipeline::add_skybox3_d_layers_to_view(child_setup);
         objects::destroy(child_setup);
     }
     if view::with(child, |_, st| st.layers.is_empty()) {
-        default_layers(child, p.viewport);
+        default_layers(child, vp);
     }
     view::add_layer(parent, layer::create(parent, "3DSkybox".into(), p.viewport, layer::Kind::View(child), 0, 0), Default::default());
     true
@@ -113,7 +114,7 @@ mod tests {
         let sky = Skybox { world: 1, origin: crate::math::vec3(10.0, 0.0, -5.0), scale: 16.0, ..Default::default() };
         let p = skybox_to_world(&sky).transform_point3(Vec3::new(11.0, 0.0, -5.0));
         assert!(p.abs_diff_eq(Vec3::new(16.0, 0.0, 0.0), 1e-4), "{p}");
-        let squeezed = |z: f32| (squeeze_depth() * Vec4::new(0.0, 0.0, z, 1.0)).z;
-        assert_eq!((squeezed(0.0), squeezed(1.0)), (DEPTH_NEAR, 1.0));
+        let vp = skybox_viewport(RenderViewport { min_z: MIN_Z, max_z: 1.0, ..Default::default() });
+        assert_eq!((vp.min_z, vp.max_z), (0.0, MIN_Z));
     }
 }

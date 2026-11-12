@@ -1,7 +1,8 @@
 //! A view's [`Lighting`] as the core shaders' lighting blocks hold it: `ViewLightingConfigV2` and
 //! `BinnedLightBufferV2` (common/lightbinner.hlsl), `DirectionalLightCB`
 //! (Shadows/DirectionalLightShadow.hlsl) and the clustered-culling inputs
-//! (common/classes/ClusterCulling.hlsl). There is no culling: every light sits in one cluster.
+//! (common/classes/ClusterCulling.hlsl). There is no culling: every light sits in one cluster
+//! (see [`Lighting::constant`]).
 //!
 //! Distance falloff is packed as `CLightBinnerStandard::AddLight` does (managed's mirror:
 //! `LightBinnerFeature.Pack`): no linear term, the raw quadratic attenuation over world units, and
@@ -10,6 +11,7 @@
 
 use super::{Light, Lighting, decals, local_shadow, shadow};
 use crate::render::shading::layout::{Block, Value};
+use crate::render::shading::view::View;
 use crate::render::texture;
 use glam::{Vec3, Vec4};
 
@@ -73,10 +75,14 @@ impl Light {
 }
 
 impl Lighting {
-    /// A member of one of [`BLOCKS`]; `None` for other blocks and members.
-    pub fn constant(&self, block: &str, name: &str) -> Option<Value> {
+    /// A member of one of [`BLOCKS`] for a draw through `view`; `None` for other blocks and
+    /// members. The cluster grid is one cluster deep over the view's depth range; managed's
+    /// `ClusteredCullingLayer` binds its own grid on the view's attributes, which wins.
+    pub fn constant(&self, block: &str, name: &str, view: &View) -> Option<Value> {
         let n = self.lights.len() as f32;
         let decals = self.decal_count() as f32;
+        let (near, far) = view.near_far();
+        let [_, _, w, h] = view.viewport.map(|x| x.max(1.0));
         match (block, name) {
             ("ViewLightingConfigV2", "NumLights") => v(n, 0.0, 0.0, decals),
             ("ViewLightingConfigV2", "AmbientLightColor") => Some(Value::Vec(self.ambient)),
@@ -84,8 +90,11 @@ impl Lighting {
             (local_shadow::BLOCK, local_shadow::MATRICES) => self.local.as_ref().map(|l| Value::Array(l.tiles.iter().copied().map(Value::Mat).collect())),
             ("ClusteredLightingConstants", "ClusterCounts") => v(1.0, 1.0, 1.0, 1.0),
             ("ClusteredLightingConstants", "ClusterInvCounts") => v(1.0, 1.0, 1.0, 0.0),
-            ("ClusteredLightingConstants", "ClusterZParams") => v(1.0, 0.0, 1e-3, 1e9),
-            ("ClusteredLightingConstants", "ClusterScreenParams") => v(1.0, 1.0, 1.0, 1.0),
+            ("ClusteredLightingConstants", "ClusterZParams") => {
+                let scale = 1.0 / (far / near).ln();
+                v(scale, -near.ln() * scale, near, far)
+            }
+            ("ClusteredLightingConstants", "ClusterScreenParams") => v(w, h, 1.0 / w, 1.0 / h),
             ("ClusteredLightingConstants", "ClusterCapacitiesVec") => v(n.max(1.0), 0.0, decals, 0.0),
             _ => None,
         }

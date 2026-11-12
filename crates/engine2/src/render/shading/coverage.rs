@@ -53,7 +53,7 @@ fn built_verdict(gpu: &render::Gpu, compiler: &shaders::Compiler, shader: Result
     if vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).is_none() {
         return "placeholder: mesh layout can't feed its vertex inputs".into();
     }
-    let view = View { view_proj: Mat4::IDENTITY, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0], tone_map: 1.0 };
+    let view = View { viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0], ..Default::default() };
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
     let lighting = crate::render::lighting::Lighting::fallback();

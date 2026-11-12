@@ -17,7 +17,7 @@ fn covers_centre(eye: Vec3, material: Option<&Arc<MaterialRef>>) -> bool {
     assert_eq!(d.shaded.is_some(), material.is_some(), "shaded by its material, else the placeholder");
     let (color, depth) = (texture::create_target("cull", 16, 16, 0), texture::create_target("cull depth", 16, 16, 62));
     let target = Target { color, depth, ..Default::default() };
-    draw::execute(&target, &Lighting::default(), Load { color: Some(render::wgpu::Color::BLACK), depth: Some(1.0) }, &[d]);
+    draw::execute(&target, &Lighting::default(), Load { color: Some(render::wgpu::Color::BLACK), depth: Some(0.0) }, &[d]);
     let frame = texture::resolve(color).unwrap().gpu.as_ref().unwrap().read_back(device::gpu().unwrap());
     [color, depth].into_iter().for_each(crate::resource::destroy_handle);
     frame.texel(8, 8)[..3] != [0, 0, 0]

@@ -1,26 +1,24 @@
 	// Spliced into standin.shader's PS (standin.rs). Cascade maps: ours (render/lighting/shadow.rs,
-	// one cascade, forward Z) or, for managed's scene renderer, the maps its bindless indices name
-	// (shadow::managed_cascade, reverse Z), one binding per cascade. Matrix n maps world to uv and depth.
+	// one cascade) or, for managed's scene renderer, the maps its bindless indices name
+	// (shadow::managed_cascade), one binding per cascade; all reverse Z. Matrix n maps world to uv and depth.
 	Texture2D g_tUnderboxSunShadow < Attribute( "g_tUnderboxSunShadow" ); >;
 	Texture2D g_tUnderboxSunShadow1 < Attribute( "g_tUnderboxSunShadow1" ); >;
 	Texture2D g_tUnderboxSunShadow2 < Attribute( "g_tUnderboxSunShadow2" ); >;
 	Texture2D g_tUnderboxSunShadow3 < Attribute( "g_tUnderboxSunShadow3" ); >;
-	SamplerComparisonState g_sUnderboxSunShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( LESS_EQUAL ); >;
 	SamplerComparisonState g_sUnderboxReverseShadow < Filter( COMPARISON_MIN_MAG_MIP_LINEAR ); AddressU( CLAMP ); AddressV( CLAMP ); ComparisonFunc( GREATER_EQUAL ); >;
 
 	#define UNDERBOX_SUN_SHADOW_INDEX 0x7FFFFF00u
 
-	// 3x3 PCF of one cascade; `bOurs` compares forward Z.
+	// 3x3 PCF of one cascade; ours has no bias of its own.
 	float CascadeVisibility( Texture2D tMap, bool bOurs, float3 vShadow, float flBias )
 	{
 		float flSum = 0.0;
+		float flRef = saturate( vShadow.z + ( bOurs ? 0.0005 : flBias ) );
 		for ( int y = -1; y <= 1; y++ )
 			for ( int x = -1; x <= 1; x++ )
 			{
 				float2 uv = vShadow.xy + float2( x, y ) * g_DirectionalLightInverseShadowMapSize;
-				flSum += bOurs
-					? tMap.SampleCmpLevelZero( g_sUnderboxSunShadow, uv, vShadow.z - 0.0005 )
-					: tMap.SampleCmpLevelZero( g_sUnderboxReverseShadow, uv, saturate( vShadow.z + flBias ) );
+				flSum += tMap.SampleCmpLevelZero( g_sUnderboxReverseShadow, uv, flRef );
 			}
 		return flSum / 9.0;
 	}

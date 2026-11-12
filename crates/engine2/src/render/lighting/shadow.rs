@@ -28,7 +28,7 @@ pub struct SunShadow {
     /// World → (u, v, depth) in the shadow map.
     pub world_to_shadow: Mat4,
     pub map: texture::Ref,
-    /// Nearer is larger (managed's cascades); ours store nearer as smaller.
+    /// Nearer is larger: ours and managed's cascades both are.
     pub reverse_z: bool,
 }
 
@@ -45,7 +45,7 @@ fn bounds(view_proj: Mat4) -> (Vec3, f32) {
     let at = |x: f32, y: f32, z: f32| inv.project_point3(Vec3::new(x, y, z));
     let mut corners = Vec::with_capacity(8);
     for (x, y) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-        let (near, far) = (at(x, y, 0.0), at(x, y, 1.0));
+        let (near, far) = (at(x, y, 1.0), at(x, y, 0.0));
         let ray = far - near;
         corners.push(near);
         corners.push(near + ray * (DISTANCE / ray.length().max(1e-3)).min(1.0));
@@ -63,7 +63,7 @@ fn light_view_proj(direction: Vec3, center: Vec3, radius: f32) -> Mat4 {
     let texel = 2.0 * radius / SIZE as f32;
     let c = view.transform_point3(center);
     let snapped = Vec3::new((c.x / texel).round() * texel, (c.y / texel).round() * texel, c.z);
-    let proj = rh::proj::directx::orthographic(snapped.x - radius, snapped.x + radius, snapped.y - radius, snapped.y + radius, -c.z - radius - back, -c.z + radius);
+    let proj = rh::proj::directx::orthographic(snapped.x - radius, snapped.x + radius, snapped.y - radius, snapped.y + radius, -c.z + radius, -c.z - radius - back);
     proj * view
 }
 
@@ -87,8 +87,8 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref], view_proj: Mat4) {
         }
     }
     let target = Target { depth: map(), ..Default::default() };
-    draw::execute(&target, lighting, Load { color: None, depth: Some(1.0) }, &draws);
-    lighting.shadow = Some(SunShadow { world_to_shadow: to_texture() * light, map: target.depth, reverse_z: false });
+    draw::execute(&target, lighting, Load { color: None, depth: Some(0.0) }, &draws);
+    lighting.shadow = Some(SunShadow { world_to_shadow: to_texture() * light, map: target.depth, reverse_z: true });
 }
 
 /// Managed's cascade `n` map binds as `g_tUnderboxSunShadow` (cascade 0) or `g_tUnderboxSunShadow<n>`.
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn the_light_projection_contains_the_view_sphere() {
-        let view_proj = rh::proj::directx::perspective(1.2, 1.5, 10.0, 10000.0) * rh::view::look_at_mat4(Vec3::new(-200.0, 0.0, 100.0), Vec3::ZERO, Vec3::Z);
+        let view_proj = rh::proj::directx::perspective(1.2, 1.5, 10000.0, 10.0) * rh::view::look_at_mat4(Vec3::new(-200.0, 0.0, 100.0), Vec3::ZERO, Vec3::Z);
         let (center, radius) = bounds(view_proj);
         assert!(radius < DISTANCE * 1.5);
         let m = to_texture() * light_view_proj(Vec3::new(0.3, 0.2, -0.9).normalize(), center, radius);

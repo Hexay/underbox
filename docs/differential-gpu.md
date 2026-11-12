@@ -61,13 +61,18 @@ read; up to the maximum count is listed.
 
 ## Findings (showroom and skinned, ours vs real)
 
-Real renderer differences, not fixed in this lane. Pixel metrics already agree closely
-(docs/differential-render.md), so most are structure, not output.
+Real renderer differences. Pixel metrics already agree closely (docs/differential-render.md), so most
+are structure, not output. Fixed items say what changed and what is left.
 
-1. **Real uses reverse Z.** Every real depth target clears to 0 and tests `GreaterOrEqual`; ours clears
-   to 1 and tests `LessOrEqual`. The per-view constants (1088 bytes) differ in 106 of 272 floats, the
-   projection terms among them. Anything that reads depth or the view constants (fog, SSAO, decals)
-   sees other values on ours.
+1. **Reverse Z (fixed).** Every view now clears depth to 0 and tests `GreaterOrEqual`, shadow maps
+   included (`SunShadow::reverse_z` is always true). Main views use native's depth range
+   [0.02, 1] (`camera::MIN_Z`) and the 3D skybox [0, 0.02], in place of a squeezed projection. The
+   1088-byte per-view constants are filled as real's capture lays them out (shading/view.rs,
+   shading/view_space.rs): camera-relative `g_matWorldToProjection` with `g_vWorldToCameraOffset`,
+   `g_matViewToProjection` stored transposed, FOV in degrees (-1 for ortho), forward-Z multiview
+   copies. 7 of 272 floats still differ on the main view: `g_flTime`, `g_vRandomFloats` and
+   motion-vector jitter, left at 0 so frames stay deterministic. Shadow views' 1088-byte buffers
+   still differ (item 2).
 2. **Shadow maps.** Real draws three 2048² sun cascades, back faces culled, with dynamic depth bias
    (constant −1, slope −1.5), each caster once with three instances; ours draws two cleared plus six
    loaded 2048² passes (the six are likely the lamp's cube faces in one atlas) with culling off, no
@@ -79,16 +84,22 @@ Real renderer differences, not fixed in this lane. Pixel metrics already agree c
 5. **Vertex streams.** Real's static meshes take position, `R16G16Sfloat` UV, `A2B10G10R10` packed
    normal and tangent, plus per-instance `R32G32B32A32Sfloat`/`R32Uint`; ours feeds unpacked 32-bit
    floats. Skinned meshes differ more (real: `R32Sfloat` weights, `R8G8B8A8Uint` indices).
-6. **Constants ours leaves zero.** An 80-byte buffer real fills with the light cluster grid
-   (24×16×48 = 18432 cells, reciprocals, near/far, 1024×768) is zero or one on ours; in the 592-byte
-   buffer real sets eight floats ours leaves 0 (0.707, 0.707; 0.4, 0.03, 0.003, 0.4; −260, 130). The
-   304-byte buffer is byte-identical. The 4128-byte light array holds NaN in real's unused slots, 0 on ours.
+6. **Constants ours left zero (fixed).** The 592-byte buffer now matches byte for byte: native's
+   default wind (also what `GetSceneWorldWind` returns), the camera as
+   `g_vHighPrecisionLightingOffsetWs`, and infinite fog culling bounds. Real's 80-byte cluster block
+   comes from managed's `ClusteredCullingLayer` on the view's attributes; layers' attributes now
+   inherit the view's, so a shader that declares it gets managed's grid, identical to real's. The
+   80-byte buffer still paired against it on the main draw is the material stand-in's own globals
+   (the stand-in reads no clusters). The 304-byte buffer is byte-identical. The 4128-byte light array
+   holds NaN in real's unused slots, 0 on ours.
 7. **Morph targets.** Real composites morphs in a 2048×1024 `R16G16B16A16Sfloat` pass of two additive
    draws before shadows; ours has no such pass (compute).
-8. **Final output.** Real's last passes write the `B8G8R8A8Srgb` swap chain image directly (UI and
-   composite); ours draws into `R16G16B16A16Sfloat` and copies to the swap chain. Ours also runs about
-   12 empty 1024×768 passes per frame and 389 (skinned: 640) transfers against real's 16, mostly
-   small buffer copies and fills.
+8. **Final output (mostly fixed).** A pass that neither clears nor draws isn't recorded (showroom:
+   33 passes to 16, real 21). `TargetSupportsSrgbWrite` is true for 8-bit targets, so managed's UI no
+   longer takes the float path (the "UI Gamma Seed" / "Composite" blits through `R16G16B16A16Sfloat`);
+   the last pass writes the swap chain image as real's does. Left: the swap chain image is ours'
+   own texture, copied to the surface at present (engine textures can't wrap a surface frame), and
+   387 (skinned: 638) transfers against real's 16, mostly small buffer copies and fills.
 9. **Bindless.** Real's array holds 1252 views (every loaded texture); ours 5 per set, with material
    textures bound directly. Per-draw texture lists therefore can't be compared on real's side yet: its
    material textures are indexed from uniforms.

@@ -206,8 +206,8 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             let bytes = match (inputs.constant_buffer(&b.name).or_else(view_fog), b.name.as_str()) {
                 (Some(given), _) => block_bytes(&given, block.size),
                 (None, view::BLOCK) => block.fill(|n| inputs.view.constant(n)),
-                (None, fog::BLOCK) => block.fill(|n| fog::constant(inputs.lighting, n).or_else(|| uniform_value(s, inputs, n))),
-                (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n)),
+                (None, fog::BLOCK) => block.fill(|n| fog::constant(inputs.lighting, inputs.view, n).or_else(|| uniform_value(s, inputs, n))),
+                (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n, inputs.view)),
                 (None, _) => block.fill(|n| uniform_value(s, inputs, n)),
             };
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::UNIFORM, &bytes))

@@ -82,9 +82,13 @@ pub struct MeshDraw<'a> {
     pub shaded: Option<Shaded<'a>>,
 }
 
-/// Run one pass: load or clear the targets, then draw `draws` in order.
+/// Run one pass: load or clear the targets, then draw `draws` in order. A pass that would neither
+/// clear nor draw isn't recorded.
 pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Load, draws: &[MeshDraw]) {
     let Some((width, height)) = targets.size() else { return };
+    if draws.is_empty() && load.color.is_none() && load.depth.is_none() {
+        return;
+    }
     let stride = DRAW_UNIFORM_SIZE.next_multiple_of(u64::from(gpu.device.limits().min_uniform_buffer_offset_alignment));
     let uniforms = gpu.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("draw uniforms"),

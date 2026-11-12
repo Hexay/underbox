@@ -40,11 +40,11 @@ fn map() -> texture::Ref {
     *MAP.get_or_init(|| texture::create_target("local shadows", TILE * SIDE, TILE * SIDE, 62))
 }
 
-/// The views a light's shadow renders through (clip space, forward-Z), one per tile.
+/// The views a light's shadow renders through (clip space, reverse Z), one per tile.
 fn views(l: &Light) -> Vec<Mat4> {
     let near = (l.radius * 0.01).max(1.0);
     let far = l.radius.max(near + 1.0);
-    let face = |dir: Vec3, up: Vec3, fov: f32| rh::proj::directx::perspective(fov, 1.0, near, far) * rh::view::look_at_mat4(l.position, l.position + dir, up);
+    let face = |dir: Vec3, up: Vec3, fov: f32| rh::proj::directx::perspective(fov, 1.0, far, near) * rh::view::look_at_mat4(l.position, l.position + dir, up);
     match (l.kind, l.cone) {
         (kind::SPOT, Some((_, outer))) => {
             let dir = l.forward();
@@ -93,7 +93,7 @@ pub fn render(lighting: &mut Lighting, worlds: &[world::Ref]) {
             }
             let target = Target { depth: out.map, viewport: viewport(tile), ..Default::default() };
             // The first tile's clear covers the whole atlas.
-            draw::execute(&target, lighting, Load { color: None, depth: (!cleared).then_some(1.0) }, &draws);
+            draw::execute(&target, lighting, Load { color: None, depth: (!cleared).then_some(0.0) }, &draws);
             cleared = true;
             out.tiles.push(to_tile(tile) * view);
         }

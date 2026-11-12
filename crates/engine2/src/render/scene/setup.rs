@@ -109,7 +109,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::GET_TARGET_FORMAT, |_, h| target_info(h, |t| i64::from(t.image_format())));
     bind!(r, tools::GET_TARGET_WIDTH, |_, h| target_info(h, |t| t.gpu.as_ref().map_or(0, |g| g.desc.width as i32)));
     bind!(r, tools::GET_TARGET_HEIGHT, |_, h| target_info(h, |t| t.gpu.as_ref().map_or(0, |g| g.desc.height as i32)));
-    bind!(r, tools::TARGET_SUPPORTS_SRGB_WRITE, |_, _| false);
+    // True takes HookLayers.AddUI off its float path (seed and composite blits), as native's 8-bit targets do.
+    bind!(r, tools::TARGET_SUPPORTS_SRGB_WRITE, |_, h| target_info(h, |t| t.gpu.as_ref().is_some_and(|g| g.desc.render_target && render::srgb_twin(g.desc.format).is_some())));
     bind!(r, tools::SCREEN_TEXT, |_, _, _, _, _, _, _, _| {});
     bind!(r, tools::COLLECT_LOADED_SHADER_NAMES, || 0);
     bind!(r, tools::GET_LOADED_SHADER_NAME, |_| StrRet::from(None::<String>));
