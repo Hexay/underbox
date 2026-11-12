@@ -41,6 +41,8 @@ boot() {
     echo "== $NAME on $run ($SIDE)"
     PROJECT=$(prepare)
     [ -n "$real" ] || [ "${CONTENT:-real}" = source ] || [ -z "$ART" ] || seed=$(sh "$ROOT/tools/diff/seed.sh" "$ART")
+    # The project's own scene and manifest land in the download cache too (tools/diff/noweb.sh).
+    export UNDERBOX_LOCAL_PROJECT="${PROJECT%/*}"
     if [ "$SIDE" = server ]; then
         UNDERBOX_REAL_ENGINE2=$real SEED=$seed OUT=$dir UNTIL="$until" GRACE=1 \
             sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" > "$OUT/$run.txt" 2>&1 || true

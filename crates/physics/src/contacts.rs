@@ -46,20 +46,17 @@ pub(crate) struct Contacts {
     pub began: Vec<(ColliderHandle, ColliderHandle)>,
 }
 
-fn touches(pair: &ContactPair) -> bool {
-    pair.has_any_active_contact() && pair.find_deepest_contact().is_some_and(|(_, c)| c.dist <= TOUCH_DISTANCE)
-}
-
-/// Whether an intersecting trigger pair reports: a static-keyframed pair only when the trigger is
-/// the keyframed one (`shape::pair_types`).
-fn reports(world: &PhysicsWorld, a: ColliderHandle, b: ColliderHandle) -> bool {
-    let body = |c: ColliderHandle| world.colliders.get(c).and_then(|c| c.parent()).and_then(|h| world.bodies.get(h));
-    let (Some(ba), Some(bb)) = (body(a), body(b)) else { return true };
-    if !(ba.is_fixed() && bb.is_kinematic() || ba.is_kinematic() && bb.is_fixed()) {
-        return true;
+/// Gotcha: a recycled manifold (`persist.rs`) keeps the distance of the step it was made in, so a
+/// body that lands from far enough away never reads as touching; measure the pair again instead.
+fn touches(world: &PhysicsWorld, pair: &ContactPair) -> bool {
+    if !pair.has_any_active_contact() {
+        return false;
     }
-    let kinematic = if ba.is_kinematic() { a } else { b };
-    world.colliders.get(kinematic).is_some_and(|c| c.is_sensor())
+    let (Some(a), Some(b)) = (world.colliders.get(pair.collider1), world.colliders.get(pair.collider2)) else { return false };
+    match rapier3d::parry::query::contact(a.position(), a.shape(), b.position(), b.shape(), TOUCH_DISTANCE) {
+        Ok(found) => found.is_some(),
+        Err(_) => pair.find_deepest_contact().is_some_and(|(_, c)| c.dist <= TOUCH_DISTANCE),
+    }
 }
 
 fn event(world: &PhysicsWorld, kind: EventKind, a: ColliderHandle, b: ColliderHandle) -> ContactEvent {
@@ -86,13 +83,13 @@ impl Contacts {
     /// Diff this step's touching pairs against the last step's, queueing events.
     pub fn update(&mut self, world: &PhysicsWorld, hooks: &Hooks) {
         let mut now = HashMap::with_capacity(self.touching.len());
-        for pair in world.narrow_phase.contact_pairs().filter(|p| touches(p)) {
+        for pair in world.narrow_phase.contact_pairs().filter(|p| touches(world, p)) {
             let kind = hooks.classify(pair.collider1, pair.collider2, false);
             if kind != Contact::None {
                 now.insert(self.ordered(pair.collider1, pair.collider2), kind);
             }
         }
-        for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2 && reports(world, p.0, p.1)) {
+        for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2) {
             now.insert(self.ordered(a, b), Contact::Trigger);
         }
         let wants = |a, b, bit| [a, b].iter().any(|c| hooks.meta.get(c).is_some_and(|m: &ShapeMeta| m.functions & bit != 0));

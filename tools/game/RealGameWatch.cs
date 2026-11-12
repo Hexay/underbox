@@ -168,6 +168,8 @@ public sealed class RealGameWatch : Component
 			+ $" connections={Connection.All.Count} {DescribeCamera()}" + string.Join( "; ", players.Select( Describe ) ) );
 
 		if ( ++ticks == 4 ) ReportBodies( bodies );
+		// A joining client has no drop trace to explain where its map ended up.
+		if ( ticks == 4 && !Networking.IsHost ) ReportColliders();
 		TrackOwnedPlayers( players );
 
 		// A body falling forever never sleeps; it is counted in `fallen`, not waited on.

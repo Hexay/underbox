@@ -22,17 +22,14 @@ pub fn box_visible(eye: Vec3, pvs: usize, (lo, hi): (Vec3, Vec3)) -> bool {
     crate::world::pvs::box_visible_from(NativeRef::from_raw(pvs as *mut _), eye, lo, hi)
 }
 
+/// A model-less object without bounds is the point at its origin.
 fn world_bounds(s: &object::State) -> (Vec3, Vec3) {
-    let v = crate::math::v3;
-    let (lo, hi) = (v(s.bounds.mins), v(s.bounds.maxs));
-    if hi.cmpgt(lo).any() {
-        return (lo, hi);
+    let b = s.world_bounds();
+    let (lo, hi) = (crate::math::v3(b.mins), crate::math::v3(b.maxs));
+    if s.model.is_null() && !hi.cmpgt(lo).any() {
+        return crate::math::moved_box(model_draw::matrix(&s.transform), b);
     }
-    let b = crate::model::bounds(s.model);
-    let (a, b) = (v(b.mins), v(b.maxs));
-    let m = model_draw::matrix(&s.transform);
-    let corners = (0..8).map(|i| m.transform_point3(Vec3::new([a.x, b.x][i & 1], [a.y, b.y][(i >> 1) & 1], [a.z, b.z][i >> 2])));
-    corners.fold((Vec3::MAX, Vec3::MIN), |(lo, hi), p| (lo.min(p), hi.max(p)))
+    (lo, hi)
 }
 
 thread_local! {
