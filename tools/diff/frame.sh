@@ -15,16 +15,8 @@ WHICH=${2:-both}
 ART=${3:-}
 PROJECT=
 if [ -d "$CORPUS" ]; then
-    # A game checkout: a scratch copy starting in SCENE with tools/diff/FramePin.cs pinning camera and time.
-    . "$ROOT/tools/cache-dir.sh"
-    CHECKOUT=$(cd -- "$CORPUS" && pwd)
-    CORPUS=$(basename -- "$CHECKOUT")
-    COPY=$UNDERBOX_GAME_COPIES/$CORPUS-frame-$(printf %s "$ROOT" | cksum | cut -d' ' -f1)
-    mkdir -p "$UNDERBOX_GAME_COPIES"
-    sh "$ROOT/tools/game/copy.sh" "$CHECKOUT" "$COPY"
-    PROJECT=$(python3 -I "$ROOT/tools/game/prepare.py" "$COPY" "${SCENE:-}" "$ROOT/tools/diff/FramePin.cs" --stub-lobby \
-        --prop "Position=${CAMERA_POS:-}" --prop "Angles=${CAMERA_ANGLES:-0,0,0}" --prop "FieldOfView=${CAMERA_FOV:-0}" \
-        --prop "FreezeAt=${FREEZE_AT:-0}" --prop "KeepParticles=${KEEP_PARTICLES:-false}" --prop "KeepHud=${KEEP_HUD:-false}")
+    PROJECT=$(sh "$ROOT/tools/diff/pin-project.sh" "$CORPUS" frame)
+    CORPUS=$(basename -- "$(cd -- "$CORPUS" && pwd)")
     export PROJECT
 fi
 OUT=$ROOT/target/diff/frame/$CORPUS

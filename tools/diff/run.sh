@@ -5,6 +5,7 @@
 #        tools/diff/run.sh sound [both|ours|real]   (corpus/sound's mixed audio, tools/diff/sound-run.sh)
 #        tools/diff/run.sh state <corpus|game-checkout> [both|ours|real]   (scene state per tick, tools/diff/state.sh)
 #        tools/diff/run.sh tap <probe|corpus|game-checkout> [both|ours|real]   (every interop call, tools/diff/tap.sh)
+#        tools/diff/run.sh gpu <corpus|game-checkout> [both|ours|real]   (one frame's Vulkan work, tools/diff/gpu.sh)
 # Logs: target/diff/<scenario>/{ours,real}.log; report: target/diff/<scenario>/report.txt.
 # Real engine2 comes from UNDERBOX_REAL_ENGINE2, else the newest download in $REAL_ENGINE2_CACHE.
 # zoo needs SANDBOX=<Facepunch/sandbox checkout>.
@@ -21,6 +22,7 @@ ART=${UNDERBOX_REAL_ENGINE2:-$(ls -td "$REAL_ENGINE2_CACHE"/*/game/bin/linuxstea
 [ "$SCN" = frame ] && exec sh "$ROOT/tools/diff/frame.sh" "${2:?usage: tools/diff/run.sh frame <corpus> [both|ours|real]}" "${3:-both}" "$ART"
 [ "$SCN" = sound ] && exec sh "$ROOT/tools/diff/sound-run.sh" "$WHICH" "$ART"
 [ "$SCN" = state ] && exec sh "$ROOT/tools/diff/state.sh" "${2:?usage: tools/diff/run.sh state <corpus> [both|ours|real]}" "${3:-both}" "$ART"
+[ "$SCN" = gpu ] && exec sh "$ROOT/tools/diff/gpu.sh" "${2:?usage: tools/diff/run.sh gpu <corpus|game> [both|ours|real]}" "${3:-both}" "$ART"
 [ "$SCN" = tap ] && exec sh "$ROOT/tools/diff/tap.sh" "${2:?usage: tools/diff/run.sh tap <probe|corpus|game> [both|ours|real]}" "${3:-both}" "$ART"
 
 one() {
