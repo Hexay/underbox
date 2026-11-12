@@ -80,10 +80,9 @@ impl Shape {
     }
 }
 
-/// Which body pairs a collider meets. A trigger reports dynamic bodies, and a keyframed trigger
-/// static and keyframed colliders too: on sbox-walker real's keyframed `TriggerTeleport` moves
-/// the static floor resting under it and a keyframed coin. A static trigger stays silent for
-/// keyframed and static colliders (`contacts::reports`; `contacts_tests::*_trigger_*`).
+/// Which body pairs a collider meets. A trigger reports every pair but static-static, as real
+/// (probe `TRIGGER`; `contacts_tests::*_trigger_*`): on sbox-walker its keyframed `TriggerTeleport`
+/// moves the static floor resting under it and a keyframed coin.
 fn pair_types(trigger: bool) -> ActiveCollisionTypes {
     let default = ActiveCollisionTypes::default();
     if trigger { default | ActiveCollisionTypes::KINEMATIC_FIXED | ActiveCollisionTypes::KINEMATIC_KINEMATIC } else { default }

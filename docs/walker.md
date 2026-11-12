@@ -23,7 +23,7 @@ compiled assets. Run from a separate checkout (`../sbox-walker`); nothing is cop
 | Server, map | `MAP=scenes/scenemap.scene tools/game.sh <walker>` | passes: 0 compile errors, 0 missing components, 0 stubs, `GAME:STANDING RealGameWatchController@0,-0,12 on=Box` |
 | Server, each scene as startup | `tools/game.sh <walker> scenes/{minimal,engine,scenemap}.scene` | all load and compile with 0 stubs. scenemap: `STANDING ... on=Box`. minimal and engine have no floor, so the probe has nothing to stand on |
 | Host render | `MODE=render [MAP=..] tools/game.sh <walker> [scene]` | passes for all three. The host's own player spawns and stands (`PLAYER_STANDING ... local=True ... on=Box`) |
-| Join | `MODE=walker tools/game.sh <walker>` (a join with `MAP` defaulting to scenemap) | passes: the client finds `facepunch.walker` offline, `PLAYER_STANDING ... local=False ... on=Box` on the server and `local=True` on the client |
+| Join | `MODE=walker tools/game.sh <walker>` (a join with `MAP` defaulting to scenemap) | passes with the map pinned (below): the client finds `facepunch.walker` offline, `PLAYER_STANDING ... local=False ... on=Box` on the server and `local=True` on the client |
 | Play | `MODE=play MAP=scenes/scenemap.scene tools/game.sh <walker>` | passes: `GAME:PLAYER_MOVED owner=Player local=False dist=37` and `PLAYER_TURNED ... yaw=0->-11` on the server |
 
 `MAP` places the map 12 units up, at the Map Loader's offset: `NoOrigin` keeps the map objects'
@@ -35,15 +35,18 @@ local positions under it, as native does.
   as is, so `Assets/Audio/Ui/*.ogg` (and `Assets/Scenes`) never resolved on Linux. Each root now
   falls back to a case-blind walk (`engine2/src/fs.rs`). tools/game/prepare.py finds the scene the
   same way.
-- **The map teleported itself.** Sensors had every rapier `ActiveCollisionTypes`, so the static
-  teleport trigger reported a coin resting 0.27 units inside it. The coin is a SphereCollider without
-  a Rigidbody, so its body is keyframed. `TriggerTeleport` moves `other.GameObject.Root`, which
-  under a MapInstance is the map itself, so the whole map moved twice by the target's offset and
-  the floor left the origin. Triggers now report only pairs with a dynamic body
-  (`physics/src/shape.rs`, test `static_trigger_ignores_static_and_keyframed_but_sees_dynamic`).
-  Native must behave the same way, or walker's map would move when it loads. Walker's triggers act
-  only on the owner, whose body is dynamic. Found with the watcher's collider probe
-  (`GAME:COLLIDER`, logged when the drop trace misses).
+- **The map teleports itself, on real too.** The static teleport trigger overlaps two coins, whose
+  SphereColliders without a Rigidbody are keyframed. Real reports every trigger pair but
+  static-static (probe `TRIGGER`, docs/differential-tap.md "Fixed"), and so does ours
+  (`physics/src/shape.rs`). `TriggerTeleport` moves `other.GameObject.Root`, which under a
+  MapInstance is the Map Loader, so the server's map moves twice by the target's offset at tick 1
+  (real's tap shows the same `IPhysicsBody_Set*` calls). A joining client loads the moved map from
+  the snapshot, and its own trigger moves it twice more (the same managed code runs there), so the
+  host's spawn point puts the client's player in the air. Walker ships vpk maps without coins
+  (`MapList`: flatgrass), so it never meets this. Runs with `MAP` pass `--pin-map` to
+  tools/game/prepare.py, which keeps the scratch copy's `TriggerTeleport` off a MapInstance root.
+  Found with the watcher's collider probe (`GAME:COLLIDER`, logged when the drop trace misses and
+  on a joining client).
 - **Meshes with a missing material didn't load** (7 of 13: the brick walls, the door frame, the
   `TriggerHurt` volume). `PolygonMesh.CalculateTextureSize` reads `Material.FirstTexture`, whose
   `Texture.FromNative` calls `IsStrongHandleValid()` on the returned pointer and throws on null.

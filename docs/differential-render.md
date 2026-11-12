@@ -233,12 +233,10 @@ Ranked divergences:
 4. **Fixed, physics: the floor moved on real, not on ours.** Top-down frames (camera
    `32,0,700`, angles `89,0,0`) show real's floor centred on `TeleportTarget` (4,200,4): the
    keyframed `TriggerTeleport` box rests on the static floor and real teleports the floor's
-   root. Ours reported trigger pairs only with a dynamic body; a keyframed trigger now reports
-   static and keyframed colliders too (`shape::pair_types`, `contacts::reports`;
-   docs/differential-tap.md, "Fixed"). That also explains the
-   coins: rolled 180°, their error models hang below the old floor, half sunk on ours.
-   Unverified: a static trigger over a keyframed collider (walker's map under `MapInstance`)
-   stays silent, as before.
+   root. Ours reported trigger pairs only with a dynamic body; now every trigger reports every
+   pair but static-static, as real (`shape::pair_types`; docs/differential-tap.md, "Fixed"). That
+   also explains the coins: rolled 180°, their error models hang below the old floor, half sunk on
+   ours.
 5. **Fixed, ours: error models were redder.** `materialforerrormodel.vmat` (`generic.shader`)
    tints by `[0.753 0.251 0]`; real's gold fits a linear tint, so `generic` maps to
    `Kind::Generic`, which skips the stand-in's gamma decode.

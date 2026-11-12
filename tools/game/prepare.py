@@ -75,6 +75,17 @@ def stub_lobby(code, name):
             path.write_text(stubbed, encoding="utf-8")
 
 
+def pin_map(code):
+    """Keep sbox-walker's `TriggerTeleport` off a map loaded by a MapInstance. It moves
+    `other.GameObject.Root`, which for a map's coin is the whole map; real does that too, once on the
+    server and again on each joining client, so the client's map ends up elsewhere (docs/walker.md)."""
+    for path in code.rglob("*.cs"):
+        text = path.read_text(encoding="utf-8-sig")
+        pinned = re.sub(r"\bgo = go\.Root;", "go = go.Root; if ( go.Components.Get<MapInstance>().IsValid() ) return false;", text)
+        if pinned != text and "TriggerTeleport" in text:
+            path.write_text(pinned, encoding="utf-8")
+
+
 def prop(text):
     """`Key=value`: value as JSON when it parses (15, true), else as a string ("0,0,64")."""
     key, _, value = text.partition("=")
@@ -91,6 +102,7 @@ def main():
     args.add_argument("watch", type=pathlib.Path, help="the component's .cs; its stem names the component")
     args.add_argument("--prop", type=prop, action="append", default=[], help="Key=value set on the injected component")
     args.add_argument("--stub-lobby", action="store_true", help="the component's static SkipLobby replaces Networking.CreateLobby")
+    args.add_argument("--pin-map", action="store_true", help="a teleport trigger never moves a MapInstance's map")
     a = args.parse_args()
     name = a.watch.stem
     sbproj = project_file(a.root)
@@ -104,6 +116,8 @@ def main():
     code.mkdir(exist_ok=True)
     if a.stub_lobby:
         stub_lobby(code, name)
+    if a.pin_map:
+        pin_map(code)
     (code / f"{name}.cs").write_text(a.watch.read_text(encoding="utf-8"), encoding="utf-8")
     print(sbproj)
 

@@ -14,6 +14,7 @@ public sealed class DiffProbe : Component
 	GameObject errorProp;
 	(GameObject Wall, Rigidbody Frozen) massBodies;
 	ProbeBounds.Objects boundsObjects;
+	GameObject movedTrigger;
 	int tick;
 
 	static string F( float v ) => v.ToString( "F3", CultureInfo.InvariantCulture );
@@ -37,6 +38,7 @@ public sealed class DiffProbe : Component
 		errorProp = ProbeExtras.ErrorProp( new Vector3( 0, -1400, 300 ) );
 		massBodies = ProbeMass.Spawn();
 		boundsObjects = ProbeBounds.Spawn();
+		movedTrigger = ProbeTrigger.Spawn();
 		bodies.Add( ProbeExtras.ErrorChair( new Vector3( 600, -1400, 0 ) ) );
 		Mark( $"START bodies={bodies.Count}" );
 	}
@@ -58,6 +60,8 @@ public sealed class DiffProbe : Component
 	{
 		if ( IsProxy || bodies.Count == 0 ) return;
 		tick++;
+		ProbeTrigger.Tick = tick;
+		if ( tick == 3 ) movedTrigger.WorldPosition += Vector3.Right;
 		if ( System.Array.IndexOf( Ticks, tick ) >= 0 )
 		{
 			foreach ( var b in bodies )

@@ -59,18 +59,6 @@ fn touches(world: &PhysicsWorld, pair: &ContactPair) -> bool {
     }
 }
 
-/// Whether an intersecting trigger pair reports: a static-keyframed pair only when the trigger is
-/// the keyframed one (`shape::pair_types`).
-fn reports(world: &PhysicsWorld, a: ColliderHandle, b: ColliderHandle) -> bool {
-    let body = |c: ColliderHandle| world.colliders.get(c).and_then(|c| c.parent()).and_then(|h| world.bodies.get(h));
-    let (Some(ba), Some(bb)) = (body(a), body(b)) else { return true };
-    if !(ba.is_fixed() && bb.is_kinematic() || ba.is_kinematic() && bb.is_fixed()) {
-        return true;
-    }
-    let kinematic = if ba.is_kinematic() { a } else { b };
-    world.colliders.get(kinematic).is_some_and(|c| c.is_sensor())
-}
-
 fn event(world: &PhysicsWorld, kind: EventKind, a: ColliderHandle, b: ColliderHandle) -> ContactEvent {
     let mut e = ContactEvent { kind, a, b, point: Vector::ZERO, normal: Vector::ZERO, speed: Vector::ZERO, normal_speed: 0.0, impulse: 0.0 };
     let (Some(ca), Some(cb)) = (world.colliders.get(a), world.colliders.get(b)) else { return e };
@@ -101,7 +89,7 @@ impl Contacts {
                 now.insert(self.ordered(pair.collider1, pair.collider2), kind);
             }
         }
-        for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2 && reports(world, p.0, p.1)) {
+        for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2) {
             now.insert(self.ordered(a, b), Contact::Trigger);
         }
         let wants = |a, b, bit| [a, b].iter().any(|c| hooks.meta.get(c).is_some_and(|m: &ShapeMeta| m.functions & bit != 0));

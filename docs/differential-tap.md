@@ -140,11 +140,12 @@ From the tap and a scene-state dump, checked with `ProbeBounds.cs` (`BOUNDS`, `S
 | `SkinnedModelRenderer.Bounds` (`m_worldBounds`, `m_localBounds`) | the posed bounds | zero (fields never written) | the model's render bounds, moved for world |
 | A sphere's triangulation | 402 vertices, 800 triangles | a 62-vertex UV sphere | an octahedron cut 10 times per edge: 402 and 800 (`triangulate::octasphere`) |
 | Error model inertia | body-axis order | ascending | body-axis order (docs/differential-joints.md, 21) |
-| A keyframed trigger over a keyframed collider | reports it: on sbox-walker the keyframed `TriggerTeleport` moves a keyframed coin | silent | reports (`shape::pair_types`); a static trigger still ignores keyframed and static colliders |
+| Which pairs a trigger reports (`ProbeTrigger.cs`, `TRIGGER`: static, keyframed and dynamic triggers over static, keyframed and dynamic boxes) | every pair but static-static, at tick 1. Teleporting a trigger that already overlaps reports nothing new | only pairs with a dynamic body (a522d19: also keyframed-keyframed) | every pair but static-static (`shape::pair_types`) |
 
 The walker check: `MAP=scenes/scenemap.scene SLOTS='IPhysicsBody_*' TICKS=0-12 tools/diff/run.sh tap
 <sbox-walker> both`. Before, 447 `IPhysicsBody_Set*` calls diverged from tick 1 (real teleports
-bodies ours left alone); after, none.
+bodies ours left alone); after, none. The walker join (`MODE=walker tools/game.sh`) passes with the
+map pinned (docs/walker.md); unpinned it fails on the client, as real's managed code would too.
 
 Left: real's posed bounds aren't the render bounds. The citizen at yaw 45 reads local
 (−7.0, −29.1, −3.75)–(10.0, 29.1, 71.7) against render bounds (−5.2, −25.7, 0)–(8.6, 25.7, 71.7), and

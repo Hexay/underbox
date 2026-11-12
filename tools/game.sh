@@ -2,7 +2,8 @@
 # Boot a real game from a checkout (Facepunch/sandbox, apetavern/grubs, sbox-public's samples) on our
 # libengine2; print evidence lines and a PASS/FAIL summary.
 # usage: [MODE=server|join|interop|host|grubs|walker|render|play|sound] [MAP=<map>] [SECS=300] [SBOX=<sbox-public>] [COMPILED_ONLY=1] tools/game.sh <checkout> [scene]
-#   MAP     passed as `+game <sbproj> <map>`: what a MapInstance with UseMapFromLaunch loads
+#   MAP     passed as `+game <sbproj> <map>`: what a MapInstance with UseMapFromLaunch loads. The copy's
+#           teleport triggers leave the map alone unless PIN_MAP=0 (prepare.py --pin-map, docs/walker.md)
 #   server  dedicated server on the scene until its bodies settle and it has idled
 #   join    the server plus a second instance joining it with +connect; PASS when the client's own player
 #           stands on the floor. The client gets an offline package record for the local checkout
@@ -83,7 +84,7 @@ if [ "${COMPILED_ONLY:-0}" = 1 ]; then
         -exec sh -c 'for f; do [ -f "${f}_c" ] && rm -f "$f"; done' sh {} +
 fi
 PROJECT=$(python3 -I "$ROOT/tools/game/prepare.py" "$COPY" "$SCENE" "$ROOT/tools/game/RealGameWatch.cs" \
-    --prop "IdleSeconds=$IDLE" --prop "StartCommand=${START_CMD:-}")
+    --prop "IdleSeconds=$IDLE" --prop "StartCommand=${START_CMD:-}" $([ -z "${MAP:-}" ] || [ "${PIN_MAP:-1}" = 0 ] || echo --pin-map))
 SCENE=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8-sig"))["Metadata"]["StartupScene"])' "$PROJECT")
 
 export HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9

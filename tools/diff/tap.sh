@@ -37,7 +37,7 @@ one() {
         OUT="$OUT/$run" UNTIL=${UNTIL-Server is idle} GRACE=${GRACE:-5} sh "$ROOT/tools/boot-server.sh" "${SECS:-90}" "$SBOX" -- \
             +game "$ROOT/corpus/$SCN/.sbproj" > "$OUT/$run.txt" 2>&1 || true
     elif [ -d "$SCN" ]; then
-        OUT="$OUT/$run" SECS=${SECS:-180} sh "$ROOT/tools/game.sh" "$SCN" > "$OUT/$run.txt" 2>&1 || true
+        OUT="$OUT/$run" SECS=${SECS:-180} PIN_MAP=0 sh "$ROOT/tools/game.sh" "$SCN" > "$OUT/$run.txt" 2>&1 || true
     else
         echo "tap: no scenario, corpus or checkout '$SCN'" >&2; exit 2
     fi
