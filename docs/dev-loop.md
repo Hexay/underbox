@@ -49,9 +49,9 @@ engine2 has `doctest = false`, and its `coverage` bin has `test = false`. Withou
 `cargo test -p engine2` also built the plain cdylib/rlib for the bin and for rustdoc, compiling
 engine2 twice per edit. If you add a doctest or a bin test, turn the target back on.
 
-Don't give `shaders` an optimized dev profile. It cut the shaders tests from 85 s to 27 s, but the
-engine2 suite then failed in 5 of 10 runs, against 0 of 16 without it. Some race in the render
-tests is unfixed (cmaa2, stand-in cull, managed shadows).
+`shaders` builds at `opt-level = 3` in dev (shaders tests 85 s → 27 s). It used to make the engine2
+suite flake (9 of 30 runs): one test's present rewound the shared upload buffer under another
+test's unsubmitted slices. Upload buffers are per thread now (`render/src/batch.rs`).
 
 ## Loop timings
 
