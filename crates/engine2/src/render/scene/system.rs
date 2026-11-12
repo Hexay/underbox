@@ -2,6 +2,7 @@
 //! (camera.rs), so a frame's batch (`BeginRenderingViews` .. `FinishRenderingViews`) only tracks
 //! that it is open and does the frame-end housekeeping; waiting is a queue flush.
 
+use super::shadow_view;
 use crate::render::{device, draw, texture};
 use abi::slots::g_p_scene_system as s;
 use abi::structs::TextureCreationConfig_t;
@@ -61,9 +62,16 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::IS_RENDERING_VIEWS, || RENDERING.load(Ordering::Acquire));
     bind!(r, s::FRAME_UPDATE, || {});
     bind!(r, s::BEGIN_RENDERING_DYNAMIC_VIEW, |_| {});
-    // TODO: shadow maps; without a shadow view managed's shadow mapper draws nothing.
-    bind!(r, s::ADD_SHADOW_VIEW, |_, _, _, _, _, _, _, _, _, _, _| NativeRef::default());
-    bind!(r, s::ADD_SHADOW_VIEW_1, |_, _, _, _, _, _, _, _, _, _| NativeRef::default());
+    // A static-cache view hands its cached statics in; ours draws them again instead of copying.
+    bind!(r, s::ADD_SHADOW_VIEW, |_, parent, frustum, viewport, target, slice, required, excluded, bias, slope, cached: NativeRef<_>| {
+        let excluded = if cached.is_null() { excluded } else { 0 };
+        shadow_view::render(&shadow_view::ShadowView { parent, frustum, viewport, target, slice: slice.max(0) as u32, required, excluded, bias: (bias, slope) });
+        NativeRef::default()
+    });
+    bind!(r, s::ADD_SHADOW_VIEW_1, |_, parent, frustum, viewport, target, slice, required, excluded, bias, slope| {
+        shadow_view::render(&shadow_view::ShadowView { parent, frustum, viewport, target, slice: slice.max(0) as u32, required, excluded, bias: (bias, slope) });
+        NativeRef::default()
+    });
     bind!(r, s::GET_WELL_KNOWN_TEXTURE, |_| well_known_texture());
     bind!(r, s::GET_WELL_KNOWN_MATERIAL_HANDLE, |_| NativeRef::default());
     bind!(r, s::SETUP_PER_OBJECT_LIGHTING, |_, _, _| {});

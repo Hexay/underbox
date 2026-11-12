@@ -9,6 +9,7 @@ pub mod execute;
 pub mod layer;
 pub(crate) mod pvs;
 pub mod setup;
+pub mod shadow_view;
 pub mod skybox;
 pub mod system;
 pub(crate) mod trace;

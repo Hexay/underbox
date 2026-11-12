@@ -9,14 +9,15 @@
 //! `FalloffBias = 1 / (r²·q)` so `saturate(1 / (q·d²) - bias)` reaches 0 at the radius. Map lights
 //! carry Hammer's colour × 10000 with q = 1, so 1 at 100 units; components carry q = 1e-4.
 
-use super::{Light, Lighting, decals, local_shadow, shadow};
+use super::{Light, Lighting, decals};
 use crate::render::shading::layout::{Block, Value};
 use crate::render::shading::view::View;
 use crate::render::texture;
 use glam::{Vec3, Vec4};
 
-/// Uniform blocks this module fills.
-pub const BLOCKS: [&str; 4] = ["ViewLightingConfigV2", "DirectionalLightCB", "ClusteredLightingConstants", local_shadow::BLOCK];
+/// Uniform blocks this module fills. `DirectionalLightCB` here is the unshadowed sun; with
+/// shadows, managed's shadow mapper supplies the whole block (shadow.rs).
+pub const BLOCKS: [&str; 3] = ["ViewLightingConfigV2", "DirectionalLightCB", "ClusteredLightingConstants"];
 
 fn v(x: f32, y: f32, z: f32, w: f32) -> Option<Value> {
     Some(Value::Vec(Vec4::new(x, y, z, w)))
@@ -55,8 +56,8 @@ impl Light {
         Vec4::new(ci, co, 1.0 / (ci - co).max(0.01), outer.tan())
     }
 
-    /// The light as one `GPULight`; `shadow` is its first local shadow tile.
-    fn gpu_light(&self, shadow: Option<u32>) -> [u32; GPU_LIGHT_WORDS] {
+    /// The light as one `GPULight`.
+    fn gpu_light(&self) -> [u32; GPU_LIGHT_WORDS] {
         let (linear, quadratic, bias) = self.falloff();
         let mut w = [0u32; GPU_LIGHT_WORDS];
         // Type, shape (sphere), flags (visible, diffuse, specular).
@@ -69,7 +70,7 @@ impl Light {
         w[29..33].copy_from_slice(&self.cone_cosines().to_array().map(f32::to_bits));
         w[33] = self.fog.to_bits();
         // Shadow map, cookie and shadow mask indices; modulator offset and count stay 0.
-        w[34..37].copy_from_slice(&[shadow.map_or(u32::MAX, |t| local_shadow::INDEX + t), u32::MAX, u32::MAX]);
+        w[34..37].copy_from_slice(&[self.shadow_index.unwrap_or(u32::MAX), u32::MAX, u32::MAX]);
         w
     }
 }
@@ -87,7 +88,6 @@ impl Lighting {
             ("ViewLightingConfigV2", "NumLights") => v(n, 0.0, 0.0, decals),
             ("ViewLightingConfigV2", "AmbientLightColor") => Some(Value::Vec(self.ambient)),
             ("DirectionalLightCB", _) => self.sun_constant(name),
-            (local_shadow::BLOCK, local_shadow::MATRICES) => self.local.as_ref().map(|l| Value::Array(l.tiles.iter().copied().map(Value::Mat).collect())),
             ("ClusteredLightingConstants", "ClusterCounts") => v(1.0, 1.0, 1.0, 1.0),
             ("ClusteredLightingConstants", "ClusterInvCounts") => v(1.0, 1.0, 1.0, 0.0),
             ("ClusteredLightingConstants", "ClusterZParams") => {
@@ -103,24 +103,17 @@ impl Lighting {
     fn sun_constant(&self, name: &str) -> Option<Value> {
         let sun = self.sun.as_ref()?;
         let (c, d) = (sun.color, sun.forward());
-        let shadow = self.shadow.as_ref();
         match name {
             "g_DirectionalLightColor" => v(c.x, c.y, c.z, sun.fog),
             "g_DirectionalLightDirection" => v(d.x, d.y, d.z, 0.0),
             "g_DirectionalLightEnabled" => s(1.0),
-            "g_DirectionalLightCascadeCount" => s(shadow.map_or(0.0, |_| 1.0)),
-            "g_DirectionalLightWorldToShadowViewMatrices" => shadow.map(|sh| Value::Array(vec![Value::Mat(sh.world_to_shadow)])),
-            "g_DirectionalLightInverseShadowMapSize" => s(1.0 / shadow::SIZE as f32),
-            "g_DirectionalLightShadowMapTextureIndex" => shadow.and(v(shadow::INDEX as f32, 0.0, 0.0, 0.0)),
             _ => None,
         }
     }
 
-    /// A texture the lighting supplies by shader name (the shadow maps).
+    /// A texture the lighting supplies by shader name.
     pub fn texture(&self, name: &str) -> Option<texture::Ref> {
         match name {
-            shadow::TEXTURE => self.shadow.as_ref().map(|s| s.map),
-            local_shadow::TEXTURE => self.local.as_ref().map(|l| l.map),
             "g_fogCubemapTexture" => crate::render::fog::cube_texture(self),
             _ => None,
         }
@@ -131,10 +124,7 @@ impl Lighting {
     pub fn storage(&self, name: &str, element: &Block) -> Option<Vec<u8>> {
         let n = self.lights.len();
         Some(match name {
-            "BinnedLightBufferV2" => {
-                let first = |i: usize| self.local.as_ref().and_then(|l| l.first.get(i).copied().flatten());
-                self.lights.iter().enumerate().flat_map(|(i, l)| l.gpu_light(first(i))).flat_map(u32::to_le_bytes).collect()
-            }
+            "BinnedLightBufferV2" => self.lights.iter().flat_map(Light::gpu_light).flat_map(u32::to_le_bytes).collect(),
             "ClusterLightCounts" => element.fill_elements(1, |_, _| s(n as f32)),
             "ClusterLightIndices" => element.fill_elements(n, |i, _| s(i as f32)),
             "ClusterDecalCounts" => element.fill_elements(1, |_, _| s(self.decal_count() as f32)),
@@ -159,7 +149,7 @@ mod tests {
 
     /// A `PointLight` component's light: `Attenuation` 1 reaches native as 1e-4.
     fn point(radius: f32) -> Light {
-        Light { kind: kind::POINT, position: Vec3::new(1.0, 2.0, 3.0), rotation: Quat::IDENTITY, color: Vec3::ONE, radius, quadratic: 1e-4, cone: None, fog: 1.0, shadows: false }
+        Light { kind: kind::POINT, position: Vec3::new(1.0, 2.0, 3.0), rotation: Quat::IDENTITY, color: Vec3::ONE, radius, quadratic: 1e-4, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None }
     }
 
     /// The stand-in's `saturate(1 / (l·d + q·d²) - bias)` at distance `d`.
@@ -193,14 +183,15 @@ mod tests {
     fn gpu_light_matches_managed_scalar_layout() {
         let mut l = Light { kind: kind::SPOT, cone: Some((15.0, 30.0)), ..point(5.0) };
         l.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
-        let w = l.gpu_light(Some(2)).map(f32::from_bits);
+        l.shadow_index = Some(2);
+        let w = l.gpu_light().map(f32::from_bits);
         let forward = Vec3::new(w[3], w[7], w[11]);
         assert!(forward.distance(Vec3::Y) < 1e-6, "{forward}");
-        let p = point(5.0).gpu_light(None).map(f32::from_bits);
+        let p = point(5.0).gpu_light().map(f32::from_bits);
         assert_eq!(([p[3], p[7], p[11]], [p[29], p[30], p[31]]), ([0.0; 3], [0.0, -1.0, 1.0]));
         assert_eq!([w[6], w[10], w[14], w[18]], [1.0, 2.0, 3.0, 1.0]);
         assert_eq!([w[19], w[26]], [1.0, 25.0]);
-        assert_eq!(l.gpu_light(Some(2))[34], local_shadow::INDEX + 2);
-        assert_eq!(l.gpu_light(None)[34], u32::MAX);
+        assert_eq!(l.gpu_light()[34], 2);
+        assert_eq!(point(5.0).gpu_light()[34], u32::MAX);
     }
 }

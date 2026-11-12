@@ -106,6 +106,7 @@ fn pass_draw(gpu: &render::Gpu, shader: &VfxShader, mat: material::Ref, pass: u6
         uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::IDENTITY, tint: [1.0; 4] },
         state: RasterState::default(),
         shaded: Some(shaded),
+        transforms: None,
     }
 }
 

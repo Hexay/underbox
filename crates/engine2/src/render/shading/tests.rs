@@ -99,7 +99,7 @@ fn standin_draws_a_tinted_cube() {
 /// saturated (the blown-out map frame), and nothing on the faces turned away.
 #[test]
 fn hammer_point_light_is_not_blown_out() {
-    let lamp = Light { kind: kind::POINT, position: Vec3::new(0.0, 0.0, 208.0), rotation: Quat::IDENTITY, color: Vec3::splat(20000.0), radius: 512.0, quadratic: 1.0, cone: None, fog: 1.0, shadows: false };
+    let lamp = Light { kind: kind::POINT, position: Vec3::new(0.0, 0.0, 208.0), rotation: Quat::IDENTITY, color: Vec3::splat(20000.0), radius: 512.0, quadratic: 1.0, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None };
     let lighting = Lighting { lights: vec![lamp], ..Default::default() };
     let Some(frame) = standin_cube([1.0; 4], &lighting) else { return };
     let grey: Vec<u8> = (0..64).flat_map(|y| (0..64).map(move |x| (x, y))).map(|(x, y)| frame.texel(x, y)[0]).filter(|r| *r > 0).collect();

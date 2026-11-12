@@ -48,6 +48,17 @@ After 14–15 (skinned with its third, morphed puppet; the others unchanged wher
 | skinned | 0.17 / 0.31 / 0.47, 0.9984; managed: real draws no morphed puppet (15) |
 | glass, managed | 0.09 / 0.27 / 0.07, 0.9997 (0.17 / 0.40 / 0.19, 0.9985 after 9–11) |
 
+Shadows through managed's shadow mapper and core's sun filter (docs/differential-gpu.md finding
+2, docs/lighting.md), same real frames:
+
+| Scene | Before | After |
+| --- | --- | --- |
+| showroom | 0.14 / 0.33 / 0.41, 0.9989 | 0.12 / 0.31 / 0.40, 0.9993 |
+| outdoor | 0.10 / 0.11 / 0.11, 0.9994 | 0.10 / 0.11 / 0.11, 0.9994 |
+| fog | 0.25 / 0.24 / 0.26, 0.9972 | 0.14 / 0.17 / 0.22, 0.9991 |
+| skinned | 0.18 / 0.32 / 0.47, 0.9983 | 0.12 / 0.26 / 0.43, 0.9997 |
+| glass | 0.11 / 0.27 / 0.35, 0.9996 | 0.10 / 0.26 / 0.35, 0.9998 |
+
 Ranked divergences:
 
 1. **Fixed. Real's compiled textures didn't load on ours.** Real stores mips zstd-compressed
@@ -63,8 +74,8 @@ Ranked divergences:
    dropped the write because ours announced no native convars. `render/convars.rs` now defines
    real libengine2's (`r_3d_skybox`, `r_enable_volume_fog`, `volume_fog_width/height/depth`, with
    its defaults 1, 1, 240, 160, 64), `SourceEngineInit` announces them before `ApplyAll`, and
-   `fog_volume::render` draws nothing while `r_enable_volume_fog` is 0. Left in fog: the roof's
-   shadow edge across the box (real's is a soft band) and the foreground shadow (ours 0, real 12).
+   `fog_volume::render` draws nothing while `r_enable_volume_fog` is 0. The roof's soft
+   shadow band across the box now matches (core's tent filter, docs/lighting.md).
 4. **Fixed, harness: real drew no HUD.** Under `-nosteam` `SteamFriends()` is null, so
    `SteamRichPresenceSystem.Poll` throws every frame (from `EngineLoop.FrameStart` via
    `GameInstanceDll.Tick`); `RunFrame` catches it and skips the rest of `FrameStart`,

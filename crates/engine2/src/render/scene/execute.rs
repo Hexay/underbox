@@ -10,7 +10,7 @@ use crate::render::draw::shaded::{self, ContextBindings};
 use crate::render::draw::{self, Draw, Target, immediate};
 use crate::render::material::Material;
 use crate::render::shading::bind::Instance;
-use crate::render::lighting::{Lighting, local_shadow, shadow};
+use crate::render::lighting::{Lighting, shadow};
 use crate::render::{context, device, fog_volume, texture};
 use crate::scene::object::{IS_OPAQUE, IS_TRANSLUCENT};
 use abi::callbacks::sandbox_scene_custom_object_render as custom;
@@ -89,8 +89,7 @@ pub fn run(v: view::Ref) {
     (lighting.tone_map, lighting.fog, lighting.view_fog) = (view.environment.tone_map, view.environment.fog.clone(), view.environment.view_fog.clone());
     // Child views (the 3D skybox) are lit without shadow maps or froxels, as native's.
     if !child {
-        shadow::render(&mut lighting, &worlds, view.view_proj);
-        local_shadow::render(&mut lighting, &worlds);
+        shadow::render(&mut lighting, v);
         let volumetric = lighting.view_fog.as_ref().and_then(|f| f.volumetric);
         lighting.fog_volume = volumetric.and_then(|p| fog_volume::render(&worlds, view.view_proj, &lighting, &p, view.color.addr()));
     }
@@ -147,7 +146,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
         Kind::Clear(_) => {
             let f = layer::clear_flags(l);
             let color = render::wgpu::Color { r: clear_color.x.into(), g: clear_color.y.into(), b: clear_color.z.into(), a: clear_color.w.into() };
-            draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(0.0) }, &[]);
+            draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(crate::render::depth::VIEW.clear()) }, &[]);
         }
         Kind::Render(_) => {
             if layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 {
@@ -222,6 +221,7 @@ pub(crate) fn sky(tint: [f32; 4], material: Option<Arc<Material>>, view_proj: Ma
         uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::from_translation(Vec3::ZERO), tint: flat },
         state: RasterState { depth_write: false, ..Default::default() },
         shaded,
+        transforms: None,
     })
 }
 

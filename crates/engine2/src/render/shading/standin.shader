@@ -183,15 +183,6 @@ PS
 
 	//@sun_shadows
 
-	// Point and spot shadow tiles (render/lighting/local_shadow.rs).
-	#define UNDERBOX_LOCAL_SHADOW_INDEX 0x7FFF0000u
-	#define UNDERBOX_LOCAL_SHADOW_TILES 16
-	cbuffer UnderboxLocalShadows
-	{
-		float4x4 g_matUnderboxLocalShadow[UNDERBOX_LOCAL_SHADOW_TILES];
-	};
-	Texture2D g_tUnderboxLocalShadow < Attribute( "g_tUnderboxLocalShadow" ); >;
-
 	//@managed_shadows
 	#include "common/classes/Fog.hlsl"
 
@@ -199,36 +190,7 @@ PS
 	{
 		if ( l.ShadowMapIndex == 0xFFFFFFFFu )
 			return 1.0;
-		if ( l.ShadowMapIndex < UNDERBOX_LOCAL_SHADOW_INDEX )
-			return ManagedLocalVisibility( l, vPositionWs, vNormalWs );
-		uint nTile = l.ShadowMapIndex - UNDERBOX_LOCAL_SHADOW_INDEX;
-		if ( nTile >= UNDERBOX_LOCAL_SHADOW_TILES )
-			return 1.0;
-		float3 vRay = vPositionWs - l.Position;
-		if ( l.Type == 1 )
-		{
-			// Cube face +X, -X, +Y, -Y, +Z, -Z by the ray's dominant axis.
-			float3 a = abs( vRay );
-			uint nFace = ( a.x >= a.y && a.x >= a.z ) ? ( vRay.x < 0.0 ? 1u : 0u ) : ( a.y >= a.z ? ( vRay.y < 0.0 ? 3u : 2u ) : ( vRay.z < 0.0 ? 5u : 4u ) );
-			nTile += nFace;
-		}
-		if ( nTile >= UNDERBOX_LOCAL_SHADOW_TILES )
-			return 1.0;
-		// Normal offset grows with distance: a texel covers more world further out.
-		float3 vOffset = vNormalWs * ( 1.0 + length( vRay ) * 0.01 );
-		float4 vClip = mul( g_matUnderboxLocalShadow[nTile], float4( vPositionWs + vOffset, 1.0 ) );
-		float3 vShadow = vClip.xyz / vClip.w;
-		const float flTile = 1.0 / 4.0;
-		float2 vMin = float2( nTile % 4, nTile / 4 ) * flTile;
-		const float flTexel = 1.0 / 2048.0;
-		float flSum = 0.0;
-		for ( int y = -1; y <= 1; y++ )
-			for ( int x = -1; x <= 1; x++ )
-			{
-				float2 uv = clamp( vShadow.xy + float2( x, y ) * flTexel, vMin + flTexel, vMin + flTile - flTexel );
-				flSum += g_tUnderboxLocalShadow.SampleCmpLevelZero( g_sUnderboxReverseShadow, uv, vShadow.z + 0.0002 );
-			}
-		return flSum / 9.0;
+		return ManagedLocalVisibility( l, vPositionWs, vNormalWs );
 	}
 
 	//@lighting

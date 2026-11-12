@@ -103,7 +103,7 @@ pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool
         tex.clear(gpu, rgba, 1.0);
     }
     if clear_depth && let Some(t) = gpu_of(depth) && let Some(tex) = &t.gpu {
-        tex.clear_layer(gpu, rgba, 0.0, slice);
+        tex.clear_layer(gpu, rgba, crate::render::depth::VIEW.clear(), slice);
     }
 }
 
