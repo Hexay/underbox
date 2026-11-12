@@ -40,12 +40,12 @@ pub fn get(r: Ref) -> Option<std::sync::Arc<RenderContext>> {
 /// The bound targets, viewport and scissor draws go to.
 pub fn target(r: Ref) -> Target {
     let reverse_z = reverse_z(r);
-    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor, reverse_z })
+    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor, reverse_z, srgb_write: b.srgb_write })
 }
 
-/// Bind `t`'s targets, viewport and scissor at once.
+/// Bind `t`'s targets, viewport, scissor and sRGB write at once.
 pub fn bind_target(r: Ref, t: &Target) {
-    bind_targets(r, t.color, t.depth);
+    bind_targets_srgb(r, t.color, t.depth, t.srgb_write);
     with(r, |b| {
         b.depth_slice = t.depth_slice;
         if t.viewport.m_n_width > 0 && t.viewport.m_n_height > 0 {
@@ -129,7 +129,7 @@ pub fn register(r: &mut Registry) {
     // Managed sets the viewport itself right after (NativeFrameView.RestoreTargets).
     bind!(r, ctx::RESTORE_RENDER_TARGETS, |r, layer| {
         let (color, depth) = crate::render::scene::layer::targets(layer);
-        bind_targets(r, color, depth);
+        bind_targets_srgb(r, color, depth, crate::render::scene::layer::srgb_output(layer));
     });
     bind!(r, ctx::SET_VIEWPORT, |r, rect| set_viewport(r, rect.x, rect.y, rect.w, rect.h));
     bind!(r, ctx::SET_VIEWPORT_1, |r, v| with(r, |b| b.viewport = v));

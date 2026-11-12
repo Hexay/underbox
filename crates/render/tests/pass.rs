@@ -54,6 +54,21 @@ fn position_only_mesh_in_a_viewport() {
 }
 
 #[test]
+fn srgb_write_encodes_into_an_8_bit_target() {
+    let gpu = gpu();
+    let placeholder = Placeholder::new(gpu);
+    let color = Texture::new(gpu, TextureDesc::render_target("c", SIZE, SIZE, wgpu::TextureFormat::Rgba8Unorm));
+    let (v, i) = quad(gpu);
+    let grey = |srgb_write: bool| {
+        let targets = Targets { color: Some(&color), srgb_write, ..Default::default() };
+        pass::execute(gpu, &placeholder, &targets, Load::default(), &[draw(&v, &i, [0.5, 0.5, 0.5, 1.0])]);
+        color.read_back(gpu).texel(4, 4)[0]
+    };
+    assert_eq!(grey(false), 128);
+    assert!((187..=188).contains(&grey(true)), "0.5 linear is sRGB 187.5");
+}
+
+#[test]
 fn depth_only_pass_writes_depth() {
     let gpu = gpu();
     let placeholder = Placeholder::new(gpu);

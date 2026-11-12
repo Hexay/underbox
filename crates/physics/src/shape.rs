@@ -80,13 +80,19 @@ impl Shape {
     }
 }
 
+/// Which body pairs a collider meets. A trigger reports dynamic bodies, and a keyframed trigger
+/// static colliders too: real teleports sbox-walker's floor, resting under its keyframed
+/// `TriggerTeleport`. A static trigger stays silent for keyframed and static colliders
+/// (`contacts::reports`; `contacts_tests::*_trigger_*`).
+fn pair_types(trigger: bool) -> ActiveCollisionTypes {
+    let default = ActiveCollisionTypes::default();
+    if trigger { default | ActiveCollisionTypes::KINEMATIC_FIXED } else { default }
+}
+
 impl World {
     /// Mass comes from the shape's [`ShapeMeta`] density (see `mass.rs`), so colliders are massless.
-    /// Triggers keep rapier's default pair types too: only a pair with a dynamic body reports, as
-    /// native. A keyframed or static collider resting in a static trigger stays silent; sbox-walker's
-    /// map relies on it (`contacts_tests::static_trigger_*`).
     pub fn add_shape(&mut self, body: RigidBodyHandle, shape: &Shape, surface: Surface) -> Option<ColliderHandle> {
-        let collider = shape.collider(surface)?.density(0.0).active_collision_types(ActiveCollisionTypes::default());
+        let collider = shape.collider(surface)?.density(0.0).active_collision_types(pair_types(surface.trigger));
         self.body(body)?;
         let id = self.raw_mut().insert_collider(collider, Some(body));
         self.meta.insert(id, ShapeMeta::default());
@@ -114,6 +120,7 @@ impl World {
     pub fn set_trigger(&mut self, id: ColliderHandle, trigger: bool) {
         if let Some(c) = self.shape_mut(id) {
             c.set_sensor(trigger);
+            c.set_active_collision_types(pair_types(trigger));
         }
     }
 

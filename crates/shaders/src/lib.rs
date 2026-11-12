@@ -16,6 +16,7 @@ pub mod directives;
 pub mod dxc;
 pub mod expr;
 mod formats;
+mod hoist;
 mod image_atomics;
 mod image_coords;
 mod overrides;

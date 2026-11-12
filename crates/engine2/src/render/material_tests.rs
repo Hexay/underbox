@@ -8,6 +8,7 @@ fn holds_texture(t: Texture) -> bool {
 fn missing_textures_hand_out_empty_strong_handles_not_null() {
     let error = load_path("materials/test/does_not_exist.vmat");
     assert!(resolve(error).unwrap().is_error());
+    assert_eq!(resolve(error).unwrap().shader(), "shaders/error.shader", "drawn as native's error material");
     for t in [first_texture(error), texture(error, "g_tColor")] {
         assert!(!t.is_null(), "managed's Texture.FromNative throws on a null handle");
         assert!(!holds_texture(t), "IsStrongHandleValid must be false so FromNative returns null");

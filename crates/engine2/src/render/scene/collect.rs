@@ -41,8 +41,9 @@ impl Filter {
     }
 }
 
-/// The draws for the view's objects this layer matches, and the managed objects to call back.
-pub fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<abi::class::CManagedSceneObject>>) {
+/// The draws for the view's objects this layer matches, and the managed objects to call back
+/// with their world transforms.
+pub fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<(abi::HandleId<abi::class::CManagedSceneObject>, glam::Mat4)>) {
     let (mut draws, mut managed) = (Vec::new(), Vec::new());
     let mut sorted: Vec<(f32, Vec<Draw>)> = Vec::new();
     let sky_layer = f.match_id == StringToken::of("SkyBox").0;
@@ -71,7 +72,7 @@ pub fn collect(view: &SceneView, f: &Filter) -> (Vec<Draw>, Vec<abi::HandleId<ab
         }
         if obj.kind == ObjectKind::ManagedSceneObject {
             if f.pass != Pass::DepthPrepass {
-                managed.push(obj.handle.id());
+                managed.push((obj.handle.id(), model_draw::matrix(&s.transform)));
             }
             continue;
         }

@@ -17,11 +17,19 @@ pub struct Targets<'a> {
     /// `x, y, w, h, min_z, max_z` in pixels; the whole target when `None`.
     pub viewport: Option<[f32; 6]>,
     pub scissor: Option<[u32; 4]>,
+    /// Write colour through its sRGB twin (encoded), where the format has one.
+    pub srgb_write: bool,
 }
 
 impl Targets<'_> {
     pub fn size(&self) -> Option<(u32, u32)> {
         self.color.or(self.depth).map(|t| (t.desc.width, t.desc.height))
+    }
+
+    /// The colour attachment's format as pipelines see it: the sRGB twin under [`Targets::srgb_write`].
+    pub fn color_format(&self) -> Option<wgpu::TextureFormat> {
+        let t = self.color?;
+        Some(crate::texture::srgb_twin(t.desc.format).filter(|_| self.srgb_write && t.desc.render_target).unwrap_or(t.desc.format))
     }
 }
 
@@ -97,8 +105,9 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         }],
     });
     let store = wgpu::StoreOp::Store;
+    let srgb_view = targets.color.filter(|_| targets.srgb_write).and_then(Texture::srgb_target_view);
     let color = targets.color.map(|t| wgpu::RenderPassColorAttachment {
-        view: &t.target_view,
+        view: srgb_view.as_ref().unwrap_or(&t.target_view),
         depth_slice: None,
         resolve_target: None,
         ops: wgpu::Operations { load: load.color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store },
@@ -127,7 +136,7 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
             pass.set_scissor_rect(x, y, w.min(width - x), h.min(height - y));
         }
         for (i, d) in draws.iter().enumerate() {
-            let key = PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: d.vertex.clone(), state: d.state };
+            let key = PipelineKey { color: targets.color_format(), depth: targets.depth.map(|t| t.desc.format), vertex: d.vertex.clone(), state: d.state };
             pass.set_vertex_buffer(0, d.vertices.0.slice(d.vertices.1..));
             if let Some(s) = d.state.stencil {
                 pass.set_stencil_reference(s.reference);
