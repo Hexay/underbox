@@ -2,7 +2,7 @@ use crate::filter::ShapeMeta;
 use crate::heightfield::Grid;
 use crate::world::World;
 use rapier3d::math::{Pose, Rotation, Vector};
-use rapier3d::prelude::{ActiveCollisionTypes, ActiveHooks, Collider, ColliderBuilder, ColliderHandle, RigidBodyHandle, SharedShape};
+use rapier3d::prelude::{ActiveCollisionTypes, Collider, ColliderBuilder, ColliderHandle, RigidBodyHandle, SharedShape};
 
 /// A collision shape in its body's space, as managed's `IPhysicsBody.Add*Shape` describes it.
 #[derive(Debug, Clone)]
@@ -86,11 +86,11 @@ impl World {
     /// native. A keyframed or static collider resting in a static trigger stays silent; sbox-walker's
     /// map relies on it (`contacts_tests::static_trigger_*`).
     pub fn add_shape(&mut self, body: RigidBodyHandle, shape: &Shape, surface: Surface) -> Option<ColliderHandle> {
-        let hooks = ActiveHooks::FILTER_CONTACT_PAIRS | ActiveHooks::FILTER_INTERSECTION_PAIR;
-        let collider = shape.collider(surface)?.density(0.0).active_hooks(hooks).active_collision_types(ActiveCollisionTypes::default());
+        let collider = shape.collider(surface)?.density(0.0).active_collision_types(ActiveCollisionTypes::default());
         self.body(body)?;
         let id = self.raw_mut().insert_collider(collider, Some(body));
         self.meta.insert(id, ShapeMeta::default());
+        self.refresh_hooks(id);
         self.contacts.created(id);
         self.rebuild_mass(body);
         Some(id)
@@ -105,6 +105,7 @@ impl World {
         let Some(meta) = self.meta.get_mut(&id) else { return };
         f(meta);
         meta.keep_base_tag();
+        self.refresh_hooks(id);
         if let Some(body) = self.shape(id).and_then(|c| c.parent()) {
             self.rebuild_mass(body);
         }
