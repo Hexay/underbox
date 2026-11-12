@@ -5,7 +5,7 @@
 use render::{Buffer, BufferKind, ComputeProgram, Gpu, Stage, wgpu};
 use std::time::{Duration, Instant};
 
-/// An LCG run `n` times on one thread: about a second of lavapipe work per 10⁹ steps.
+/// An LCG run `n` times on one thread: on a loaded 16-core box, lavapipe takes about 4 s per 10⁸ steps.
 const WGSL: &str = "
 @group(0) @binding(0) var<storage, read_write> data: array<u32>;
 @compute @workgroup_size(1)
@@ -30,7 +30,8 @@ fn a_runaway_shader_times_out_then_recovers() {
     });
     let stage = Stage::new(&gpu, "spin", WGSL, "main");
     let program = ComputeProgram::new(&gpu, "spin", &stage, vec![layout], [1, 1, 1]);
-    let steps: u32 = 1_000_000_000;
+    // Far past the 20 ms wait timeout even on a fast, idle machine.
+    let steps: u32 = 100_000_000;
     let data = Buffer::with_data(&gpu, "data", BufferKind::Storage, &[steps.to_le_bytes(), [0; 4]].concat());
     let group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,

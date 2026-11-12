@@ -5,8 +5,16 @@ edition.workspace = true
 license.workspace = true
 description = "libengine2: the native library s&box's managed engine loads"
 
+# No doctests and no tests in the bin: without these, every `cargo test` also compiled engine2 a
+# second time (docs/dev-loop.md, "Test targets"). A doctest or bin test added later won't run.
 [lib]
 crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[[bin]]
+name = "coverage"
+path = "src/bin/coverage.rs"
+test = false
 
 [dependencies]
 abi = { path = "../abi" }
