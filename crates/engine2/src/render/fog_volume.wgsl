@@ -77,6 +77,11 @@ fn sun_visibility(world: vec3f) -> f32 {
     return lit / 9.0;
 }
 
+// A history within this fraction of the current value is replaced by it. History is half
+// precision, and a rounded blend stalls anywhere within ~1.7 ulps (2^-10) of its target, so
+// without the snap a still view settles on a value that depends on the frames before it.
+const SNAP: f32 = 1.0 / 256.0;
+
 // `current` blended with the froxel last frame had at `world`, reprojected through its
 // world-to-clip (w is view depth). The nearest froxel, not a filtered one: a still camera
 // reads back exactly what it wrote.
@@ -94,7 +99,9 @@ fn temporal(world: vec3f, current: vec4f) -> vec4f {
     if any(at < vec3f(0.0)) || any(at >= size) {
         return current;
     }
-    return mix(textureLoad(history, vec3u(at), 0), current, p.history_blend.x);
+    let previous = textureLoad(history, vec3u(at), 0);
+    let settled = abs(previous - current) <= max(abs(current) * SNAP, vec4f(1e-6));
+    return select(mix(previous, current, p.history_blend.x), current, settled);
 }
 
 // Henyey-Greenstein, scaled so an isotropic medium scatters 1.
