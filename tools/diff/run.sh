@@ -3,6 +3,7 @@
 # usage: tools/diff/run.sh <probe|orbmatch|sweeper|zoo> [both|ours|real] [tol=0.5]
 #        [MANAGED=1] tools/diff/run.sh frame <corpus|game-checkout> [both|ours|real]   (a client frame, tools/diff/frame.sh)
 #        tools/diff/run.sh sound [both|ours|real]   (corpus/sound's mixed audio, tools/diff/sound-run.sh)
+#        tools/diff/run.sh state <corpus|game-checkout> [both|ours|real]   (scene state per tick, tools/diff/state.sh)
 #        tools/diff/run.sh tap <probe|corpus|game-checkout> [both|ours|real]   (every interop call, tools/diff/tap.sh)
 # Logs: target/diff/<scenario>/{ours,real}.log; report: target/diff/<scenario>/report.txt.
 # Real engine2 comes from UNDERBOX_REAL_ENGINE2, else the newest download in $REAL_ENGINE2_CACHE.
@@ -19,6 +20,7 @@ mkdir -p "$OUT"
 ART=${UNDERBOX_REAL_ENGINE2:-$(ls -td "$REAL_ENGINE2_CACHE"/*/game/bin/linuxsteamrt64 2>/dev/null | head -n 1 | sed 's#/game/bin/linuxsteamrt64$##')}
 [ "$SCN" = frame ] && exec sh "$ROOT/tools/diff/frame.sh" "${2:?usage: tools/diff/run.sh frame <corpus> [both|ours|real]}" "${3:-both}" "$ART"
 [ "$SCN" = sound ] && exec sh "$ROOT/tools/diff/sound-run.sh" "$WHICH" "$ART"
+[ "$SCN" = state ] && exec sh "$ROOT/tools/diff/state.sh" "${2:?usage: tools/diff/run.sh state <corpus> [both|ours|real]}" "${3:-both}" "$ART"
 [ "$SCN" = tap ] && exec sh "$ROOT/tools/diff/tap.sh" "${2:?usage: tools/diff/run.sh tap <probe|corpus|game> [both|ours|real]}" "${3:-both}" "$ART"
 
 one() {

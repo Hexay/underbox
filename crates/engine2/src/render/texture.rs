@@ -67,7 +67,7 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = LOADED.find_or_insert(&name, || {
         if let Some(c) = crate::compiled::texture::load(&name) {
-            return decoded(&name, c, guid);
+            return decoded(&name, c, crate::resource_guid::or_path(guid, &crate::compiled::texture::compiled_path(&name)));
         }
         let generated = super::texture_generated::texture(&name);
         let error = generated.is_none();
@@ -198,7 +198,7 @@ pub fn clear(t: Ref, c: Color32) {
 pub fn register(r: &mut Registry) {
     crate::bind_resource_handle!(r, abi::slots::c_texture_base, Texture);
     bind!(r, device_slots::FIND_OR_CREATE_TEXTURE2, create);
-    bind!(r, glue::GET_TEXTURE, load);
+    bind!(r, glue::GET_TEXTURE, |p, g| crate::resource_loaded::flushed(load(p, g)));
     bind!(r, device_slots::FIND_OR_CREATE_FILE_TEXTURE, |path, _flags| load(path, Guid::default()));
     bind!(r, device_slots::GET_TEXTURE_DESC, |t| on(t, |t| RawPtr::from_raw(&*t.desc as *const _ as *mut _)));
     bind!(r, device_slots::GET_ON_DISK_TEXTURE_DESC, |t| on(t, |t| RawPtr::from_raw(&*t.desc as *const _ as *mut _)));

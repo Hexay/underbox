@@ -90,6 +90,9 @@ fn joint(j: &joint::Joint) -> JointDesc {
     }
 }
 
+/// What real names a model's own physics (its `PHYS` block), whatever the model.
+pub const EMBEDDED: &str = "embedded_physics.vphys";
+
 /// The engine's physics data for a compiled aggregate; surfaces resolve by name hash (unknown
 /// ones fall back to "default").
 pub fn data(name: &str, a: &Aggregate) -> Arc<PhysicsData> {
@@ -140,7 +143,10 @@ pub fn load(path: &str) -> Option<Arc<PhysicsData>> {
 }
 
 pub fn register(r: &mut Registry) {
-    bind!(r, glue::GET_PHYSICS, |path: Option<&CStr>, _: Guid| data_slots::handle(path.and_then(|p| load(&p.to_string_lossy())).as_ref()));
+    bind!(r, glue::GET_PHYSICS, |path: Option<&CStr>, _: Guid| {
+        let data = path.and_then(|p| load(&p.to_string_lossy()));
+        crate::resource_loaded::flushed(data_slots::handle(data.as_ref()))
+    });
     // Real engine2 only finds resources already loaded; loading on demand answers the same.
     bind!(r, abi::slots::g_p_physics_system::GET_AGGREGATE_DATA, |name: Option<&CStr>| {
         data_slots::handle(name.and_then(|p| load(&p.to_string_lossy())).as_ref())

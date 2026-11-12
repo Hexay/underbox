@@ -71,7 +71,7 @@ pub(super) fn on_hitbox(h: NativeRef<class::CBuilderHitBox>, f: impl FnOnce(&mut
 
 pub(super) fn create_model(b: Ref, name: Option<&CStr>, anonymous: bool) -> NativeRef<class::CModel> {
     static NEXT: AtomicU32 = AtomicU32::new(0);
-    let name = Some(text(name)).filter(|n| !n.is_empty() && !anonymous).unwrap_or_else(|| format!("__runtime_model_{}", NEXT.fetch_add(1, Ordering::Relaxed)));
+    let name = Some(text(name)).filter(|n| !n.is_empty() && !anonymous).unwrap_or_else(|| format!("{}{}", crate::model::RUNTIME_PREFIX, NEXT.fetch_add(1, Ordering::Relaxed)));
     let anim = on(b, |b| {
         let mut anim = b.anim.clone();
         let bind = anim.skeleton.model_space(&anim.skeleton.bind_pose());

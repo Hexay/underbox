@@ -33,8 +33,16 @@ pub fn unmount_pak(pak: &std::sync::Arc<world::vpk::Vpk>) {
     MOUNTS.write().unwrap().paks.retain(|p| !std::sync::Arc::ptr_eq(p, pak));
 }
 
-/// A file's bytes: from the folders [`resolve`] searches, else from a mounted pak.
+/// A file's bytes, as [`read_unreported`]; a compiled resource is reported to managed
+/// (`crate::resource_loaded`).
 pub fn read(path: &str, path_id: &str) -> Option<Vec<u8>> {
+    let file = read_unreported(path, path_id)?;
+    crate::resource_loaded::read(path, &file);
+    Some(file)
+}
+
+/// A file's bytes: from the folders [`resolve`] searches, else from a mounted pak.
+pub fn read_unreported(path: &str, path_id: &str) -> Option<Vec<u8>> {
     if let Some(file) = resolve(path, path_id) {
         return std::fs::read(file).ok();
     }

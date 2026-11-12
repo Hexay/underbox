@@ -46,7 +46,8 @@ local positions under it, as native does.
   (`MapList`: flatgrass), so it never meets this. Runs with `MAP` pass `--pin-map` to
   tools/game/prepare.py, which keeps the scratch copy's `TriggerTeleport` off a MapInstance root.
   Found with the watcher's collider probe (`GAME:COLLIDER`, logged when the drop trace misses and
-  on a joining client).
+  on a joining client). As the startup scene, the coin is its own root and only it moves
+  (docs/differential-state.md, 1).
 - **Meshes with a missing material didn't load** (7 of 13: the brick walls, the door frame, the
   `TriggerHurt` volume). `PolygonMesh.CalculateTextureSize` reads `Material.FirstTexture`, whose
   `Texture.FromNative` calls `IsStrongHandleValid()` on the returned pointer and throws on null.
