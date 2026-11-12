@@ -101,7 +101,7 @@ are structure, not output. Fixed items say what changed and what is left.
 7. **Morph targets.** Real composites morphs in a 2048×1024 `R16G16B16A16Sfloat` pass of two additive
    draws before shadows; ours has no such pass (compute).
 8. **Final output (mostly fixed).** A pass that neither clears nor draws isn't recorded (showroom:
-   33 passes to 16, real 21). `TargetSupportsSrgbWrite` is true for 8-bit targets, so managed's UI no
+   18 passes with the shadow views, real 21). `TargetSupportsSrgbWrite` is true for 8-bit targets, so managed's UI no
    longer takes the float path (the "UI Gamma Seed" / "Composite" blits through `R16G16B16A16Sfloat`);
    the last pass writes the swap chain image as real's does. Left: the swap chain image is ours'
    own texture, copied to the surface at present (engine textures can't wrap a surface frame), and
