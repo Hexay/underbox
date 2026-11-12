@@ -181,7 +181,72 @@ bisecting them: research/resources.md "What real engine2 accepts". `real-game.sh
 Agreeing: sky clear colour (exact), ACES auto-exposure on outdoor's floor (exact), sun shadows'
 placement and softness, box shading within 1–6.
 
+## Real games: sbox-walker
+
+`run.sh frame <game checkout>` runs a game instead of a corpus scene (docs/walker.md for the
+game). `frame.sh` syncs the checkout into a scratch copy under `$UNDERBOX_GAME_COPIES`
+(`tools/game/copy.sh`, as `tools/game.sh`); the checkout stays read-only. `prepare.py` starts
+the copy in `SCENE` and injects `tools/diff/FramePin.cs`, which pins the camera
+(`CAMERA_POS`, `CAMERA_ANGLES`, `CAMERA_FOV`), stops scene time at `FREEZE_AT` (default 0),
+holds rigidbodies still, drops particle effects (unseeded emitters) and hides screen panels
+(`KEEP_HUD=true` keeps them). `--stub-lobby` routes the game's `Networking.CreateLobby` to a
+no-op on both engines: real segfaults in `SteamAPI_ISteamMatchmaking_CreateLobby` under
+`-nosteam` (walker's `GameManager.OnHostInitialize`). Real compiles the copy with `assetc` as for
+the corpus.
+
+    SCENE=scenes/scenemap.scene CAMERA_POS=-260,-260,180 CAMERA_ANGLES=21,39,0 \
+        tools/diff/run.sh frame ../sbox-walker
+
+Walker's map plus `engine.scene` (camera with Tonemapping, Bloom, Sharpen, Vignette), host
+player spawn skipped with the lobby. Neither side has walker's cloud content (`facepunch.*`
+models and materials: coins, road cone, door, brick walls); both draw their error stand-ins.
+Real is deterministic: two runs differ by 0.96 / 0.44 / 0.43, SSIM 0.9953, before rigidbodies
+were held (the error-model road cone fell a frame-timed distance).
+
+| Run | Metrics |
+| --- | --- |
+| First (ours with HUD) | 59.1 / 58.1 / 57.4, SSIM 0.301; luma ours 20.4, real 73.8 |
+| After 7–9, HUD hidden | 56.8 / 60.2 / 56.1, SSIM 0.336; luma ours 19.7, real 73.9 |
+| Same, `Sharpen` stripped from both (scratch copy) | 16.6 / 23.1 / 25.8, SSIM 0.749; luma ours 73.6, real 73.9 |
+
+Ranked divergences:
+
+1. **Open, ours: `Sharpen` darkens the whole frame** (luma 19.7 against 73.9; without it 73.6).
+   It blits at `Stage.AfterPostProcess`, onto the 8-bit target after `ResolveHDRToFinalSDR`, and
+   samples `ColorBuffer` with `SrgbRead( true )`; ours writes the decoded values back unencoded,
+   so the frame comes out linear. Real writes through the target's sRGB encode. Bisected by
+   stripping Sharpen, Vignette, Bloom and the tonemapper one at a time.
+2. **Open, ours: the error material draws as plain lit grey.** Real's `materials/error.vmat`
+   (`shaders/error.shader`, closed) is a fine red/black checker; ours maps `error` to the lit
+   stand-in, and a missing `.vmat` gets an empty material (`material.rs`).
+3. **Open, ours: walker's world text is missing** ("FLAMING MOES", a `TextRenderer`). It draws
+   `ui_text` with `D_WORLDPANEL` 1, and that variant doesn't compile from sbox-public's source:
+   `ui/pixel.hlsl` includes `ui/scissor.hlsl`, which reads `BoxSize`, before declaring it.
+   Real's compiled shader has it. A fix hoists annotated globals (as vfx's cbuffer does).
+4. **Open: error models lie flat on ours.** The coins (rolled 180°) show their `ERROR` letters
+   upright on real and flat, half sunk, on ours; their tint is redder on ours.
+5. **Open: floor.** Ours draws an extra slab right of the map and a sunlit band where real's
+   floor is evenly lit. Not bisected; the trigger volumes' `toolstrigger` meshes are the first
+   suspects (real hides tool materials in game).
+6. **Fixed, harness: real crashed creating walker's lobby** (above).
+7. **Fixed. A pass sampling its own target dropped whole submits.** The bindless array bound
+   every texture, the depth prepass's normals target included, and wgpu rejects an attachment
+   that is also bound (64 validation errors a run; Vulkan only leaves it undefined). The pass's
+   targets now get the default view in the array (`bindless::view`).
+8. **Fixed. Mip-generation dispatches were skipped.** `Set( name, texture, mip )` binds that one
+   mip natively; ours bound every mip, so `downsample_cs` read the mip it wrote (walker's
+   backdrop blur). A texture attribute set for a mip now samples a one-mip view
+   (`attributes::texture_slice`, `Texture::mip_sample_view`).
+9. **Fixed. Missing models drew the cube stand-in.** Native draws core's
+   `models/dev/error.vmdl`; ours now does too, compiled when seeded, else from source
+   (`model.rs` `error_content`).
+10. **Open, harness:** with `KEEP_HUD=true` (real draws HUD since 4) walker's `Scoreboard` overlay
+    (`#1115`, backdrop blur, hidden by an opacity transition) stays drawn on ours. Not compared.
+
 ## Follow-up lanes
+
+- **Walker (above):** the Sharpen encode (1), the error shader (2), `ui_text` world panels (3),
+  error-model pose (4), floor (5), the HUD with `KEEP_HUD=true` (10).
 
 - **Rendering:** `render/convars.rs` defines the
   texture quality group's convars with real's defaults (`r_max_anisotropy` 4,
