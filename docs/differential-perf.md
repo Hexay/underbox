@@ -36,6 +36,9 @@ logs, `sample.json` and `load.txt`.
   `^(llvmpipe|lp:|lvp|gallivm)` or Mesa's shader-cache thread (`<process>:disk$N`)
   (`perf_sample.py --gpu`); lavapipe's CPU per frame is reported
   apart as the GPU-work proxy. Check the "busiest threads" line when a new Mesa renames them.
+  Two engine sub-series: the main thread, and unnamed threads (the process's own name, not the
+  main thread). Lavapipe's compute-shader pool (`LP_NUM_THREADS` threads) is unnamed, so compute
+  dispatches land in engine CPU on both engines, most of it on the client (docs/perf-render.md).
 - **Fairness.** Each run is pinned with `taskset -c $CPUS` (default `0-7`) and `LP_NUM_THREADS`
   (default 4) on both engines, and both use the same lavapipe ICD (`tools/diff/lavapipe.sh`'s build
   when present, as `real-env.sh`). Ours runs a release build (`cargo build --release`, or
@@ -67,6 +70,7 @@ showroom` leaves `VK_ICD_FILENAMES` alone, so both engines pick the hardware dri
 "frame wall ms" becomes meaningful and the lavapipe column should read zero.
 
 Server tick profile on `pile`, what was changed and before/after numbers: docs/perf-physics.md.
+Client frame profile on `showroom` and `skinned`, the same: docs/perf-render.md.
 
 ## Caveats
 

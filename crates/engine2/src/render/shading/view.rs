@@ -72,12 +72,17 @@ impl View {
         Mat4::from_cols(Vec4::new(w / 2.0, 0.0, 0.0, 0.0), Vec4::new(0.0, -h / 2.0, 0.0, 0.0), Vec4::Z, Vec4::new(x + w / 2.0, y + h / 2.0, 0.0, 1.0))
     }
 
-    pub fn constant(&self, name: &str) -> Option<Value> {
+    /// The block's members by name, taking the view's [`Space`] apart once.
+    pub fn constants(&self) -> impl Fn(&str) -> Option<Value> + '_ {
+        let s = self.space();
+        move |name| self.constant(&s, name)
+    }
+
+    fn constant(&self, s: &Space, name: &str) -> Option<Value> {
         let [x, y, w, h] = self.viewport;
         let [tw, th] = self.target;
         let (w, h, tw, th) = (w.max(1.0), h.max(1.0), tw.max(1.0), th.max(1.0));
         let v = |x: f32, y: f32, z: f32, w: f32| Some(Value::Vec(Vec4::new(x, y, z, w)));
-        let s = self.space();
         let pos = s.position;
         let m = |m: Mat4| Some(Value::Mat(m));
         let pair = |v: Value| Some(Value::Array(vec![v.clone(), v]));
@@ -148,7 +153,8 @@ mod tests {
         let eye = Vec3::new(-260.0, 0.0, 130.0);
         let vp = glam::camera::rh::proj::directx::perspective(1.0, 1.5, 10_000.0, 10.0) * glam::camera::rh::view::look_at_mat4(eye, Vec3::ZERO, Vec3::Z);
         let view = View { view_proj: vp, ..Default::default() };
-        let (Some(Value::Mat(m)), Some(Value::Vec(offset))) = (view.constant("g_matWorldToProjection"), view.constant("g_vWorldToCameraOffset")) else { panic!() };
+        let constant = view.constants();
+        let (Some(Value::Mat(m)), Some(Value::Vec(offset))) = (constant("g_matWorldToProjection"), constant("g_vWorldToCameraOffset")) else { panic!() };
         let p = Vec3::new(10.0, 20.0, 30.0);
         assert!((m * (p + offset.truncate()).extend(1.0)).abs_diff_eq(vp * p.extend(1.0), 1e-3), "Position3WsToPs");
     }

@@ -1,6 +1,7 @@
 //! The wgpu instance, adapter, device and queue.
 
 use crate::batch::{Batch, Slice};
+use crate::bind_cache::BindCache;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -32,6 +33,7 @@ pub struct Gpu {
     hung: AtomicBool,
     wait_timeout_ms: AtomicU64,
     batch: Batch,
+    bind_groups: BindCache,
 }
 
 #[derive(Debug)]
@@ -58,6 +60,8 @@ impl Gpu {
     /// Create one per process (tests share a static): the Vulkan loader frees a new instance's
     /// device-less ICDs without a lock that other instances' device calls take, which segfaults.
     pub fn headless() -> Result<Gpu, GpuError> {
+        // Indirect-call validation stays on: managed (untrusted game code) fills indirect args.
+        // `WGPU_VALIDATION_INDIRECT_CALL=0` turns it off, as the differential harness does.
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
         let options = wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::from_env().unwrap_or_default(),
@@ -108,6 +112,7 @@ impl Gpu {
             hung: AtomicBool::new(false),
             wait_timeout_ms: AtomicU64::new(default_wait_timeout_ms()),
             batch: Batch::default(),
+            bind_groups: BindCache::default(),
         })
     }
 
@@ -137,12 +142,20 @@ impl Gpu {
     pub fn checked<R>(&self, f: impl FnOnce() -> R) -> Result<R, String> {
         let scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
         let r = f();
-        match pollster::block_on(scope.pop()) {
+        let err = match pollster::block_on(scope.pop()) {
             // wgpu's Display is just "Validation Error"; the cause is in the description.
-            Some(wgpu::Error::Validation { description, .. }) => Err(description),
-            Some(e) => Err(e.to_string()),
-            None => Ok(r),
-        }
+            Some(wgpu::Error::Validation { description, .. }) => description,
+            Some(e) => e.to_string(),
+            None => return Ok(r),
+        };
+        self.bind_groups.clear();
+        Err(err)
+    }
+
+    /// A bind group for `desc`: the one an earlier frame made from the same layout and resources,
+    /// else a new one (crate::bind_cache).
+    pub fn bind_group(&self, desc: &wgpu::BindGroupDescriptor) -> wgpu::BindGroup {
+        self.bind_groups.get(&self.device, desc)
     }
 
     /// The largest device-local memory heap in bytes (what drivers report as VRAM; system RAM on
@@ -200,6 +213,7 @@ impl Gpu {
     /// [`Gpu::flush`] at the end of a frame: the next frame's uploads reuse the upload buffer.
     pub fn end_frame(&self) {
         self.flush_batch(true);
+        self.bind_groups.end_frame();
     }
 
     fn flush_batch(&self, end_frame: bool) {

@@ -52,6 +52,10 @@ def metrics(sample, side):
             n = int(e["args"][0].split("=")[1])
             out["frame engine cpu ms"] = (e["eng"] - b["eng"]) / 1e6 / n
             out["frame lavapipe cpu ms"] = (e["gpu"] - b["gpu"]) / 1e6 / n
+            # Parts of engine cpu (perf_sample.py Threads.kind); samples from before the split lack them.
+            for k, name in (("main", "main thread"), ("unnamed", "unnamed threads")):
+                if k in b and k in e:
+                    out[f"frame {name} ms"] = (e[k] - b[k]) / 1e6 / n
             out["frame wall ms"] = (e["t"] - b["t"]) * 1e3 / n
             out["frames"] = n
             t0, t1 = b["t"], e["t"]

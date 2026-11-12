@@ -31,6 +31,7 @@ objects = { path = "../objects" }
 physics = { path = "../physics" }
 platform = { path = "../platform" }
 render = { path = "../render" }
+rustc-hash = "2"
 serde.workspace = true
 serde_json.workspace = true
 shaders = { path = "../shaders" }

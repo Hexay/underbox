@@ -124,11 +124,18 @@ pub fn sample_type_fits(format: wgpu::TextureFormat, want: wgpu::TextureSampleTy
 }
 
 /// A bindless sampler array: element `i` is the sampler state managed registered at index `i`
-/// (render/samplers.rs), else the default; comparison arrays keep the default.
+/// (render/samplers.rs), else the default; comparison arrays keep the default. Partially bound as
+/// [`bindless_views`], one past the registered states (real binds 15 of 2048).
 fn bindless_samplers(gpu: &render::Gpu, b: &Binding, kind: wgpu::SamplerBindingType) -> Vec<wgpu::Sampler> {
+    let declared = program::array_len(b) as usize;
+    let len = if partially_bound(gpu) { declared.min(samplers::count() + 1) } else { declared };
     let fallback = defaults::sampler(gpu, kind, None, false);
     let real = |i| samplers::desc(i).filter(|_| kind != wgpu::SamplerBindingType::Comparison).map(|d| samplers::sampler(gpu, &d, kind));
-    (0..program::array_len(b) as usize).map(|i| real(i).unwrap_or_else(|| fallback.clone())).collect()
+    (0..len).map(|i| real(i).unwrap_or_else(|| fallback.clone())).collect()
+}
+
+fn partially_bound(gpu: &render::Gpu) -> bool {
+    gpu.device.features().contains(wgpu::Features::PARTIALLY_BOUND_BINDING_ARRAY)
 }
 
 /// A bindless texture array: element `i` is the texture managed's index `i` names
@@ -136,8 +143,7 @@ fn bindless_samplers(gpu: &render::Gpu, b: &Binding, kind: wgpu::SamplerBindingT
 fn bindless_views(gpu: &render::Gpu, inputs: &Inputs, b: &Binding, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Vec<wgpu::TextureView> {
     let declared = program::array_len(b);
     // Partially bound arrays may stop past the highest index handed out; others fill the declared length.
-    let partial = gpu.device.features().contains(wgpu::Features::PARTIALLY_BOUND_BINDING_ARRAY);
-    let len = if partial { declared.min(bindless::len()) } else { declared };
+    let len = if partially_bound(gpu) { declared.min(bindless::len()) } else { declared };
     let fallback = defaults::texture(gpu, dimension, sample_type);
     (0..len).map(|i| bindless::view(i, dimension, sample_type, inputs.targets).unwrap_or_else(|| fallback.clone())).collect()
 }
@@ -179,7 +185,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             let view_fog = || (b.name == FOG_BLOCK).then(|| inputs.lighting.fog.clone()).flatten();
             let bytes = match (inputs.constant_buffer(&b.name).or_else(view_fog), b.name.as_str()) {
                 (Some(given), _) => block_bytes(&given, block.size),
-                (None, view::BLOCK) => block.fill(|n| inputs.view.constant(n)),
+                (None, view::BLOCK) => block.fill(inputs.view.constants()),
                 (None, fog::BLOCK) => block.fill(|n| fog::constant(inputs.lighting, inputs.view, n).or_else(|| uniform_value(s, inputs, n))),
                 (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n, inputs.view)),
                 (None, _) => block.fill(|n| uniform_value(s, inputs, n)),
@@ -264,7 +270,7 @@ pub fn bind_groups<P: Layouts>(gpu: &render::Gpu, s: &Shading<P>, inputs: &Input
                 },
             })
             .collect();
-        groups.push(gpu.device.create_bind_group(&wgpu::BindGroupDescriptor { label: Some(&s.label), layout, entries: &entries }));
+        groups.push(gpu.bind_group(&wgpu::BindGroupDescriptor { label: Some(&s.label), layout, entries: &entries }));
     }
     Ok(groups)
 }

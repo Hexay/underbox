@@ -201,16 +201,16 @@ impl StringToken {
     /// ASCII text, seed 0x31415926 (Sandbox.System/Extend/StringExtensions.cs).
     pub fn of(s: &str) -> Self {
         const M: u32 = 0x5bd1_e995;
-        let bytes = s.to_ascii_lowercase().into_bytes();
+        let bytes = s.as_bytes();
         let mut h = 0x3141_5926 ^ bytes.len() as u32;
         let (chunks, tail) = bytes.as_chunks::<4>();
-        for &c in chunks {
-            let mut k = u32::from_le_bytes(c).wrapping_mul(M);
+        for c in chunks {
+            let mut k = u32::from_le_bytes(c.map(|b| b.to_ascii_lowercase())).wrapping_mul(M);
             k ^= k >> 24;
             h = h.wrapping_mul(M) ^ k.wrapping_mul(M);
         }
         if !tail.is_empty() {
-            h ^= tail.iter().enumerate().fold(0, |acc, (i, &b)| acc | (b as u32) << (8 * i));
+            h ^= tail.iter().enumerate().fold(0, |acc, (i, &b)| acc | (b.to_ascii_lowercase() as u32) << (8 * i));
             h = h.wrapping_mul(M);
         }
         h ^= h >> 13;

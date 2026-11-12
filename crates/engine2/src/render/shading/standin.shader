@@ -228,7 +228,10 @@ PS
 		// Before any branch: derivatives (BRDF.hlsl's AdjustRoughnessByGeometricNormal).
 		float3 vDx = ddx( vNormalWs ), vDy = ddy( vNormalWs );
 		float flGeometric = pow( saturate( max( dot( vDx, vDx ), dot( vDy, vDy ) ) ), 0.333 );
-		float3 vBentNormalWs = BentNormalWs( vNormalWs, i.vPositionWs, i.vTexCoord );
+		// A uniform branch, so its derivatives stay valid.
+		float3 vBentNormalWs = vNormalWs;
+		if ( g_flStandinBentNormals != 0.0 )
+			vBentNormalWs = BentNormalWs( vNormalWs, i.vPositionWs, i.vTexCoord );
 		uint nCluster = Cluster::Index( i.vPositionSs );
 		DecalSurface m;
 		m.vAlbedo = vColor;

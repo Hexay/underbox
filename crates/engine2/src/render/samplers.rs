@@ -10,9 +10,11 @@ use std::sync::Mutex;
 /// Distinct descriptions in registration order: index `i` is handle `i + 1`.
 static DESCS: Mutex<Vec<CSamplerStateDesc>> = Mutex::new(Vec::new());
 
-fn bytes(d: &CSamplerStateDesc) -> Vec<u8> {
+type Bytes = [u8; size_of::<CSamplerStateDesc>()];
+
+fn bytes(d: &CSamplerStateDesc) -> Bytes {
     // SAFETY: CSamplerStateDesc is a plain repr(C) struct of scalars.
-    unsafe { std::slice::from_raw_parts((d as *const CSamplerStateDesc).cast::<u8>(), size_of::<CSamplerStateDesc>()) }.to_vec()
+    unsafe { std::mem::transmute_copy(d) }
 }
 
 /// The handle for `desc`: 1 + its bindless index.
@@ -29,6 +31,11 @@ pub fn find_or_create(desc: CSamplerStateDesc) -> usize {
 /// The description at bindless index `index`.
 pub fn desc(index: usize) -> Option<CSamplerStateDesc> {
     DESCS.lock().unwrap().get(index).copied()
+}
+
+/// Descriptions registered so far.
+pub fn count() -> usize {
+    DESCS.lock().unwrap().len()
 }
 
 fn address(mode: u8) -> AddressMode {
@@ -84,7 +91,7 @@ fn border_color(rgba: u32) -> wgpu::SamplerBorderColor {
 
 /// The wgpu sampler `desc` describes for a binding of `kind`, created once.
 pub fn sampler(gpu: &render::Gpu, desc: &CSamplerStateDesc, kind: SamplerBindingType) -> wgpu::Sampler {
-    type Key = (Vec<u8>, SamplerBindingType);
+    type Key = (Bytes, SamplerBindingType);
     static CACHE: Mutex<Option<HashMap<Key, wgpu::Sampler>>> = Mutex::new(None);
     let border_ok = gpu.device.features().contains(wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER);
     let mut cache = CACHE.lock().unwrap();

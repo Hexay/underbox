@@ -18,6 +18,8 @@ import sys
 import time
 
 MARK = re.compile(r"PERF:(START|TICK|BEGIN|END|DONE)\b(.*)")
+# Threads.totals' order; each marker gets its CPU in every series.
+SERIES = ("eng", "gpu", "main", "unnamed")
 
 
 def find_pid(stdout, deadline):
@@ -74,19 +76,31 @@ class Threads:
                 os.close(self.fds.pop(tid))
         return True
 
+    def kind(self, tid):
+        """`main`, `unnamed` (a thread that kept the process's name: lavapipe's compute pool), or
+        `named`."""
+        if tid == str(self.pid):
+            return "main"
+        return "unnamed" if self.name.get(tid) == self.name.get(str(self.pid)) else "named"
+
     def totals(self):
-        eng = gpu = 0
+        """Engine and GPU-proxy CPU (ns), and the main and unnamed threads' share of engine."""
+        eng = gpu = main = unnamed = 0
         for tid, ns in self.cpu.items():
             if self.gpu.search(self.name.get(tid, "")):
                 gpu += ns
-            else:
-                eng += ns
-        return eng, gpu
+                continue
+            eng += ns
+            kind = self.kind(tid)
+            main += ns if kind == "main" else 0
+            unnamed += ns if kind == "unnamed" else 0
+        return eng, gpu, main, unnamed
 
     def by_name(self):
         out = {}
         for tid, ns in self.cpu.items():
-            key = re.sub(r"\d+$", "#", self.name.get(tid, "?"))
+            kind = self.kind(tid)
+            key = f"{self.name.get(tid, '?')} ({kind})" if kind != "named" else re.sub(r"\d+$", "#", self.name.get(tid, "?"))
             out[key] = out.get(key, 0) + ns
         return out
 
@@ -135,12 +149,14 @@ def main():
         sys.exit(f"perf_sample: no dotnet process writing {a.stdout}")
     threads, log = Threads(pid, re.compile(a.gpu)), Log(a.log)
     start = started_at(pid)
-    ts, eng, gpu, rss, marks = [], [], [], [], []
+    ts, rss, marks = [], [], []
+    series = {k: [] for k in SERIES}
     hwm, n, done_at, window_names = 0, 0, None, None
     while threads.sample(n % 200 == 0):
         now = time.time()
-        e, g = threads.totals()
-        ts.append(now); eng.append(e); gpu.append(g)
+        ts.append(now)
+        for k, v in zip(SERIES, threads.totals()):
+            series[k].append(v)
         if n % 20 == 0:
             try:
                 m = memory(pid)
@@ -165,25 +181,24 @@ def main():
     for m in marks:
         if m["args"] and m["args"][-1].isdigit() and ts:
             m["t"] = int(m["args"][-1]) / 1e6
-            m["eng"], m["gpu"] = cpu_at((ts, eng, gpu), m["t"])
+            m.update({k: cpu_at(ts, series[k], m["t"]) for k in SERIES})
     json.dump({
         "pid": pid, "started": start, "samples": len(ts),
         "period": (ts[-1] - ts[0]) / max(1, len(ts) - 1) if ts else 0,
-        "last": [ts[-1], eng[-1], gpu[-1]] if ts else None, "rss": rss, "hwm": hwm, "marks": marks,
+        "last": [ts[-1], series["eng"][-1], series["gpu"][-1]] if ts else None, "rss": rss, "hwm": hwm, "marks": marks,
         "threads_window_s": dict(sorted(names.items(), key=lambda kv: -kv[1])[:40]),
     }, open(a.out, "w"))
 
 
-def cpu_at(series, t):
-    """Engine and GPU-proxy CPU (ns) at Unix time t, linear between the samples around it."""
-    ts, eng, gpu = series
+def cpu_at(ts, values, t):
+    """One series' CPU (ns) at Unix time t, linear between the samples around it."""
     i = bisect.bisect_left(ts, t)
     if i <= 0:
-        return eng[0], gpu[0]
+        return values[0]
     if i >= len(ts):
-        return eng[-1], gpu[-1]
+        return values[-1]
     f = (t - ts[i - 1]) / (ts[i] - ts[i - 1])
-    return eng[i - 1] + f * (eng[i] - eng[i - 1]), gpu[i - 1] + f * (gpu[i] - gpu[i - 1])
+    return values[i - 1] + f * (values[i] - values[i - 1])
 
 
 if __name__ == "__main__":

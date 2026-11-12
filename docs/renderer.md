@@ -216,7 +216,9 @@ HLSL → DXC → SPIR-V → naga → WGSL lazily per combo, cached). The seam is
 - Bindless (`render/bindless.rs`): `GetTextureViewIndex` hands out linear/sRGB index pairs from
   1 (`GetTexture2DSrgb` adds 1); `g_bindless_*` arrays (with `TEXTURE_BINDING_ARRAY`) hold the
   real textures of each array's shape, the default elsewhere, partially bound up to the highest
-  index; samplers are managed's sampler states (docs/skinning.md). naga can't compare-sample an array, so the stand-in reads
+  index; samplers are managed's sampler states (docs/skinning.md), partially bound one past the
+  last registered state, as real's. Bind groups are reused across frames when a draw's layout and
+  resources repeat (`render/src/bind_cache.rs`). naga can't compare-sample an array, so the stand-in reads
   managed's shadow maps through slots (`shading/shadow_slots.rs`). `render::Gpu` also takes
   `SUBGROUP` (wave ops in the lit shaders) and the adapter's per-stage binding limits.
 - `SystemInfo.SetGpu` and `GetVideoMemoryInfo` report the largest Vulkan device-local heap
