@@ -119,7 +119,10 @@ linear and angular speeds, sizes and shapes, gravity off: the step each falls as
 stack sleep timing; `ProbePush.cs` unjointed overlaps pushed apart and orbmatch's re-aimed push;
 `ProbeRefresh.cs` when a persistent contact is refreshed; `ProbeTrike.cs` the zoo trike through its
 sign; `ProbeMass.cs` mass queries on bodies of each type (docs/differential-joints.md); `ProbeModel.cs`
-core models' metadata and new lights' radius (`MODEL`, `LIGHT`; docs/differential-tap.md). Orbmatch's bots log `MATCH:POS` every 5 ticks;
+core models' metadata and new lights' radius (`MODEL`, `LIGHT`; docs/differential-tap.md);
+`ProbeBounds.cs` renderer, body and collider bounds, shape friction, static sleep and sphere
+triangulation, and `ProbeTrigger.cs` which pairs a trigger reports (docs/differential-tap.md,
+"Fixed"). Orbmatch's bots log `MATCH:POS` every 5 ticks;
 the game watcher logs `GAME:RESTED` for every body at `SETTLED` in scenes of 20 bodies or fewer.
 
 `zoo` needs `SANDBOX=<Facepunch/sandbox checkout>`. Runs take 30 s to 3 min each.

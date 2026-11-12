@@ -92,8 +92,10 @@ impl World {
         first.and_then(|c| self.meta.get(&c)).map_or(SHAPELESS_BODY_DENSITY, |m| m.density * CUBIC_INCHES_PER_CUBIC_METRE)
     }
 
-    /// Native's principal inertia and its frame: zero for bodies that aren't dynamic, and the
-    /// body-axis diagonal (unsorted, identity frame) when the tensor is already diagonal.
+    /// Native's principal inertia and its frame: zero for bodies that aren't dynamic, the
+    /// body-axis diagonal (identity frame) when the tensor is already diagonal, and otherwise the
+    /// principal axes in the order of the body axes they lie closest to (the error model's hull:
+    /// real 692785, 48626, 657604 at a 0.4° frame, where Rapier sorts them ascending).
     pub fn reported_inertia(&self, id: RigidBodyHandle) -> (Vector, Rotation) {
         let Some(rb) = self.dynamic(id) else { return (Vector::ZERO, Rotation::IDENTITY) };
         let props = &rb.mass_properties().local_mprops;
@@ -102,7 +104,20 @@ impl World {
         let entry = |i: usize, j: usize| (0..3).map(|k| p[k] * cols[k][i] * cols[k][j]).sum::<f32>();
         let diagonal = Vector::new(entry(0, 0), entry(1, 1), entry(2, 2));
         let off = entry(0, 1).abs().max(entry(0, 2).abs()).max(entry(1, 2).abs());
-        if off <= 1e-5 * diagonal.max_element() { (diagonal, Rotation::IDENTITY) } else { (p, frame) }
+        if off <= 1e-5 * diagonal.max_element() {
+            return (diagonal, Rotation::IDENTITY);
+        }
+        let nearest = |i: usize| (0..3).max_by(|&a, &b| cols[a][i].abs().total_cmp(&cols[b][i].abs())).unwrap();
+        let order = [nearest(0), nearest(1), nearest(2)];
+        if order[0] == order[1] || order[0] == order[2] || order[1] == order[2] {
+            return (p, frame);
+        }
+        let mut axes = [0, 1, 2].map(|i| cols[order[i]] * cols[order[i]][i].signum());
+        if axes[0].cross(axes[1]).dot(axes[2]) < 0.0 {
+            axes[2] = -axes[2];
+        }
+        let frame = Rotation::from_mat3(&rapier3d::math::Matrix::from_cols(axes[0], axes[1], axes[2])).normalize();
+        (Vector::new(p[order[0]], p[order[1]], p[order[2]]), frame)
     }
 
     pub fn mass_overrides(&self, id: RigidBodyHandle) -> BodyMass {
@@ -191,6 +206,19 @@ mod tests {
         let expected = Vector::new(725_469.1, 49_502.6, 689_622.4);
         assert!(((inertia - expected) / expected).abs().max_element() < 1e-4, "body axes, unsorted: {inertia:?}");
         assert_eq!(frame, Rotation::IDENTITY);
+    }
+
+    /// Probe `INERTIA`: a slightly tilted sign keeps its moments in body-axis order.
+    #[test]
+    fn principal_axes_follow_the_body_axes() {
+        let mut world = World::default();
+        let body = world.add_body(BodyType::Dynamic, Pose::IDENTITY);
+        let tilt = Rotation::from_rotation_x(0.0066);
+        let sign = Shape::Box { center: Vector::ZERO, rotation: tilt, half_extents: Vector::new(5.0, 50.0, 12.5) };
+        world.add_shape(body, &sign, Surface::default()).unwrap();
+        let (inertia, frame) = world.reported_inertia(body);
+        assert!(inertia.y < inertia.z && inertia.z < inertia.x, "x, y, z order: {inertia:?}");
+        assert!(frame.angle_between(tilt) < 1e-3, "{frame:?}");
     }
 
     #[test]

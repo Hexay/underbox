@@ -41,6 +41,17 @@ pub const IS_OPAQUE: i64 = 0x1;
 pub const IS_TRANSLUCENT: i64 = 0x2;
 
 impl State {
+    /// `GetBounds`, in world space: managed's `SetBounds` if it set any, else the model's render
+    /// bounds moved by the transform, as real (a model-less object keeps its box as set).
+    pub fn world_bounds(&self) -> BBox {
+        let (lo, hi) = (crate::math::v3(self.bounds.mins), crate::math::v3(self.bounds.maxs));
+        if self.model.is_null() || hi.cmpgt(lo).any() {
+            return self.bounds;
+        }
+        let (lo, hi) = crate::math::moved_box(crate::render::draw::model::matrix(&self.transform), crate::model::bounds(self.model));
+        BBox { mins: crate::math::from_v3(lo), maxs: crate::math::from_v3(hi) }
+    }
+
     /// The flags managed reads: a model object also reports `IsOpaque` and/or `IsTranslucent`,
     /// which native derives from its draws' materials (`render::draw::model::surface_flags`).
     pub fn effective_flags(&self) -> i64 {

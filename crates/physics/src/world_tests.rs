@@ -34,6 +34,18 @@ fn body_types_round_trip() {
 }
 
 #[test]
+fn updating_a_shape_moves_its_offset() {
+    let mut world = World::default();
+    let body = world.add_body(BodyType::Static, Pose::from_translation(Vector::new(100.0, 0.0, 0.0)));
+    let id = world.add_shape(body, &Shape::Sphere { center: Vector::ZERO, radius: 8.0 }, Surface::default()).unwrap();
+    world.update_shape(id, &Shape::Sphere { center: Vector::new(4.0, 0.0, 10.0), radius: 8.0 });
+    assert_eq!(world.shape(id).unwrap().position_wrt_parent().unwrap().translation, Vector::new(4.0, 0.0, 10.0));
+    world.step(1.0 / 60.0, 1);
+    let (lo, _) = world.shape_bounds(id).unwrap();
+    assert!((lo - Vector::new(96.0, -8.0, 2.0)).length() < 1e-3, "{lo:?}");
+}
+
+#[test]
 fn speeds_are_clamped() {
     let mut world = World::default();
     world.set_max_speed(100.0);
