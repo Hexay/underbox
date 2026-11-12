@@ -54,13 +54,19 @@ everywhere except skinned (6: real's `RootMotion` on a server is uninitialized, 
 
 Ranked by reach. Before → after where fixed.
 
-1. **Walker: real's trigger teleports a keyframed coin.** At tick 5 real moves `coin01 (25)` (a
+Items 1, 2, 4–7 and 10 are fixed, and 3 gives the render bounds, not yet the posed ones
+(docs/differential-tap.md, "Fixed"). A walker re-run
+(`SCENE=scenes/scenemap.scene`) leaves 116 diverging properties, none of them 1, 2 or 4–7: model
+metadata (8), the road cone's hull (20 triangles on ours, 24 on real) and the motion that follows
+from it, `Button`'s body bounds 3 units off in x, and the door sleeping by tick 50 on real only.
+
+1. **Fixed. Walker: real's trigger teleports a keyframed coin.** At tick 5 real moves `coin01 (25)` (a
    SphereCollider without a Rigidbody, so keyframed) to the teleport target (4, 200, 4); ours
    leaves it at (−120, −200, 4.5). Before the keyframed-trigger fix (docs/differential-render.md,
    walker 4) real also moved `Box[0]`, the floor, and the road cone on it fell (vz −51) on real
    only; both now match. This settles that fix's "unverified" case: the trigger does report a
    keyframed collider on real.
-2. **`SceneObject.Bounds` is model-local on ours** (every renderer, every scene). Real returns the
+2. **Fixed. `SceneObject.Bounds` is model-local on ours** (every renderer, every scene). Real returns the
    model's bounds through the object's transform (showroom's scaled, rotated boxes); ours stores
    the model's bounds at creation and never transforms them (`scene/create.rs`,
    `scene/object_slots.rs` `GET_BOUNDS`). Managed's `LocalBounds` is `Bounds` minus the position, so
@@ -89,7 +95,6 @@ Known already and seen again: the sliding box's vertical pop (docs/differential.
 
 ## Follow-up lanes
 
-- Triggers against keyframed colliders (1), then walker past tick 5.
-- World-space scene object bounds (2) and skinned bounds (3): culling and lighting read them.
-- Physics query surface (4–7) and compiled model metadata (8, 9).
+- Skinned bounds (3) from the posed mesh, as real; ours uses the render bounds.
+- Compiled model metadata (8, 9), the road cone's hull and `Button`'s bounds.
 - `SIDE=client`: one window size on both, then camera, post-processing and render-only state.
