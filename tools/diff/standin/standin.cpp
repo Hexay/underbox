@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 
+ISteamFriends *standin_friends();
+
 namespace {
 
 // By handle, not RTLD_NEXT: libengine2 pulls libsteam_api in locally, outside the global scope.
@@ -121,6 +123,17 @@ bool networking(const char *ver) {
     return !std::strncmp(ver, "SteamNetworkingSockets", 22) || !std::strncmp(ver, "SteamNetworkingUtils", 20);
 }
 
+// UNDERBOX_STANDIN_FRIENDS=1: without a friends interface managed's rich presence throws every frame,
+// and that skips the rest of the frame, audio included (docs/differential-audio.md). The game-server
+// context has none, so it is friends.cpp's. The rest of the frame then needs utils, which it has.
+bool friends(const char *ver) {
+    return !std::strcmp(ver, STEAMFRIENDS_INTERFACE_VERSION) && getenv("UNDERBOX_STANDIN_FRIENDS");
+}
+
+bool utils(const char *ver) {
+    return !std::strcmp(ver, STEAMUTILS_INTERFACE_VERSION) && getenv("UNDERBOX_STANDIN_FRIENDS");
+}
+
 }
 
 extern "C" {
@@ -130,7 +143,8 @@ extern "C" {
 S_API void *S_CALLTYPE SteamInternal_FindOrCreateUserInterface(HSteamUser user, const char *ver) {
     if (getenv("UNDERBOX_STANDIN_LOG")) std::fprintf(stderr, "standin: user %d %s\n", user, ver);
     if (!std::strcmp(ver, STEAMUSER_INTERFACE_VERSION)) return &g_user;
-    if (networking(ver)) {
+    if (friends(ver)) return standin_friends();
+    if (networking(ver) || utils(ver)) {
         if (!server()) return nullptr;
         static auto gs = real<decltype(&SteamInternal_FindOrCreateGameServerInterface)>("SteamInternal_FindOrCreateGameServerInterface");
         static auto gs_user = real<decltype(&SteamGameServer_GetHSteamUser)>("SteamGameServer_GetHSteamUser");

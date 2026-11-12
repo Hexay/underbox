@@ -40,8 +40,11 @@ audio system"). Mix-ahead is 4 blocks, or `SetMixAhead` seconds while loading.
 
 - `dedicated_server` or `test_mode` app, or `UNDERBOX_AUDIO=off`: no device. `IsValid` is false, so
   managed never mixes or calls `SendOutput`; nothing is opened.
-- `UNDERBOX_AUDIO=null`: the null device, a clock thread that drains the queue in real time.
-  Same mixing path as a real device, with nothing to hear.
+- `UNDERBOX_AUDIO=null` (or `SDL_AUDIO_DRIVER=dummy`): the null device, a clock thread that drains
+  the queue in real time. Same mixing path as a real device, with nothing to hear.
+- `UNDERBOX_AUDIO=disk` (or `SDL_AUDIO_DRIVER=disk`): the null clock, appending what it plays to
+  `SDL_AUDIO_DISK_OUTPUT_FILE` as interleaved f32 LE, as SDL's disk driver does for real engine2
+  (docs/differential-audio.md).
 - Otherwise cpal's default output (feature `audio-device` in engine2, on by default), falling back to
   no device if none opens. The device runs at 44100 Hz when it can; otherwise the queue is resampled.
 

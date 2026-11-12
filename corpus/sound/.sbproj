@@ -1,0 +1,24 @@
+{
+  "Title": "Sound",
+  "Type": "game",
+  "Org": "local",
+  "Ident": "sound",
+  "Schema": 1,
+  "IncludeSourceFiles": false,
+  "Resources": null,
+  "PackageReferences": [],
+  "EditorReferences": null,
+  "IsStandaloneOnly": false,
+  "Metadata": {
+    "MaxPlayers": 1,
+    "MinPlayers": 1,
+    "TickRate": 50,
+    "GameNetworkType": "Singleplayer",
+    "MapSelect": "Unrestricted",
+    "RankType": "None",
+    "PerMapRanking": false,
+    "LeaderboardType": "None",
+    "CsProjName": "",
+    "StartupScene": "scenes/sound.scene"
+  }
+}

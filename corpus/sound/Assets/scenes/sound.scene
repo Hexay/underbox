@@ -1,0 +1,52 @@
+{
+  "__guid": "5a0c3e71-2b8d-4f19-9e46-7d1c8a3f2b60",
+  "GameObjects": [
+    {
+      "__guid": "6b1d4f82-3c9e-4a2a-8f57-8e2d9b4a3c71",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "0,0,0",
+      "Rotation": "0,0,0,1",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "7c2e5a93-4daf-4b3b-9068-9f3eac5b4d82",
+          "BackgroundColor": "0.1,0.1,0.1,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        },
+        {
+          "__type": "SoundScript",
+          "__guid": "8d3f6ba4-5eb0-4c4c-a179-a04fbd6c5e93"
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}
