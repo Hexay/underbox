@@ -28,6 +28,7 @@ fn sun_constants(cascades: &[Cascade]) -> Vec<u8> {
     for (n, c) in cascades.iter().enumerate() {
         w[8 + 16 * n..24 + 16 * n].copy_from_slice(&c.world_to_uv.to_cols_array().map(f32::to_bits));
         w[72 + n] = c.index as u32;
+        w[80 + n] = 1.0f32.to_bits();
         w[84 + 4 * n..88 + 4 * n].copy_from_slice(&c.sphere.to_array().map(f32::to_bits));
     }
     (w[76], w[77], w[79]) = (cascades.len() as u32, (1.0f32 / 512.0).to_bits(), 1);
@@ -138,13 +139,16 @@ fn assert_shadowed(px: &render::Frame, camera: Mat4, at: Vec3, what: &str) {
     assert!(shadowed + 30 < lit, "{what}: floor down-sun in shadow: shadowed {shadowed}, lit {lit}");
 }
 
-/// One cascade like the Low preset's (one 512² map over a 2700-unit sphere), `DirectionalLightCB`
-/// inherited from the frame's attributes.
+/// Sphere radius of the wide cascade. Low's 2700 would make 10-unit texels, and core's normal
+/// offset (5 texels at filter quality 3) would lift the floor's sample above the boxes.
+const WIDE: f32 = 600.0;
+
+/// One 512² cascade, `DirectionalLightCB` inherited from the frame's attributes.
 #[test]
 fn managed_sun_shadow_darkens_the_floor() {
     let Some(mut s) = Scene::new(&[Vec3::ZERO]) else { return };
     let map = s.target("shadow map", 512, 62);
-    let (light_constants, world_to_uv) = cascade_view(Vec3::ZERO, 2700.0);
+    let (light_constants, world_to_uv) = cascade_view(Vec3::ZERO, WIDE);
     let (constants, camera) = main_view();
     // The frame's constants come first: the map's clear needs them to know it's reverse-Z.
     attributes::set_constant_buffer(s.attrs(), StringToken::of(crate::render::shading::view::BLOCK), &constants);
@@ -175,7 +179,7 @@ fn managed_cascades_in_boot_order() {
     let (main_constants, camera) = main_view();
     let block = StringToken::of(crate::render::shading::view::BLOCK);
     let maps = [s.target("cascade 0", 512, 62), s.target("cascade 1", 512, 62)];
-    let views = [cascade_view(Vec3::ZERO, 20.0 * K), cascade_view(Vec3::ZERO, 2700.0)];
+    let views = [cascade_view(Vec3::ZERO, 20.0 * K), cascade_view(Vec3::ZERO, WIDE)];
     let near_sphere = Vec4::new(0.0, 0.0, 0.0, (18.0 * K) * (18.0 * K));
     let cascades: Vec<Cascade> = (0..2).map(|n| Cascade { world_to_uv: views[n].1, index: crate::render::bindless::index(maps[n], false), sphere: if n == 0 { near_sphere } else { Vec4::new(0.0, 0.0, 0.0, 1e9) } }).collect();
     attributes::set_constant_buffer(s.attrs(), StringToken::of("DirectionalLightCB"), &sun_constants(&cascades));

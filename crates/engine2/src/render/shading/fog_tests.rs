@@ -110,7 +110,7 @@ fn sky_tint_multiplies_the_fog_colour_by_the_bindless_cube() {
 
 fn green_sun(toward: Vec3) -> Light {
     let rotation = Quat::from_rotation_arc(Vec3::X, -toward);
-    Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::Y, radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false }
+    Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::Y, radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None }
 }
 
 /// Black distance fog with a tight lobe: green toward the sun, nothing away from it.

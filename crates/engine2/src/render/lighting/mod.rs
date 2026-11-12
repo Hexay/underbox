@@ -11,7 +11,6 @@
 
 mod blocks;
 pub mod decals;
-pub mod local_shadow;
 pub mod shadow;
 
 pub use blocks::BLOCKS;
@@ -40,6 +39,10 @@ pub struct Light {
     pub cone: Option<(f32, f32)>,
     pub fog: f32,
     pub shadows: bool,
+    /// The scene object's managed handle id, for managed's shadow mapper.
+    pub handle: Option<i32>,
+    /// `ShadowMapIndex`: managed's `ProjectedShadows` (spot) or `ProjectedCubeShadows` (point) index.
+    pub shadow_index: Option<u32>,
 }
 
 impl Light {
@@ -55,10 +58,11 @@ pub struct Lighting {
     pub ambient: Vec4,
     pub sun: Option<Light>,
     pub lights: Vec<Light>,
-    /// The sun's shadow map, once shadow.rs has drawn it for the view.
+    /// The sun's first cascade, once managed's shadow mapper has drawn it for the view (shadow.rs).
     pub shadow: Option<shadow::SunShadow>,
-    /// Point and spot shadow tiles, once local_shadow.rs has drawn them.
-    pub local: Option<local_shadow::LocalShadows>,
+    /// What the shadow mapper set for the view (`DirectionalLightCB`, `ProjectedShadows`,
+    /// `ProjectedCubeShadows`): every draw of the view binds from it.
+    pub shadow_attributes: Option<crate::render::attributes::Ref>,
     /// The view's exposure (`g_flToneMapScalarLinear`, render/exposure.rs); none is 1.
     pub tone_map: Option<f32>,
     /// The view's analytic fog (`FogConstants`, render/fog.rs), when managed set one.
@@ -76,7 +80,7 @@ impl Lighting {
     pub fn fallback() -> Lighting {
         let toward = Vec3::new(0.4, 0.3, 0.85).normalize();
         let rotation = Quat::from_rotation_arc(Vec3::X, -toward);
-        let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false };
+        let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None };
         Lighting { ambient: Vec4::new(0.3, 0.3, 0.3, 1.0), sun: Some(sun), ..Default::default() }
     }
 
@@ -104,7 +108,7 @@ impl Lighting {
                 continue;
             }
             let Some(l) = obj.light.as_ref().filter(|_| rendering) else { continue };
-            let l = from_scene(&l.lock().unwrap(), Vec3::new(p.x, p.y, p.z));
+            let l = Light { handle: Some(obj.handle.id::<()>().id).filter(|id| *id >= 0), ..from_scene(&l.lock().unwrap(), Vec3::new(p.x, p.y, p.z)) };
             match l.kind {
                 kind::DIRECTIONAL if out.sun.is_none() => out.sun = Some(l),
                 _ => out.lights.push(l),
@@ -137,6 +141,8 @@ fn from_scene(l: &light::Light, position: Vec3) -> Light {
         cone: (kind == kind::SPOT).then_some((l.theta, l.phi)),
         fog: l.fog_strength,
         shadows: l.shadows,
+        handle: None,
+        shadow_index: None,
     }
 }
 
