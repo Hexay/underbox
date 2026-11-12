@@ -47,9 +47,9 @@ Sounds: mono PCM16 at 44100 Hz, peak 0.5, 5 ms ramps.
 
 ### Metrics
 
-Each capture is cut into bursts of sound (joined across gaps under 0.3 s) and the bursts are matched
-to the events in order, so an underrun between two sounds delays one onset instead of shifting every
-later window. Per event: onset error against the previous event's onset and the schedule, RMS per
+Each capture is cut into bursts of sound (joined across gaps under 0.3 s). Each event takes the
+burst nearest where it's due after the previous event's onset (within 0.5 s, else `missing`), so an
+underrun between two sounds delays one onset instead of shifting every later window. Per event: onset error against the previous event's onset and the schedule, RMS per
 channel over the steady part, L/R balance, frequency from interpolated zero crossings, the tail's
 level after the sound (reverb), runs of exact zeros inside the sound (dropouts, i.e. underruns),
 and the loop's audible length. Divergences are ranked by `|ours − real|` over a per-metric unit
@@ -84,31 +84,35 @@ web API (`unshare -rn` is not permitted here); skipping the menu (no switch for 
 
 ## Real vs ours
 
-First run, after the fixes above (`target/diff/sound/report.txt`). Real's levels and balance below
-are from its capture's 100 ms envelope, since its bursts don't line up with the schedule (1):
+`run.sh sound both` after the underrun fix (`target/diff/sound/report.txt`). Both captures have no
+dropouts, and every event found on both is within 1.0 ms of the schedule: ours passes the
+single-capture check (0 underruns). Real's only flag there is `pitch1.5` missing (1), not silence.
 
-| Event | Ours L / R dB | Real L / R dB |
-| --- | --- | --- |
-| `ui` | −9.19 / −9.19 | −12.5 / −12.3 |
-| `left200` | −9.03 / −89.03 | −9.4 / −14.0 |
-| `right200` | −89.03 / −9.03 | −14.0 / −9.0 |
-| `ahead200` | −9.03 / −9.03 | −12.5 / −12.3 |
-| `vol0.5` | −15.05 / −15.05 | −18.5 / −18.4 |
-| `noise` | −10.78 / −10.78 | −13.7 / −11.6 |
-| `loop` | −9.03 / −9.03 | −10.6 / −10.8 |
+| Event | Ours L / R dB | Real L / R dB | Real Hz |
+| --- | --- | --- | --- |
+| `ui` | −9.19 / −9.19 | −12.50 / −12.33 | 440.0 |
+| `left200` | −9.03 / −89.03 | −9.35 / −13.97 | 440.0 |
+| `right200` | −89.03 / −9.03 | −13.95 / −9.01 | 440.0 |
+| `ahead200` | −9.03 / −9.03 | −12.50 / −12.33 | 440.0 |
+| `ahead800` | −20.48 / −20.48 | −12.31 / −11.97 (with `pitch1.5`) | 617.2 (mixed) |
+| `vol0.5` | −15.05 / −15.05 | −18.52 / −18.35 | 440.0 |
+| `pitch1.5` | −9.03 / −9.03 (660 Hz) | missing (1) | |
+| `noise` | −10.78 / −10.78 | −13.62 / −11.57 | |
+| `loop` | −9.03 / −9.03, 1520 ms | −10.65 / −10.76, 1424 ms | 330.0 |
 
 1. **Pitch scales the delay on real.** `pitch1.5` (delay 6 s) starts at 4.0 s on real, on top of
    `ahead800`: the sampler consumes `DelayOrSkipSamples` in source samples at the pitched rate
-   (6 / 1.5 = 4). Ours waits 6 s. So the in-order matcher sees 8 bursts on real and shifts
-   `pitch1.5`, `noise` and `loop` by one; `ahead800` alone can't be measured on real yet.
+   (6 / 1.5 = 4). Ours waits 6 s. So `ahead800` alone can't be measured on real yet.
 2. **Panning:** real's 3D sounds go through Steam Audio (about 4.7 dB between ears at 200 units to
    the side); ours uses managed's fallback pan law (80 dB, hard). Expected, see below.
 3. **Level:** real is about 3.3 dB quieter for 2D and ahead sounds (`ui`, `ahead200`, `vol0.5`);
-   the loop only 1.6 dB, the noise 2.9 dB on the left and 0.8 dB on the right.
-4. Real plays a faint 110 Hz sound (about −48 dB) about 1.3 s before `ui`, from the menu; the burst
-   threshold (`sound.py`, −26 dB peak) skips it.
-
-Real had no underruns in this run. Onsets of the events that line up agree within 0.3 ms.
+   the loop only 1.6 dB, the noise 2.8 dB on the left and 0.8 dB on the right.
+4. **Loop length:** real's loop ends about 100 ms sooner (stopped from the main thread at 9.5 s on
+   both). Not looked into.
+5. Real's menu plays a sound (110 Hz or lower, −48 to −34 dB) about 1 s before `ui`.
+   `sound.py` starts the schedule at the first burst with another burst 1 s after it, and finds
+   each later event's burst near where it's due, so that sound or a merged slot doesn't shift the
+   rest.
 
 ## Ours
 
