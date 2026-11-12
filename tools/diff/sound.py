@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare two corpus/sound captures (interleaved f32 LE stereo at 44100 Hz, SDL's disk driver).
 
-usage: sound.py <ours.raw> <real.raw>   or   sound.py <one.raw>   (just measure it)
+usage: sound.py <ours.raw> <real.raw>   or   sound.py <one.raw>   (measure it; FAIL on any underrun)
 
 Each capture is aligned on its own first onset, the start of the schedule in
 corpus/sound/Code/SoundScript.cs. Per event: onset relative to the schedule, steady-state RMS per
@@ -29,6 +29,8 @@ EVENTS = [
 # Score divisors: what counts as one unit of divergence per metric.
 UNITS = {"db_l": 1.0, "db_r": 1.0, "balance": 1.0, "hz": 2.0, "onset_ms": 5.0, "tail_db": 3.0, "length_ms": 30.0, "dropouts": 1.0}
 FLOOR_DB = -120.0
+# Onsets land within 0.6 ms of the schedule; one block (11.6 ms) of silence is far outside this.
+ONSET_TOLERANCE_MS = 2.0
 
 
 def load(path):
@@ -141,6 +143,22 @@ def measure(path):
     return out, len(l) / RATE
 
 
+def underruns(ev):
+    """Where the device played silence it shouldn't have: a dropout inside a sound, or an onset
+    off the schedule (silence between sounds delays the next one; delays are sample-accurate)."""
+    bad = []
+    for name, *_ in EVENTS:
+        e = ev[name]
+        if "missing" in e:
+            bad.append(f"{name} missing")
+            continue
+        if e["dropouts"]:
+            bad.append(f"{name} {e['dropouts']} dropouts")
+        if abs(e["onset_ms"]) > ONSET_TOLERANCE_MS:
+            bad.append(f"{name} onset {e['onset_ms']:+.1f} ms")
+    return bad
+
+
 def show(name, e):
     if "missing" in e:
         return f"{name:9} missing"
@@ -163,7 +181,9 @@ def main(argv):
         for name, *_ in EVENTS:
             print("  " + show(name, ev[name]))
     if len(runs) == 1:
-        return 0
+        bad = underruns(runs[0][1])
+        print(f"RESULT: {'FAIL' if bad else 'PASS'} ({len(bad)} underruns{': ' if bad else ''}{', '.join(bad)})")
+        return 1 if bad else 0
     ours, real = runs[0][1], runs[1][1]
     rows = []
     for name, *_ in EVENTS:

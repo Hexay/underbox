@@ -4,6 +4,7 @@
 # Both engines write their output through SDL's disk audio driver contract (SDL_AUDIO_DRIVER=disk,
 # SDL_AUDIO_DISK_OUTPUT_FILE): real through its own SDL3, ours through engine2's disk device.
 # Out: target/diff/sound/{ours,real}/{audio.raw,client.log}, report.txt (tools/diff/sound.py).
+# With one engine, that capture is measured alone: RESULT: FAIL on any underrun.
 # See docs/differential-audio.md.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -33,7 +34,12 @@ one() {
 
 case $WHICH in
     both) one ours; one real ;;
-    ours|real) one "$WHICH" ;;
+    ours|real)
+        one "$WHICH"
+        C=$OUT/$WHICH/audio.raw
+        [ -s "$C" ] || { echo "RESULT: FAIL (missing capture: $C)"; exit 1; }
+        python3 -I "$ROOT/tools/diff/sound.py" "$C" | tee "$OUT/report.txt"
+        exit 0 ;;
     *) echo "sound: unknown engine '$WHICH'" >&2; exit 2 ;;
 esac
 A=$OUT/ours/audio.raw
