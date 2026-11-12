@@ -22,7 +22,7 @@ and glass: after their content fixes, below):
 | fog | 20.3 / 17.5 / 17.4, 0.901 | 5.0 / 4.8 / 8.0, 0.969 | 0.23 / 0.27 / 0.32, 0.997 |
 | skinned | 12.2 / 11.5 / 14.7, 0.877 (real: error signs) | | 1.7 / 1.2 / 0.8, 0.980 |
 | glass | no settled frame (real: error checker) | | 3.9 / 5.4 / 5.1, 0.980 |
-| hud | 37.7 / 29.4 / 36.4, 0.851 | | open, 4 |
+| hud | 37.7 / 29.4 / 36.4, 0.851 | | 0.02 / 0.02 / 0.01, 1.0000 (4) |
 
 After 9–11 (`MANAGED=1` for managed):
 
@@ -65,12 +65,14 @@ Ranked divergences:
    its defaults 1, 1, 240, 160, 64), `SourceEngineInit` announces them before `ApplyAll`, and
    `fog_volume::render` draws nothing while `r_enable_volume_fog` is 0. Left in fog: the roof's
    shadow edge across the box (real's is a soft band) and the foreground shadow (ours 0, real 12).
-4. **Open, harness: real draws no HUD.** Under `-nosteam` `SteamFriends()` is null, so
+4. **Fixed, harness: real drew no HUD.** Under `-nosteam` `SteamFriends()` is null, so
    `SteamRichPresenceSystem.Poll` throws every frame (from `EngineLoop.FrameStart` via
    `GameInstanceDll.Tick`); `RunFrame` catches it and skips the rest of `FrameStart`,
-   `SimulateUI()` included. Managed loads its own `libsteam_api.so` (`NativeDllPath`), so
-   `LD_PRELOAD` can't stub Steam; hot-patched Friends/Utils got past the throw, but the client
-   then called the sbox API (401) and never loaded the game.
+   `SimulateUI()` included. `real-client.sh` now runs with the friends stand-in and shim, the web
+   API cut off, and a newer lavapipe (Mesa 26.0 crashed in real's UI shader): docs/differential.md,
+   "Real's UI on lavapipe". Real's HUD then matches ours: every box, border, radius, gradient and
+   both labels, mean error under 0.03 per channel, SSIM 1.0000. Showroom under the new setup:
+   0.14 / 0.33 / 0.41, 0.9989 (before 0.12 / 0.33 / 0.41).
 5. **Fixed. Point light hotspot dimmer on ours.** Showroom lamp peak was (209,112,94) against
    real's (246,147,110); now both (247,148,111). The hotspot is specular, which the stand-in for
    closed `complex` lacked: it now lights as `vr_lighting.fxc` does, normalized pow(N·L) diffuse
@@ -188,7 +190,6 @@ placement and softness, box shading within 1–6.
   (`render/samplers.rs`), though real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
 - **Content:** why real's managed renderer draws no morphed puppet (15). Next: does real draw
   its own citizen under `MANAGED=1` on lavapipe? If not, it's real's, not our content.
-- **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.
 - **Decals (16):** normal and height (parallax) maps, sheeted decal textures
   (`GetSheetSequenceTextureData`), and the exclusion mask aren't applied; the corpus uses none.
   Decal edges (19).
