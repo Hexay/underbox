@@ -1,5 +1,5 @@
 //! Frame capture for headless runs: with `UNDERBOX_FRAMES` set, presented frames are read back,
-//! their hash logged (`frame: <swap chain> #<n> <w>x<h> <blake3>`) and, when the value is a
+//! their hash logged (`frame: <swap chain> #<n> <w>x<h> <blake3> <ms since the last present>ms`) and, when the value is a
 //! directory rather than `log`, written there as PPM. `UNDERBOX_FRAMES_EVERY=n` keeps every n-th;
 //! `UNDERBOX_FRAMES_LAST=1` keeps only the latest (`<swap chain>.ppm`).
 
@@ -20,8 +20,16 @@ static CONFIG: LazyLock<Option<Config>> = LazyLock::new(|| {
     Some(Config { dir: (value != "log").then(|| PathBuf::from(value)), every, last_only })
 });
 
+/// Milliseconds since the previous present of any swap chain (0 for the first).
+fn since_last_present() -> f64 {
+    static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+    let now = std::time::Instant::now();
+    LAST.lock().unwrap().replace(now).map_or(0.0, |t| (now - t).as_secs_f64() * 1000.0)
+}
+
 pub fn on_present(gpu: &render::Gpu, name: &str, n: u64, color: &render::Texture) {
     let Some(config) = CONFIG.as_ref() else { return };
+    let ms = since_last_present();
     if !n.is_multiple_of(config.every) {
         return;
     }
@@ -31,7 +39,7 @@ pub fn on_present(gpu: &render::Gpu, name: &str, n: u64, color: &render::Texture
         frame.pixels.as_chunks_mut::<4>().0.iter_mut().for_each(|p| p.swap(0, 2));
     }
     let hash = frame.hash();
-    abi::rt::log::log(abi::rt::log::Level::Info, &format!("frame: {name} #{n} {}x{} {hash}", frame.width, frame.height));
+    abi::rt::log::log(abi::rt::log::Level::Info, &format!("frame: {name} #{n} {}x{} {hash} {ms:.1}ms", frame.width, frame.height));
     if let Some(dir) = &config.dir {
         let name = name.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
         let file = if config.last_only { dir.join(format!("{name}.ppm")) } else { dir.join(format!("{name}-{n:05}.ppm")) };

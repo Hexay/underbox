@@ -225,7 +225,7 @@ pub(crate) fn sky(tint: [f32; 4], material: Option<Arc<Material>>, view_proj: Ma
         uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::from_translation(Vec3::ZERO), tint: flat },
         state: RasterState { depth_write: false, ..Default::default() },
         shaded,
-        transforms: None,
+        caster: None,
     })
 }
 

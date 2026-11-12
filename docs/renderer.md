@@ -26,6 +26,8 @@ envmaps → `BeforeRenderingViews` → panel windows → `BeginRenderingViews` �
 ```
 crates/render            wgpu, no abi: usable from tests and tools
   gpu.rs                 Gpu: instance, adapter, device, queue; Gpu::headless()
+  batch.rs               per-frame upload arena: one queue write per flush, buffer writes as
+                         ordered copies, command buffers submitted together at flush/present
   texture.rs             Texture/TextureDesc: create, upload, clear, read_back -> Frame
   buffer.rs              Buffer/BufferKind: write, fill, copy_to, read
   program.rs, state.rs   Program (one module or per-stage Stages) + pipelines cached by PipelineKey

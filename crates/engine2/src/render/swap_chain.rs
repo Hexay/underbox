@@ -118,13 +118,12 @@ pub fn present(h: Handle) -> bool {
     let mut c = chain.lock().unwrap();
     c.presented += 1;
     let color = texture::resolve(c.color);
-    if let Some(tex) = color.as_ref().and_then(|t| t.gpu.as_ref()) {
+    let shown = color.as_ref().and_then(|t| t.gpu.as_ref()).is_none_or(|tex| {
         frames::on_present(gpu, &c.name, c.presented, tex);
-        if let Some(s) = &c.surface {
-            return s.present(gpu, tex);
-        }
-    }
-    true
+        c.surface.as_ref().is_none_or(|s| s.present(gpu, tex))
+    });
+    gpu.end_frame();
+    shown
 }
 
 pub fn register(r: &mut Registry) {

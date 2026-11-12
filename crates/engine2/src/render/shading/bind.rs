@@ -3,6 +3,7 @@
 //! defaults, material textures, and stand-ins (1×1 white, zeroed buffers, default samplers) for
 //! whatever the draw doesn't supply. Binding numbers are never assumed (research/shaders.md).
 
+use super::bind_buffers::{block_bytes, buffer, transforms, whole};
 use super::defaults;
 use super::layout::Value;
 use super::program::{self, Layouts, Shading};
@@ -67,21 +68,6 @@ pub(super) fn names<'a, P>(s: &'a Shading<P>, name: &'a str) -> impl Iterator<It
     std::iter::once(name).chain(s.attributes.get(name).and_then(|a| a.attribute.as_deref()))
 }
 
-fn transforms(instances: &[Instance]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(instances.len().max(1) * 64);
-    for i in instances {
-        let rows = i.world.transpose().to_cols_array();
-        out.extend(rows[..12].iter().flat_map(|f| f.to_le_bytes()));
-        let [r, g, b, a] = i.tint.map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u32);
-        let _ = a;
-        out.extend(i.tint[3].to_le_bytes());
-        out.extend(((r << 16) | (g << 8) | b).to_le_bytes());
-        out.extend([0u8; 8]);
-    }
-    out.resize(out.len().max(64), 0);
-    out
-}
-
 pub(super) fn uniform_value<P>(s: &Shading<P>, inputs: &Inputs, name: &str) -> Option<Value> {
     let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
@@ -93,21 +79,8 @@ pub(super) fn uniform_value<P>(s: &Shading<P>, inputs: &Inputs, name: &str) -> O
     vector.map(Value::Vec).or_else(matrix).or_else(|| attr.and_then(|a| a.default).map(Value::Vec)).or(unset_matrix)
 }
 
-/// Managed's bytes for a whole block, sized to the block.
-fn block_bytes(bytes: &[u8], size: u32) -> Vec<u8> {
-    let mut out = bytes.to_vec();
-    out.resize(size.max(16) as usize, 0);
-    out
-}
-
-fn buffer(gpu: &render::Gpu, label: &str, usage: wgpu::BufferUsages, bytes: &[u8]) -> wgpu::Buffer {
-    let b = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some(label), size: (bytes.len() as u64).next_multiple_of(16).max(16), usage: usage | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
-    gpu.queue.write_buffer(&b, 0, bytes);
-    b
-}
-
 enum Resource {
-    Buffer(wgpu::Buffer),
+    Buffer(render::Slice),
     View(wgpu::TextureView),
     Sampler(wgpu::Sampler),
     /// A bindless array, every element the same default.
@@ -210,19 +183,19 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
                 (None, name) if lighting::BLOCKS.contains(&name) => block.fill(|n| inputs.lighting.constant(name, n, inputs.view)),
                 (None, _) => block.fill(|n| uniform_value(s, inputs, n)),
             };
-            Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::UNIFORM, &bytes))
+            Resource::Buffer(buffer(gpu, &b.name, false, &bytes))
         }
-        B::Buffer { ty: wgpu::BufferBindingType::Storage { .. }, min_binding_size, .. } => {
+        B::Buffer { ty: wgpu::BufferBindingType::Storage { read_only }, min_binding_size, .. } => {
             if let Some(given) = names(s, &b.name).find_map(|n| inputs.gpu_buffer(n)) {
-                return Ok(Resource::Buffer(given));
+                return Ok(Resource::Buffer(whole(given)));
             }
             if texel_words::image_of(&b.name).is_some() {
-                return texel_words::bound(gpu, s, inputs, &b.name).map(|(_, words)| Resource::Buffer(words)).ok_or_else(|| format!("{}: no texture", b.name));
+                return texel_words::bound(gpu, s, inputs, &b.name).map(|(_, words)| Resource::Buffer(whole(words))).ok_or_else(|| format!("{}: no texture", b.name));
             }
             if names(s, &b.name).any(|n| n == VERTEX_CACHE)
                 && let Some(cache) = crate::render::skin::cache::buffer()
             {
-                return Ok(Resource::Buffer(cache.buffer.clone()));
+                return Ok(Resource::Buffer(whole(cache.buffer.clone())));
             }
             let element = s.storage.get(&(b.group, b.binding));
             let mut bytes = match element.and_then(|e| inputs.lighting.storage(&b.name, e)) {
@@ -232,7 +205,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             };
             // An empty light list is shorter than one element (clustered_light_culling_cs binds 176).
             bytes.resize(bytes.len().max(min_binding_size.map_or(0, |n| n.get() as usize)), 0);
-            Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
+            Resource::Buffer(buffer(gpu, &b.name, !read_only, &bytes))
         }
         B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, inputs, b, view_dimension, sample_type)),
         B::Sampler(kind) if b.count.is_some() => Resource::Samplers(bindless_samplers(gpu, b, kind)),
@@ -282,7 +255,7 @@ pub fn bind_groups<P: Layouts>(gpu: &render::Gpu, s: &Shading<P>, inputs: &Input
             .map(|(b, (r, (views, samplers)))| wgpu::BindGroupEntry {
                 binding: b.binding,
                 resource: match r {
-                    Resource::Buffer(buf) => buf.as_entire_binding(),
+                    Resource::Buffer(buf) => buf.binding(),
                     Resource::View(v) => wgpu::BindingResource::TextureView(v),
                     Resource::Sampler(smp) => wgpu::BindingResource::Sampler(smp),
                     Resource::Views(_) => wgpu::BindingResource::TextureViewArray(views),

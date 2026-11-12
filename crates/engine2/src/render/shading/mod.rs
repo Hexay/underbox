@@ -5,6 +5,7 @@
 //! draw with the stand-in (standin.rs).
 
 pub mod bind;
+mod bind_buffers;
 mod bind_log;
 mod defaults;
 mod shadow_slots;

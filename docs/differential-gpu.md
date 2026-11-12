@@ -91,9 +91,13 @@ are structure, not output. Fixed items say what changed and what is left.
    (showroom: six lamp cube faces, one spot), clear 0, `GreaterOrEqual`, back faces culled, bias
    constant −1 / slope −1.5, each caster mesh one instanced draw. Cascade 0's depth dump matches
    real's, and `DirectionalLightCB` differs only in bindless indices and a tiny sun direction
-   difference. Left: casters take ours' 64-byte view-projection and a 64-byte instance matrix
-   stream instead of real's 1088-byte view constants and shared instance format, and draw order
-   within a pass differs. Ours' contact-shadow compute (`screen_space_shadows_cs`) now skips its
+   difference. Casters draw through a depth-only stand-in (`shading/standin_depth.shader`) with
+   real's inputs: the shadow view's 1088-byte constants, `g_TransformBuffer` and real's vertex
+   formats (position, instance id, blend indices); skinned casters read the vertex cache. Order in
+   every opaque pass is real's (`draw::sort_opaque`): rigid before vertex-cached, then larger index
+   count first, stable otherwise. It isn't distance: on fog the ground is nearest yet real draws the
+   box first. Left: 67 of the cascades' 272 constant floats differ (ours' cascade fit). Ours'
+   contact-shadow compute (`screen_space_shadows_cs`) now skips its
    dispatch, since its R8 mask isn't storage-writable on ours; the stand-in doesn't read the mask.
 3. **Depth format and stencil.** Real's main depth is `D32SfloatS8Uint` with stencil test on in the
    opaque pass; ours is `D32Sfloat`, stencil off.
@@ -116,9 +120,15 @@ are structure, not output. Fixed items say what changed and what is left.
 8. **Final output (mostly fixed).** A pass that neither clears nor draws isn't recorded (showroom:
    18 passes with the shadow views, real 21). `TargetSupportsSrgbWrite` is true for 8-bit targets, so managed's UI no
    longer takes the float path (the "UI Gamma Seed" / "Composite" blits through `R16G16B16A16Sfloat`);
-   the last pass writes the swap chain image as real's does. Left: the swap chain image is ours'
-   own texture, copied to the surface at present (engine textures can't wrap a surface frame), and
-   387 (skinned: 638) transfers against real's 16, mostly small buffer copies and fills.
+   the last pass writes the swap chain image as real's does. Transfers are batched like real's
+   (`render/batch.rs`): one upload arena per frame, written with one queue write per flush, buffer
+   writes as ordered copies out of it, command buffers submitted together at present. Showroom 13
+   (was 335), skinned 18 (was 745); real 16 and 14. The anti-aliasing composite has the depth test
+   off on both sides; real's state still carries `GreaterOrEqual`, which wgpu can't set on a
+   disabled test (it leaves `Never`), so `gpu_diff.py` ignores the op there. Left: the swap chain
+   image is ours' own texture, copied to the surface at present. Engine textures are long-lived
+   handles that binds, views, bindless entries and readbacks keep, while a wgpu surface texture
+   lives for one frame and can't back one.
 9. **Textures per draw.** Real binds material textures directly too (box: `primary_white_color`,
    plane: `testgrid_color`, the same files as ours); its one bindless array (about 1250 views, every
    loaded texture) serves shadow maps, the contact-shadow mask and decals. Ours fills a few dozen slots per

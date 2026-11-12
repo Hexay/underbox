@@ -1,17 +1,23 @@
-//! Shadow casters batched as native's shadow views draw them: every placeholder-class draw of the
-//! same mesh range becomes one instanced draw of the caster program (`render::Caster`), its world
-//! matrices on an instance stream. Draws that bind their own program (skinned vertex-cache draws)
-//! stay as they are, after the instanced ones.
+//! Shadow casters as native's shadow views draw them: through the depth-only program
+//! (`shading/standin_depth.shader`, real's closed `depth_only.shader`), which binds the shadow
+//! view's 1088-byte per-view constants and reads world transforms from `g_TransformBuffer` like
+//! the main view's programs. Every rigid draw of the same mesh range becomes one instanced draw;
+//! vertex-cache (skinned) draws keep their own bindings and switch program.
 
-use super::{Draw, device};
+use super::{Draw, device, sort_opaque, vertex_cached};
+use crate::mesh::layout::{Field, Layout, format};
+use crate::render::shading::bind::{self as binding, Instance};
+use crate::render::shading::{self, Shading, standin, vertex, view::View};
+use crate::render::lighting::Lighting;
+use crate::render::texture;
 use glam::Mat4;
-use render::Caster;
-use std::sync::{Arc, OnceLock};
+use render::wgpu::{self, VertexFormat};
+use render::{PipelineKey, VertexBufferKey};
+use std::collections::HashMap;
+use std::sync::Arc;
 
-pub fn program() -> Option<&'static Caster> {
-    static CASTER: OnceLock<Caster> = OnceLock::new();
-    let gpu = device::gpu()?;
-    Some(CASTER.get_or_init(|| Caster::new(gpu)))
+pub fn program() -> Option<Arc<Shading>> {
+    shading::program(device::gpu()?, standin::DEPTH_PATH, &[])
 }
 
 /// What makes two draws one mesh range: buffers by identity, offsets, range, layout and state.
@@ -26,33 +32,56 @@ fn same_mesh(a: &Draw, b: &Draw) -> bool {
         && a.vertex.first() == b.vertex.first()
 }
 
-/// `draws` seen through `view_proj`, same-mesh placeholder draws merged into instanced caster
-/// draws in order of first appearance; each instance is a draw's `uniforms.model`.
+/// The depth program's vertex inputs from a placeholder mesh key (its position at location 0).
+fn vertex_keys(depth: &Shading, mesh: &VertexBufferKey) -> Option<Vec<VertexBufferKey>> {
+    let position = mesh.attributes.iter().find(|a| a.shader_location == 0)?;
+    let format = match position.format {
+        VertexFormat::Float32x4 => format::RGBA32F,
+        VertexFormat::Float32x3 => format::RGB32F,
+        VertexFormat::Float32x2 => format::RG32F,
+        _ => return None,
+    };
+    let field = Field { semantic: "position".into(), index: 0, format, offset: position.offset as usize };
+    let layout = Layout { name: "shadow caster".into(), stride: mesh.stride as usize, fields: vec![field] };
+    vertex::inputs(&depth.vertex_inputs, &layout).map(|i| i.keys)
+}
+
+/// `draws` seen through `view_proj` as casters: same-mesh rigid draws merged into instanced
+/// draws, vertex-cache draws on the depth program, in real's opaque order ([`sort_opaque`]).
 pub fn instanced(draws: Vec<Draw>, view_proj: Mat4) -> Vec<Draw> {
-    let Some(gpu) = device::gpu() else { return draws };
-    let mut groups: Vec<(Draw, Vec<Mat4>)> = Vec::new();
-    let mut bound = Vec::new();
-    for d in draws {
-        if d.shaded.is_some() || d.vertex.is_empty() {
-            bound.push(d);
-            continue;
-        }
-        match groups.iter_mut().find(|(g, _)| same_mesh(g, &d)) {
-            Some((_, worlds)) => worlds.push(d.uniforms.model),
-            None => {
-                let world = d.uniforms.model;
-                groups.push((d, vec![world]));
+    let Some(depth) = program() else { return draws };
+    let mut groups: Vec<(Draw, Vec<VertexBufferKey>, Vec<Instance>)> = Vec::new();
+    let mut out = Vec::new();
+    for mut d in draws {
+        let keys = d.vertex.first().and_then(|k| vertex_keys(&depth, k));
+        let cached = vertex_cached(&d);
+        match (d.shaded.take(), keys) {
+            (Some(s), Some(keys)) if cached => {
+                out.push(Draw { shaded: Some(super::shaded::Shaded { shading: depth.clone(), vertex: keys, ..s }), ..d });
             }
+            (None, Some(keys)) => {
+                let instance = Instance { world: d.uniforms.model, tint: d.uniforms.tint };
+                match groups.iter_mut().find(|(g, _, _)| same_mesh(g, &d)) {
+                    Some((_, _, instances)) => instances.push(instance),
+                    None => groups.push((d, keys, vec![instance])),
+                }
+            }
+            (shaded, _) => out.push(Draw { shaded, ..d }),
         }
     }
-    let mut out: Vec<Draw> = groups
-        .into_iter()
-        .map(|(d, worlds)| {
-            let stream = Arc::new(Caster::instances(gpu, &worlds));
-            let uniforms = render::pass::DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..d.uniforms };
-            Draw { vertex: Caster::vertex_keys(&d.vertex[0]), instances: worlds.len() as u32, uniforms, transforms: Some(stream), ..d }
-        })
-        .collect();
-    out.extend(bound);
-    out
+    let uniforms = |d: &Draw| render::pass::DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..d.uniforms };
+    let batch = |(d, vertex, instances): (Draw, Vec<VertexBufferKey>, Vec<Instance>)| Draw { instances: instances.len() as u32, uniforms: uniforms(&d), vertex, caster: Some(instances), ..d };
+    let mut all: Vec<Draw> = groups.into_iter().map(batch).collect();
+    all.extend(out);
+    sort_opaque(&mut all);
+    all
+}
+
+/// A caster batch's bind groups for the depth program, its pipeline for `key` built.
+pub fn bind(gpu: &render::Gpu, depth: &Shading, instances: &[Instance], view: &View, key: &PipelineKey, targets: &[texture::Ref]) -> Option<Vec<wgpu::BindGroup>> {
+    let lighting = Lighting::default();
+    let none = HashMap::new();
+    let inputs = binding::Inputs { view, lighting: &lighting, instances, textures: &HashMap::new(), values: &[&none], attributes: &[], slots: &[], targets };
+    let built = gpu.checked(|| binding::bind_groups(gpu, depth, &inputs)).and_then(|groups| groups);
+    built.and_then(|groups| depth.program.try_pipeline(gpu, key).map(|_| groups)).inspect_err(|e| super::shaded::warn_once(&depth.label, e)).ok()
 }

@@ -14,7 +14,9 @@ pub const PATH: &str = "shaders/underbox_standin.shader";
 pub const SKY_PATH: &str = "shaders/underbox_standin_sky.shader";
 pub const GIZMO_LINE_PATH: &str = "shaders/underbox_standin_gizmo_line.shader";
 pub const GIZMO_SPRITE_PATH: &str = "shaders/underbox_standin_gizmo_sprite.shader";
-pub const ALL_PATHS: [&str; 4] = [PATH, SKY_PATH, GIZMO_LINE_PATH, GIZMO_SPRITE_PATH];
+/// Shadow casters' depth-only program (render/draw/caster.rs), not a material shader.
+pub const DEPTH_PATH: &str = "shaders/underbox_standin_depth.shader";
+pub const ALL_PATHS: [&str; 5] = [PATH, SKY_PATH, GIZMO_LINE_PATH, GIZMO_SPRITE_PATH, DEPTH_PATH];
 
 /// Which stand-in draws a closed shader.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,7 +96,7 @@ impl Kind {
 }
 
 pub fn is_path(path: &str) -> bool {
-    matches!(path, PATH | SKY_PATH | GIZMO_LINE_PATH | GIZMO_SPRITE_PATH)
+    ALL_PATHS.contains(&path)
 }
 
 /// The stand-in source cached under `path`, or `None` when `path` isn't a stand-in key.
@@ -108,6 +110,7 @@ pub fn shader(path: &str, includes: &IncludePaths) -> Option<Result<VfxShader, S
         SKY_PATH => include_str!("standin_sky.shader").to_owned(),
         GIZMO_LINE_PATH => include_str!("standin_gizmo_line.shader").to_owned(),
         GIZMO_SPRITE_PATH => include_str!("standin_gizmo_sprite.shader").to_owned(),
+        DEPTH_PATH => include_str!("standin_depth.shader").to_owned(),
         _ => return None,
     };
     Some(VfxShader::parse(&source, Path::new(path), includes))
