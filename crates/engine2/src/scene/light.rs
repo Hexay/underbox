@@ -60,7 +60,7 @@ impl Light {
             direction: crate::math::identity().rotation,
             color: vec3(1.0, 1.0, 1.0),
             bounce_color: vec3(0.0, 0.0, 0.0),
-            radius: 200.0,
+            radius: 0.0,
             theta: 0.0,
             phi: 0.0,
             fall_off: 1.0,

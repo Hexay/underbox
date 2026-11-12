@@ -76,6 +76,7 @@ public sealed class DiffProbe : Component
 			ProbeTrike.Run();
 			ProbeMass.Run();
 			ProbeMass.Scene( massBodies.Wall, massBodies.Frozen );
+			ProbeModel.Run( Scene );
 		}
 		if ( tick == Ticks[^1] ) Mark( "END" );
 	}

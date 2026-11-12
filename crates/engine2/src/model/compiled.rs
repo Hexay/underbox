@@ -116,7 +116,7 @@ pub fn content(m: &model::Model) -> Content {
         .map(|g| MaterialGroup { name: g.name.clone(), materials: g.materials.iter().filter_map(|p| materials.get(p)).collect() })
         .collect();
     let physics = match &m.physics {
-        Some(a) => Some(physics::data(&m.name, a)),
+        Some(a) => Some(physics::data(physics::EMBEDDED, a)),
         None => m.physics_refs.iter().find_map(|p| physics::load(p)),
     };
     Content {

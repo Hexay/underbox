@@ -11,19 +11,29 @@ use abi::slots::c_model as m;
 use abi::{Registry, StrRet, StringToken, bind};
 use std::ffi::CStr;
 
-/// A body part: its name and the mesh groups that are its choices.
+/// A body part: its name and its choices (a mesh group's name and mask).
 pub(super) struct Part {
     pub name: String,
-    pub groups: Vec<usize>,
+    pub choices: Vec<(String, u64)>,
 }
 
+/// A file model without mesh groups has one part, "Body", whose one choice is the file's stem and
+/// covers every mesh (real, probe `MODEL`).
 pub(super) fn parts(m: &Model) -> Vec<Part> {
+    if m.content.groups.is_empty() {
+        if m.name.starts_with(super::RUNTIME_PREFIX) {
+            return Vec::new();
+        }
+        let stem = std::path::Path::new(&m.name).file_stem().map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+        return vec![Part { name: "Body".into(), choices: vec![(stem, u64::MAX)] }];
+    }
     let mut parts: Vec<Part> = Vec::new();
     for (i, g) in m.content.groups.iter().enumerate() {
         let name = g.rsplit_once("_@").map_or(g.as_str(), |(p, _)| p);
+        let choice = (g.clone(), bit(i));
         match parts.iter_mut().find(|p| p.name == name) {
-            Some(p) => p.groups.push(i),
-            None => parts.push(Part { name: name.to_owned(), groups: vec![i] }),
+            Some(p) => p.choices.push(choice),
+            None => parts.push(Part { name: name.to_owned(), choices: vec![choice] }),
         }
     }
     parts
@@ -37,21 +47,17 @@ fn bit(group: usize) -> u64 {
     1u64.checked_shl(group as u32).unwrap_or(0)
 }
 
-fn choice(p: &Part, n: i32) -> Option<usize> {
-    usize::try_from(n).ok().and_then(|n| p.groups.get(n).copied())
+fn choice(p: &Part, n: i32) -> Option<&(String, u64)> {
+    usize::try_from(n).ok().and_then(|n| p.choices.get(n))
 }
 
 fn text(s: Option<&CStr>) -> String {
     s.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-/// Skins; a model without any has the one "default" skin.
+/// Skins, as the model lists them: real reports none for a model without `m_materialGroups`.
 pub(super) fn group_name(m: &Model, i: i32) -> Option<String> {
-    let groups = &m.content.material_groups;
-    if groups.is_empty() {
-        return (i == 0).then(|| "default".to_owned());
-    }
-    usize::try_from(i).ok().and_then(|i| groups.get(i)).map(|g| g.name.clone())
+    usize::try_from(i).ok().and_then(|i| m.content.material_groups.get(i)).map(|g| g.name.clone())
 }
 
 /// Every distinct material, in first-use order: skins first, then draw calls.
@@ -91,16 +97,16 @@ pub fn register(r: &mut Registry) {
         let name = text(name);
         on(r, |m| parts(m).iter().position(|p| p.name.eq_ignore_ascii_case(&name)).map_or(-1, |i| i as i32))
     });
-    bind!(r, m::GET_NUM_BODY_PART_MESHES, |r, p| on_part(r, p, |_, p| p.groups.len() as i32));
-    bind!(r, m::GET_BODY_PART_MASK, |r, p| on_part(r, p, |_, p| p.groups.iter().fold(0, |m, &g| m | bit(g))));
-    bind!(r, m::GET_BODY_PART_MESH_MASK, |r, p, n| on_part(r, p, |_, p| choice(p, n).map_or(0, bit)));
-    bind!(r, m::GET_BODY_PART_MESH_NAME, |r, p, n| StrRet::from(on_part(r, p, |m, p| choice(p, n).map(|g| m.content.groups[g].clone()))));
-    bind!(r, m::FIND_MESH_INDEX_FOR_MASK, |r, p, mask| on_part(r, p, |_, p| p.groups.iter().position(|&g| mask & bit(g) != 0).map_or(-1, |i| i as i32)));
+    bind!(r, m::GET_NUM_BODY_PART_MESHES, |r, p| on_part(r, p, |_, p| p.choices.len() as i32));
+    bind!(r, m::GET_BODY_PART_MASK, |r, p| on_part(r, p, |_, p| p.choices.iter().fold(0, |m, c| m | c.1)));
+    bind!(r, m::GET_BODY_PART_MESH_MASK, |r, p, n| on_part(r, p, |_, p| choice(p, n).map_or(0, |c| c.1)));
+    bind!(r, m::GET_BODY_PART_MESH_NAME, |r, p, n| StrRet::from(on_part(r, p, |_, p| choice(p, n).map(|c| c.0.clone()))));
+    bind!(r, m::FIND_MESH_INDEX_FOR_MASK, |r, p, mask| on_part(r, p, |_, p| p.choices.iter().position(|c| mask & c.1 != 0).map_or(-1, |i| i as i32)));
 
-    bind!(r, m::GET_NUM_MATERIAL_GROUPS, |r| on(r, |m| m.content.material_groups.len().max(1) as i32));
+    bind!(r, m::GET_NUM_MATERIAL_GROUPS, |r| on(r, |m| m.content.material_groups.len() as i32));
     bind!(r, m::GET_MATERIAL_GROUP_NAME, |r, i| StrRet::from(on(r, |m| group_name(m, i))));
     bind!(r, m::GET_MATERIAL_GROUP_INDEX, |r, name| {
-        on(r, |m| (0..m.content.material_groups.len().max(1) as i32).find(|&i| group_name(m, i).is_some_and(|n| StringToken::of(&n) == name)).unwrap_or(-1))
+        on(r, |m| m.content.material_groups.iter().position(|g| StringToken::of(&g.name) == name).map_or(-1, |i| i as i32))
     });
     bind!(r, m::GET_NUM_MATERIALS_IN_GROUP, |r, g| on(r, |m| usize::try_from(g).ok().and_then(|g| m.content.material_groups.get(g)).map_or(0, |g| g.materials.len() as i32)));
     bind!(r, m::GET_MATERIAL_IN_GROUP, |r, g, i| {

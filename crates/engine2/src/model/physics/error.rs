@@ -14,7 +14,7 @@ pub fn physics() -> Option<Arc<PhysicsData>> {
     let points: Vec<Vec3> = [-5.0, 5.0].into_iter().flat_map(|x| OUTLINE.map(|(y, z)| Vec3::new(x, y, z))).collect();
     let hull = Hull::from_points(&points)?;
     let part = Part { shapes: Shapes { hulls: vec![HullDesc { hull, ids: Default::default() }], ..Default::default() }, ..Default::default() };
-    Some(PhysicsData::new("models/dev/error.vmdl", vec![part], vec![], vec![0]))
+    Some(PhysicsData::new(super::compiled::EMBEDDED, vec![part], vec![], vec![0]))
 }
 
 #[cfg(test)]

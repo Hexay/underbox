@@ -14,8 +14,12 @@ struct Request {
 
 pub fn register(r: &mut Registry) {
     bind!(r, rs::IS_SHUTTING_DOWN, crate::app::platform::shutting_down);
+    // Real reads the file and hands it to managed (`resource_loaded`) on a later frame.
     bind!(r, rs::LOAD_RESOURCE_IN_MANIFEST, |path| -> Manifest {
-        objects::create(Request { path: path.map(|p| p.to_string_lossy().into_owned()).unwrap_or_default() })
+        let path = path.map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+        let compiled = if path.ends_with("_c") { path.clone() } else { format!("{path}_c") };
+        crate::fs::read(&compiled, "GAME");
+        objects::create(Request { path })
     });
     bind!(r, rs::IS_MANIFEST_LOADED, |m| objects::get::<_, Request>(m).is_some());
     bind!(r, rs::DESTROY_RESOURCE_MANIFEST, |m| {
@@ -25,8 +29,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, rs::HAS_PENDING_WORK, || false);
     bind!(r, rs::GET_NUM_PENDING_STREAMING_REQUESTS, || 0);
     bind!(r, rs::UPDATE_SIMPLE, || {});
-    // No GUID database: source files carry none, so managed keys resources by path alone.
-    bind!(r, rs::RESOLVE_PATH_TO_GUID, |_, _| false);
+    bind!(r, rs::RESOLVE_PATH_TO_GUID, |path, out: &mut Guid| {
+        *out = path.and_then(|p| crate::resource_guid::of_path(&p.to_string_lossy())).unwrap_or_default();
+        *out != Guid::default()
+    });
     bind!(r, rs::NEEDS_GUID_WRITE, |_| false);
     // TODO: hot reload — evict the path from its type's ByName cache and recompile.
     bind!(r, rs::RELOAD_RESOURCE, |_| {});
