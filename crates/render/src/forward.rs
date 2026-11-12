@@ -55,6 +55,7 @@ impl ForwardPass {
                 uniforms: DrawUniforms { mvp: camera.view_proj * item.transform, model: item.transform, tint: item.tint },
                 state: RasterState::default(),
                 shaded: None,
+                indirect: None,
             })
             .collect();
         let targets = Targets { color: Some(color), depth: Some(depth), ..Default::default() };

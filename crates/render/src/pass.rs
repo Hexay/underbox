@@ -80,6 +80,9 @@ pub struct MeshDraw<'a> {
     pub uniforms: DrawUniforms,
     pub state: RasterState,
     pub shaded: Option<Shaded<'a>>,
+    /// An indexed draw's arguments (`DrawIndexedIndirectArgs`) at this buffer and byte offset, in
+    /// place of `range`, `base_vertex` and `instances`.
+    pub indirect: Option<(&'a wgpu::Buffer, u64)>,
 }
 
 /// Run one pass: load or clear the targets, then draw `draws` in order. A pass that would neither
@@ -117,7 +120,7 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
     let depth = targets.depth.map(|t| wgpu::RenderPassDepthStencilAttachment {
         view: layer_view.as_ref().unwrap_or(&t.target_view),
         depth_ops: Some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store }),
-        stencil_ops: t.desc.format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Load, store }),
+        stencil_ops: t.desc.format.has_stencil_aspect().then_some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, |_| wgpu::LoadOp::Clear(0)), store }),
     });
     let color_count = usize::from(color.is_some());
     let colors = [color];
@@ -161,7 +164,10 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
             match d.indices {
                 Some((buffer, format)) => {
                     pass.set_index_buffer(buffer.slice(..), format);
-                    pass.draw_indexed(d.range.clone(), d.base_vertex, 0..d.instances);
+                    match d.indirect {
+                        Some((args, offset)) => pass.draw_indexed_indirect(args, offset),
+                        None => pass.draw_indexed(d.range.clone(), d.base_vertex, 0..d.instances),
+                    }
                 }
                 None => pass.draw(d.range.clone(), 0..d.instances),
             }

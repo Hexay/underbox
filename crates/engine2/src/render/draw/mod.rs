@@ -41,6 +41,24 @@ pub struct Draw {
     /// A shadow caster batch's instances: drawn by the depth-only program through `uniforms.mvp`
     /// (caster.rs).
     pub caster: Option<Vec<Instance>>,
+    pub cull: Cull,
+}
+
+/// A draw's part in the view's GPU occlusion cull (render/scene/occlusion.rs).
+#[derive(Default)]
+pub struct Cull {
+    /// World bounds (min, max) of each instance; none or a mismatched count never culls.
+    pub bounds: Vec<[glam::Vec3; 2]>,
+    /// Drawn indirect: the cull's arguments and the ids that survived it, in place of the
+    /// instance-id stream.
+    pub indirect: Option<Indirect>,
+}
+
+pub struct Indirect {
+    pub args: Arc<render::Buffer>,
+    pub args_offset: u64,
+    pub ids: Arc<render::Buffer>,
+    pub ids_offset: u64,
 }
 
 /// Whether `d` draws from the skinning vertex cache: only its material program's bindings read it.
@@ -171,9 +189,11 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
         .zip(&bound)
         .map(|(d, groups)| {
             let as_caster = depth.as_ref().zip(groups.as_ref()).filter(|_| d.shaded.is_none() && d.caster.is_some());
-            let as_caster = as_caster.map(|(c, g)| Shaded { program: &c.program, bind_groups: g, buffers: vec![(&defaults.buffer, 0), (&ids.buffer, 0)] });
+            let culled = d.cull.indirect.as_ref().map(|c| (&c.ids.buffer, c.ids_offset));
+            let as_caster = as_caster.map(|(c, g)| Shaded { program: &c.program, bind_groups: g, buffers: vec![culled.unwrap_or((&ids.buffer, 0)), (&defaults.buffer, 0)] });
             let material = d.shaded.as_ref().zip(groups.as_ref());
             MeshDraw {
+                indirect: d.cull.indirect.as_ref().map(|c| (&c.args.buffer, c.args_offset)),
                 vertices: (&d.vertices.buffer, d.vertex_offset),
                 vertex: material.map_or_else(|| d.vertex.clone(), |(s, _)| s.vertex.clone()),
                 indices: d.indices.as_ref().map(|(b, f)| (&b.buffer, *f)),
@@ -183,8 +203,8 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
                 uniforms: d.uniforms,
                 state: state(d),
                 shaded: material.map(|(s, groups)| {
-                    let ids = s.context.instance_ids.as_ref().map_or((&ids.buffer, 0), |(b, offset)| (&b.buffer, *offset));
-                    Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![(&defaults.buffer, 0), ids] }
+                    let ids = culled.or(s.context.instance_ids.as_ref().map(|(b, offset)| (&b.buffer, *offset))).unwrap_or((&ids.buffer, 0));
+                    Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![ids, (&defaults.buffer, 0)] }
                 }).or(as_caster),
             }
         })

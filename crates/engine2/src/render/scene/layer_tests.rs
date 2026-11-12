@@ -91,6 +91,10 @@ fn run_layers(w: world::Ref, cam: camera::Ref, layers: &[(i64, i64)]) -> (render
     for &(layer_type, required) in layers {
         let l = view::add_layer(v, layer::create(v, "Render".into(), viewport, layer::Kind::Render(StringToken::of("Forward")), required, 0), Default::default());
         field!(set i64, abi::slots::i_scene_layer::GET_LAYER_ENUM, l.addr(), layer_type);
+        // As managed's pipeline adds it without depth normals: no colour target.
+        if layer_type == layer::layer_type::DEPTH_PREPASS {
+            layer::set_output(l, texture::Ref::default(), depth);
+        }
     }
     execute::run(v);
     let out = (read(color), read(depth));

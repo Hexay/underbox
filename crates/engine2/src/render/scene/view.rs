@@ -32,6 +32,9 @@ pub struct ViewState {
     pub required: i64,
     pub excluded: i64,
     pub worlds: Vec<world::Ref>,
+    pub occlusion: Option<super::occlusion::Buffers>,
+    /// Instances the culled layers recorded last run, capacity or not (`GetOcclusionCullRequested`).
+    pub occlusion_requested: i32,
 }
 
 pub struct SceneView {
@@ -159,9 +162,11 @@ pub fn register(r: &mut Registry) {
         layer::set_output(l, rt_texture(dst), texture::Ref::default());
         l
     });
-    // Occlusion culling is a GPU feedback loop we don't run; managed sees it never requested.
-    bind!(r, v::SET_OCCLUSION_CULL, |_, _, _, _, _, _, _, _, _| {});
-    bind!(r, v::GET_OCCLUSION_CULL_REQUESTED, |_| 0);
+    bind!(r, v::SET_OCCLUSION_CULL, |r, instances, runs, args, ids, stats, dispatch, capacity: i32, _aggregate_mode| {
+        let capacity = capacity.max(0) as u32;
+        with(r, |_, s| s.occlusion = Some(super::occlusion::Buffers { instances, runs, args, ids, stats, dispatch, capacity }));
+    });
+    bind!(r, v::GET_OCCLUSION_CULL_REQUESTED, |r| with(r, |_, s| s.occlusion_requested));
     bind!(r, v::SET_DEFAULT_LAYER_OBJECT_REQUIRED_FLAGS, |r, f| with(r, |_, s| s.required = f));
     bind!(r, v::SET_DEFAULT_LAYER_OBJECT_EXCLUDED_FLAGS, |r, f| with(r, |_, s| s.excluded = f));
     bind!(r, v::GET_DEFAULT_LAYER_OBJECT_REQUIRED_FLAGS, |r| with(r, |_, s| s.required));

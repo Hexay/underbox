@@ -14,7 +14,9 @@ const OPTIONAL: wgpu::Features = wgpu::Features::TEXTURE_BINDING_ARRAY
     .union(wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER)
     // DXC's storage images reflect read-write even when only written (no NonReadable), which
     // core WebGPU allows for few formats; the adapter's own format table allows more.
-    .union(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
+    .union(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+    // Native's main depth (`D32FS8`).
+    .union(wgpu::Features::DEPTH32FLOAT_STENCIL8);
 
 /// One device and its queue. Everything else in this crate borrows it.
 pub struct Gpu {

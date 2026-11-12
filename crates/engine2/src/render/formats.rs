@@ -20,7 +20,8 @@ pub fn to_wgpu(format: i32) -> Option<F> {
         59 => F::R16Float,
         60 => F::Depth16Unorm,
         62 => F::Depth32Float,
-        // D24S8, LINEAR_D24S8, D24FS8, D32FS8: Depth32FloatStencil8 needs an optional feature.
+        92 if crate::render::device::gpu().is_none_or(|g| g.device.features().contains(render::wgpu::Features::DEPTH32FLOAT_STENCIL8)) => F::Depth32FloatStencil8,
+        // D24S8, LINEAR_D24S8, D24FS8, and D32FS8 without the optional feature.
         63 | 64 | 67 | 92 => F::Depth24PlusStencil8,
         87 => F::R32Uint,
         96 => F::Rg11b10Ufloat,

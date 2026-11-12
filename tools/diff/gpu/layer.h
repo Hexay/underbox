@@ -31,7 +31,8 @@
     X(CmdDispatch) X(CmdDispatchIndirect) X(CmdSetViewport) X(CmdSetScissor) X(CmdSetCullMode) \
     X(CmdSetFrontFace) X(CmdSetPrimitiveTopology) X(CmdSetDepthTestEnable) X(CmdSetDepthWriteEnable) \
     X(CmdSetDepthCompareOp) X(CmdSetDepthBiasEnable) X(CmdSetDepthBias) X(CmdSetStencilTestEnable) \
-    X(CmdSetStencilReference) X(CmdSetBlendConstants) X(CmdSetColorBlendEnableEXT) X(CmdSetColorWriteMaskEXT) \
+    X(CmdSetStencilReference) X(CmdSetStencilOp) X(CmdSetStencilCompareMask) X(CmdSetStencilWriteMask) \
+    X(CmdSetBlendConstants) X(CmdSetColorBlendEnableEXT) X(CmdSetColorWriteMaskEXT) \
     X(CmdSetColorBlendEquationEXT) X(CmdSetPolygonModeEXT) X(CmdClearAttachments) X(CmdClearColorImage) \
     X(CmdClearDepthStencilImage) X(CmdCopyBuffer) X(CmdCopyBufferToImage) X(CmdCopyImage) X(CmdCopyImageToBuffer) \
     X(CmdBlitImage) X(CmdResolveImage) X(CmdUpdateBuffer) X(CmdFillBuffer) X(CmdCopyBuffer2) \
@@ -54,7 +55,7 @@
     X(CmdDispatch) X(CmdDispatchIndirect) X(CmdSetViewport) X(CmdSetScissor) X(CmdSetCullMode) X(CmdSetFrontFace) \
     X(CmdSetPrimitiveTopology) X(CmdSetDepthTestEnable) X(CmdSetDepthWriteEnable) X(CmdSetDepthCompareOp) \
     X(CmdSetDepthBiasEnable) X(CmdSetDepthBias) X(CmdSetStencilTestEnable) X(CmdSetStencilReference) \
-    X(CmdSetBlendConstants) X(CmdSetColorBlendEnableEXT) X(CmdSetColorWriteMaskEXT) X(CmdSetColorBlendEquationEXT) \
+    X(CmdSetStencilOp) X(CmdSetStencilCompareMask) X(CmdSetStencilWriteMask) X(CmdSetBlendConstants) X(CmdSetColorBlendEnableEXT) X(CmdSetColorWriteMaskEXT) X(CmdSetColorBlendEquationEXT) \
     X(CmdSetPolygonModeEXT) X(CmdClearAttachments) X(CmdClearColorImage) X(CmdClearDepthStencilImage) \
     X(CmdCopyBuffer) X(CmdCopyBufferToImage) X(CmdCopyImage) X(CmdCopyImageToBuffer) X(CmdBlitImage) \
     X(CmdResolveImage) X(CmdUpdateBuffer) X(CmdFillBuffer) X(CmdCopyBuffer2) X(CmdCopyBufferToImage2) \

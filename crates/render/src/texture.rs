@@ -1,6 +1,6 @@
-//! Textures and render targets, with CPU upload and synchronous read-back.
+//! Textures and render targets, with CPU upload; read-back is in readback.rs.
 
-use crate::{Frame, Gpu};
+use crate::Gpu;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -80,7 +80,7 @@ impl Texture {
             view_formats: twin.as_slice(),
         });
         let dimension = Some(desc.dimension());
-        let view = texture.create_view(&wgpu::TextureViewDescriptor { dimension, ..Default::default() });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor { dimension, aspect: sample_aspect(desc.format), ..Default::default() });
         // Sampling only: sRGB formats can't be storage images, which the texture itself may allow.
         let srgb_view = twin.map(|f| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(f), dimension, usage: Some(wgpu::TextureUsages::TEXTURE_BINDING), ..Default::default() }));
         let target_view = layer_view(&texture, 0);
@@ -128,17 +128,19 @@ impl Texture {
             usage,
             base_mip_level: mip,
             mip_level_count: Some(1),
+            aspect: sample_aspect(self.desc.format),
             ..Default::default()
         })
     }
 
-    /// Bytes per texel of mip 0; `None` for block-compressed or depth-stencil formats.
+    /// Bytes per texel of mip 0 (a depth-stencil format's depth); `None` for block-compressed
+    /// formats and depth that can't be copied.
     pub fn texel_size(&self) -> Option<u32> {
         let f = self.desc.format;
         if f.block_dimensions() != (1, 1) {
             return None;
         }
-        f.block_copy_size(None)
+        f.block_copy_size(Some(sample_aspect(f)))
     }
 
     /// Bytes of one tightly packed mip-0 layer.
@@ -238,51 +240,16 @@ impl Texture {
         true
     }
 
-    /// Copy mip 0 back to the CPU, tightly packed. Blocks until the GPU is done.
-    pub fn read_back(&self, gpu: &Gpu) -> Frame {
-        self.read_region(gpu, 0, [0, 0, self.desc.width, self.desc.height]).expect("read-back needs an uncompressed colour format")
-    }
-
     /// The size of `mip`.
     pub fn mip_size(&self, mip: u32) -> (u32, u32) {
         ((self.desc.width >> mip).max(1), (self.desc.height >> mip).max(1))
     }
+}
 
-    /// Copy `[x, y, w, h]` of `mip` back to the CPU, tightly packed; `None` for a format without
-    /// a texel size or a rect outside the mip. Blocks until the GPU is done.
-    pub fn read_region(&self, gpu: &Gpu, mip: u32, [x, y, w, h]: [u32; 4]) -> Option<Frame> {
-        let texel = self.texel_size()?;
-        let (mw, mh) = self.mip_size(mip);
-        if mip >= self.desc.mips.max(1) || w == 0 || h == 0 || x + w > mw || y + h > mh {
-            return None;
-        }
-        let row = w * texel;
-        // Gotcha: buffer copies need rows padded to COPY_BYTES_PER_ROW_ALIGNMENT (256).
-        let padded = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let staging = gpu.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("readback"),
-            size: u64::from(padded * h),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        let mut encoder = gpu.device.create_command_encoder(&Default::default());
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &staging,
-                layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None },
-            },
-            extent(w, h),
-        );
-        gpu.submit(encoder.finish());
-        let bytes = crate::buffer::map_read(gpu, &staging);
-        let mut pixels = Vec::with_capacity((row * h) as usize);
-        for y in 0..h as usize {
-            let start = y * padded as usize;
-            pixels.extend_from_slice(&bytes[start..start + row as usize]);
-        }
-        Some(Frame { width: w, height: h, texel_size: texel, pixels })
-    }
+/// What shaders sample and read-backs copy: a depth-stencil format's depth alone (a view or copy
+/// of both aspects can't be bound or copied to a buffer).
+pub fn sample_aspect(format: wgpu::TextureFormat) -> wgpu::TextureAspect {
+    if format.has_depth_aspect() && format.has_stencil_aspect() { wgpu::TextureAspect::DepthOnly } else { wgpu::TextureAspect::All }
 }
 
 fn layer_view(texture: &wgpu::Texture, layer: u32) -> wgpu::TextureView {

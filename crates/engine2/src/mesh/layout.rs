@@ -15,7 +15,10 @@ pub mod format {
     pub const RGBA32F: u32 = 2;
     pub const RGB32F: u32 = 6;
     pub const RG32F: u32 = 16;
+    /// Real's packed tangent frame (assets `compiled::vertex::unpack_frame`).
+    pub const RGB10A2_UNORM: u32 = 24;
     pub const RGBA8_UNORM: u32 = 28;
+    pub const RG16F: u32 = 34;
     pub const RGBA8_UINT: u32 = 30;
     pub const R32F: u32 = 41;
     pub const R32_UINT: u32 = 42;
@@ -46,7 +49,7 @@ pub fn format_size(format: u32) -> usize {
         format::RGBA32F => 16,
         format::RGB32F => 12,
         format::RG32F => 8,
-        format::RGBA8_UNORM | format::RGBA8_UINT | format::R32F | format::R32_UINT | format::R32_SINT => 4,
+        format::RGBA8_UNORM | format::RGBA8_UINT | format::R32F | format::R32_UINT | format::R32_SINT | format::RG16F | format::RGB10A2_UNORM => 4,
         format::R8_UINT | format::R8_SINT => 1,
         _ => 0,
     }
@@ -91,6 +94,17 @@ impl Layout {
                 field("texcoord", 1, format::RGBA32F, 44),
                 field("tangent", 0, format::RGBA32F, 60),
             ],
+        })
+    }
+
+    /// What real's compiled meshes hold and its draws read (20 bytes): position, a half-float UV
+    /// and the packed tangent frame. The GPU copy of a [`Layout::sbox_vertex`] mesh (gpu_mesh.rs).
+    pub fn packed_vertex() -> Arc<Layout> {
+        let field = |semantic: &str, format, offset| Field { semantic: semantic.into(), index: 0, format, offset };
+        Arc::new(Layout {
+            name: "PackedVertex".into(),
+            stride: 20,
+            fields: vec![field("position", format::RGB32F, 0), field("texcoord", format::RG16F, 12), field("normal", format::RGB10A2_UNORM, 16)],
         })
     }
 
