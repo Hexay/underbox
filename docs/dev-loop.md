@@ -11,6 +11,7 @@
 | Net probe | `tools/net-probe.sh` |
 | Shared-build lock | `tools/boot-lock.sh <cmd...>` (only for scripts that write `sbox-public/game`) |
 | Release build | `tools/dist.sh` (portable libengine2 in `dist/`; see docs/release.md) |
+| Merge gate | `sh tools/verify.sh > log 2>&1`, then check `$?` and `RESULT: PASS` (step logs in `target/verify/`) |
 | Measure a loop | `tools/loop-bench.sh <runs> <file> <cmd...>` (median and spread) |
 
 ## Rules
@@ -23,6 +24,55 @@
   `Server is idle`. Give game boots an `UNTIL` that marks "done" instead of idling to the timeout.
   The last line, `== timing:`, splits the boot into prepare, cargo and server.
 - `test.sh` and `boot-server.sh` check out missing submodules (`tools/submodules.sh`).
+
+## Merge gate
+
+`tools/verify.sh` builds engine2 and runs the render and engine2 crate tests first, by themselves.
+Under the boots' load, their shared-render-state races flaked: a black sky in 1 of 4 runs. Then two
+lanes run side by side:
+
+- cargo, one step at a time: the other crate tests, clippy, coverage.
+- boots, `VERIFY_JOBS` at once (default 4): match, map, the 17 golden frames.
+
+Boots install a copy of that one build (`UNDERBOX_ENGINE2`), so none of them waits on the cargo
+lane's lock. `tools/verify-step.sh` runs each step with `OUT=target/verify/<step>`, so a frame's
+PNG lands in `target/verify/frame-<corpus>[-managed]/`. Once a step fails, steps not yet started
+are skipped, and every failure is reported.
+
+Frames are lavapipe CPU work. At 4 jobs, a frame takes about 50 s instead of 29 s. At 6 jobs and
+load ~90, frames reached 247 s against client-frame's 240 s client timeout, so leave the default.
+Peak memory is about 4 GB above the session's idle level.
+
+## Test targets
+
+engine2 has `doctest = false`, and its `coverage` bin has `test = false`. Without them, every
+`cargo test -p engine2` also built the plain cdylib/rlib for the bin and for rustdoc, compiling
+engine2 twice per edit. If you add a doctest or a bin test, turn the target back on.
+
+Don't give `shaders` an optimized dev profile. It cut the shaders tests from 85 s to 27 s, but the
+engine2 suite then failed in 5 of 10 runs, against 0 of 16 without it. Some race in the render
+tests is unfixed (cmaa2, stand-in cull, managed shadows).
+
+## Loop timings
+
+Medians on a shared 16-core box at load 25–60, 2026-11-12:
+
+| Loop | Before | After |
+| --- | --- | --- |
+| engine2 edit → `tools/test.sh engine2 convar` (`loop-bench.sh 5`) | 10.0 s (9.3–12.9) | 6.0 s (4.7–6.0) |
+| `sh tools/verify.sh`, warm (3 runs each) | 675 s (569–731) | 244 s (225–251) |
+| One golden frame, `tools/client-frame.sh` | 29 s (26–40) | 27.8 s (26.3–28.1) |
+| `tools/boot-client.sh` (orbmatch, 300 frames) | not measured | 23.1 s (22.9–23.2) |
+| `tools/diff/run.sh frame showroom ours` | not measured | 25.1 s (24.4–26.4) |
+
+In verify, the frames used to be 73% of the time (17 × ~29 s, back to back). Coverage used to
+rebuild engine2 without incremental compilation (18 s), and engine2's tests then rebuilt it again.
+`render/tests/hang.rs` spun for 47 s; with a tenth of the steps, the render tests went from 43 s to 5 s. The shaders tests (85 s, debug string
+scanning) now run in the cargo lane, alongside the boots.
+
+A client boot's own time isn't ours to cut. About 14 s of it is managed polling Steam for a web
+ticket (`Api.Account.cs`, 100 × `Task.Delay(100)`), and real engine2 offline waits just as long.
+Then there's 6 s of `GRACE` and about 4 s of game load. Prepare plus cargo take under 0.5 s.
 
 ## Game dirs
 
