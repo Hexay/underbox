@@ -4,10 +4,10 @@
 //! densities ([`ShapeMeta`]) and handed to Rapier as the body's additional mass properties, so
 //! the overrides (mass, centre, inertia, inertia scale) apply on top in one place.
 
-use crate::filter::ShapeMeta;
+use crate::filter::{CUBIC_INCHES_PER_CUBIC_METRE, SHAPELESS_BODY_DENSITY, ShapeMeta};
 use crate::world::World;
 use rapier3d::math::{Rotation, Vector};
-use rapier3d::prelude::{MassProperties, RigidBodyHandle};
+use rapier3d::prelude::{MassProperties, RigidBody, RigidBodyHandle};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BodyMass {
@@ -65,6 +65,44 @@ impl World {
             rb.set_additional_mass_properties(props, true);
             rb.recompute_mass_properties_from_colliders(&raw.colliders);
         }
+    }
+
+    fn dynamic(&self, id: RigidBodyHandle) -> Option<&RigidBody> {
+        self.body(id).filter(|rb| rb.is_dynamic())
+    }
+
+    /// Native's `GetMass`: 0 for static and keyframed bodies, whose overrides are kept for
+    /// when they turn dynamic (docs/differential-joints.md, 20).
+    pub fn reported_mass(&self, id: RigidBodyHandle) -> f32 {
+        self.dynamic(id).map_or(0.0, |rb| rb.mass())
+    }
+
+    /// Native's local mass centre: a body that isn't dynamic reports its shapes' centroid,
+    /// ignoring an overridden centre.
+    pub fn reported_local_center(&self, id: RigidBodyHandle) -> Vector {
+        match self.dynamic(id) {
+            Some(rb) => rb.local_center_of_mass(),
+            None => self.shape_mass(id).local_com,
+        }
+    }
+
+    /// Native's body density: its first shape's, in kg/m³.
+    pub fn reported_density(&self, id: RigidBodyHandle) -> f32 {
+        let first = self.body(id).and_then(|rb| rb.colliders().first().copied());
+        first.and_then(|c| self.meta.get(&c)).map_or(SHAPELESS_BODY_DENSITY, |m| m.density * CUBIC_INCHES_PER_CUBIC_METRE)
+    }
+
+    /// Native's principal inertia and its frame: zero for bodies that aren't dynamic, and the
+    /// body-axis diagonal (unsorted, identity frame) when the tensor is already diagonal.
+    pub fn reported_inertia(&self, id: RigidBodyHandle) -> (Vector, Rotation) {
+        let Some(rb) = self.dynamic(id) else { return (Vector::ZERO, Rotation::IDENTITY) };
+        let props = &rb.mass_properties().local_mprops;
+        let (p, frame) = (props.principal_inertia(), props.principal_inertia_local_frame);
+        let cols = [Vector::X, Vector::Y, Vector::Z].map(|e| frame * e);
+        let entry = |i: usize, j: usize| (0..3).map(|k| p[k] * cols[k][i] * cols[k][j]).sum::<f32>();
+        let diagonal = Vector::new(entry(0, 0), entry(1, 1), entry(2, 2));
+        let off = entry(0, 1).abs().max(entry(0, 2).abs()).max(entry(1, 2).abs());
+        if off <= 1e-5 * diagonal.max_element() { (diagonal, Rotation::IDENTITY) } else { (p, frame) }
     }
 
     pub fn mass_overrides(&self, id: RigidBodyHandle) -> BodyMass {
@@ -129,6 +167,30 @@ mod tests {
         world.set_mass_overrides(body, |m| m.inertia = Some((Vector::new(1.0, 2.0, 3.0), Rotation::IDENTITY)));
         let inertia = world.body(body).unwrap().mass_properties().local_mprops.principal_inertia();
         assert!((inertia - Vector::new(1.0, 2.0, 3.0)).length() < 1e-3, "{inertia:?}");
+    }
+
+    /// Probe `MASS`: the zoo sign's box (10 × 100 × 25, centred at (0, 10, 12.5)).
+    #[test]
+    fn only_dynamic_bodies_report_mass_and_inertia() {
+        let mut world = World::default();
+        let body = world.add_body(BodyType::Static, Pose::IDENTITY);
+        let sign = Shape::Box { center: Vector::new(0.0, 10.0, 12.5), rotation: Rotation::IDENTITY, half_extents: Vector::new(5.0, 50.0, 12.5) };
+        world.add_shape(body, &sign, Surface::default()).unwrap();
+        world.set_mass(body, 5.0);
+        world.set_mass_overrides(body, |m| m.center = Some(Vector::new(1.0, 2.0, 3.0)));
+        assert_eq!(world.reported_mass(body), 0.0);
+        assert_eq!(world.reported_inertia(body), (Vector::ZERO, Rotation::IDENTITY));
+        assert!((world.reported_local_center(body) - Vector::new(0.0, 10.0, 12.5)).length() < 1e-4);
+        assert!((world.reported_density(body) - 2000.0).abs() < 0.01);
+
+        world.set_body_type(body, BodyType::Dynamic);
+        assert!((world.reported_mass(body) - 5.0).abs() < 1e-4, "the override survives");
+        assert_eq!(world.reported_local_center(body), Vector::new(1.0, 2.0, 3.0));
+        world.set_mass_overrides(body, |m| (m.mass, m.center) = (None, None));
+        let (inertia, frame) = world.reported_inertia(body);
+        let expected = Vector::new(725_469.1, 49_502.6, 689_622.4);
+        assert!(((inertia - expected) / expected).abs().max_element() < 1e-4, "body axes, unsorted: {inertia:?}");
+        assert_eq!(frame, Rotation::IDENTITY);
     }
 
     #[test]

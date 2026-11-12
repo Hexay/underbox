@@ -104,7 +104,7 @@ linear and angular speeds, sizes and shapes, gravity off: the step each falls as
 `ProbeJoint.cs` adds hinge motors, springs and friction, joints against their own contacts, and
 stack sleep timing; `ProbePush.cs` unjointed overlaps pushed apart and orbmatch's re-aimed push;
 `ProbeRefresh.cs` when a persistent contact is refreshed; `ProbeTrike.cs` the zoo trike through its
-sign (docs/differential-joints.md). Orbmatch's bots log `MATCH:POS` every 5 ticks;
+sign; `ProbeMass.cs` mass queries on bodies of each type (docs/differential-joints.md). Orbmatch's bots log `MATCH:POS` every 5 ticks;
 the game watcher logs `GAME:RESTED` for every body at `SETTLED` in scenes of 20 bodies or fewer.
 
 `zoo` needs `SANDBOX=<Facepunch/sandbox checkout>`. Runs take 30 s to 3 min each.
@@ -234,9 +234,9 @@ Client frames (`run.sh frame`), their metrics, divergences and lanes: docs/diffe
 
 ## Follow-up lanes
 
-- **Joints, stack sleep, contacts (11–19):** docs/differential-joints.md.
+- **Joints, stack sleep, contacts, mass queries (11–20):** docs/differential-joints.md.
 - **Zoo trike (10):** the trike creeps under its own joints alone, then is pushed out of the sign
-  too weakly (`TRIKE`, docs/differential-joints.md, 19).
+  too weakly (`TRIKE`, docs/differential-joints.md, 19; a rigid relax pass doesn't fix it).
 - **Orbmatch bots (1):** matches to tick 70; the next gap is a score a tick apart. Real's
   relative-turn extent (`r·√2`, 18) is not reproduced.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
