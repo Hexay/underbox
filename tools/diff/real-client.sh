@@ -43,7 +43,7 @@ printf 'pcm.!default { type null }\n' > "$OUT/asound.conf"
 LOG=$GAME/logs/dotnet.log
 rm -f "$LOG"
 (cd "$GAME" && DISPLAY=$D ALSA_CONFIG_PATH="$OUT/asound.conf" LD_PRELOAD=$STANDIN timeout -s TERM -k 10 "$SECS" \
-    $NOWEB dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1
+    dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1
     echo "real-client: exit $?" >> "$OUT/client.out") &
 CLIENT=$!
 
@@ -71,6 +71,7 @@ kill -TERM $CLIENT 2>/dev/null || true
 wait $CLIENT 2>/dev/null || true
 CLIENT=
 cp "$LOG" "$OUT/client.log" 2>/dev/null || : > "$OUT/client.log"
+no_downloads "$GAME" || exit 4
 grep -m1 -E 'Vulkan Physical Device' "$OUT/client.log" || true
 grep -m1 -E 'game.load (success|fail)' "$OUT/client.log" | cut -c1-160 || echo "real-client: game never loaded"
 [ "$STATUS" = 0 ] || { echo "real-client: no settled frame (see $OUT/client.log)"; exit 1; }

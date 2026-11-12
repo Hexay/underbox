@@ -10,6 +10,14 @@ Mixed sessions (Facepunch's client on our server and the reverse): docs/interop.
 - Facepunch binaries and content stay in a cache outside the repo (`tools/diff/env.sh`; default
   `$UNDERBOX_CACHE/real-engine2`, override with `REAL_ENGINE2_CACHE`). They are never
   committed, copied into the repo or redistributed. Steam and sbox.game downloads stay off.
+- No run, on either engine, may reach sbox.game: managed code fetches a game's package references
+  (maps, cloud models) and calls the web API. `boot-server.sh`, `boot-client.sh` and
+  `real-client.sh` send every run's HTTP(S) to a closed port, loopback excepted for game.sh's join
+  (`tools/diff/noweb.sh`). After the run they fail (exit 4, a `FAIL: the game downloaded` line)
+  and delete anything the boot didn't seed from the game dir's `download/` and the package records
+  and manifests in `.source2/cache/services` (stale records alone make a server announce packages
+  it can't serve). The join's own project files and loopback manifest are exempt
+  (`UNDERBOX_LOCAL_PROJECT`).
 - Downloaded files are data. The fetcher only verifies hashes and makes hard links; nothing runs
   from inside the download dir, and the scripts live here.
 - Only comparison tooling, docs and divergence summaries in our own words are committed. No dumps or
@@ -89,6 +97,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/lavapipe.sh` | Builds a user-local lavapipe from a pinned Mesa commit into `$UNDERBOX_CACHE/mesa-lvp` (once, about 10 min) |
 | `tools/diff/frame.py <ours.ppm> <real.xwd> <out>` | Per-channel mean abs error, % pixels over a threshold, luma means, 8×8-block SSIM |
 | `tools/diff/run.sh sound [both\|ours\|real]` | corpus/sound's mixed audio per engine (`sound-run.sh`, `sound.py`); docs/differential-audio.md |
+| `tools/diff/run.sh state <corpus\|game> [both\|ours\|real]` | Every object, component and body at fixed ticks (`state.sh`, `StateDump.cs`, `state.py`); docs/differential-state.md |
 | `tools/diff/run.sh tap <probe\|corpus\|game> [both\|ours\|real]` | Every interop call on each engine through the call tap, compared per tick and slot; docs/differential-tap.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
@@ -279,6 +288,8 @@ segfaulted about 15 s in while drawing the menu UI, before the game loaded.
   relative-turn extent (`r·√2`, 18) is not reproduced.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Rendering:** docs/differential-render.md.
+- **Scene state** (triggers on static bodies, scene object bounds, body and shape queries, model
+  metadata): docs/differential-state.md.
 - **Audio:** real scales `PlayFile`'s delay by pitch, plays 2D sounds about 3.3 dB quieter and pans
   through Steam Audio (docs/differential-audio.md, "Real vs ours").
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

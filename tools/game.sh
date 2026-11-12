@@ -125,7 +125,7 @@ join_client() {
     until='GAME:PLAYER_STANDING .*local=True|wasn.t found|Unable to download|Kicked|Disconnected' grace=3
     [ "$MODE" = play ] && until=$CLIENT_UNTIL'|wasn.t found|Unable to download' grace=$CLIENT_GRACE
     # shellcheck disable=SC2086
-    run_client UNDERBOX_REAL_ENGINE2="$CLIENT_ENGINE2" NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 SEED="$OUT/seed" OUT="$OUT" GRACE=$grace UNTIL="$until" \
+    run_client UNDERBOX_REAL_ENGINE2="$CLIENT_ENGINE2" UNDERBOX_LOCAL_PROJECT="$COPY" SEED="$OUT/seed" OUT="$OUT" GRACE=$grace UNTIL="$until" \
         FRAMES="$OUT/frames" UNDERBOX_FRAMES_LAST=1 sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- +connect "127.0.0.1:$PORT" ${CLIENT_ARGS:-}
     kill "$http" 2>/dev/null || true
 }

@@ -41,7 +41,8 @@ local positions under it, as native does.
   under a MapInstance is the map itself, so the whole map moved twice by the target's offset and
   the floor left the origin. Triggers now report only pairs with a dynamic body
   (`physics/src/shape.rs`, test `static_trigger_ignores_static_and_keyframed_but_sees_dynamic`).
-  Native must behave the same way, or walker's map would move when it loads. Walker's triggers act
+  Real doesn't: its triggers report static and keyframed colliders (docs/differential-render.md,
+  walker 4; docs/differential-state.md, 1). Walker's triggers act
   only on the owner, whose body is dynamic. Found with the watcher's collider probe
   (`GAME:COLLIDER`, logged when the drop trace misses).
 - **Meshes with a missing material didn't load** (7 of 13: the brick walls, the door frame, the
