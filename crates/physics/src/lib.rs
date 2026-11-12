@@ -8,6 +8,7 @@ mod filter;
 mod heightfield;
 mod joint;
 mod mass;
+mod persist;
 mod rules;
 mod scrape;
 mod shape;
@@ -24,7 +25,11 @@ mod landing_tests;
 #[cfg(test)]
 mod orb_tests;
 #[cfg(test)]
+mod refresh_tests;
+#[cfg(test)]
 mod rest_tests;
+#[cfg(test)]
+mod trike_tests;
 #[cfg(test)]
 mod world_tests;
 

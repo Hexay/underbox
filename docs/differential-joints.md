@@ -15,6 +15,8 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
 | `STACKSLEEP` / `STACKV` | the step a resting three-box stack and a lone box fall asleep, and their early speeds |
 | `PUSHOUT` | two unjointed 16-unit boxes (or radius-16 balls) overlapping by `d`, at rest: their gap and speeds |
 | `REAIM` | orbmatch's push: balls at (−400, 0) and (−440, y) set toward the origin every step at 200 and `rear` u/s; `nofriction` zeroes friction |
+| `REFRESH` | `ProbeRefresh.cs`: ball B pushed into ball A (stopped before each step) at `vn`, slid at `vt`, optionally spun; A's velocity after the step is the normal used |
+| `TRIKE` | `ProbeTrike.cs`: the zoo trike (boxes, two cylinder wheels, two caster spheres, motorised hinges with joint collision) through a 10 × 100 × 25 box sign on a slab, gravity on |
 
 ## Findings (before → after)
 
@@ -57,8 +59,7 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
     still closing (243.2, 256.7; real 250.55, 249.34). After (`filter.rs`: hooks only on shapes
     some rule can filter, one tag per uncolliding rule, and on jointed bodies; `bounce.rs`): −3.102,
     250.55 and 249.34, positions within 0.04 of real to step 22 with or without friction
-    (`orb_tests`). Real refreshes the rolling pair at step 23 and ours at 26 (Rapier's bound: 1.97
-    units of relative drift and 11.5° of absolute turn); both then close the pair the same way.
+    (`orb_tests`). The refresh rule is 18.
     Jointed bodies keep the hooks because recycled contacts freeze their normals in world space
     and fight the soft joint locks (14): the `CAR` crept at 2 u/s and never slept.
 17. **Not changed. Push-out of unjointed overlaps.** `PUSHOUT`: the gap already follows real (box
@@ -69,6 +70,38 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
     4 gaps within 0.02, speed 1.33 then 2.24) but breaks the landing, stack depth and sleep, and
     car fits (`landing_tests`, `rest_tests`, `soft_tests`), and moves the zoo trike by under 5
     units. Kept at 2 PGS and 3 stabilization iterations.
+18. **Fixed. When a persistent contact is refreshed.** `REFRESH` replays Rapier's recycling bound
+    on both engines' poses: a pair keeps its contact while the relative pose drifts at most
+    `D = 1.97` (translation plus the rotation chord times an extent) and neither body turns past
+    a limit. Pure slides refresh on the same steps on both engines (`vt` 25–200, radius 8–32,
+    `vn` 50–200), so `D` agrees. Real's extent is about `r·√2` (fitted 1.35–1.43 r from spins of 2–10
+    rad/s at r = 8 and 16; Rapier's is the AABB corner, `r·√3`), and its absolute-turn limit is
+    10° (a rolling pair refreshes at 10.4°, not at 9.4°; Rapier's is 11.5°). Both are hard-coded in
+    Rapier. The turn limit is what orbmatch's rolling pair hits; `persist.rs` forces a full update
+    at 10° by switching the pair's hooks on for one step. The extent is left (it only matters when
+    the bodies turn relative to each other while sliding: ours refreshes 1–4 steps early).
+    Before: the rolling `REFRESH` pair refreshed at steps 15, 23, 28 (real 13, 20, 25, 29);
+    orbmatch's bots parted at tick 23 on real and 26 on ours, `FINAL` `Bot0_0` x = −138.6 and
+    `Bot1_1` 42.1 (real −161.5, 52.9). After: 13, 20, 25, 29 (`refresh_tests`); every orbmatch
+    `MATCH:POS` within 0.01 of real through tick 70 (`orb_tests` to step 30); `FINAL` −157.5 and
+    46.9. Tick 75 differs because a bot scores a tick apart.
+19. **Not changed. The trike against its own joints, and through the sign.** `TRIKE` (variants:
+    `dynamic` sign, `static` sign, `nojoint`, `nocollide` for joint collision off, `nosign`), and
+    headless in `trike_tests::print_trike`, which reproduces ours. Real, alone on the slab
+    (`nosign`): the base rises 0.12, the rear wheels slide back 0.7 and all sleep by step 100. Ours
+    creeps under its own joints, tips over by step 100 and never sleeps; with joint collision off
+    it rests at once. The rear wheels and casters sit inside the base's boxes, so their contacts
+    fight the hinges. Through the 819 kg `dynamic` sign, real pushes the base out +x (3.7 by step
+    10, 9.9 by 20) and the sign falls flat beside it (z 4.986); the trike ends 16 units out,
+    upright and asleep. Ours pushes 1.1–2.0 by step 10, the sign falls onto the trike (z ≈ 9.5)
+    and it never sleeps. Tried, none matching both: locked-axis softness 20–160 Hz × ζ 5–40, rigid
+    (1 MHz), Box2D's 60 Hz ζ 2, joint warm-starting, friction in the bias pass, max corrective
+    velocity 1–20 m/s, dynamic contact softness 10 Hz (`nosign` rests, but the sign then pins the
+    trike) or 60 Hz (explodes), and scaling jointed pairs' penetration by 0–0.5 in a contact hook
+    (0.25 and below rest `nosign`, but break `OVERLAP` and `CAR` at every softness tried, and the
+    sign still lands on the trike). One PGS and one stabilization iteration is the only setting
+    that throws the trike out like real (`dynamic`: base x 10–15, sign flat at 4.986) but it
+    still creeps alone and breaks 17's fits. Real's static `PhysicsBody.Mass` reads 0; ours 819.
 
 ## The zoo hoover (differential.md, 10)
 
@@ -88,8 +121,10 @@ Real's `RESTED`: `base` (583, 138, 8) `up=0.1`, `rear` (581, 132, 12), wheels at
 than 5 units or tipping it: one stabilization iteration per substep with 1 or 3 PGS iterations
 (real's residual push-out speed; 579, 185 and 574, 184), per-step restitution and contact
 persistence (16; 576, 184). The trike's bodies are jointed, so they keep fresh contacts (16).
-Next: probe a hinged pair inside a static or heavy dynamic hull, the trike's own geometry, rather
-than unjointed boxes. Real's tick-4 sample is
+`TRIKE` (19) rebuilds the trike and sign in a private world: two gaps, the trike creeping under its
+own joint-vs-contact fight and a weaker push out of the sign. Next: why Rapier's joints never settle
+against contacts inside their own bodies (unverified lead: Box2D's relax pass solves joints rigidly,
+Rapier keeps their softness there), then the push-out. Real's tick-4 sample is
 not repeatable either: two runs gave `base` v = 41 and 8, `rear` 12 and 36, because the watcher
 samples on wall-clock seconds. Softer joints (Box2D's 60 Hz ζ 2, or 50 Hz ζ 2) kept 4–5 trike
 bodies awake for about 20 s, close to real's awake counts, but only because the trike creeps under
@@ -107,8 +142,7 @@ re-aimed at the goal (200 and 300 u/s) and the solver resolves the push:
   stabilization iterations, warm-starting, friction model and restitution alone left tick 20
   within 0.1 of the old numbers; the normal is what moved it.
 
-The bots part at tick 23 on real and 26 on ours, when each refreshes the rolling pair's contact
-(16): 0.23 apart by tick 25, 0.35 by tick 30. `FINAL`: `Bot0_0` ends at x = −138.6 on ours and
-−161.5 on real (before −180), `Bot1_1` 42.1 against 52.9. `orb_tests` replays the push headless
-(positions and velocities to step 19, the bounce threshold). Next: when real refreshes a
-persistent contact (the anchored points' drift, or the bodies' turn).
+The rolling pair's contact now refreshes at real's 10° of turn (18): every `MATCH:POS` is within
+0.01 of real through tick 70; at 75 a bot scores a tick apart. `FINAL`: `Bot0_0` ends at x =
+−157.5 on ours and −161.5 on real (before −138.6, and −180 before 16), `Bot1_1` 46.9 against 52.9.
+`orb_tests` replays the push headless (positions and velocities to step 30).
