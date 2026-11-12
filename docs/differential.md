@@ -99,6 +99,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/run.sh sound [both\|ours\|real]` | corpus/sound's mixed audio per engine (`sound-run.sh`, `sound.py`); docs/differential-audio.md |
 | `tools/diff/run.sh state <corpus\|game> [both\|ours\|real]` | Every object, component and body at fixed ticks (`state.sh`, `StateDump.cs`, `state.py`); docs/differential-state.md |
 | `tools/diff/run.sh tap <probe\|corpus\|game> [both\|ours\|real]` | Every interop call on each engine through the call tap, compared per tick and slot; docs/differential-tap.md |
+| `tools/diff/run.sh gpu <corpus\|game> [both\|ours\|real]` | One pinned frame's Vulkan passes, draws, state and uniforms per engine through a capture layer, matched by structure; docs/differential-gpu.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the
