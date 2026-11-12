@@ -1,0 +1,15 @@
+[package]
+name = "tap"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "A libengine2 that logs every igen_engine call and forwards it to another engine2 (docs/differential-tap.md)"
+publish = false
+
+[lib]
+name = "engine2_tap"
+crate-type = ["cdylib"]
+
+[dependencies]
+abi = { path = "../abi" }
+libc = "0.2"

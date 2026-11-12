@@ -21,11 +21,10 @@ pub(crate) struct Planned<'a> {
     pub ret: Mapped,
 }
 
-pub fn emit(abi: &Abi, structs: &Structs) -> Result<Emitted, String> {
-    let planned = plan(abi, structs)?;
+pub fn emit(abi: &Abi, structs: &Structs, planned: &[Planned]) -> Result<Emitted, String> {
     let mut markers = BTreeSet::new();
     let mut handles = BTreeSet::new();
-    for p in &planned {
+    for p in planned {
         if let Some(c) = &p.slot.class {
             markers.insert(names::type_name(&c.native));
         }
@@ -46,10 +45,10 @@ pub fn emit(abi: &Abi, structs: &Structs) -> Result<Emitted, String> {
             }
         }
     }
-    Ok(Emitted { slots: emit_slots(abi, structs, &planned, &markers, &handles)?, thunks: emit_thunks(&planned)? })
+    Ok(Emitted { slots: emit_slots(abi, structs, planned, &markers, &handles)?, thunks: emit_thunks(planned)? })
 }
 
-fn plan<'a>(abi: &'a Abi, structs: &Structs) -> Result<Vec<Planned<'a>>, String> {
+pub(crate) fn plan<'a>(abi: &'a Abi, structs: &Structs) -> Result<Vec<Planned<'a>>, String> {
     let mut used: HashMap<Option<String>, BTreeSet<String>> = HashMap::new();
     let mut out = Vec::with_capacity(abi.slots.len());
     for slot in &abi.slots {

@@ -42,3 +42,4 @@ for f in libengine2 libvfx_vulkan libfilesystem_stdio libsteam_api libSkiaSharp 
     [ "$(od -An -tx1 -N4 "$NATIVE/$f.so" 2>/dev/null | tr -d ' ')" = 7f454c46 ] ||
         { echo "install-engine2: $NATIVE/$f.so is missing or not ELF; refusing to boot" >&2; exit 3; }
 done
+[ -z "${UNDERBOX_TAP_DIR:-}" ] || sh "$ROOT/tools/diff/tap-install.sh" "$NATIVE"
