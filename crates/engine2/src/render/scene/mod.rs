@@ -7,6 +7,7 @@ pub mod camera;
 mod collect;
 pub mod execute;
 pub mod layer;
+mod occlusion;
 pub(crate) mod pvs;
 pub mod setup;
 pub mod shadow_view;

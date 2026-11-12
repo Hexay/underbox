@@ -44,6 +44,7 @@ enum DynBit : uint32_t {
     D_VIEWPORT = 1 << 0, D_SCISSOR = 1 << 1, D_CULL = 1 << 2, D_FRONT = 1 << 3, D_TOPO = 1 << 4, D_DTEST = 1 << 5,
     D_DWRITE = 1 << 6, D_DCMP = 1 << 7, D_BIASEN = 1 << 8, D_BIAS = 1 << 9, D_STEST = 1 << 10, D_SREF = 1 << 11,
     D_BC = 1 << 12, D_BLENDEN = 1 << 13, D_MASK = 1 << 14, D_EQ = 1 << 15, D_POLY = 1 << 16,
+    D_SOP = 1 << 17, D_SCMASK = 1 << 18, D_SWMASK = 1 << 19,
 };
 struct Dyn {
     uint32_t set = 0;
@@ -56,6 +57,8 @@ struct Dyn {
     VkCompareOp dCmp{};
     float bias[3]{};
     uint32_t sref = 0;
+    // Front [0] and back [1] faces' dynamic ops, compare mask and write mask (reference: sref).
+    VkStencilOpState sface[2]{};
     float bc[4]{};
     VkPolygonMode poly{};
     std::vector<VkBool32> blendEn;

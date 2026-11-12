@@ -31,6 +31,7 @@ fn draw<'a>(v: &'a Buffer, i: &'a Buffer, tint: [f32; 4]) -> MeshDraw<'a> {
         uniforms: DrawUniforms { mvp: Mat4::IDENTITY, model: Mat4::IDENTITY, tint },
         state: RasterState::default(),
         shaded: None,
+        indirect: None,
     }
 }
 

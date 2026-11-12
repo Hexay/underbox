@@ -89,7 +89,22 @@ std::string state_obj(const PipeInfo& p, const Dyn& y) {
         o.raw("bias", arr({num(d ? y.bias[0] : p.rs.depthBiasConstantFactor), num(d ? y.bias[1] : p.rs.depthBiasClamp),
                            num(d ? y.bias[2] : p.rs.depthBiasSlopeFactor)}));
     }
-    o.n("stencil", dyn(VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE, D_STEST) ? y.sTest : p.ds.stencilTestEnable);
+    bool sTest = dyn(VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE, D_STEST) ? y.sTest : p.ds.stencilTestEnable;
+    o.n("stencil", sTest);
+    if (sTest) {
+        // Per face: fail, pass, depth-fail, compare, compare mask, write mask, reference.
+        std::vector<std::string> sf;
+        for (int i = 0; i < 2; i++) {
+            VkStencilOpState s = i ? p.ds.back : p.ds.front;
+            const VkStencilOpState& d = y.sface[i];
+            if (dyn(VK_DYNAMIC_STATE_STENCIL_OP, D_SOP)) s.failOp = d.failOp, s.passOp = d.passOp, s.depthFailOp = d.depthFailOp, s.compareOp = d.compareOp;
+            if (dyn(VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK, D_SCMASK)) s.compareMask = d.compareMask;
+            if (dyn(VK_DYNAMIC_STATE_STENCIL_WRITE_MASK, D_SWMASK)) s.writeMask = d.writeMask;
+            if (dyn(VK_DYNAMIC_STATE_STENCIL_REFERENCE, D_SREF)) s.reference = y.sref;
+            sf.push_back(arr({q(nm(s.failOp)), q(nm(s.passOp)), q(nm(s.depthFailOp)), q(nm(s.compareOp)), num(s.compareMask), num(s.writeMask), num(s.reference)}));
+        }
+        o.raw("sops", arr(sf));
+    }
     if (p.rs.depthClampEnable) o.n("clamp", 1);
     if (p.rs.rasterizerDiscardEnable) o.n("discard", 1);
     o.n("samples", p.samples);

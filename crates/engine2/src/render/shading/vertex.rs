@@ -1,7 +1,8 @@
 //! A material program's vertex inputs fed from a mesh layout, matched by HLSL semantic
-//! (`TEXCOORD0` ↔ texcoord 0). Slot 0 is the mesh; slot 1 a constant defaults buffer (stride 0)
-//! for inputs the mesh lacks; slot 2 the per-instance transform ids (`TEXCOORD13`,
-//! `InstanceTransformUv`), which index the draw's transform buffer from 0.
+//! (`TEXCOORD0` ↔ texcoord 0). Slot 0 is the mesh; slot 1 the per-instance transform ids
+//! (`TEXCOORD13`, `InstanceTransformUv`), which index the draw's transform buffer from 0; slot 2
+//! a constant defaults buffer (stride 0, per instance) for inputs the mesh lacks. The slots are
+//! real's: its capture binds the same three.
 
 use crate::mesh::layout::{Layout, format};
 use render::VertexBufferKey;
@@ -28,6 +29,8 @@ fn mesh_format(f: u32) -> Option<F> {
         format::RGBA8_UINT => F::Uint8x4,
         format::R32_UINT => F::Uint32,
         format::R32_SINT => F::Sint32,
+        format::RG16F => F::Float16x2,
+        format::RGB10A2_UNORM => F::Unorm10_10_10_2,
         _ => return None,
     })
 }
@@ -69,7 +72,7 @@ pub fn inputs(shader: &[VertexInput], layout: &Layout) -> Option<Inputs> {
         let attr = |format, offset| VertexAttribute { format, offset, shader_location: input.location };
         match found {
             Some((f, fmt)) => {
-                uncompressed_normals |= name == "normal" && base(fmt) == Base::Float && fmt != F::Unorm8x4;
+                uncompressed_normals |= name == "normal" && base(fmt) == Base::Float && !matches!(fmt, F::Unorm8x4 | F::Unorm10_10_10_2);
                 mesh.push(attr(fmt, f.offset as u64));
             }
             None if (name.as_str(), index) == INSTANCE_ID && base(want) == Base::Uint => instance.push(attr(F::Uint32, 0)),
@@ -90,8 +93,8 @@ pub fn inputs(shader: &[VertexInput], layout: &Layout) -> Option<Inputs> {
     }
     let keys = vec![
         VertexBufferKey { stride, step: VertexStepMode::Vertex, attributes: mesh },
-        VertexBufferKey { stride: 0, step: VertexStepMode::Vertex, attributes: defaults },
         VertexBufferKey { stride: 4, step: VertexStepMode::Instance, attributes: instance },
+        VertexBufferKey { stride: 0, step: VertexStepMode::Instance, attributes: defaults },
     ];
     Some(Inputs { keys, uncompressed_normals })
 }
@@ -111,7 +114,7 @@ mod tests {
         let i = inputs(&shader, &layout).unwrap();
         let locations = |k: &VertexBufferKey| k.attributes.iter().map(|a| a.shader_location).collect::<Vec<_>>();
         assert!(locations(&i.keys[0]).contains(&0));
-        assert_eq!(locations(&i.keys[2]), [2]);
+        assert_eq!(locations(&i.keys[1]), [2]);
         assert_eq!(semantic("TEXCOORD13"), ("texcoord".into(), 13));
         assert_eq!(semantic("POSITION"), ("position".into(), 0));
     }

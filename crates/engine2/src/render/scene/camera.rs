@@ -113,6 +113,10 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
         managed_camera_id: camera_id,
     };
     let v = view::create(desc);
+    // The view's attributes see the camera's: the pipeline reads `NeedsDepthNormals` off the view.
+    if let Some(view) = view::get(v) {
+        attributes::set_parent(view.attributes, attrs);
+    }
     // Managed's `BackgroundColor` is gamma space; the view clears its linear target with it.
     let gamma = attributes::vector4(attrs, StringToken::of("clearColor")).map_or(Vec4::new(0.0, 0.0, 0.0, 1.0), |c| Vec4::new(c.vec.x, c.vec.y, c.vec.z, c.vec.w));
     let d = render::srgb::decode;
@@ -197,7 +201,7 @@ impl ScratchDepth {
         let mut free = FREE_DEPTHS.lock().unwrap();
         let t = match free.iter().position(|(s, _)| *s == (w, h)) {
             Some(i) => free.swap_remove(i).1,
-            None => texture::create_target("camera depth", w, h, 62),
+            None => texture::create_target("camera depth", w, h, swap_chain::DEPTH_IMAGE_FORMAT),
         };
         ScratchDepth(t, (w, h))
     }

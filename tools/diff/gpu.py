@@ -104,7 +104,8 @@ def state_line(st):
     bl = ",".join("off" if not b["en"] else f"{b['c']}|{b['a']}" for b in st.get("blend", [])) or "-"
     masks = ",".join(b["mask"] or "none" for b in st.get("blend", [])) or "-"
     depth = f"depth {st['dcmp']}{' w' if st['dwrite'] else ''}" if st["dtest"] else ("depth off w" if st["dwrite"] else "depth off")
-    return f"{st['topo']} {st['poly']} cull {st['cull']} {st['front']} {depth}{' bias' + str(st['bias']) if 'bias' in st else ''} blend {bl} mask {masks}"
+    stencil = f" stencil {st['sops']}" if st.get("sops") else (" stencil" if st.get("stencil") else "")
+    return f"{st['topo']} {st['poly']} cull {st['cull']} {st['front']} {depth}{' bias' + str(st['bias']) if 'bias' in st else ''}{stencil} blend {bl} mask {masks}"
 
 
 def resources(fr, res):

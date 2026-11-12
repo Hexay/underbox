@@ -23,8 +23,8 @@ fn surface(gpu: &render::Gpu, w: RawPtr<c_void>, width: u32, height: u32, vsync:
 
 /// `SwapChainBuffer`: which of a swap chain's textures `GetSwapChainTexture` returns.
 const BUFFER_DEPTH: i64 = 1;
-/// `ImageFormat` of swap-chain depth: D32F (formats.rs).
-const DEPTH_IMAGE_FORMAT: i32 = 62;
+/// `ImageFormat` of swap-chain depth: native's D32FS8 (formats.rs).
+pub const DEPTH_IMAGE_FORMAT: i32 = 92;
 
 pub struct SwapChain {
     pub name: String,

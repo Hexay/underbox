@@ -16,20 +16,27 @@ struct Entry {
     gpu: Arc<render::Buffer>,
 }
 
-static CACHE: LazyLock<Mutex<HashMap<usize, Entry>>> = LazyLock::new(Default::default);
+type Cache = LazyLock<Mutex<HashMap<usize, Entry>>>;
+static CACHE: Cache = LazyLock::new(Default::default);
+/// [`draw_vertices`]' packed copies, by the same key.
+static PACKED: Cache = LazyLock::new(Default::default);
 
 fn upload<M: Send + Sync + 'static>(b: &Arc<Buffer<M>>, kind: BufferKind) -> Option<Arc<render::Buffer>> {
+    upload_to(&CACHE, b, kind, |bytes| bytes.to_vec())
+}
+
+fn upload_to<M: Send + Sync + 'static>(cache: &Cache, b: &Arc<Buffer<M>>, kind: BufferKind, convert: impl FnOnce(&[u8]) -> Vec<u8>) -> Option<Arc<render::Buffer>> {
     let gpu = device::gpu()?;
     let key = Arc::as_ptr(b) as usize;
     let version = b.version();
-    let mut cache = CACHE.lock().unwrap();
+    let mut cache = cache.lock().unwrap();
     if let Some(e) = cache.get(&key)
         && e.version == version
         && (e.alive)()
     {
         return Some(e.gpu.clone());
     }
-    let bytes = b.read();
+    let bytes = convert(&b.read());
     if bytes.is_empty() {
         return None;
     }
@@ -49,6 +56,26 @@ pub fn vertices(b: &Arc<VertexBuffer>) -> Option<Arc<render::Buffer>> {
     upload(b, BufferKind::Vertex)
 }
 
+/// The vertex stream a draw reads and its layout. Compiled geometry ([`Layout::sbox_vertex`])
+/// draws from [`Layout::packed_vertex`], as real's does; skinning and the CPU keep the full
+/// vertices ([`vertices`]).
+pub fn draw_vertices(b: &Arc<VertexBuffer>) -> Option<(Arc<render::Buffer>, Arc<Layout>)> {
+    if *b.meta != *Layout::sbox_vertex() {
+        return Some((vertices(b)?, b.meta.clone()));
+    }
+    Some((upload_to(&PACKED, b, BufferKind::Vertex, |bytes| pack(&b.meta, bytes))?, Layout::packed_vertex()))
+}
+
+fn pack(layout: &Layout, bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len() / layout.stride.max(1) * 20);
+    for v in layout.decode_all(bytes) {
+        v.position.iter().for_each(|p| out.extend_from_slice(&p.to_le_bytes()));
+        v.tex0[..2].iter().for_each(|t| out.extend_from_slice(&half::f16::from_f32(*t).to_le_bytes()));
+        out.extend_from_slice(&assets::compiled::vertex::pack_frame(v.normal, v.tangent).to_le_bytes());
+    }
+    out
+}
+
 pub fn indices(b: &Arc<IndexBuffer>) -> Option<(Arc<render::Buffer>, IndexFormat)> {
     let format = if b.meta { IndexFormat::Uint32 } else { IndexFormat::Uint16 };
     upload(b, BufferKind::Index).map(|g| (g, format))
@@ -56,7 +83,9 @@ pub fn indices(b: &Arc<IndexBuffer>) -> Option<(Arc<render::Buffer>, IndexFormat
 
 /// Forget GPU copies whose mesh buffer was released.
 pub fn prune() {
-    CACHE.lock().unwrap().retain(|_, e| (e.alive)());
+    for cache in [&CACHE, &PACKED] {
+        cache.lock().unwrap().retain(|_, e| (e.alive)());
+    }
 }
 
 fn vertex_format(f: u32) -> Option<VertexFormat> {

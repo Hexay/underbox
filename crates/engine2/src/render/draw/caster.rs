@@ -62,7 +62,10 @@ pub fn instanced(draws: Vec<Draw>, view_proj: Mat4) -> Vec<Draw> {
             (None, Some(keys)) => {
                 let instance = Instance { world: d.uniforms.model, tint: d.uniforms.tint };
                 match groups.iter_mut().find(|(g, _, _)| same_mesh(g, &d)) {
-                    Some((_, _, instances)) => instances.push(instance),
+                    Some((g, _, instances)) => {
+                        instances.push(instance);
+                        g.cull.bounds.append(&mut d.cull.bounds);
+                    }
                     None => groups.push((d, keys, vec![instance])),
                 }
             }

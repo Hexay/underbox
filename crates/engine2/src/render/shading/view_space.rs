@@ -34,11 +34,19 @@ impl Space {
         let up = unit(up - forward * up.dot(forward), forward.any_orthonormal_vector());
         let right = forward.cross(up);
         let rotation = Mat4::from_mat3(Mat3::from_cols(right, up, -forward).transpose());
-        let projection = view_proj * Mat4::from_translation(position) * rotation.transpose();
+        let mut projection = view_proj * Mat4::from_translation(position) * rotation.transpose();
+        if !perspective {
+            // An ortho projection only scales each axis and offsets z (the eye is clip (0, 0, 1));
+            // native's holds exact zeros where taking the matrix apart leaves float noise.
+            (projection.x_axis.y, projection.x_axis.z, projection.y_axis.x, projection.y_axis.z, projection.z_axis.x, projection.z_axis.y) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            (projection.w_axis.x, projection.w_axis.y) = (0.0, 0.0);
+        }
         let (a, b) = (projection.z_axis.z, projection.w_axis.z);
         let (near, far) = if perspective { (b / (1.0 + a), b / a) } else { ((b - 1.0) / a, b / a) };
         let finite = |x: f32, or: f32| if x.is_finite() { x } else { or };
+        // A shadow cascade's near plane is 0: b - 1 is then rounding, scaled up by the far plane.
         let near = finite(near, 0.0);
+        let near = if !perspective && near.abs() < far.abs() * 1e-6 { 0.0 } else { near };
         Space { position, forward, up, right, rotation, projection, near, far: finite(far, near.max(1.0) * 1e6), perspective }
     }
 

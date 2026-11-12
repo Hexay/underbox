@@ -143,19 +143,42 @@ pub fn unpack_frame_r32(p: u32) -> ([f32; 3], [f32; 4]) {
     (n, [t[0], t[1], t[2], if p & 1 == 0 { -1.0 } else { 1.0 }])
 }
 
-/// The inverse of [`unpack_frame_r32`] (for fixtures): `tangent` must be perpendicular to `normal`.
-pub fn pack_frame_r32(normal: [f32; 3], tangent: [f32; 4]) -> u32 {
-    let l1 = normal.iter().map(|v| v.abs()).sum::<f32>();
+/// `normal` as [`octahedral`]'s 10-bit x and y, and the decoded normal they stand for.
+fn octahedral_bits(normal: [f32; 3]) -> (u32, u32, [f32; 3]) {
+    let l1 = normal.iter().map(|v| v.abs()).sum::<f32>().max(f32::MIN_POSITIVE);
     let (mut x, mut y) = (normal[0] / l1, normal[1] / l1);
     if normal[2] < 0.0 {
         (x, y) = ((1.0 - y.abs()) * x.signum(), (1.0 - x.abs()) * y.signum());
     }
     let q = |v: f32| (((v + 1.0) / 2.0 * 1023.0).round() as u32).min(1023);
-    let base = (q(y) << 22) | (q(x) << 12) | u32::from(tangent[3] > 0.0);
-    let n = octahedral(q(x), q(y));
-    let (t0, t1) = (basis(n), cross(n, basis(n)));
+    (q(x), q(y), octahedral(q(x), q(y)))
+}
+
+/// `tangent`'s components along the basis around the decoded normal `n`.
+fn tangent_in_basis(n: [f32; 3], tangent: [f32; 4]) -> (f32, f32) {
     let dot = |a: [f32; 3]| a[0] * tangent[0] + a[1] * tangent[1] + a[2] * tangent[2];
-    let a = dot(t1).atan2(dot(t0)).rem_euclid(std::f32::consts::TAU);
+    (dot(basis(n)), dot(cross(n, basis(n))))
+}
+
+/// The inverse of [`unpack_frame`]: what real's compiler stores, and the vertex stream ours
+/// draws with. `tangent` must be perpendicular to `normal`.
+pub fn pack_frame(normal: [f32; 3], tangent: [f32; 4]) -> u32 {
+    let (x, y, n) = octahedral_bits(normal);
+    let (tx, ty) = tangent_in_basis(n, tangent);
+    let l1 = (tx.abs() + ty.abs()).max(f32::MIN_POSITIVE);
+    let (p, q) = (tx / l1, ty / l1);
+    let d = if q >= 0.0 { (3.0 - p) / 4.0 } else { (p + 1.0) / 4.0 };
+    let z = ((d * 1023.0).round() as u32).min(1023);
+    let w = if tangent[3] > 0.0 { 3 } else { 0 };
+    x | (y << 10) | (z << 20) | (w << 30)
+}
+
+/// The inverse of [`unpack_frame_r32`] (for fixtures): `tangent` must be perpendicular to `normal`.
+pub fn pack_frame_r32(normal: [f32; 3], tangent: [f32; 4]) -> u32 {
+    let (x, y, n) = octahedral_bits(normal);
+    let base = (y << 22) | (x << 12) | u32::from(tangent[3] > 0.0);
+    let (tx, ty) = tangent_in_basis(n, tangent);
+    let a = ty.atan2(tx).rem_euclid(std::f32::consts::TAU);
     base | ((((a / std::f32::consts::TAU) * 2047.0).round() as u32 % 2048) << 1)
 }
 
@@ -237,6 +260,17 @@ mod tests {
         for (word, n, t) in cases {
             let (dn, dt) = unpack_frame(word);
             assert!(near(&dn, &n) && near(&dt, &t), "{word:#x}: {dn:?} {dt:?}");
+            assert_eq!(pack_frame(dn, dt), word, "{word:#x} packs back");
+        }
+    }
+
+    #[test]
+    fn real_frames_round_trip() {
+        let s = std::f32::consts::FRAC_1_SQRT_2;
+        for (n, t) in [([0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0]), ([s, 0.0, -s], [0.0, 1.0, 0.0, -1.0]), ([0.0, -1.0, 0.0], [s, 0.0, s, 1.0])] {
+            let (dn, dt) = unpack_frame(pack_frame(n, t));
+            assert!(n.iter().zip(dn).all(|(a, b)| (a - b).abs() < 0.01), "{n:?} -> {dn:?}");
+            assert!(t.iter().zip(dt).all(|(a, b)| (a - b).abs() < 0.01), "{t:?} -> {dt:?}");
         }
     }
 }
