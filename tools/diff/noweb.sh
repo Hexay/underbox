@@ -24,15 +24,15 @@ from_local_project() {
 
 # no_downloads <game-dir> [seeded files, as `find .` lists them]: after a run. Anything else in
 # download/, or a package record or manifest in the services cache, was fetched: print it loudly,
-# delete it, return 1.
+# delete it, return 1. The join's local files go quietly: game dirs are reused, and real copies them.
 no_downloads() {
     found=$(cd "$1" && find download .source2/cache/services -type f 2>/dev/null | while read -r f; do
         case $f in .source2/*/package_types.json) continue ;; .source2/*/package.*|.source2/*/manifest.*|download/*) ;; *) continue ;; esac
         printf '%s\n' "${2:-}" | grep -qxF "./$f" && continue
-        from_local_project "$f" || printf '%s\n' "$f"
+        if from_local_project "$f"; then rm -f "$f"; else printf '%s\n' "$f"; fi
     done)
     [ -n "$found" ] || return 0
-    echo "FAIL: the game downloaded $(printf '%s\n' "$found" | wc -l) files into $1; no run may reach sbox.game (docs/differential.md). Deleted:" | tee /dev/stderr
+    echo "FAIL: the game downloaded $(printf '%s\n' "$found" | wc -l) files into $1; no run may reach sbox.game (docs/differential.md). Deleted:"
     printf '%s\n' "$found" | head -n 10
     (cd "$1" && printf '%s\n' "$found" | while read -r f; do rm -f "$f"; done)
     return 1
