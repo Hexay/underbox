@@ -9,21 +9,12 @@ mod windows;
 use abi::slots::global_sdl as sdl;
 use abi::{RawPtr, Registry, bind};
 use std::ffi::{CStr, c_void};
-use std::time::{Duration, Instant};
 use window::Window;
 
-/// OS sleeps overshoot by up to about this much, so the tail is spun.
-const SPIN: Duration = Duration::from_millis(1);
-
-/// SDL_DelayPrecise: wait `ns` nanoseconds, sleeping the bulk and spinning the tail.
+/// SDL's own: our earlier 1 ms spin tail cost a server about 1 ms of CPU per frame
+/// (docs/perf-physics.md).
 fn delay_precise(ns: u64) {
-    let deadline = Instant::now() + Duration::from_nanos(ns);
-    if let Some(sleep) = deadline.checked_duration_since(Instant::now()).and_then(|d| d.checked_sub(SPIN)) {
-        std::thread::sleep(sleep);
-    }
-    while Instant::now() < deadline {
-        std::hint::spin_loop();
-    }
+    window::delay_precise(ns);
 }
 
 fn video_allowed() -> bool {

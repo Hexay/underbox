@@ -3,7 +3,7 @@
 use crate::rules::{CollisionRules, Rule};
 use crate::world::World;
 use rapier3d::prelude::{ActiveHooks, ColliderHandle, PairFilterContext, PhysicsHooks, RigidBodyHandle, SolverFlags};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 /// managed's `CollisionFunctionMask`.
 pub mod function {

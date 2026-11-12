@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 rapier3d = "0.36"
+rustc-hash = "2"

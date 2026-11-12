@@ -78,6 +78,13 @@ pub fn set_error(message: &str) -> bool {
     unsafe { sdl3_sys::error::SDL_SetError(c"%s".as_ptr(), message.as_ptr()) }
 }
 
+/// SDL_DelayPrecise: sleeps in 1 ms steps, then sleeps the rest less the worst overshoot seen and
+/// spins only what is left.
+pub fn delay_precise(ns: u64) {
+    // SAFETY: plain value argument; SDL's tick source initialises itself on first use.
+    unsafe { sdl3_sys::timer::SDL_DelayPrecise(ns) }
+}
+
 /// SDL_free: releases memory SDL handed out (clipboard text, display and mode arrays).
 ///
 /// # Safety

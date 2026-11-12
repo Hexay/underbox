@@ -5,7 +5,7 @@ use crate::filter::{Contact, Hooks, ShapeMeta, function};
 use rapier3d::math::Vector;
 use rapier3d::pipeline::PhysicsWorld;
 use rapier3d::prelude::{ColliderHandle, ContactPair};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 /// managed's `IntersectionEventType_t`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,11 +35,25 @@ pub struct ContactEvent {
 /// A contact closer than this (inches) touches; Rapier also keeps speculative contacts further out.
 const TOUCH_DISTANCE: f32 = 0.1;
 
+/// A shape's place in creation order, then its handle for shapes created before tracking.
+type Rank = (u64, u32, u32);
+
+/// A touching pair, `a` created before `b`.
+#[derive(Clone, Copy)]
+struct Touch {
+    key: (Rank, Rank),
+    a: ColliderHandle,
+    b: ColliderHandle,
+    kind: Contact,
+}
+
 #[derive(Default)]
 pub(crate) struct Contacts {
-    touching: HashMap<(ColliderHandle, ColliderHandle), Contact>,
-    /// Shape creation order: pairs and events follow it, as native's do (orbmatch's tie-break).
-    created: HashMap<ColliderHandle, u64>,
+    /// Sorted by `key`: shape creation order, which pairs and events follow as native's do
+    /// (orbmatch's tie-break).
+    touching: Vec<Touch>,
+    spare: Vec<Touch>,
+    created: FxHashMap<ColliderHandle, u64>,
     next: u64,
     pub events: Vec<ContactEvent>,
     /// Solid pairs that started touching in the last step.
@@ -48,12 +62,19 @@ pub(crate) struct Contacts {
 
 /// Gotcha: a recycled manifold (`persist.rs`) keeps the distance of the step it was made in, so a
 /// body that lands from far enough away never reads as touching; measure the pair again instead.
+/// Overlapping pairs skip the contact query's EPA. Not `distance` for the rest: for box pairs the
+/// contact query disagrees with GJK's distance both ways near the threshold (0.24 apart reads as
+/// touching; one pair 0.004 apart doesn't).
 fn touches(world: &PhysicsWorld, pair: &ContactPair) -> bool {
     if !pair.has_any_active_contact() {
         return false;
     }
     let (Some(a), Some(b)) = (world.colliders.get(pair.collider1), world.colliders.get(pair.collider2)) else { return false };
-    match rapier3d::parry::query::contact(a.position(), a.shape(), b.position(), b.shape(), TOUCH_DISTANCE) {
+    let (pa, pb) = (a.position(), b.position());
+    if rapier3d::parry::query::intersection_test(pa, a.shape(), pb, b.shape()).is_ok_and(|i| i.intersecting) {
+        return true;
+    }
+    match rapier3d::parry::query::contact(pa, a.shape(), pb, b.shape(), TOUCH_DISTANCE) {
         Ok(found) => found.is_some(),
         Err(_) => pair.find_deepest_contact().is_some_and(|(_, c)| c.dist <= TOUCH_DISTANCE),
     }
@@ -79,53 +100,64 @@ fn event(world: &PhysicsWorld, kind: EventKind, a: ColliderHandle, b: ColliderHa
     e
 }
 
+fn find(touches: &[Touch], key: (Rank, Rank)) -> Option<&Touch> {
+    touches.binary_search_by_key(&key, |t| t.key).ok().map(|i| &touches[i])
+}
+
 impl Contacts {
     /// Diff this step's touching pairs against the last step's, queueing events.
     pub fn update(&mut self, world: &PhysicsWorld, hooks: &Hooks) {
-        let mut now = HashMap::with_capacity(self.touching.len());
+        let mut now = std::mem::take(&mut self.spare);
+        now.clear();
         for pair in world.narrow_phase.contact_pairs().filter(|p| touches(world, p)) {
             let kind = hooks.classify(pair.collider1, pair.collider2, false);
             if kind != Contact::None {
-                now.insert(self.ordered(pair.collider1, pair.collider2), kind);
+                now.push(self.touch(pair.collider1, pair.collider2, kind));
             }
         }
         for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2) {
-            now.insert(self.ordered(a, b), Contact::Trigger);
+            now.push(self.touch(a, b, Contact::Trigger));
         }
+        // Stable sort, and a repeated pair keeps its last entry (a trigger over a solid contact).
+        now.sort_by_key(|t| t.key);
+        now.dedup_by(|later, kept| {
+            let same = later.key == kept.key;
+            if same {
+                *kept = *later;
+            }
+            same
+        });
         let wants = |a, b, bit| [a, b].iter().any(|c| hooks.meta.get(c).is_some_and(|m: &ShapeMeta| m.functions & bit != 0));
         self.began.clear();
-        for ((a, b), kind) in self.sorted(&now) {
-            let was = self.touching.get(&(a, b)).copied();
-            if kind == Contact::Solid && was.is_none() {
-                self.began.push((a, b));
+        for t in &now {
+            let was = find(&self.touching, t.key).map(|w| w.kind);
+            if t.kind == Contact::Solid && was.is_none() {
+                self.began.push((t.a, t.b));
             }
-            let kind_event = match (kind, was) {
+            let kind_event = match (t.kind, was) {
                 (Contact::Trigger, None) => Some(EventKind::TriggerBegin),
-                (Contact::Solid, None) if wants(a, b, function::TOUCH) => Some(EventKind::TouchBegin),
-                (Contact::Solid, Some(_)) if wants(a, b, function::PERSISTS) => Some(EventKind::TouchPersists),
+                (Contact::Solid, None) if wants(t.a, t.b, function::TOUCH) => Some(EventKind::TouchBegin),
+                (Contact::Solid, Some(_)) if wants(t.a, t.b, function::PERSISTS) => Some(EventKind::TouchPersists),
                 _ => None,
             };
             if let Some(k) = kind_event {
-                self.events.push(event(world, k, a, b));
+                self.events.push(event(world, k, t.a, t.b));
             }
         }
-        for ((a, b), kind) in self.sorted(&self.touching) {
-            if now.contains_key(&(a, b)) {
-                continue;
-            }
-            match kind {
-                Contact::Trigger => self.events.push(event(world, EventKind::TriggerEnd, a, b)),
-                Contact::Solid if wants(a, b, function::TOUCH) => self.events.push(event(world, EventKind::TouchEnd, a, b)),
+        for t in self.touching.iter().filter(|t| find(&now, t.key).is_none()) {
+            match t.kind {
+                Contact::Trigger => self.events.push(event(world, EventKind::TriggerEnd, t.a, t.b)),
+                Contact::Solid if wants(t.a, t.b, function::TOUCH) => self.events.push(event(world, EventKind::TouchEnd, t.a, t.b)),
                 _ => {}
             }
         }
-        self.touching = now;
+        self.spare = std::mem::replace(&mut self.touching, now);
     }
 
     /// Whether `a` touches `b` (solidly, or as a trigger when `triggers`).
     pub fn touching(&self, a: ColliderHandle, b: ColliderHandle, triggers: bool) -> bool {
         let want = if triggers { Contact::Trigger } else { Contact::Solid };
-        self.touching.get(&self.ordered(a, b)) == Some(&want)
+        find(&self.touching, self.touch(a, b, want).key).is_some_and(|t| t.kind == want)
     }
 
     pub fn created(&mut self, shape: ColliderHandle) {
@@ -135,22 +167,17 @@ impl Contacts {
 
     /// Forget pairs involving a removed shape without reporting them.
     pub fn forget(&mut self, shape: ColliderHandle) {
-        self.touching.retain(|&(a, b), _| a != shape && b != shape);
+        self.touching.retain(|t| t.a != shape && t.b != shape);
         self.created.remove(&shape);
     }
 
-    fn rank(&self, c: ColliderHandle) -> (u64, u32, u32) {
+    fn rank(&self, c: ColliderHandle) -> Rank {
         let (index, generation) = c.into_raw_parts();
         (self.created.get(&c).copied().unwrap_or(u64::MAX), index, generation)
     }
 
-    fn ordered(&self, a: ColliderHandle, b: ColliderHandle) -> (ColliderHandle, ColliderHandle) {
-        if self.rank(a) <= self.rank(b) { (a, b) } else { (b, a) }
-    }
-
-    fn sorted(&self, pairs: &HashMap<(ColliderHandle, ColliderHandle), Contact>) -> Vec<((ColliderHandle, ColliderHandle), Contact)> {
-        let mut v: Vec<_> = pairs.iter().map(|(&k, &c)| (k, c)).collect();
-        v.sort_by_key(|((a, b), _)| (self.rank(*a), self.rank(*b)));
-        v
+    fn touch(&self, a: ColliderHandle, b: ColliderHandle, kind: Contact) -> Touch {
+        let (ra, rb) = (self.rank(a), self.rank(b));
+        if ra <= rb { Touch { key: (ra, rb), a, b, kind } } else { Touch { key: (rb, ra), a: b, b: a, kind } }
     }
 }

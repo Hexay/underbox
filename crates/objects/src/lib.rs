@@ -4,8 +4,8 @@
 //! without holding the registry's lock.
 
 use abi::{NativeClass, NativeRef};
+use rustc_hash::FxHashMap;
 use std::any::Any;
-use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
 
 struct Entry {
@@ -17,9 +17,10 @@ struct Entry {
 #[allow(dead_code)]
 struct Token(u64);
 
-static OBJECTS: LazyLock<RwLock<HashMap<usize, Entry>>> = LazyLock::new(|| {
+// Looked up on most interop calls; SipHash was a few % of a server tick (docs/perf-physics.md).
+static OBJECTS: LazyLock<RwLock<FxHashMap<usize, Entry>>> = LazyLock::new(|| {
     abi::rt::casts::set_class_of(class_of);
-    RwLock::new(HashMap::new())
+    RwLock::new(FxHashMap::default())
 });
 
 /// Make an object of native class `C` holding `value`.

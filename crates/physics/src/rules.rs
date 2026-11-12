@@ -1,6 +1,6 @@
 //! Collision rules: what two shapes do when they meet, from their tags (managed's `CollisionRules`).
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 /// managed's `CollisionRules.Result`, ordered from most to least colliding (after `Unset`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -39,7 +39,7 @@ impl CollisionRules {
         // Greedy cover: one tag of every uncolliding pair, the tag in the most open pairs first.
         loop {
             open.retain(|(a, b)| !rules.filtering.contains(a) && !rules.filtering.contains(b));
-            let mut degree: HashMap<u32, usize> = HashMap::new();
+            let mut degree: HashMap<u32, usize> = HashMap::default();
             for t in open.iter().flat_map(|(a, b)| [*a, *b]) {
                 *degree.entry(t).or_default() += 1;
             }

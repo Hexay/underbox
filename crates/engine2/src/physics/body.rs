@@ -6,7 +6,7 @@ use crate::math::to_vec;
 use abi::structs::PhysicsBodySettings;
 use abi::{HandleId, NativeRef, class};
 use physics::{BodyId, BodyType, Pose, RigidBody};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 pub type Ref = NativeRef<class::IPhysicsBody>;
 
@@ -30,6 +30,8 @@ pub struct State {
 
 pub struct Body {
     pub world: world::Ref,
+    /// `world`'s object, so a slot call skips a second registry lookup (docs/perf-physics.md).
+    sim_world: Weak<world::PhysicsWorld>,
     pub id: BodyId,
     pub handle: Handle,
     pub shapes: Mutex<Vec<shape::Ref>>,
@@ -48,7 +50,8 @@ pub fn from_user_data(data: u128) -> Ref {
 /// Run `f` on a live body in its simulation (the world locked). Never call managed inside `f`.
 pub fn with_sim<R: Default>(r: Ref, f: impl FnOnce(&mut physics::World, BodyId) -> R) -> R {
     let Some(body) = get(r) else { return R::default() };
-    world::with_sim(body.world, |s| f(s, body.id))
+    let Some(world) = body.sim_world.upgrade() else { return R::default() };
+    f(&mut world.sim.lock().unwrap(), body.id)
 }
 
 /// As [`with_sim`], for just the Rapier body.
@@ -120,7 +123,8 @@ pub fn spawn(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &Physi
         override_mass_center: settings.flags & OVERRIDE_MASS_CENTER != 0,
         local_mass_center: to_vec(settings.mass_center),
     };
-    let body = Arc::new(Body { world: world_ref, id, handle: Handle::default(), shapes: Mutex::default(), state: Mutex::new(state) });
+    let sim_world = Arc::downgrade(&world);
+    let body = Arc::new(Body { world: world_ref, sim_world, id, handle: Handle::default(), shapes: Mutex::default(), state: Mutex::new(state) });
     let r: Ref = objects::create_shared(body.clone());
     world.bodies.lock().unwrap().push(r);
     with_rb(r, |rb| rb.user_data = r.addr() as u128);

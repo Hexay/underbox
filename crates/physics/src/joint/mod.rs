@@ -11,7 +11,7 @@ mod tests;
 use crate::world::World;
 use rapier3d::math::{Pose, Rotation, Vector};
 use rapier3d::prelude::{ImpulseJointHandle, RigidBodyHandle};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 pub use rapier3d::prelude::ImpulseJointHandle as JointId;
 
