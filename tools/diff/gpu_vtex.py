@@ -100,7 +100,7 @@ def content_hash(fmt, w, h, layers, data):
 
 def source_name(rel):
     """A compiled texture's source, as ours labels it: `x_tga_1234abcd.generated.vtex_c` -> `x.tga`."""
-    m = re.match(r"(.*)_([a-z0-9]+)_[0-9a-f]+\.generated\.vtex_c$", rel)
+    m = re.match(r"(.*)_([a-z0-9]+)_[0-9a-f]+\.generated\.vtex(?:_c)?$", rel)
     return f"{m.group(1)}.{m.group(2)}" if m else re.sub(r"\.vtex_c$", ".vtex", rel)
 
 

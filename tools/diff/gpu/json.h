@@ -16,6 +16,10 @@ inline std::string q(const std::string& s) {
 }
 
 inline std::string num(double v) {
+    // Python's json reads these tokens; printf's "nan" (real clears to a NaN alpha) isn't JSON at all.
+    if (v != v) return "NaN";
+    if (v > 1.7976931348623157e308) return "Infinity";
+    if (v < -1.7976931348623157e308) return "-Infinity";
     char b[32];
     snprintf(b, sizeof b, "%.9g", v);
     return b;

@@ -74,7 +74,7 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
         let (w, h, data) = generated.unwrap_or((1, 1, vec![255, 0, 255, 255]));
         let mut config = TextureCreationConfig_t::default();
         (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels) = (w as _, h as _, 1, 1);
-        let gpu = gpu_texture(&name, &config, &data);
+        let gpu = gpu_texture(&name, &config, &data, Storage::Loaded);
         Texture { desc: Box::new(desc_of(&config)), config, name: name.clone(), data: Mutex::new(data), gpu, error, guid, sheet: Default::default() }
     });
     resource::new_handle(texture)
@@ -82,7 +82,7 @@ pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
 
 /// A compiled texture's pixels and sprite sheet as a texture.
 pub(crate) fn decoded(name: &str, c: crate::compiled::texture::Decoded, guid: Guid) -> Texture {
-    let gpu = gpu_texture(name, &c.config, &c.data);
+    let gpu = gpu_texture(name, &c.config, &c.data, Storage::Loaded);
     if let (Some(device), Some(tex)) = (device::gpu(), &gpu) {
         tex.upload_smaller_mips(device, &c.smaller);
     }
@@ -114,11 +114,26 @@ fn mem_size(c: &TextureCreationConfig_t) -> i32 {
     image::mem_required(c.m_n_width as i32, c.m_n_height as i32, c.m_n_depth as i32, Some(mips), c.m_n_image_format as i64)
 }
 
+/// How a texture's image is stored.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Storage {
+    /// Managed's own textures and targets: the format as asked.
+    AsCreated,
+    /// Resource files: in the format's sRGB form where it has one, as real engine2 keeps them
+    /// (its captures show `R8G8B8A8Srgb` and `Bc*SrgbBlock` images, normal maps included).
+    /// Samples go through the linear view unless the shader asks for sRGB.
+    Loaded,
+}
+
 /// The GPU side of a 2D, 2D array or cube texture, when a device exists and the format maps.
 /// Volumes stay CPU-only for now (TODO).
-fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8]) -> Option<render::Texture> {
+fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8], storage: Storage) -> Option<render::Texture> {
     let gpu = device::gpu()?;
     let format = formats::to_wgpu(c.m_n_image_format)?;
+    if format.is_compressed() && !gpu.supports_bc() {
+        return None;
+    }
+    let format = if storage == Storage::Loaded { format.add_srgb_suffix() } else { format };
     let cube = c.m_n_flags & TSPEC_CUBE_TEXTURE != 0;
     let depth = c.m_n_depth.max(1) as u32;
     let plain = c.m_n_flags & TSPEC_TEXTURE_ARRAY == 0 && !cube;
@@ -145,7 +160,7 @@ fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8]) -> Option<r
 pub(crate) fn create(name: Option<&CStr>, _anonymous: bool, config: TextureCreationConfig_t, data: &mut [u8]) -> Ref {
     let name = name.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = Texture {
-        gpu: gpu_texture(&name, &config, data),
+        gpu: gpu_texture(&name, &config, data, Storage::AsCreated),
         name,
         desc: Box::new(desc_of(&config)),
         config,

@@ -52,6 +52,7 @@ impl PartialEq for Frustum {
 /// What `volumetric_fog.fxc` samples: the view's grid, else no fog (black, opaque). Managed's own
 /// `FogVolume` is a volume texture without a GPU side here, and its writer `cs_volumetric_fog`
 /// ships without source, so its binding would sample the white default and wash the frame out.
+/// Without one, real binds its 2×2×2 opaque-black sRGB image through a linear view.
 pub fn view(gpu: &render::Gpu, lighting: &Lighting) -> wgpu::TextureView {
     static CLEAR: OnceLock<wgpu::TextureView> = OnceLock::new();
     let clear = || {
@@ -59,18 +60,18 @@ pub fn view(gpu: &render::Gpu, lighting: &Lighting) -> wgpu::TextureView {
             &gpu.queue,
             &wgpu::TextureDescriptor {
                 label: Some("no fog"),
-                size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+                size: wgpu::Extent3d { width: 2, height: 2, depth_or_array_layers: 2 },
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D3,
-                format: wgpu::TextureFormat::Rgba8Unorm,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
+                view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
             },
             Default::default(),
-            &[0, 0, 0, 255],
+            &[0, 0, 0, 255].repeat(8),
         );
-        texture.create_view(&Default::default())
+        texture.create_view(&wgpu::TextureViewDescriptor { format: Some(wgpu::TextureFormat::Rgba8Unorm), ..Default::default() })
     };
     lighting.fog_volume.as_ref().map_or_else(|| CLEAR.get_or_init(clear).clone(), |f| f.view.clone())
 }

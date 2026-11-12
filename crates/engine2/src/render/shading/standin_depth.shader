@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 // underbox stand-in for the closed depth_only.shader, which real engine2 draws shadow casters
-// with: a vertex stage only, positions placed through the instance's transform-buffer entry (or
+// with: positions placed through the instance's transform-buffer entry (or
 // the vertex cache) and the view's per-view constants, as the material stand-in's vertex stage
 // does (render/draw/caster.rs).
 //-------------------------------------------------------------------------------------------------
@@ -37,6 +37,8 @@ struct PS_INPUT
 {
 	#if ( PROGRAM == VFX_PROGRAM_VS )
 		float4 vPositionPs : SV_Position;
+	#else
+		float4 vPositionSs : SV_Position;
 	#endif
 };
 
@@ -57,5 +59,13 @@ VS
 			vPositionWs = mul( GetTransformMatrix( i.nInstanceTransformID, i.vBlendIndices.x ), float4( i.vPositionOs.xyz, 1.0 ) );
 		o.vPositionPs = Position3WsToPs( vPositionWs );
 		return o;
+	}
+}
+
+// Writes nothing: lets the main view's depth prepass, which keeps a colour target with writes masked, draw it.
+PS
+{
+	void MainPs( PS_INPUT i )
+	{
 	}
 }

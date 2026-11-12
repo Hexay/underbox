@@ -59,6 +59,19 @@ Shadows through managed's shadow mapper and core's sun filter (docs/differential
 | skinned | 0.18 / 0.32 / 0.47, 0.9983 | 0.12 / 0.26 / 0.43, 0.9997 |
 | glass | 0.11 / 0.27 / 0.35, 0.9996 | 0.10 / 0.26 / 0.35, 0.9998 |
 
+Real's main-draw textures (docs/differential-gpu.md item 9: BC stored, AO, bent normal, env
+maps, contact shadows), after the depth lane's merge (before: its numbers):
+
+| Scene | Before | After |
+| --- | --- | --- |
+| showroom | 0.12 / 0.31 / 0.40, 0.9993 | 0.10 / 0.21 / 0.33, 0.9994 |
+| outdoor | 0.10 / 0.11 / 0.11, 0.9994 | 0.10 / 0.10 / 0.10, 0.9994 |
+| fog | 0.13 / 0.16 / 0.21 | 0.11 / 0.12 / 0.20, 0.9992 |
+| skinned | 0.12 / 0.25 / 0.42 | 0.06 / 0.18 / 0.33, 0.9998 |
+| glass | 0.10 / 0.26 / 0.34 | 0.07 / 0.17 / 0.25, 0.9998 |
+| particles | 0.26 / 0.42 / 0.16, 0.9992 | 0.24 / 0.32 / 0.13, 0.9993 |
+| decals | 0.21 / 0.30 / 0.50 | 0.17 / 0.20 / 0.43, 0.9966 |
+
 Ranked divergences:
 
 1. **Fixed. Real's compiled textures didn't load on ours.** Real stores mips zstd-compressed

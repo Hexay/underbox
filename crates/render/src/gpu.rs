@@ -15,6 +15,10 @@ const OPTIONAL: wgpu::Features = wgpu::Features::TEXTURE_BINDING_ARRAY
     // DXC's storage images reflect read-write even when only written (no NonReadable), which
     // core WebGPU allows for few formats; the adapter's own format table allows more.
     .union(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+    // Block-compressed textures upload as stored, as real engine2 keeps them.
+    .union(wgpu::Features::TEXTURE_COMPRESSION_BC)
+    // 32-bit float textures behind filtering samplers, as the depth chain is gathered (MSAAUtils.hlsl).
+    .union(wgpu::Features::FLOAT32_FILTERABLE)
     // Native's main depth (`D32FS8`).
     .union(wgpu::Features::DEPTH32FLOAT_STENCIL8);
 
@@ -110,6 +114,22 @@ impl Gpu {
     /// `backend/adapter name`, e.g. `vulkan/llvmpipe (LLVM 20.1.2, 256 bits)`.
     pub fn describe(&self) -> String {
         format!("{}/{}", self.info.backend, self.info.name)
+    }
+
+    /// What the device allows for `format`: the adapter's own table when the device took it, else
+    /// what wgpu guarantees.
+    pub fn format_features(&self, format: wgpu::TextureFormat) -> wgpu::TextureFormatFeatures {
+        let features = self.device.features();
+        if features.contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES) {
+            self.adapter.get_texture_format_features(format)
+        } else {
+            format.guaranteed_format_features(features)
+        }
+    }
+
+    /// Whether BC1-BC7 textures can be created (and so uploaded as stored).
+    pub fn supports_bc(&self) -> bool {
+        self.device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
     }
 
     /// Run `f` (resource or pipeline creation) and report the validation error it raised, if any,

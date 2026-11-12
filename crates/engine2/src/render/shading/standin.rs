@@ -106,6 +106,7 @@ pub fn shader(path: &str, includes: &IncludePaths) -> Option<Result<VfxShader, S
             .replace("\t//@sun_shadows\n", include_str!("standin_sun_shadows.hlsl"))
             .replace("\t//@managed_shadows\n", include_str!("standin_managed_shadows.hlsl"))
             .replace("\t//@lighting\n", include_str!("standin_lighting.hlsl"))
+            .replace("\t//@indirect\n", include_str!("standin_indirect.hlsl"))
             .replace("\t//@decals\n", include_str!("standin_decals.hlsl")),
         SKY_PATH => include_str!("standin_sky.shader").to_owned(),
         GIZMO_LINE_PATH => include_str!("standin_gizmo_line.shader").to_owned(),

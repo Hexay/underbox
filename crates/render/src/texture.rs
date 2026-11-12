@@ -1,4 +1,5 @@
-//! Textures and render targets, with CPU upload; read-back is in readback.rs.
+//! Textures and render targets: creation and views. Uploads, clears and copies are in texture_io.rs,
+//! read-back in readback.rs.
 
 use crate::Gpu;
 
@@ -9,6 +10,8 @@ pub struct TextureDesc {
     pub label: String,
     pub width: u32,
     pub height: u32,
+    /// The image's format. An sRGB format here stores the image as real engine2 does its loaded
+    /// textures: sampled through a linear view by default, through [`Texture::srgb_view`] on request.
     pub format: wgpu::TextureFormat,
     pub mips: u32,
     pub render_target: bool,
@@ -39,10 +42,10 @@ impl TextureDesc {
         Self::render_target(label, width, height, DEPTH_FORMAT)
     }
 
-    fn usage(&self) -> wgpu::TextureUsages {
+    fn usage(&self, gpu: &Gpu) -> wgpu::TextureUsages {
         let mut base = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC;
-        // Compute writes (RWTexture2D) wherever the format allows them on every device.
-        if self.format.guaranteed_format_features(wgpu::Features::empty()).allowed_usages.contains(wgpu::TextureUsages::STORAGE_BINDING) {
+        // Compute writes (RWTexture2D) wherever the device allows them for the format (the contact-shadow mask is R8).
+        if gpu.format_features(self.format).allowed_usages.contains(wgpu::TextureUsages::STORAGE_BINDING) {
             base |= wgpu::TextureUsages::STORAGE_BINDING;
         }
         if self.render_target { base | wgpu::TextureUsages::RENDER_ATTACHMENT } else { base }
@@ -52,10 +55,11 @@ impl TextureDesc {
 pub struct Texture {
     pub desc: TextureDesc,
     pub texture: wgpu::Texture,
+    /// Every mip and layer through the format's linear form.
     pub view: wgpu::TextureView,
     /// Mip 0 alone: attachments may not span mips.
     pub target_view: wgpu::TextureView,
-    /// The same texels read through the format's sRGB twin (decoded on sample), for formats
+    /// The same texels read through the format's sRGB form (decoded on sample), for formats
     /// that have one (8-bit RGBA/BGRA and the BC formats).
     pub srgb_view: Option<wgpu::TextureView>,
 }
@@ -68,7 +72,9 @@ pub fn srgb_twin(format: wgpu::TextureFormat) -> Option<wgpu::TextureFormat> {
 
 impl Texture {
     pub fn new(gpu: &Gpu, desc: TextureDesc) -> Texture {
-        let twin = srgb_twin(desc.format);
+        let (linear, srgb) = (desc.format.remove_srgb_suffix(), desc.format.add_srgb_suffix());
+        let other = if desc.format == linear { srgb } else { linear };
+        let twin = (linear != srgb).then_some(other);
         let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(&desc.label),
             size: wgpu::Extent3d { depth_or_array_layers: desc.layers.max(1), ..extent(desc.width, desc.height) },
@@ -76,13 +82,15 @@ impl Texture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: desc.format,
-            usage: desc.usage(),
+            usage: desc.usage(gpu),
             view_formats: twin.as_slice(),
         });
         let dimension = Some(desc.dimension());
-        let view = texture.create_view(&wgpu::TextureViewDescriptor { dimension, aspect: sample_aspect(desc.format), ..Default::default() });
-        // Sampling only: sRGB formats can't be storage images, which the texture itself may allow.
-        let srgb_view = twin.map(|f| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(f), dimension, usage: Some(wgpu::TextureUsages::TEXTURE_BINDING), ..Default::default() }));
+        // Sampling only through the twin: sRGB formats can't be storage images, which the texture itself may allow.
+        let sampled = |format| if format == desc.format { None } else { Some(wgpu::TextureUsages::TEXTURE_BINDING) };
+        let format = (!desc.format.is_depth_stencil_format()).then_some(linear);
+        let view = texture.create_view(&wgpu::TextureViewDescriptor { format, dimension, aspect: sample_aspect(desc.format), usage: sampled(linear), ..Default::default() });
+        let srgb_view = (linear != srgb).then(|| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(srgb), dimension, usage: sampled(srgb), ..Default::default() }));
         let target_view = layer_view(&texture, 0);
         Texture { desc, texture, view, target_view, srgb_view }
     }
@@ -111,7 +119,7 @@ impl Texture {
     }
 
     /// The view a shader samples: decoded through [`Texture::srgb_view`] when `srgb` and the format
-    /// has a twin, else the raw view.
+    /// has a twin, else the linear view.
     pub fn sample_view(&self, srgb: bool) -> &wgpu::TextureView {
         self.srgb_view.as_ref().filter(|_| srgb).unwrap_or(&self.view)
     }
@@ -119,125 +127,18 @@ impl Texture {
     /// [`Texture::sample_view`] of one mip only, as native binds a texture attribute set for a mip
     /// (managed's mip generation samples mip i while it writes mip i + 1).
     pub fn mip_sample_view(&self, srgb: bool, mip: u32) -> wgpu::TextureView {
-        let format = srgb_twin(self.desc.format).filter(|_| srgb);
-        let usage = format.map(|_| wgpu::TextureUsages::TEXTURE_BINDING);
+        let f = self.desc.format;
+        let format = if srgb && self.srgb_view.is_some() { f.add_srgb_suffix() } else { f.remove_srgb_suffix() };
+        let usage = (format != f).then_some(wgpu::TextureUsages::TEXTURE_BINDING);
         let mip = mip.min(self.texture.mip_level_count() - 1);
         self.texture.create_view(&wgpu::TextureViewDescriptor {
-            format,
+            format: Some(format),
             dimension: Some(self.dimension()),
             usage,
             base_mip_level: mip,
             mip_level_count: Some(1),
-            aspect: sample_aspect(self.desc.format),
             ..Default::default()
         })
-    }
-
-    /// Bytes per texel of mip 0 (a depth-stencil format's depth); `None` for block-compressed
-    /// formats and depth that can't be copied.
-    pub fn texel_size(&self) -> Option<u32> {
-        let f = self.desc.format;
-        if f.block_dimensions() != (1, 1) {
-            return None;
-        }
-        f.block_copy_size(Some(sample_aspect(f)))
-    }
-
-    /// Bytes of one tightly packed mip-0 layer.
-    pub fn layer_size(&self) -> Option<usize> {
-        Some((self.texel_size()? * self.desc.width * self.desc.height) as usize)
-    }
-
-    /// Replace mip 0 with tightly packed `data`: one layer, or every layer in order.
-    pub fn upload(&self, gpu: &Gpu, data: &[u8]) {
-        let (Some(texel), Some(layer)) = (self.texel_size(), self.layer_size()) else { return };
-        let layers = if data.len() == layer * self.desc.layers.max(1) as usize { self.desc.layers.max(1) } else { 1 };
-        // Queue writes land before the next submit: queued passes that read the old texels go first.
-        gpu.flush();
-        gpu.queue.write_texture(
-            self.texture.as_image_copy(),
-            data,
-            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(self.desc.width * texel), rows_per_image: Some(self.desc.height) },
-            wgpu::Extent3d { depth_or_array_layers: layers, ..extent(self.desc.width, self.desc.height) },
-        );
-    }
-
-    /// Fill mips 1 and up from `chain`: each level's layers tightly packed, level after level. Stops
-    /// at the first level `chain` runs short of; returns how many levels it wrote.
-    pub fn upload_smaller_mips(&self, gpu: &Gpu, chain: &[u8]) -> u32 {
-        let Some(texel) = self.texel_size() else { return 0 };
-        let layers = self.desc.layers.max(1);
-        let mut at = 0;
-        gpu.flush();
-        for mip in 1..self.desc.mips.max(1) {
-            let (w, h) = self.mip_size(mip);
-            let len = (w * h * texel * layers) as usize;
-            let Some(data) = chain.get(at..at + len) else { return mip - 1 };
-            gpu.queue.write_texture(
-                wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-                data,
-                wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * texel), rows_per_image: Some(h) },
-                wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) },
-            );
-            at += len;
-        }
-        self.desc.mips.max(1) - 1
-    }
-
-    /// Clear mip 0 with an empty render pass: to `color` for a colour format, or to `depth` (and
-    /// stencil 0) for a depth format. The value for the other kind is ignored.
-    pub fn clear(&self, gpu: &Gpu, color: wgpu::Color, depth: f32) {
-        self.clear_layer(gpu, color, depth, 0);
-    }
-
-    /// [`Texture::clear`] of one array layer (a cube face).
-    pub fn clear_layer(&self, gpu: &Gpu, color: wgpu::Color, depth: f32, layer: u32) {
-        let view = (layer > 0).then(|| self.layer_target_view(layer));
-        let view = view.as_ref().unwrap_or(&self.target_view);
-        let mut encoder = gpu.device.create_command_encoder(&Default::default());
-        let format = self.desc.format;
-        let color_attachment = [Some(wgpu::RenderPassColorAttachment {
-            view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations { load: wgpu::LoadOp::Clear(color), store: wgpu::StoreOp::Store },
-        })];
-        let store = wgpu::StoreOp::Store;
-        let depth_attachment = wgpu::RenderPassDepthStencilAttachment {
-            view,
-            depth_ops: format.has_depth_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(depth), store }),
-            stencil_ops: format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store }),
-        };
-        let is_depth = format.is_depth_stencil_format();
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("clear"),
-            color_attachments: if is_depth { &[] } else { &color_attachment },
-            depth_stencil_attachment: is_depth.then_some(depth_attachment),
-            ..Default::default()
-        });
-        gpu.submit(encoder.finish());
-    }
-
-    /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`, in every array layer both have.
-    /// False (nothing copied) when the formats differ or the rect falls outside either texture.
-    pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
-        let fits = |t: &Texture, x: u32, y: u32| x + w <= t.desc.width && y + h <= t.desc.height;
-        // Depth and stencil copies must cover whole subresources (wgpu validation).
-        let whole = |t: &Texture| [x, y, dx, dy] == [0; 4] && (w, h) == (t.desc.width, t.desc.height);
-        if self.desc.format.has_depth_aspect() && !(whole(self) && whole(dst)) {
-            return false;
-        }
-        if self.desc.format != dst.desc.format || w == 0 || h == 0 || !fits(self, x, y) || !fits(dst, dx, dy) {
-            return false;
-        }
-        fn at(texture: &wgpu::Texture, x: u32, y: u32) -> wgpu::TexelCopyTextureInfo<'_> {
-            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All }
-        }
-        let mut encoder = gpu.device.create_command_encoder(&Default::default());
-        let layers = self.desc.layers.max(1).min(dst.desc.layers.max(1));
-        encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) });
-        gpu.submit(encoder.finish());
-        true
     }
 
     /// The size of `mip`.

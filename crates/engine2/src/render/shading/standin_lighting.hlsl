@@ -7,6 +7,7 @@
 		float3 vToCameraWs;
 		float flRoughness;
 		float3 vSpecularColor;
+		float4 vPositionSs;
 	};
 
 	struct DirectLight
@@ -66,7 +67,7 @@
 		o.vSpecular = 0.0;
 		if ( g_DirectionalLightEnabled )
 		{
-			float flVisibility = SunVisibility( s.vPositionWs, s.vNormalWs );
+			float flVisibility = SunVisibility( s.vPositionWs, s.vNormalWs, s.vPositionSs );
 			if ( flVisibility > 0.0 )
 				AddLight( o, s, -g_DirectionalLightDirection.xyz, g_DirectionalLightColor.rgb * flVisibility );
 		}

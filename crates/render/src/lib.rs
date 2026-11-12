@@ -25,6 +25,7 @@ pub mod srgb;
 mod state;
 mod surface;
 mod texture;
+mod texture_io;
 
 pub use batch::Slice;
 pub use blit::{Blitter, Transfer};

@@ -116,7 +116,8 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
 
 /// Whether a texture of `format` can bind where a shader declares `want`.
 pub fn sample_type_fits(format: wgpu::TextureFormat, want: wgpu::TextureSampleType) -> bool {
-    match (format.sample_type(None, None), want) {
+    let features = crate::render::device::gpu().map(|g| g.device.features());
+    match (format.sample_type(None, features), want) {
         (Some(wgpu::TextureSampleType::Float { filterable }), wgpu::TextureSampleType::Float { filterable: want }) => filterable || !want,
         (have, want) => have == Some(want),
     }
