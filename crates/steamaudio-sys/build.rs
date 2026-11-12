@@ -62,4 +62,25 @@ fn main() {
     for p in [core.as_path(), pffft.as_path(), &manifest.join("shim")] {
         println!("cargo:rerun-if-changed={}", p.display());
     }
+    println!("cargo:rustc-env=UBX_SA_INPUTS={:016x}", inputs_hash(&manifest, &third));
+}
+
+/// A hash of the native inputs, put into this crate's metadata (`lib.rs`, `NATIVE_INPUTS`). A
+/// changed static library alone leaves the rmeta as it was, and cargo then keeps libengine2's old link.
+fn inputs_hash(manifest: &std::path::Path, third: &std::path::Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    CORE.hash(&mut h);
+    for f in ["shim/shim.cpp", "shim/prelude.h"] {
+        std::fs::read(manifest.join(f)).unwrap_or_default().hash(&mut h);
+    }
+    for m in ["steam-audio", "pffft"] {
+        let git = third.join(m).join(".git");
+        let head = std::fs::read_to_string(&git).ok().and_then(|g| {
+            let dir = g.strip_prefix("gitdir: ")?.trim().to_owned();
+            std::fs::read(third.join(m).join(dir).join("HEAD")).ok()
+        });
+        head.unwrap_or_default().hash(&mut h);
+    }
+    h.finish()
 }

@@ -43,7 +43,13 @@ fn nearest_lookup_ignores_spatial_blend_for_mono() {
 }
 
 #[test]
-fn a_source_on_the_left_is_louder_in_the_left_ear() {
-    let [l, r] = levels([-1.0, 0.0, 0.0], Interpolation::Bilinear, 1.0);
-    assert!(l - r > 4.0, "{l} {r}");
+fn off_axis_levels_match_real_with_rms_normalization() {
+    // Real's left200/right200 and a 135° probe; without RMS normalization these are 1.2 to 2.7 dB louder.
+    let left = levels([-1.0, 0.0, 0.0], Interpolation::Bilinear, 1.0);
+    assert!(near(left, [-9.35, -13.97]), "{left:?}");
+    let right = levels([1.0, 0.0, 0.0], Interpolation::Bilinear, 1.0);
+    assert!(near(right, [-13.95, -9.01]), "{right:?}");
+    let a = 135f32.to_radians();
+    let behind_left = levels([-a.sin(), 0.0, -a.cos()], Interpolation::Bilinear, 1.0);
+    assert!(near(behind_left, [-8.33, -12.75]), "{behind_left:?}");
 }

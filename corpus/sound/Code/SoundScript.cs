@@ -31,6 +31,9 @@ public sealed class SoundScript : Component
 	{
 		var ok = await _sine.LoadAsync() & await _noise.LoadAsync() & await _loopFile.LoadAsync();
 		Log.Info( $"SOUND:LOADED sine={_sine.IsValid()} noise={_noise.IsValid()} loop={_loopFile.IsValid()} playable={ok}" );
+		// The lead counts from here: real's load can outlast it, and playing at once would start the schedule while
+		// the loading mix-ahead (0.5 s) is still queued, so the loop's start leaves later than its stop.
+		_since = 0;
 		_loaded = true;
 	}
 

@@ -21,6 +21,8 @@ HRTFDatabase* ubx_sa_hrtf_create(int rate, int frame)
     try
     {
         HRTFSettings settings{};
+        // Real engine2's choice: each HRIR is scaled to the loudness of the one straight ahead.
+        settings.normType = HRTFNormType::RMS;
         return new HRTFDatabase(settings, rate, frame);
     }
     catch (...)

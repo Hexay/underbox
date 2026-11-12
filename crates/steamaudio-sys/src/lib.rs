@@ -32,6 +32,9 @@ unsafe extern "C" {
     ) -> c_int;
 }
 
+#[doc(hidden)]
+pub const NATIVE_INPUTS: &str = env!("UBX_SA_INPUTS");
+
 /// The sample rate and block size every effect runs at (s&box's mixer: 44100 Hz, 512 samples).
 pub const RATE: usize = 44100;
 pub const FRAME: usize = 512;

@@ -14,9 +14,9 @@ listener graph are all managed. Native supplies:
 | --- | --- | --- |
 | Mix buffers | `CAudioMixBuffer`, `CAudioMixDeviceBuffers` | 512 f32 blocks managed writes through a raw pointer (atomics on our side) |
 | Sounds | `g_pSoundSystemInternal`, `CSfxTable`, `VSound_t` | load a `.vsnd` or raw PCM into decoded, planar f32 `Pcm` |
-| Samplers | `CAudioMixer` | read one block per call from a sound or stream at `rate/44100 * pitch`, linear interpolation, loops, delay, sample end |
+| Samplers | `CAudioMixer` | read one block per call from a sound or stream at `rate/44100 * pitch`, linear interpolation, loops, delay (counted down at that pitched rate, as real does), sample end |
 | Streams | `CAudioStreamManaged` | i16 queue game code (and voice chat) writes, a sampler drains |
-| Effects | `CDirectEffect`, `CBinauralEffect`, `CReverbEffect`, `CPathEffect`, `CAudioProcessor` | Steam Audio's direct/binaural/reverb stand-ins, delay and pitch shift |
+| Effects | `CDirectEffect`, `CBinauralEffect`, `CReverbEffect`, `CPathEffect`, `CAudioProcessor` | Steam Audio's binaural effect itself; direct/reverb stand-ins, delay and pitch shift |
 | DSP presets | `DspPreset`, `DspInstance` | Source-style chains (reverb, diffusor, delay, filter, amp) built by `DspFactory` |
 | Output | `g_pAudioDevice` | interleaves each `SendOutput` block into a queue a device drains |
 | Voice | `VoiceGlue`, `globalOVRLipSync` | Opus 48 kHz mono 20 ms frames (libopus), capture, a viseme estimator |
@@ -76,9 +76,17 @@ PCM16, 1 PCM8, 3 f32 (managed decodes ADPCM itself). Everything is decoded once 
 
 ## Effects (as managed defines them)
 
-- Binaural: managed's own non-Steam-Audio fallback pan law (`BinauralEffect.Apply`): input averaged
-  to mono, per-ear gain `(clamp(±left) + fwd)^snd_dir_power` blended by spatial blend, smoothed 0.1
-  per block. TODO: HRTF.
+- Binaural: Steam Audio's own binaural effect and default HRTF (CIPIC subject 124), which real
+  engine2 links statically (its HRTF loader's messages are in `libengine2.so`). `crates/steamaudio-sys`
+  compiles the part of Steam Audio's core it needs (third_party/steam-audio v4.8.1, PFFFT for the
+  FFT, no SOFA) behind a C shim. The HRTF is loaded with RMS normalization (each HRIR scaled to
+  the loudness of the one straight ahead), as real's levels show: without it sources to the side
+  are 1.2 to 2.7 dB louder in both ears. Directions go from s&box's listener space (+x ahead, +y left, +z
+  up) to Steam Audio's (+x right, +y up, −z ahead); `useNearestInterpolation` picks nearest or
+  bilinear lookups. Mono input with a nearest lookup ignores the spatial blend (Steam Audio only
+  blends stereo there), so `ListenLocal` voices get the full on-axis HRTF: about −3.4/−3.3 dB at
+  440 Hz, the level drop real shows on 2D sounds. Without the HRTF, `Create` returns null and
+  managed falls back to its pan law.
 - Direct: per band gain `distance * air[b] * (occlusion + (1 - occlusion) * transmission[b])` over
   Steam Audio's bands (< 800 Hz, 800 Hz to 8 kHz, > 8 kHz), ramped across the block.
 - Reverb: a 4-line feedback delay network whose line gains give the mid band's T60; the high
