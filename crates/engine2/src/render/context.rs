@@ -39,8 +39,7 @@ pub fn get(r: Ref) -> Option<std::sync::Arc<RenderContext>> {
 
 /// The bound targets, viewport and scissor draws go to.
 pub fn target(r: Ref) -> Target {
-    let reverse_z = reverse_z(r);
-    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor, reverse_z, srgb_write: b.srgb_write })
+    with(r, |b| Target { color: b.color.unwrap_or_default(), depth: b.depth.unwrap_or_default(), depth_slice: b.depth_slice, viewport: b.viewport, scissor: b.scissor, srgb_write: b.srgb_write })
 }
 
 /// Bind `t`'s targets, viewport, scissor and sRGB write at once.
@@ -91,18 +90,12 @@ pub fn srgb_write(r: Ref) -> bool {
     with(r, |b| b.srgb_write)
 }
 
-/// Whether draws on `r` are reverse-Z (near = 1, depth cleared to 0). Managed's scene renderer
-/// (`r_managed_scene`) binds its own `PerViewConstantBuffer_t` and projects reverse-Z like native;
-/// the views we build ourselves (scene/execute.rs) are forward-Z.
-pub fn reverse_z(r: Ref) -> bool {
-    get(r).is_some_and(|c| attributes::constant_buffer(c.attributes, crate::render::shading::view::BLOCK).is_some())
-}
-
 /// TODO: clears cover the whole target; a viewport or scissor smaller than it needs a quad draw.
+/// Depth clears to 0, the far plane: every view is reverse-Z, as native's.
 pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
     let Some(gpu) = device::gpu() else { return };
     let (target, depth, slice) = with(r, |b| (b.color, b.depth, b.depth_slice));
-    crate::render::submits::log(r, &format!("clear color {clear_color} depth {clear_depth} reverse_z {}", reverse_z(r)));
+    crate::render::submits::log(r, &format!("clear color {clear_color} depth {clear_depth}"));
     let v = color.vec;
     let rgba = render::wgpu::Color { r: v.x.into(), g: v.y.into(), b: v.z.into(), a: v.w.into() };
     let gpu_of = |t: Option<texture::Ref>| t.and_then(texture::resolve);
@@ -110,7 +103,7 @@ pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool
         tex.clear(gpu, rgba, 1.0);
     }
     if clear_depth && let Some(t) = gpu_of(depth) && let Some(tex) = &t.gpu {
-        tex.clear_layer(gpu, rgba, if reverse_z(r) { 0.0 } else { 1.0 }, slice);
+        tex.clear_layer(gpu, rgba, crate::render::depth::VIEW.clear(), slice);
     }
 }
 

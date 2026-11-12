@@ -4,6 +4,7 @@
 
 use crate::render::lighting::Lighting;
 use crate::render::shading::layout::Value;
+use crate::render::shading::view::View;
 use crate::render::{attributes, scene_utils, texture};
 use abi::structs::SceneVolumetricFogParameters;
 use abi::{NativeRef, StringToken};
@@ -11,6 +12,10 @@ use glam::{Mat4, Vec4};
 
 /// The constant block these live in, as DXC names the cbuffer.
 pub const BLOCK: &str = "PerViewConstantBufferVR_t";
+
+/// Native's default world wind: strength, grass and tree frequencies, high-frequency strength;
+/// then direction (`g_vWindStrengthFreqMulHighStrength`, `g_vWindDirection`, real's capture).
+pub const WIND: (Vec4, Vec4) = (Vec4::new(0.4, 0.03, 0.003, 0.4), Vec4::new(std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2, 0.0, 0.0));
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Gradient {
@@ -113,7 +118,14 @@ pub fn gather(attrs: attributes::Ref) -> ViewFog {
 
 /// A per-view fog constant. With no fog set, the culling bounds still reject every surface:
 /// zeroes would pass Fog.hlsl's tests and paint the cubemap's default over the frame.
-pub fn constant(lighting: &Lighting, name: &str) -> Option<Value> {
+/// A [`BLOCK`] constant of `view`. Native's high-precision lighting origin is the camera.
+pub fn constant(lighting: &Lighting, view: &View, name: &str) -> Option<Value> {
+    match name {
+        "g_vWindStrengthFreqMulHighStrength" => return Some(Value::Vec(WIND.0)),
+        "g_vWindDirection" => return Some(Value::Vec(WIND.1)),
+        "g_vHighPrecisionLightingOffsetWs" => return Some(Value::Vec(view.camera_position().truncate().extend(0.0))),
+        _ => {}
+    }
     let fog = lighting.view_fog.as_deref();
     let gradient = fog.and_then(|f| f.gradient.as_ref());
     let cube = fog.and_then(|f| f.cube.as_ref());
@@ -125,11 +137,11 @@ pub fn constant(lighting: &Lighting, name: &str) -> Option<Value> {
         "g_vGradientFogBiasAndScale" => vec(gradient.map(|g| g.bias_scale)),
         "m_vGradientFogExponents" => vec(gradient.map(|g| g.exponents)),
         "g_vGradientFogColor_Opacity" => vec(gradient.map(|g| g.color_opacity)),
-        "g_vGradientFogCullingParams" => vec(Some(gradient.map_or(Vec4::new(f32::MAX, f32::MIN, 0.0, 0.0), |g| g.culling))),
+        "g_vGradientFogCullingParams" => vec(Some(gradient.map_or(Vec4::new(f32::INFINITY, f32::NEG_INFINITY, 0.0, 0.0), |g| g.culling))),
         "g_vCubeFog_Offset_Scale_Bias_Exponent" => vec(cube.map(|c| c.offset_scale_bias_exponent)),
         "g_vCubeFog_Height_Offset_Scale_Exponent_Log2Mip" => vec(cube.map(|c| c.height_offset_scale_exponent_mips)),
         "g_matvCubeFogSkyWsToOs" => cube.map(|c| Value::Mat(c.world_to_sky)),
-        "g_vCubeFogCullingParams" => vec(Some(cube.map_or(Vec4::new(f32::MAX, f32::MAX, 0.0, 0.0), |c| c.culling))),
+        "g_vCubeFogCullingParams" => vec(Some(cube.map_or(Vec4::new(f32::INFINITY, f32::INFINITY, 0.0, 0.0), |c| c.culling))),
         "g_vVolFog_VolumeScale_Shift_Near_Range" => vec(frustum.map(|f| Vec4::new(1.0, 0.0, f.near, f.range))),
         "g_vVolFogPostWorldToFrustumScale" => vec(frustum.map(|f| Vec4::new(0.5, 0.5, f.range.recip(), 0.0))),
         "g_vVolFogPostWorldToFrustumBias" => vec(frustum.map(|f| Vec4::new(0.5, 0.5, -f.near / f.range, 0.0))),

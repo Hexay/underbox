@@ -113,7 +113,7 @@ fn depth_prepass_writes_depth_only() {
     let (alone, alone_depth) = run_layers(w, cam, &[opaque]);
     let (after, after_depth) = run_layers(w, cam, &[prepass, opaque]);
     assert_ne!(alone.texel(32, 32), [0, 0, 0, 255], "the opaque layer draws the cube");
-    assert_eq!(after.hash(), alone.hash(), "LessEqual passes the prepass's depth");
+    assert_eq!(after.hash(), alone.hash(), "GreaterEqual passes the prepass's depth");
     assert_eq!(after_depth.hash(), alone_depth.hash());
     assert_eq!(d(&depth), d(&alone_depth), "the prepass writes the opaque layer's depth");
 }

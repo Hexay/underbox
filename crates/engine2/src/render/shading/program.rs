@@ -198,6 +198,6 @@ fn source_annotations_take_the_view_value() {
     let shader = VfxShader::parse(src, std::path::Path::new("source_test.shader"), &shaders::IncludePaths::new(Vec::new())).unwrap();
     let attrs = attributes(&shader);
     let source = attrs["g_vViewport"].source.as_deref().expect("Source( Viewport ) kept");
-    let view = super::view::View { view_proj: glam::Mat4::IDENTITY, viewport: [8.0, 4.0, 1024.0, 768.0], target: [1040.0, 780.0], tone_map: 1.0 };
+    let view = super::view::View { viewport: [8.0, 4.0, 1024.0, 768.0], target: [1040.0, 780.0], ..Default::default() };
     assert_eq!(view.source(source), Some(Vec4::new(8.0, 4.0, 1024.0, 768.0)));
 }

@@ -184,6 +184,19 @@ After 16–17:
 | particles | 0.29 / 0.47 / 0.21, 0.9983 | 0.27 / 0.45 / 0.18, 0.9986 |
 | decals | 0.20 / 0.31 / 0.51, 0.9971 | 0.19 / 0.28 / 0.50, 0.9976 |
 
+Reverse Z, real's per-view constants and the direct swap-chain output (docs/differential-gpu.md items
+1, 6 and 8) moved no metric at two decimals. Measured on one pair of real frames, before and after:
+
+| Scene | Before and after |
+| --- | --- |
+| showroom | 0.14 / 0.33 / 0.41, 0.9989 |
+| outdoor | 0.10 / 0.11 / 0.11, 0.9994 |
+| fog | 0.25 / 0.24 / 0.26, 0.9972 |
+| skinned | 0.18 / 0.32 / 0.47, 0.9983 |
+| glass | 0.11 / 0.27 / 0.35, 0.9996 |
+| particles | 0.31 / 0.47 / 0.21, 0.9983 |
+| decals | 0.25 / 0.32 / 0.53, 0.9957 |
+
 Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
 and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
 bisecting them: research/resources.md "What real engine2 accepts". `real-game.sh` now runs

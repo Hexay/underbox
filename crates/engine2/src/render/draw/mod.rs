@@ -51,8 +51,6 @@ pub struct Target {
     pub depth_slice: u32,
     pub viewport: RenderViewport,
     pub scissor: Option<NativeRect>,
-    /// Depth runs near = 1 (`context::reverse_z`): shaders' declared depth functions apply as is.
-    pub reverse_z: bool,
     /// Native's sRGB write (`RENDER_SRGB` output, `BindColorAndDepthTarget`'s flag): an 8-bit
     /// colour target stores what draws write sRGB-encoded.
     pub srgb_write: bool,
@@ -142,7 +140,7 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
     }
     targets.scissor = target.scissor.filter(|s| s.w > 0 && s.h > 0).map(|s| [s.x.max(0) as u32, s.y.max(0) as u32, s.w as u32, s.h as u32]);
     let state = |d: &Draw| {
-        let s = d.shaded.as_ref().map_or(d.state, |s| s.raster_state(d.state, target.reverse_z));
+        let s = d.shaded.as_ref().map_or(d.state, |s| s.raster_state(d.state));
         RasterState { depth_write: s.depth_write && targets.depth.is_some(), ..s }
     };
     let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
@@ -185,6 +183,6 @@ fn casting(d: &Draw) -> Option<(&'static render::Caster, &Arc<render::Buffer>)> 
 /// The per-view constants' viewport and target size for a pass (its view-projection is per draw).
 fn view_of(targets: &Targets) -> View {
     let (w, h) = targets.size().unwrap_or((1, 1));
-    let viewport = targets.viewport.map_or([0.0, 0.0, w as f32, h as f32], |[x, y, vw, vh, _, _]| [x, y, vw, vh]);
-    View { view_proj: glam::Mat4::IDENTITY, viewport, target: [w as f32, h as f32], tone_map: 1.0 }
+    let ([x, y, vw, vh], depth_range) = targets.viewport.map_or(([0.0, 0.0, w as f32, h as f32], [0.0, 1.0]), |[x, y, vw, vh, min, max]| ([x, y, vw, vh], [min, max]));
+    View { viewport: [x, y, vw, vh], target: [w as f32, h as f32], depth_range, ..Default::default() }
 }

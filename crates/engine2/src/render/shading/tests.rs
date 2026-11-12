@@ -36,7 +36,7 @@ fn scene_renderer_mesh_builds_and_binds() {
     let inputs = vertex::inputs(&s.vertex_inputs, &Layout::sbox_vertex()).expect("mesh layout feeds the shader");
     assert!(!inputs.keys.is_empty());
 
-    let view = View { view_proj: Mat4::IDENTITY, viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0], tone_map: 1.0 };
+    let view = View { viewport: [0.0, 0.0, 64.0, 64.0], target: [64.0, 64.0], ..Default::default() };
     let instances = [bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] }];
     let (textures, values) = (HashMap::new(), HashMap::new());
     let lighting = Lighting::fallback();
@@ -73,7 +73,7 @@ pub(crate) fn standin_cube(tint: [f32; 4], lighting: &Lighting) -> Option<render
 
     let (color, depth) = (texture::create_target("standin", 64, 64, 0), texture::create_target("standin depth", 64, 64, 62));
     let target = Target { color, depth, ..Default::default() };
-    draw::execute(&target, lighting, Load { color: Some(render::wgpu::Color::BLACK), depth: Some(1.0) }, &[d]);
+    draw::execute(&target, lighting, Load { color: Some(render::wgpu::Color::BLACK), depth: Some(0.0) }, &[d]);
     let frame = texture::resolve(color).unwrap().gpu.as_ref().unwrap().read_back(gpu);
     crate::resource::destroy_handle(color);
     crate::resource::destroy_handle(depth);

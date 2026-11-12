@@ -133,9 +133,11 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
         (s.clear_color.vec, s.required, s.excluded, s.match_id)
     };
     context::bind_target(ctx, &t);
-    // Draws see the layer's attributes beneath the context's (HookLayers' `UIGammaOutput`).
+    // Draws see the layer's attributes beneath the context's (HookLayers' `UIGammaOutput`), and
+    // the view's beneath those (ClusteredCullingLayer's cluster lists).
     if let Some(c) = context::get(ctx) {
         crate::render::attributes::set_parent(c.attributes, layer.attributes);
+        crate::render::attributes::set_parent(layer.attributes, view.attributes);
     }
     if !matches!(layer.kind, Kind::Render(_)) {
         super::trace::layer(v.addr(), &layer, &t, &[]);
@@ -144,7 +146,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
         Kind::Clear(_) => {
             let f = layer::clear_flags(l);
             let color = render::wgpu::Color { r: clear_color.x.into(), g: clear_color.y.into(), b: clear_color.z.into(), a: clear_color.w.into() };
-            draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(1.0) }, &[]);
+            draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(crate::render::depth::VIEW.clear()) }, &[]);
         }
         Kind::Render(_) => {
             if layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 {
@@ -198,7 +200,7 @@ fn custom_objects_callable() -> bool {
 pub(crate) fn sky(tint: [f32; 4], material: Option<Arc<Material>>, view_proj: Mat4, context: ContextBindings) -> Option<Draw> {
     static TRIANGLE: OnceLock<Arc<render::Buffer>> = OnceLock::new();
     let gpu = device::gpu()?;
-    let p: [f32; 9] = [-1.0, -1.0, 1.0, 3.0, -1.0, 1.0, -1.0, 3.0, 1.0];
+    let p: [f32; 9] = [-1.0, -1.0, 0.0, 3.0, -1.0, 0.0, -1.0, 3.0, 0.0];
     let bytes: Vec<u8> = p.iter().flat_map(|f| f.to_le_bytes()).collect();
     let vertices = TRIANGLE.get_or_init(|| Arc::new(render::Buffer::with_data(gpu, "sky", BufferKind::Vertex, &bytes))).clone();
     let shaded = material.filter(|m| has_sky_texture(m)).and_then(|m| {

@@ -40,6 +40,9 @@ pub(crate) fn mat4(m: Matrix) -> Mat4 {
     Mat4::from_cols(Vec4::new(n.m11, n.m21, n.m31, n.m41), Vec4::new(n.m12, n.m22, n.m32, n.m42), Vec4::new(n.m13, n.m23, n.m33, n.m43), Vec4::new(n.m14, n.m24, n.m34, n.m44))
 }
 
+/// The main world's viewport depth floor.
+pub const MIN_Z: f32 = 0.02;
+
 /// The camera and pixel viewport the renderer's fields describe, for a `width × height` target.
 pub(super) fn camera(r: Ref, width: u32, height: u32) -> (Camera, Option<Mat4>, RenderViewport) {
     let a = r.addr();
@@ -51,6 +54,8 @@ pub(super) fn camera(r: Ref, width: u32, height: u32) -> (Camera, Option<Mat4>, 
         m_n_top_left_y: (v.y * h) as i32,
         m_n_width: ((v.z * w) as i32).max(1),
         m_n_height: ((v.w * h) as i32).max(1),
+        // Native's MainWorldMinZ: the 3D skybox draws into [0, MIN_Z], behind the world.
+        min_z: MIN_Z,
         max_z: 1.0,
         ..Default::default()
     };
@@ -78,7 +83,7 @@ pub(super) fn camera(r: Ref, width: u32, height: u32) -> (Camera, Option<Mat4>, 
     if flip != Vec3::ONE {
         proj = Some(Mat4::from_scale(flip) * proj.unwrap_or_else(|| cam.proj()));
     }
-    (cam, proj, viewport)
+    (cam, proj.map(Camera::reverse_z), viewport)
 }
 
 /// Render into `color` / `depth` (sized `width × height`), recording what managed reads back.
@@ -145,7 +150,7 @@ fn environment(attrs: attributes::Ref) -> view::Environment {
 /// `RenderedProjectionToView`, `RenderedViewport` and `RenderedDepthRange`, as managed reads them
 /// after `RenderToTexture`.
 fn record(a: usize, cam: &Camera, vp: RenderViewport) {
-    let inv = matrix(cam.proj().inverse());
+    let inv = matrix(Camera::reverse_z(cam.proj()).inverse());
     field!(set Matrix, c::GET_RENDERED_PROJECTION_TO_VIEW, a, inv);
     let v = |x: i32| x as f32;
     field!(set Vector4, c::GET_RENDERED_VIEWPORT, a, crate::math::vec4(v(vp.m_n_top_left_x), v(vp.m_n_top_left_y), v(vp.m_n_width), v(vp.m_n_height)));

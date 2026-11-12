@@ -38,7 +38,7 @@ fn pipeline(gpu: &render::Gpu) -> &'static wgpu::ComputePipeline {
 }
 
 fn params_bytes(view_proj: Mat4, sources: &Sources, settings: &Settings, (near, range): (f32, f32), counts: [u32; 2], history: Option<&History>, shadow: Option<(Mat4, bool)>) -> Vec<u8> {
-    let view = View { view_proj, viewport: [0.0; 4], target: [1.0; 2], tone_map: 1.0 };
+    let view = View { view_proj, ..Default::default() };
     let asymmetry = settings.anisotropy.clamp(-1.0, 1.0) * MAX_ASYMMETRY;
     let (sun_direction, sun_color) = sources.sun.unwrap_or((Vec3::Z, Vec3::ZERO));
     let (fade_start, fade_end) = settings.fade_in;

@@ -1,7 +1,7 @@
 //! Stand-ins a material program binds when the draw doesn't supply a resource: a 1×1 texture per
 //! (view dimension, sample type) — white for float textures, zero otherwise — and default
-//! samplers (trilinear wrap, anisotropic where the vfx asks for `ANISO`; comparison samplers compare with the vfx `ComparisonFunc`, less-equal
-//! by default).
+//! samplers (trilinear wrap, anisotropic where the vfx asks for `ANISO`; comparison samplers compare with the vfx `ComparisonFunc`,
+//! greater-equal by default, as reverse-Z maps want).
 
 use render::wgpu::{self, SamplerBindingType, TextureSampleType, TextureViewDimension as D};
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ fn clear_depth(gpu: &render::Gpu, texture: &wgpu::Texture, layers: u32) {
     let mut encoder = gpu.device.create_command_encoder(&Default::default());
     for layer in 0..layers {
         let view = texture.create_view(&wgpu::TextureViewDescriptor { dimension: Some(D::D2), base_array_layer: layer, array_layer_count: Some(1), ..Default::default() });
-        let ops = wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store };
+        let ops = wgpu::Operations { load: wgpu::LoadOp::Clear(crate::render::depth::SHADOW.clear()), store: wgpu::StoreOp::Store };
         let depth = wgpu::RenderPassDepthStencilAttachment { view: &view, depth_ops: Some(ops), stencil_ops: None };
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor { label: Some("default depth"), depth_stencil_attachment: Some(depth), ..Default::default() });
     }
@@ -79,7 +79,7 @@ pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu
                 mag_filter: filter,
                 min_filter: filter,
                 mipmap_filter: if kind == SamplerBindingType::NonFiltering { wgpu::MipmapFilterMode::Nearest } else { wgpu::MipmapFilterMode::Linear },
-                compare: (kind == SamplerBindingType::Comparison).then_some(compare.unwrap_or(wgpu::CompareFunction::LessEqual)),
+                compare: (kind == SamplerBindingType::Comparison).then_some(compare.unwrap_or(crate::render::depth::SHADOW.compare())),
                 anisotropy_clamp: anisotropy,
                 ..Default::default()
             })

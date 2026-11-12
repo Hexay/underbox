@@ -66,6 +66,6 @@ pub fn render(v: &ShadowView) {
     let view_proj = view_proj(&c);
     let state = RasterState { cull: Some(render::wgpu::Face::Back), depth_compare: depth::SHADOW.compare(), depth_bias: depth::SHADOW.bias(v.bias.0, v.bias.1), ..Default::default() };
     let draws: Vec<_> = casters(v, &c, view_proj).into_iter().map(|d| draw::Draw { state: RasterState { topology: d.state.topology, ..state }, ..d }).collect();
-    let target = Target { depth: v.target, depth_slice: v.slice, viewport: v.viewport, reverse_z: depth::SHADOW.is_reverse(), ..Default::default() };
+    let target = Target { depth: v.target, depth_slice: v.slice, viewport: v.viewport, ..Default::default() };
     draw::execute(&target, &Lighting::default(), Load { color: None, depth: Some(depth::SHADOW.clear()) }, &caster::instanced(draws, view_proj));
 }

@@ -7,7 +7,7 @@ use crate::{Gpu, Mesh, Texture, Vertex};
 use glam::Mat4;
 use glam::camera::rh::{proj::directx as proj, view};
 
-/// Right-handed, Y-up view space; wgpu's clip depth is 0..1, as in Direct3D.
+/// Right-handed, Y-up view space; reverse Z (near 1, far 0), as native.
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     pub view_proj: Mat4,
@@ -16,11 +16,11 @@ pub struct Camera {
 impl Camera {
     /// Orthographic over `[-half_w, half_w] × [-half_h, half_h]`, looking down -Z from z = 0.
     pub fn ortho(half_w: f32, half_h: f32, near: f32, far: f32) -> Camera {
-        Camera { view_proj: proj::orthographic(-half_w, half_w, -half_h, half_h, near, far) }
+        Camera { view_proj: proj::orthographic(-half_w, half_w, -half_h, half_h, far, near) }
     }
 
     pub fn perspective(fov_y_radians: f32, aspect: f32, near: f32, eye: glam::Vec3, target: glam::Vec3) -> Camera {
-        let proj = proj::perspective_infinite(fov_y_radians, aspect, near);
+        let proj = proj::perspective_infinite_reverse(fov_y_radians, aspect, near);
         Camera { view_proj: proj * view::look_at_mat4(eye, target, glam::Vec3::Y) }
     }
 }
@@ -58,7 +58,7 @@ impl ForwardPass {
             })
             .collect();
         let targets = Targets { color: Some(color), depth: Some(depth), ..Default::default() };
-        let load = Load { color: clear, depth: clear.map(|_| 1.0) };
+        let load = Load { color: clear, depth: clear.map(|_| 0.0) };
         pass::execute(gpu, &self.placeholder, &targets, load, &draws);
     }
 }

@@ -68,7 +68,8 @@ impl Default for RasterState {
             topology: wgpu::PrimitiveTopology::TriangleList,
             cull: None,
             depth_write: true,
-            depth_compare: wgpu::CompareFunction::LessEqual,
+            // Reverse Z, as native: near is 1, depth clears to 0.
+            depth_compare: wgpu::CompareFunction::GreaterEqual,
             blend: None,
             write_mask: wgpu::ColorWrites::ALL,
             depth_bias: (0, 0),

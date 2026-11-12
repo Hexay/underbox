@@ -65,6 +65,7 @@ pub struct Environment {
 /// What a camera render decides about its view before the layers are added.
 pub struct Desc {
     pub camera: Camera,
+    /// A reverse-Z projection in place of the camera's own (which the view reverses itself).
     pub proj: Option<Mat4>,
     pub viewport: RenderViewport,
     pub swap_chain: swap_chain::Handle,
@@ -81,7 +82,7 @@ pub struct Desc {
 }
 
 pub fn create(d: Desc) -> Ref {
-    let view_proj = d.proj.unwrap_or_else(|| d.camera.proj()) * d.camera.view();
+    let view_proj = d.proj.unwrap_or_else(|| Camera::reverse_z(d.camera.proj())) * d.camera.view();
     let frustum = objects::create(Mutex::new(d.camera));
     let state = ViewState { worlds: d.worlds, ..Default::default() };
     let view = SceneView {

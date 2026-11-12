@@ -122,6 +122,16 @@ fn light_probe_volume(mins: RawPtr<c_void>, maxs: RawPtr<c_void>, priority: RawP
     0
 }
 
+/// Every world blows native's default wind ([`crate::render::fog::WIND`]).
+fn world_wind(strength: RawPtr<c_void>, direction: RawPtr<c_void>) {
+    let (s, d) = crate::render::fog::WIND;
+    // SAFETY: managed passes two Vector4s it reads back (RenderContext.ReadWorldWind).
+    unsafe {
+        *strength.cast::<[f32; 4]>().as_ptr() = s.to_array();
+        *direction.cast::<[f32; 4]>().as_ptr() = d.to_array();
+    }
+}
+
 pub fn register(r: &mut Registry) {
     bind!(r, tools::RESOLVE_FRAME_BUFFER, |c, t, vp| {
         copy_from_target(c, t, rect(vp), false);
@@ -151,7 +161,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::GET_MODEL_DRAW_CALL_TINT, |_, _, _, _| false);
     bind!(r, tools::GET_SCENE_OBJECT_LIGHTMAP_KEY, |_| 0);
     bind!(r, tools::SET_SCENE_OBJECT_LIGHTMAP_ATTRIBUTES, |_, _| false);
-    bind!(r, tools::GET_SCENE_WORLD_WIND, |_, _, _| {});
+    bind!(r, tools::GET_SCENE_WORLD_WIND, |_, s, d| world_wind(s, d));
     bind!(r, tools::PACK_SCENE_LIGHT, |_, _, _| -1);
     bind!(r, tools::PACK_SCENE_ENV_MAP, |_, _| false);
     bind!(r, tools::GET_LIGHT_PROBE_VOLUME, |_, mins, maxs, priority, _, _| light_probe_volume(mins, maxs, priority));

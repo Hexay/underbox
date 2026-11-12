@@ -68,8 +68,9 @@ PS
 	{
 		PS_OUTPUT o;
 		// Halfway in depth is finite for forward, reverse and infinite-far projections alike.
+		// g_matProjectionToWorld is camera-relative, as native's.
 		float4 vWorld = mul( g_matProjectionToWorld, i.vRayPs );
-		float3 vRay = vWorld.xyz / vWorld.w - g_vCameraPositionWs.xyz;
+		float3 vRay = vWorld.xyz / vWorld.w;
 		float3 vDirection = normalize( vRay );
 		float3 vSky = g_tSkyTexture.Sample( g_sSky, vDirection ).rgb * g_vSkyTint.rgb * exp2( g_flBrightnessExposureBias );
 		// Far past the froxel grid and any fog range: Fog.hlsl only reads the sky ray's direction.

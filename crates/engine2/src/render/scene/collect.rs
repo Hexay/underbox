@@ -17,7 +17,7 @@ use glam::Vec3;
 pub enum Pass {
     Opaque,
     Translucent,
-    /// Opaque draws, depth only: later layers' `LessEqual` tests see the same depth.
+    /// Opaque draws, depth only: later layers' `GreaterEqual` tests see the same depth.
     DepthPrepass,
 }
 

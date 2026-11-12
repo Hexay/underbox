@@ -13,6 +13,9 @@ pub enum Convention {
 /// Shadow maps: managed's shadow mapper projects them with `GetReverseZViewProjTranspose`.
 pub const SHADOW: Convention = Convention::Reverse;
 
+/// Camera views and every other target: native's main and skybox views are reverse Z.
+pub const VIEW: Convention = Convention::Reverse;
+
 impl Convention {
     pub fn of(reverse_z: bool) -> Convention {
         if reverse_z { Convention::Reverse } else { Convention::Forward }
