@@ -14,9 +14,11 @@ use crate::bitmap::bc;
 mod puppet;
 mod rigged;
 mod sheet;
+mod tones;
 pub use puppet::*;
 pub use rigged::*;
 pub use sheet::*;
+pub use tones::*;
 
 pub const MODEL: &str = "models/compiled/crate.vmdl";
 pub const MATERIAL: &str = "materials/compiled/crate.vmat";

@@ -47,6 +47,7 @@ if [ -n "${UNDERBOX_REAL_ENGINE2:-}" ]; then
     fi
     export VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/usr/share/vulkan/icd.d/lvp_icd.json} SDL_VIDEO_DRIVER=x11
     STANDIN=$(sh "$ROOT/tools/diff/standin.sh")
+    [ -z "${UNDERBOX_STANDIN_FRIENDS:-}" ] || sh "$ROOT/tools/diff/standin.sh" --shim "$GAME/bin/linuxsteamrt64"
     # libsteam_api dlopens a bare "steamclient.so" before trying ~/.steam.
     export LD_LIBRARY_PATH=$GAME/bin/linuxsteamrt64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 else

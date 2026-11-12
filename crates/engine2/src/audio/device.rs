@@ -15,21 +15,32 @@ use std::time::Duration;
 pub enum Mode {
     /// No device: servers, test apps, `UNDERBOX_AUDIO=off`.
     Off,
-    /// A clock drains the queue in real time (`UNDERBOX_AUDIO=null`).
+    /// A clock drains the queue in real time (`UNDERBOX_AUDIO=null`, `SDL_AUDIO_DRIVER=dummy`).
     Null,
+    /// The null clock, writing what it plays to `SDL_AUDIO_DISK_OUTPUT_FILE` (`SDL_AUDIO_DRIVER=disk`).
+    Disk,
     /// cpal's output.
     Real,
 }
 
 pub fn mode() -> Mode {
     let config = dict::current_config();
-    match std::env::var("UNDERBOX_AUDIO").as_deref() {
+    // Real engine2 opens audio through SDL3, so SDL's own driver choice applies to it as well.
+    let sdl = std::env::var("SDL_AUDIO_DRIVER").or_else(|_| std::env::var("SDL_AUDIODRIVER"));
+    match (std::env::var("UNDERBOX_AUDIO").as_deref(), sdl.as_deref()) {
         _ if config.dedicated_server || config.test_mode => Mode::Off,
-        Ok("off" | "none") => Mode::Off,
-        Ok("null") => Mode::Null,
+        (Ok("off" | "none"), _) => Mode::Off,
+        (Ok("null"), _) => Mode::Null,
+        (Ok("disk"), _) | (Err(_), Ok("disk")) => Mode::Disk,
+        (Err(_), Ok("dummy")) => Mode::Null,
         _ if cfg!(feature = "audio-device") => Mode::Real,
         _ => Mode::Off,
     }
+}
+
+/// SDL's default when `SDL_AUDIO_DISK_OUTPUT_FILE` is unset.
+fn disk_path() -> String {
+    std::env::var("SDL_AUDIO_DISK_OUTPUT_FILE").unwrap_or_else(|_| "sdlaudio.raw".into())
 }
 
 enum Backend {
@@ -56,6 +67,18 @@ fn open(mode: Mode, id: &str) -> Option<Device> {
         Mode::Null => {
             let queue = Arc::new(Queue::new(2));
             (queue.clone(), "null".to_owned(), Backend::Null(audio::output::spawn_null_clock(queue)))
+        }
+        Mode::Disk => {
+            let path = disk_path();
+            let file = match std::fs::File::create(&path) {
+                Ok(f) => std::io::BufWriter::new(f),
+                Err(e) => {
+                    abi::rt::log::warn(&format!("audio disk device: {path}: {e}"));
+                    return None;
+                }
+            };
+            let queue = Arc::new(Queue::new(2));
+            (queue.clone(), format!("disk {path}"), Backend::Null(audio::output::spawn_disk_clock(queue, file)))
         }
         #[cfg(feature = "audio-device")]
         Mode::Real => match audio::device::open_output(Some(id)) {

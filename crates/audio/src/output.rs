@@ -155,15 +155,32 @@ pub fn spawn_feeder(queue: Arc<Queue>, mut mix: impl FnMut() + Send + 'static) -
     })
 }
 
-/// The null device: drains one block per block of wall time, as a sound card would.
-pub fn spawn_null_clock(queue: Arc<Queue>) -> Worker {
-    Worker::spawn("audio null device", move |stop| {
+/// Drain one block per block of wall time, as a sound card would, handing each to `played`.
+fn spawn_clock(name: &str, queue: Arc<Queue>, mut played: impl FnMut(&[f32]) + Send + 'static) -> Worker {
+    Worker::spawn(name, move |stop| {
         let mut scratch = vec![0.0; BLOCK * queue.channels];
         let mut next = Instant::now();
         while !stop.load(Relaxed) {
             queue.pull(&mut scratch);
+            played(&scratch);
             next += block_duration();
             std::thread::sleep(next.saturating_duration_since(Instant::now()));
+        }
+    })
+}
+
+/// The null device: a clock with nothing to hear.
+pub fn spawn_null_clock(queue: Arc<Queue>) -> Worker {
+    spawn_clock("audio null device", queue, |_| {})
+}
+
+/// The disk device: a clock that appends every played frame to `out` as interleaved f32 LE, as
+/// SDL's `disk` audio driver does for real engine2 (docs/differential-audio.md).
+pub fn spawn_disk_clock(queue: Arc<Queue>, mut out: impl std::io::Write + Send + 'static) -> Worker {
+    spawn_clock("audio disk device", queue, move |frames| {
+        let bytes: Vec<u8> = frames.iter().flat_map(|s| s.to_le_bytes()).collect();
+        if let Err(e) = out.write_all(&bytes).and_then(|_| out.flush()) {
+            eprintln!("audio disk device: {e}");
         }
     })
 }
@@ -201,6 +218,35 @@ mod tests {
         let mut out = [9.0; 3];
         q.pull(&mut out);
         assert_eq!(out, [0.25, 0.0, 0.0], "missing channels are silent");
+    }
+
+    #[derive(Clone, Default)]
+    struct Sink(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Sink {
+        fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(b);
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn disk_clock_writes_played_frames_as_f32() {
+        let q = Arc::new(Queue::new(2));
+        q.push(&[block(0.5), block(-0.25)]);
+        let sink = Sink::default();
+        let clock = spawn_disk_clock(q.clone(), sink.clone());
+        while sink.0.lock().unwrap().len() < BLOCK * 2 * 4 {
+            q.wait_pull(Duration::from_millis(5));
+        }
+        drop(clock);
+        let bytes = sink.0.lock().unwrap().clone();
+        let first: Vec<f32> = bytes[..BLOCK * 8].chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect();
+        assert!(first.chunks_exact(2).all(|f| f == [0.5, -0.25]));
+        assert_eq!(bytes.len() % (BLOCK * 8), 0, "whole blocks, silence after the queue ran dry");
     }
 
     #[test]

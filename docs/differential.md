@@ -86,6 +86,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/run.sh frame <corpus> [both\|ours\|real]` | One client frame per engine (`frame.sh`); PNGs, `diff.png`, `metrics.txt` in `target/diff/frame/<corpus>/` |
 | `tools/diff/real-client.sh <corpus> <out>` | Real's client under Xvfb + lavapipe; grabs the settled window from Xvfb's `-fbdir` framebuffer |
 | `tools/diff/frame.py <ours.ppm> <real.xwd> <out>` | Per-channel mean abs error, % pixels over a threshold, luma means, 8×8-block SSIM |
+| `tools/diff/run.sh sound [both\|ours\|real]` | corpus/sound's mixed audio per engine (`sound-run.sh`, `sound.py`); docs/differential-audio.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the
@@ -231,6 +232,13 @@ same packages and miss the same package models. Differences:
 ## Rendering
 
 Client frames (`run.sh frame`), their metrics, divergences and lanes: docs/differential-render.md.
+
+## Audio
+
+`run.sh sound`: corpus/sound's mixed output from both engines through SDL's `disk` audio driver,
+compared per event (docs/differential-audio.md). Blocked on real: a headless `-nosteam` client never
+starts its mixer (rich presence throws before `AudioEngine.Tick`), and stubbing Steam past that
+crashes real's UI drawing in lavapipe. What was tried is in that doc.
 
 ## Follow-up lanes
 
