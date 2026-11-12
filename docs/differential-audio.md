@@ -1,9 +1,9 @@
 # Audio differential
 
 Compare the final mixed audio of our engine2 and Facepunch's on one scripted scene
-(docs/differential.md has the rules and the other lanes). **Status: blocked on real's side.** Real's
-output can be captured, but real never mixes a sound in a headless `-nosteam` client; see
-[Why real stays silent](#why-real-stays-silent). Ours runs end to end.
+(docs/differential.md has the rules and the other lanes). **Status: runs on both engines** with
+`tools/diff/lavapipe.sh` built once ([Getting real to mix](#getting-real-to-mix)); first results in
+[Real vs ours](#real-vs-ours).
 
 ## Harness
 
@@ -26,9 +26,12 @@ the same format from a clock that drains one block per block of wall time
 
 ### Scene
 
-`SoundScript` waits a second after `OnStart`, then makes every `PlayFile` call at once with a
-`delay`, so onsets are sample-accurate and don't depend on frame timing. Only the loop's stop is
-timed by the main thread. Sounds: mono PCM16 at 44100 Hz, peak 0.5, 5 ms ramps.
+`SoundScript` loads the sounds in `OnStart` and waits until they are playable (`LoadAsync`) and a
+second has passed, then makes every `PlayFile` call at once with a `delay`, so onsets are
+sample-accurate and don't depend on frame timing. Real loads sound data asynchronously, and
+`PlayFile` drops the delay while the sound has no mixer yet (`SoundHandle.sampler` null), so
+without the wait every sound started together. Only the loop's stop is timed by the main thread.
+Sounds: mono PCM16 at 44100 Hz, peak 0.5, 5 ms ramps.
 
 | s | Event | Sound | Set up |
 | --- | --- | --- | --- |
@@ -70,18 +73,42 @@ Real's capture works; the file is all zeros because its managed mixer never star
 3. The same variable makes `standin.sh --shim` put `standin/flat.cpp` in the run copy as
    `libsteam_api.so` over the renamed original, answering `SteamAPI_SteamUtils_v010` and
    `SteamAPI_SteamFriends_v018` from the stand-in. That gets past it, and the menu UI now runs. It
-   calls sbox.game's web API (401 Unauthorized, and the harness must not talk to it; pointing
-   `HTTPS_PROXY` at a closed local port stops that), then real segfaults about 15 s in, before the
-   game loads, in lavapipe's JIT'd shader code (AVX-512, a bounds check reading a `{pointer, size}`
-   buffer descriptor). It does the same with `LP_NUM_THREADS=0`; one run of five hung instead.
-   That is real's UI drawing on llvmpipe, not audio, and nothing in our harness can change it.
+   calls sbox.game's web API, which the harness must not reach: `tools/diff/real-env.sh` points
+   real clients' HTTP(S) proxy at a closed local port.
+4. Real then segfaulted about 15 s in, drawing the menu UI, inside lavapipe's JIT'd shader code.
+   That was a Mesa 26.0 bug, fixed by a newer lavapipe (docs/differential.md, "Real's UI on
+   lavapipe"). With `tools/diff/lavapipe.sh` built, real loads the game and mixes.
 
 Also ruled out: the game-server context's `SteamFriends018` (null); a network namespace to cut the
 web API (`unshare -rn` is not permitted here); skipping the menu (no switch for it).
 
-To unblock: a GPU, or real's UI draw on lavapipe fixed in the render lane; or a way to tick
-`AudioEngine` without the UI. Then `UNDERBOX_STANDIN_FRIENDS=1` (set by `sound-run.sh`) gets real
-mixing.
+## Real vs ours
+
+First run, after the fixes above (`target/diff/sound/report.txt`). Real's levels and balance below
+are from its capture's 100 ms envelope, since its bursts don't line up with the schedule (1):
+
+| Event | Ours L / R dB | Real L / R dB |
+| --- | --- | --- |
+| `ui` | −9.19 / −9.19 | −12.5 / −12.3 |
+| `left200` | −9.03 / −89.03 | −9.4 / −14.0 |
+| `right200` | −89.03 / −9.03 | −14.0 / −9.0 |
+| `ahead200` | −9.03 / −9.03 | −12.5 / −12.3 |
+| `vol0.5` | −15.05 / −15.05 | −18.5 / −18.4 |
+| `noise` | −10.78 / −10.78 | −13.7 / −11.6 |
+| `loop` | −9.03 / −9.03 | −10.6 / −10.8 |
+
+1. **Pitch scales the delay on real.** `pitch1.5` (delay 6 s) starts at 4.0 s on real, on top of
+   `ahead800`: the sampler consumes `DelayOrSkipSamples` in source samples at the pitched rate
+   (6 / 1.5 = 4). Ours waits 6 s. So the in-order matcher sees 8 bursts on real and shifts
+   `pitch1.5`, `noise` and `loop` by one; `ahead800` alone can't be measured on real yet.
+2. **Panning:** real's 3D sounds go through Steam Audio (about 4.7 dB between ears at 200 units to
+   the side); ours uses managed's fallback pan law (80 dB, hard). Expected, see below.
+3. **Level:** real is about 3.3 dB quieter for 2D and ahead sounds (`ui`, `ahead200`, `vol0.5`);
+   the loop only 1.6 dB, the noise 2.9 dB on the left and 0.8 dB on the right.
+4. Real plays a faint 110 Hz sound (about −48 dB) about 1.3 s before `ui`, from the menu; the burst
+   threshold (`sound.py`, −26 dB peak) skips it.
+
+Real had no underruns in this run. Onsets of the events that line up agree within 0.3 ms.
 
 ## Ours
 
@@ -105,7 +132,5 @@ are within 0.6 ms of the schedule, except for underruns: the device ran dry and 
 for 81 ms before `ahead200` in one run, 836 ms before `right200` in the other, and one block
 (11.6 ms) inside the loop in the first. The managed mixer stalled for longer than the 4-block
 (46 ms) mix-ahead. The loop's stop is timed on the main thread, so a stall before it shortens the
-loop (1439 ms, then 661 ms). Whether real underruns the same way is the first thing to check once
-real mixes. Expected divergence then: real's binaural effect is Steam Audio's HRTF
-(`snd_steamaudio` on), ours is managed's pan law, so `left200`/`right200` balance and levels will
-differ.
+loop (1439 ms, then 661 ms). Real's first run had none. Real's binaural effect is Steam Audio's
+HRTF (`snd_steamaudio` on), ours is managed's pan law, so `left200`/`right200` balance differs (2).

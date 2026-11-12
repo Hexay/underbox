@@ -85,6 +85,8 @@ server boots, loads a local project and plays it.
 | `tools/diff/probe/` | A diff-only project: rigid bodies and traces logged as `DIFF:` markers at ticks 1–150 |
 | `tools/diff/run.sh frame <corpus> [both\|ours\|real]` | One client frame per engine (`frame.sh`); PNGs, `diff.png`, `metrics.txt` in `target/diff/frame/<corpus>/` |
 | `tools/diff/real-client.sh <corpus> <out>` | Real's client under Xvfb + lavapipe; grabs the settled window from Xvfb's `-fbdir` framebuffer |
+| `tools/diff/real-env.sh` | Sourced by both client boots for real: lavapipe ICD, Steam stand-in and friends shim, web API cut off |
+| `tools/diff/lavapipe.sh` | Builds a user-local lavapipe from a pinned Mesa commit into `$UNDERBOX_CACHE/mesa-lvp` (once, about 10 min) |
 | `tools/diff/frame.py <ours.ppm> <real.xwd> <out>` | Per-channel mean abs error, % pixels over a threshold, luma means, 8×8-block SSIM |
 | `tools/diff/run.sh sound [both\|ours\|real]` | corpus/sound's mixed audio per engine (`sound-run.sh`, `sound.py`); docs/differential-audio.md |
 
@@ -236,9 +238,36 @@ Client frames (`run.sh frame`), their metrics, divergences and lanes: docs/diffe
 ## Audio
 
 `run.sh sound`: corpus/sound's mixed output from both engines through SDL's `disk` audio driver,
-compared per event (docs/differential-audio.md). Blocked on real: a headless `-nosteam` client never
-starts its mixer (rich presence throws before `AudioEngine.Tick`), and stubbing Steam past that
-crashes real's UI drawing in lavapipe. What was tried is in that doc.
+compared per event (docs/differential-audio.md). Runs on both engines once `lavapipe.sh` is built
+(below).
+
+## Real's UI on lavapipe
+
+A headless `-nosteam` real client skips its UI and audio ticks: rich presence throws every frame
+(docs/differential-audio.md, steps 1–3). With the friends stand-in it got past that, then
+segfaulted about 15 s in while drawing the menu UI, before the game loaded.
+
+- **Cause: a Mesa 26.0 llvmpipe bug, not real's.** From a core dump (`ulimit -c unlimited`; the
+  core lands in the run copy): the fault is in JIT'd fragment code on a lavapipe worker thread,
+  loading `size` from a null `{pointer, size}` SSBO descriptor. The execution mask was all zero,
+  yet the code still took the descriptor from the "first active lane", which falls back to lane 0,
+  whose pointer was never filled in. Mesa 26.0.8's `ssbo_base_pointer`
+  (`gallivm/lp_bld_nir_soa.c`) has no empty-mask guard; Mesa main substitutes a zero-buffer
+  descriptor when no lane is active. Real's batched UI shader (`ui_cssbox_batched`, eight
+  `StructuredBuffer`s plus bindless textures) is the likely trigger; not confirmed per pipeline.
+- **Fix:** `tools/diff/lavapipe.sh` builds lavapipe from a Mesa main commit without root (headers
+  from `apt-get download` into a sysroot, LLVM 21 from the system), and `real-env.sh` selects it
+  through `VK_ICD_FILENAMES` when present (an explicit `VK_ICD_FILENAMES` wins). Real then loads
+  corpus games with the menu, UI and mixer ticking: the hud frame matches ours
+  (docs/differential-render.md, 4) and corpus/sound mixes.
+- **Tried first, no effect:** `LP_NUM_THREADS=0` (still crashes; one run of five hung) and
+  `LP_NATIVE_VECTOR_WIDTH=128` (same crash). Other `LP_*`/`GALLIVM_*` knobs weren't tried once the
+  cause was clear. No switch skips the menu: `MenuDll.Initialize` always loads the menu addon (and
+  its scene, unless the platform menu runs), and `+game` loads the game after it.
+- **Web API:** once the UI ticks, the menu calls sbox.game. `real-env.sh` points real clients'
+  HTTP(S) proxy at a closed local port, so those calls fail fast (logged, harmless).
+- `real-client.sh` turns the friends stand-in on by default (`UNDERBOX_STANDIN_FRIENDS=` turns it
+  off); `sound-run.sh` sets it too.
 
 ## Follow-up lanes
 
@@ -249,4 +278,6 @@ crashes real's UI drawing in lavapipe. What was tried is in that doc.
   relative-turn extent (`r·√2`, 18) is not reproduced.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Rendering:** docs/differential-render.md.
+- **Audio:** real scales `PlayFile`'s delay by pitch, plays 2D sounds about 3.3 dB quieter and pans
+  through Steam Audio (docs/differential-audio.md, "Real vs ours").
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.

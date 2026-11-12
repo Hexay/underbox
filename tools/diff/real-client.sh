@@ -25,6 +25,10 @@ rm -rf "$OUT"; mkdir -p "$OUT/fb"
 GAME=$(UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client)
 LEASED=$GAME
 GAME=$(sh "$ROOT/tools/diff/real-game.sh" "$GAME" "$ART" $$ +game "$PROJ")
+# Friends on by default: without them real's FrameStart throws before SimulateUI (no HUD).
+# The stand-in only checks that the variable exists, so an empty value must unset it.
+if [ -n "${UNDERBOX_STANDIN_FRIENDS-1}" ]; then export UNDERBOX_STANDIN_FRIENDS=${UNDERBOX_STANDIN_FRIENDS:-1}; else unset UNDERBOX_STANDIN_FRIENDS; fi
+. "$ROOT/tools/diff/real-env.sh"
 # As tools/client-frame.sh pins ours.
 python3 -I "$ROOT/tools/video-setting.py" "$GAME" shadow.quality "${SHADOW_QUALITY:-2}"
 python3 -I "$ROOT/tools/video-setting.py" "$GAME" volumetricfog.quality "${FOG_QUALITY:-2}"
@@ -37,9 +41,8 @@ trap 'rm -f "$LEASED/.underbox-lease.$$"; [ -z "$CLIENT" ] || kill -TERM $CLIENT
 printf 'pcm.!default { type null }\n' > "$OUT/asound.conf"
 LOG=$GAME/logs/dotnet.log
 rm -f "$LOG"
-(cd "$GAME" && DISPLAY=$D SDL_VIDEO_DRIVER=x11 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json \
-    ALSA_CONFIG_PATH="$OUT/asound.conf" timeout -s TERM -k 10 "$SECS" \
-    dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1) &
+(cd "$GAME" && DISPLAY=$D ALSA_CONFIG_PATH="$OUT/asound.conf" LD_PRELOAD=$STANDIN timeout -s TERM -k 10 "$SECS" \
+    $NOWEB dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1) &
 CLIENT=$!
 
 grab() {

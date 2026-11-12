@@ -89,9 +89,10 @@ def frequency(x, a, b):
     return (len(ups) - 1) * RATE / (ups[-1] - ups[0]) if len(ups) > 2 else 0.0
 
 
-def bursts(l, r, level=0.01, hop=441, quiet_s=0.3):
+def bursts(l, r, level=0.05, hop=441, quiet_s=0.3):
     """(start, end) sample spans where either channel's block peak exceeds `level`, joined across
-    gaps shorter than `quiet_s` (the schedule leaves at least 0.5 s between sounds)."""
+    gaps shorter than `quiet_s` (the schedule leaves at least 0.5 s between sounds). `level` sits
+    above real's menu blip (about -48 dB) and below the quietest event (ahead800, -20 dB)."""
     spans = []
     for a in range(0, len(l), hop):
         if peak(l, r, a, a + hop) > level:
