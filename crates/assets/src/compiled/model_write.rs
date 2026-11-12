@@ -29,9 +29,27 @@ fn model_info(m: &Model) -> Value {
     ])
 }
 
-/// What real's compiler gives a plain skinned bone: used by vertices at every LOD (0x400 <<
-/// 0..8) plus 0x40. Real animates only bones flagged as used; with 0 it holds the bind pose.
-const BONE_FLAGS: i64 = 0x3FC40;
+/// Bone flags as real's compiler sets them: every bone is animated; a bone a vertex weights is
+/// in a mesh; it and its ancestors are used by vertices at every LOD (0x400 << 0..8). Real
+/// animates only bones flagged as used; with 0 it holds the bind pose.
+const FLAG_ANIMATION: i64 = 0x40;
+const FLAG_MESH: i64 = 0x80;
+const FLAG_VERTEX_LODS: i64 = 0x3FC00;
+
+fn bone_flags(m: &Model) -> Vec<i64> {
+    let mut flags = vec![FLAG_ANIMATION; m.bones.len()];
+    let weighted = m.meshes.iter().flat_map(|mm| &mm.mesh.vertices).flat_map(|v| v.bones.iter().zip(v.weights).filter(|(_, w)| *w > 0.0).map(|(b, _)| usize::from(*b)));
+    let n = flags.len();
+    for b in weighted.filter(|&b| b < n) {
+        flags[b] |= FLAG_MESH;
+        let mut at = Some(b);
+        while let Some(i) = at {
+            flags[i] |= FLAG_VERTEX_LODS;
+            at = m.bones[i].parent;
+        }
+    }
+    flags
+}
 
 /// `PermModelData_t` with every member real's compiler writes, in its order: its schema
 /// conversion rejects a DATA block that leaves members out (docs/differential.md).
@@ -41,7 +59,7 @@ fn write_data(m: &Model) -> Value {
         ("m_boneName", list(s.iter().map(|b| text(&b.name)))),
         ("m_nParent", list(s.iter().map(|b| int_value(b.parent.map_or(-1, |p| p as i64))))),
         ("m_boneSphere", list(s.iter().map(|_| Value::Double(0.0)))),
-        ("m_nFlag", list(s.iter().map(|_| int_value(BONE_FLAGS)))),
+        ("m_nFlag", list(bone_flags(m).into_iter().map(int_value))),
         ("m_bonePosParent", list(s.iter().map(|b| floats(&b.position)))),
         ("m_boneRotParent", list(s.iter().map(|b| floats(&b.rotation)))),
     ]);

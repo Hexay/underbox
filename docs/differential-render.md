@@ -5,8 +5,8 @@ scene at 1024×768 on lavapipe. Real needs two of its own switches: `-nosteam` (
 forever for a Steam client) and `-vulkan_allow_cpu` (else "No usable Vulkan physical devices were
 found": it skips CPU device types). Its window sits at the origin of a screen-sized Xvfb; four
 identical grabs one second apart count as settled. Ours is seeded with real's compiled core
-textures and materials (`.vtex_c`, `.vmat_c`; shaders stay each engine's own), since sbox-public
-ships none of core's images. Both pin shadow quality High and volumetric fog Off (`FOG_QUALITY`,
+textures, materials and models (`.vtex_c`, `.vmat_c`, `.vmdl_c`, `.vmesh_c`; shaders stay each
+engine's own), since sbox-public ships none of core's images. Both pin shadow quality High and volumetric fog Off (`FOG_QUALITY`,
 the auto-detected Low preset's level; the goldens pin High); the rest of the Low preset applies to
 both. `MANAGED=1` runs both through managed's scene renderer (`+r_managed_scene 1`) into
 `target/diff/frame/<corpus>-managed`, for divergences only the managed path shows. Never commit
@@ -30,6 +30,16 @@ After 9–11 (`MANAGED=1` for managed):
 | --- | --- | --- |
 | skinned | 1.26 / 1.23 / 0.83, 0.983 | 1.32 / 1.29 / 0.56, 0.983 |
 | glass | 0.09 / 0.32 / 0.37, 0.9996 | 0.17 / 0.40 / 0.19, 0.9985 |
+
+After 12–13, with real's core models seeded (native unless marked):
+
+| Scene | Metrics |
+| --- | --- |
+| skinned | 0.26 / 0.59 / 0.65, 0.9955; managed 0.57 / 0.62 / 0.39, 0.9958 |
+| showroom | 0.12 / 0.33 / 0.41, 0.9989 |
+| outdoor | 0.10 / 0.11 / 0.11, 0.9994 |
+| fog | 0.26 / 0.24 / 0.26, 0.9972 |
+| glass | 0.09 / 0.27 / 0.34, 0.9996 |
 
 Ranked divergences:
 
@@ -81,8 +91,7 @@ Ranked divergences:
 9. **Fixed. Puppet pose** (skinned). Real played `bow` too (the sequence advanced) but held the
    bind pose: our `.vmdl_c` was the cause, not autoplay. Bone flags, decoder table, quaternion
    segments, block overlap, mesh inverse binds and unorm8 weights: research/resources.md "What
-   real engine2 accepts". Left: a vertex weighted half spine, half root follows the spine fully
-   on real and blends linearly on ours (the puppet's sides). Cause unknown.
+   real engine2 accepts". The split weights left here: 12.
 10. **Fixed. Translucent glass lighter on ours** (glass). Three causes. `complex` takes
     `g_vColorTint` in gamma space (`SrgbGammaToLinear`, `vr_shared_standard_vs_code.fxc`; the
     stand-in used it as linear). Real's compiler binds `materials/default/default_color.tga`
@@ -92,6 +101,27 @@ Ranked divergences:
 11. **Fixed. Crate tops lighter on ours** (skinned): a compiled draw call's `m_vTintColor` and
     `m_flAlpha` multiply the object's tint on real; ours dropped them (`DrawCall::tinted`; managed
     draws pass it to the stand-in as `StandinDrawTint`).
+12. **Fixed, content. Split skin weights** (skinned). A puppet side vertex weighted half spine,
+    half root followed the spine fully on real. Bisected with per-face fixture variants: with
+    blend indices (root, spine) the vertex followed the root, with (spine, head) the spine, so
+    real used the first weight only. Not the bone flags (real's compiler adds 0x80 to bones a
+    mesh weights; ours now does too, no change) but the morph set: without it real blends exactly
+    as ours does. Real's mesh carrying our morph set skins by its first weight, and through
+    managed's renderer a morphed second mesh isn't drawn at all, so the puppet now has no morphs
+    (morphs stay covered by the rigged fixture's headless tests). Why our morph set does that is
+    open: there's no real compiled morph model to compare with. Before: 1.26 / 1.23 / 0.83, 0.983
+    (managed 1.32 / 1.29 / 0.56, 0.983). Left: ours draws the open puppet's inside faces, which
+    real culls.
+13. **Fixed. Real's compiled models went dark on ours.** Real's core models store `NORMAL` as
+    `R10G10B10A2_UNORM` (format 24), which ours didn't decode at all (zero normals). skinning_cs
+    shows only the split (x, y, z 10 bits, w 2); `vs_decompress.fxc` is closed, so the decode was
+    fitted to 28k vertices of real's core models against their face normals and UV tangents: x, y
+    an octahedral normal; z a diamond-encoded tangent direction in Duff et al.'s basis around it;
+    w 3 for bitangent sign +1, 0 for −1 (`compiled/vertex.rs` `unpack_frame`, the stand-in's
+    `_DecompressNormalTangent` the same). Normals match to 0.9999, tangents to 0.98: the rest is
+    real's compiler storing a tangent exactly opposite the basis axis as the axis itself
+    (`real_core_tangent_frames_match_their_geometry`, with `UNDERBOX_REAL_CORE`). `frame.sh` now
+    seeds real's `.vmdl_c` and `.vmesh_c`.
 
 Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
 and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
@@ -103,12 +133,11 @@ placement and softness, box shading within 1–6.
 
 ## Follow-up lanes
 
-- **Rendering:** the split-weight skinning left in 9. `render/convars.rs` defines the
+- **Rendering:** the puppet's inside faces (12). `render/convars.rs` defines the
   texture quality group's convars with real's defaults (`r_max_anisotropy` 4,
   `r_texture_stream_max_resolution` -1, `r_texture_stream_resolution_bias_min` 1.0). Nothing
   reads the streaming two yet, and managed sampler states don't clamp to `r_max_anisotropy`
   (`render/samplers.rs`), though real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
-- **Content:** seed real's compiled `.vmdl_c` into ours (`frame.sh`). Blocked: real's core models
-  pack `NORMAL` as `R10G10B10A2` (format 24) compressed tangent frames, which `unpack_frame`
-  misdecodes (seeded, the scene goes dark). Decode those first.
+- **Content:** what in our morph set makes real skin by the first weight and drop a morphed
+  second mesh under managed (12). Needs a real compiled model with morphs.
 - **HUD (4):** keep real's `FrameStart` alive under `-nosteam` without going online.

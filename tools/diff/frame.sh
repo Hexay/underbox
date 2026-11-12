@@ -3,7 +3,7 @@
 # usage: [MANAGED=1] tools/diff/frame.sh <corpus> [both|ours|real] [artifact-root]   (or tools/diff/run.sh frame ...)
 # Out: target/diff/frame/<corpus>/{ours,real}.png, diff.png, metrics.txt (tools/diff/frame.py).
 # MANAGED=1 renders both through managed's scene renderer (+r_managed_scene 1), into <corpus>-managed.
-# Both sides see the same content: real's compiled core textures and materials are seeded
+# Both sides see the same content: real's compiled core textures, materials and models are seeded
 # into our game dir for the boot (CONTENT=source skips that). Shaders stay each engine's own.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -20,11 +20,10 @@ mkdir -p "$OUT"
 [ -n "$ART" ] || { echo "frame: no real engine2; run tools/diff/fetch.sh" >&2; exit 3; }
 
 seed() {
-    s=$REAL_ENGINE2_RUNS/content2-$(basename -- "$ART")
+    s=$REAL_ENGINE2_RUNS/content3-$(basename -- "$ART")
     if [ ! -f "$s/.done" ]; then
         rm -rf "$s"; mkdir -p "$s"
-        # Not vmdl_c yet: ours on real's compiled models is unchecked (docs/differential-render.md).
-        (cd "$ART/game" && find core -type f \( -name '*.vtex_c' -o -name '*.vmat_c' \) |
+        (cd "$ART/game" && find core -type f \( -name '*.vtex_c' -o -name '*.vmat_c' -o -name '*.vmdl_c' -o -name '*.vmesh_c' \) |
             cpio -pdl --quiet "$s")
         touch "$s/.done"
     fi

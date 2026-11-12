@@ -7,18 +7,21 @@
 
 bool g_bUncompressedTangentFrame < Attribute( "UncompressedTangentFrame" ); Default( 0 ); >;
 
-// TODO: Valve's compressed layout is unknown; ours is the contract with crates/assets' vertex
-// writer. Input is the 10:10:10:2 word as integers: xy octahedral normal, z tangent angle about
-// the normal (one turn over 0..1023), w bit 0 set for a negative bitangent sign.
+// Real's 10:10:10:2 frame as integers, fitted to its compiled models: see crates/assets
+// compiled/vertex.rs `unpack_frame`.
 void _DecompressNormalTangent( float4 vPacked, out float3 vNormal, out float4 vTangentU_flSign )
 {
 	vNormal = OctohedralDecode( vPacked.xy / 1023.0 * 2.0 - 1.0 );
-	float3 vRef = abs( vNormal.z ) < 0.999 ? float3( 0, 0, 1 ) : float3( 1, 0, 0 );
-	float3 t0 = normalize( cross( vRef, vNormal ) );
-	float3 t1 = cross( vNormal, t0 );
-	float s, c;
-	sincos( vPacked.z / 1023.0 * 6.28318530718, s, c );
-	vTangentU_flSign = float4( t0 * c + t1 * s, ( uint( vPacked.w ) & 1 ) ? -1.0 : 1.0 );
+	float s = vNormal.z >= 0.0 ? 1.0 : -1.0;
+	float r = 1.0 / ( s + vNormal.z );
+	float3 b1 = float3( 1.0 - s * vNormal.x * vNormal.x * r, -s * vNormal.x * vNormal.y * r, -s * vNormal.x );
+	float3 b2 = cross( vNormal, b1 );
+	float d = vPacked.z / 1023.0;
+	float side = sign( d - 0.5 );
+	float2 v = float2( -side * 4.0 * d + 1.0 + side * 2.0, 0.0 );
+	v.y = side * ( 1.0 - abs( v.x ) );
+	v = normalize( v );
+	vTangentU_flSign = float4( b1 * v.x + b2 * v.y, vPacked.w >= 2.0 ? 1.0 : -1.0 );
 }
 
 void DecompressNormalTangent( float4 vNormalIn, float4 vTangentIn, out float3 vNormal, out float4 vTangentU_flSign )

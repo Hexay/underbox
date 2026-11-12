@@ -23,6 +23,8 @@ mod tests;
 pub mod texture;
 pub mod vbib;
 pub mod vertex;
+#[cfg(test)]
+mod real_model_tests;
 
 use crate::container::{self, Container, FourCC};
 use crate::kv3bin::{self, Compression};

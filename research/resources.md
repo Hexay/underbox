@@ -199,8 +199,12 @@ and member order of real's own compiled core and menu models.
   whatever the decoder array says. Real decodes `CCompressedStaticQuaternion` as NaN, so every rotation is an
   `AnimQuaternion` segment. A frame block shares its last frame with the next block's first; past a block's end
   real reads NaN.
-- **Skeleton:** each bone's `m_nFlag` needs 0x3FC40 (used by vertex at every LOD). With 0 the sequence advances
-  but the bones hold the bind pose.
+- **Skeleton:** each bone's `m_nFlag` needs 0x3FC00 (used by vertex at every LOD; real sets it on weighted bones
+  and their ancestors) plus 0x40; 0x80 marks a bone a mesh weights. With 0 the sequence advances but the bones
+  hold the bind pose.
+- **Morph sets:** a mesh carrying ours skins by its first blend weight only, and a morphed second mesh isn't
+  drawn through managed's renderer. Unexplained; keep split weights out of morphed meshes.
+- **Compressed tangent frames:** `NORMAL` as `R10G10B10A2_UNORM`: `compiled/vertex.rs` `unpack_frame`.
 - **Skinned meshes** carry `m_skeleton.m_bones` with `m_invBindPose` (3×4 row-major inverse world bind),
   `m_bbox` and `m_flSphereRadius`; without them real deforms the mesh arbitrarily. `BLENDWEIGHT` must be
   `R8G8B8A8_UNORM` summing to 255: real ignores float weights.
