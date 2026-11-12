@@ -2,5 +2,6 @@
 /dist/
 tools/interop-dump/bin/
 tools/interop-dump/obj/
+__pycache__/
 # Compiled resources: we build them from source at boot.
 *_c
