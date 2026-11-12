@@ -16,6 +16,8 @@
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 CORPUS=${CORPUS:-showroom}
+# PROJECT: any other .sbproj (tools/diff/frame.sh's game copies); it has no golden, so the check skips.
+PROJECT=${PROJECT:-$ROOT/corpus/$CORPUS/.sbproj}
 if [ "${MANAGED:-}" = 1 ]; then SUFFIX=-managed; set -- "${1:-240}" "${2:-}" +r_managed_scene 1; else SUFFIX=; set -- "${1:-240}" "${2:-}"; fi
 OUT=${OUT:-$ROOT/target/client-frame$SUFFIX}
 GOLDEN=$ROOT/corpus/$CORPUS/golden$SUFFIX.tsv
@@ -23,7 +25,7 @@ SETTLE=5
 rm -rf "$OUT"; mkdir -p "$OUT/frames"
 SECS=$1 SBOX=$2; shift 2
 OUT="$OUT" FRAMES="$OUT/frames" SETTLE=$SETTLE SHADOW_QUALITY=${SHADOW_QUALITY:-2} FOG_QUALITY=${FOG_QUALITY:-2} UNDERBOX_FRAMES_LAST=1 UNTIL=${UNTIL:-game.load success} GRACE=${GRACE:-6} \
-    sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$ROOT/corpus/$CORPUS/.sbproj" "$@" > "$OUT/boot.txt" 2>&1 || true
+    sh "$ROOT/tools/boot-client.sh" "$SECS" "$SBOX" -- -mcp +game "$PROJECT" "$@" > "$OUT/boot.txt" 2>&1 || true
 ADAPTER=$(grep -ohE 'render device: .*' "$OUT/client.out" | head -n 1 | sed 's/^render device: //')
 [ -n "$ADAPTER" ] || { tail -n 20 "$OUT/boot.txt"; echo "RESULT: FAIL (no render device)"; exit 1; }
 HASH=$(tail -n 1 "$OUT/frames.tsv" | cut -f2)

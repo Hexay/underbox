@@ -102,6 +102,22 @@ impl Texture {
         self.srgb_view.as_ref().filter(|_| srgb).unwrap_or(&self.view)
     }
 
+    /// [`Texture::sample_view`] of one mip only, as native binds a texture attribute set for a mip
+    /// (managed's mip generation samples mip i while it writes mip i + 1).
+    pub fn mip_sample_view(&self, srgb: bool, mip: u32) -> wgpu::TextureView {
+        let format = srgb_twin(self.desc.format).filter(|_| srgb);
+        let usage = format.map(|_| wgpu::TextureUsages::TEXTURE_BINDING);
+        let mip = mip.min(self.texture.mip_level_count() - 1);
+        self.texture.create_view(&wgpu::TextureViewDescriptor {
+            format,
+            dimension: Some(self.dimension()),
+            usage,
+            base_mip_level: mip,
+            mip_level_count: Some(1),
+            ..Default::default()
+        })
+    }
+
     /// Bytes per texel of mip 0; `None` for block-compressed or depth-stencil formats.
     pub fn texel_size(&self) -> Option<u32> {
         let f = self.desc.format;

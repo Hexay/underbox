@@ -19,9 +19,14 @@ const PATH: &str = "shaders/tonemapping/tonemapping.shader";
 
 /// The centre texel after tonemapping a flat (64, 64, 64) source at `exposure`.
 fn tonemapped(exposure: f32) -> Option<[u8; 4]> {
+    tonemapped_with(exposure, &shaders::Variant::default())
+}
+
+/// [`tonemapped`] in a dynamic combo variant (`D_TONEMAPPING` is the first combo).
+fn tonemapped_with(exposure: f32, variant: &shaders::Variant) -> Option<[u8; 4]> {
     let (core, gpu) = (core_dir()?, device::create()?);
     let shader = shaders::VfxShader::parse_file(&core.join(PATH), &shaders::IncludePaths::new([core])).unwrap();
-    let s = Arc::new(program::build(gpu, &shaders::Compiler::new().unwrap(), &shader, PATH, &shaders::Variant::default()).unwrap());
+    let s = Arc::new(program::build(gpu, &shaders::Compiler::new().unwrap(), &shader, PATH, variant).unwrap());
     let fields = vec![
         Field { semantic: "position".into(), index: 0, format: format::RGB32F, offset: 0 },
         Field { semantic: "texcoord".into(), index: 0, format: format::RG32F, offset: 12 },
@@ -68,4 +73,19 @@ fn tonemap_blit_passes_scene_depth_and_applies_exposure() {
     let twice = tonemapped(2.0).unwrap();
     assert!(once[0].abs_diff(64) <= 2, "the blit drew over scene depth: {once:?}");
     assert!(twice[0].abs_diff(128) <= 2, "exposure 2 doubles it: {twice:?}");
+}
+
+/// Hable filmic (`D_TONEMAPPING` 1, walker's camera): Uncharted 2's curve over its value at the
+/// white point 11.2.
+#[test]
+fn tonemap_hable_divides_by_the_white_point() {
+    let Some(texel) = tonemapped_with(4.0, &shaders::Variant::new(0, 1)) else {
+        eprintln!("skipped: no sbox-public checkout or GPU");
+        return;
+    };
+    let partial = |x: f32| (x * (0.15 * x + 0.1 * 0.5) + 0.2 * 0.02) / (x * (0.15 * x + 0.5) + 0.2 * 0.3) - 0.02 / 0.3;
+    let x = 4.0 * render::srgb::decode(64.0 / 255.0);
+    // Encoded as the flat test above reads its 64 back.
+    let want = (render::srgb::encode(partial(x) / partial(11.2)) * 255.0).round() as u8;
+    assert!(texel[0].abs_diff(want) <= 2, "Hable of {x}: want {want}, got {texel:?}");
 }

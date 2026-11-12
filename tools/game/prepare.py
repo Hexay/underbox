@@ -7,10 +7,9 @@ Prints the copy's .sbproj path.
 import argparse
 import json
 import pathlib
+import re
 import sys
 import uuid
-
-WATCH_NAME = "RealGameWatch"
 
 
 def load(path):
@@ -52,43 +51,60 @@ def on_disk(root, rel):
     return path
 
 
-def add_watcher(scene_path, idle_seconds, command):
+def add_watcher(scene_path, name, props):
     scene = load(scene_path)
-    objects = [g for g in scene["GameObjects"] if g.get("Name") != WATCH_NAME]
+    objects = [g for g in scene["GameObjects"] if g.get("Name") != name]
     objects.append({
         "__guid": str(uuid.uuid4()),
         "Flags": 0,
-        "Name": WATCH_NAME,
+        "Name": name,
         "Enabled": True,
-        "Components": [{
-            "__type": WATCH_NAME,
-            "__guid": str(uuid.uuid4()),
-            "IdleSeconds": idle_seconds,
-            "StartCommand": command,
-        }],
+        "Components": [{"__type": name, "__guid": str(uuid.uuid4()), **props}],
     })
     scene["GameObjects"] = objects
     scene_path.write_text(json.dumps(scene, indent=2), encoding="utf-8")
+
+
+def stub_lobby(code, name):
+    """Route the game's `Networking.CreateLobby(...)` to `<name>.SkipLobby(...)`: real engine2 crashes
+    in libsteam_api creating a lobby under -nosteam (docs/differential-render.md, walker)."""
+    for path in code.rglob("*.cs"):
+        text = path.read_text(encoding="utf-8-sig")
+        stubbed = re.sub(r"\bNetworking\.CreateLobby\s*\(", f"{name}.SkipLobby(", text)
+        if stubbed != text:
+            path.write_text(stubbed, encoding="utf-8")
+
+
+def prop(text):
+    """`Key=value`: value as JSON when it parses (15, true), else as a string ("0,0,64")."""
+    key, _, value = text.partition("=")
+    try:
+        return key, json.loads(value)
+    except ValueError:
+        return key, value
 
 
 def main():
     args = argparse.ArgumentParser()
     args.add_argument("root", type=pathlib.Path)
     args.add_argument("scene", help="relative to Assets, e.g. scenes/zoo.scene; empty for the project's StartupScene")
-    args.add_argument("watch", type=pathlib.Path)
-    args.add_argument("--idle", type=int, default=15, help="seconds the watcher idles past the settle")
-    args.add_argument("--command", default="", help="console command the host runs once things settle")
+    args.add_argument("watch", type=pathlib.Path, help="the component's .cs; its stem names the component")
+    args.add_argument("--prop", type=prop, action="append", default=[], help="Key=value set on the injected component")
+    args.add_argument("--stub-lobby", action="store_true", help="the component's static SkipLobby replaces Networking.CreateLobby")
     a = args.parse_args()
+    name = a.watch.stem
     sbproj = project_file(a.root)
     scene = a.scene or load(sbproj).get("Metadata", {}).get("StartupScene") or ""
     scene_path = on_disk(a.root / "Assets", scene)
     if not scene or not scene_path.is_file():
         sys.exit(f"prepare: no such scene {scene_path}")
     set_startup_scene(sbproj, scene)
-    add_watcher(scene_path, a.idle, a.command)
+    add_watcher(scene_path, name, dict(a.prop))
     code = a.root / "Code"
     code.mkdir(exist_ok=True)
-    (code / f"{WATCH_NAME}.cs").write_text(a.watch.read_text(encoding="utf-8"), encoding="utf-8")
+    if a.stub_lobby:
+        stub_lobby(code, name)
+    (code / f"{name}.cs").write_text(a.watch.read_text(encoding="utf-8"), encoding="utf-8")
     print(sbproj)
 
 

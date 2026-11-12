@@ -59,15 +59,28 @@ fn compile(path: &str) -> Option<Vec<source::Mesh>> {
     Some(model.meshes)
 }
 
+const ERROR_MODEL: &str = "models/dev/error.vmdl";
+
+/// What native draws for a missing model: core's error model (compiled, else its source), else
+/// the stand-in.
+fn error_content() -> Content {
+    if let Some(m) = compiled::read(ERROR_MODEL) {
+        return compiled::content(&m);
+    }
+    Content::from_meshes(&compile(ERROR_MODEL).unwrap_or_else(|| vec![source::stand_in()]))
+}
+
 pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let model = LOADED.find_or_insert(&name, || {
         if let Some(m) = compiled::read(&name) {
             return Model { name: name.clone(), content: compiled::content(&m), error: false, guid };
         }
-        let (meshes, error) = compile(&name).map_or_else(|| (vec![source::stand_in()], true), |m| (m, false));
-        let mut content = Content::from_meshes(&meshes);
-        if error || source_path(&name) == "models/dev/error.vmdl" {
+        let (mut content, error) = match compile(&name) {
+            Some(meshes) => (Content::from_meshes(&meshes), false),
+            None => (error_content(), true),
+        };
+        if error || source_path(&name) == ERROR_MODEL {
             content.physics = physics::error::physics();
         }
         Model { name: name.clone(), content, error, guid }

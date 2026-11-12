@@ -75,18 +75,7 @@ sh "$ROOT/tools/submodules.sh"
 [ "$MODE" = server ] || UNDERBOX_LEASE=$$ sh "$ROOT/tools/game-dir.sh" "$SBOX" client > /dev/null
 env -u CARGO_INCREMENTAL cargo build -q --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
 
-[ -d "$COPY" ] || cp -a --reflink=auto "$CHECKOUT" "$COPY"
-rsync -a --delete --exclude=.git "$CHECKOUT/" "$COPY/"
-# Assets/ and assets/ (Code/ and code/) are one folder where a game was authored (Windows), two here,
-# and only the capitalised one is read.
-for d in Assets Code; do
-    lower=$(echo "$d" | tr 'A-Z' 'a-z')
-    if [ -d "$COPY/$lower" ]; then
-        mkdir -p "$COPY/$d"
-        rsync -a --ignore-existing "$COPY/$lower/" "$COPY/$d/"
-        rm -rf "${COPY:?}/$lower"
-    fi
-done
+sh "$ROOT/tools/game/copy.sh" "$CHECKOUT" "$COPY"
 # COMPILED_ONLY=1: drop project-JSON sources that ship their _c, so the game reads the shipped
 # compiled files rather than ours (engine2 recompiles project JSON resources at mount).
 if [ "${COMPILED_ONLY:-0}" = 1 ]; then
@@ -94,7 +83,7 @@ if [ "${COMPILED_ONLY:-0}" = 1 ]; then
         -exec sh -c 'for f; do [ -f "${f}_c" ] && rm -f "$f"; done' sh {} +
 fi
 PROJECT=$(python3 -I "$ROOT/tools/game/prepare.py" "$COPY" "$SCENE" "$ROOT/tools/game/RealGameWatch.cs" \
-    --idle "$IDLE" --command "${START_CMD:-}")
+    --prop "IdleSeconds=$IDLE" --prop "StartCommand=${START_CMD:-}")
 SCENE=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8-sig"))["Metadata"]["StartupScene"])' "$PROJECT")
 
 export HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9
