@@ -8,3 +8,10 @@
 	path = third_party/protobuf
 	url = https://github.com/protocolbuffers/protobuf.git
 	shallow = true
+[submodule "third_party/steam-audio"]
+	path = third_party/steam-audio
+	url = https://github.com/ValveSoftware/steam-audio.git
+	shallow = true
+[submodule "third_party/pffft"]
+	path = third_party/pffft
+	url = https://github.com/marton78/pffft.git

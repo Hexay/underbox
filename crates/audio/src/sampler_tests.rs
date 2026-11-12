@@ -75,6 +75,11 @@ fn delay_seek_and_sample_end() {
     assert!(b[..10].iter().all(|&v| v == 0.0) && b[10..].iter().all(|&v| v == 1.0));
     assert_eq!(s.position(), 502);
 
+    let mut s = Sampler::new(pcm(RATE, vec![1.0; 2000]));
+    s.delay_or_skip(20);
+    let b = read(&mut s, 2.0);
+    assert!(b[..10].iter().all(|&v| v == 0.0) && b[10] == 1.0, "pitch 2 counts the delay down twice as fast");
+
     let mut s = Sampler::new(pcm(RATE, ramp(2000)));
     s.set_position(100, 0.0);
     s.set_sample_end(110);

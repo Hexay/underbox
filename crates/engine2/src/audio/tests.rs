@@ -143,9 +143,14 @@ fn effects_apply_between_buffer_sets() {
     let b = unsafe { slot!(bin::CREATE: unsafe extern "C" fn() -> P)() };
     let apply = slot!(bin::APPLY: unsafe extern "C" fn(P, *const Vector3, f32, i32, P, P));
     let left = crate::math::vec3(0.0, 1.0, 0.0);
-    unsafe { apply(b, &left, 1.0, 1, input.as_raw(), output.as_raw()) };
+    let tone: Block = std::array::from_fn(|i| (i as f32 * std::f32::consts::TAU * 1000.0 / 44100.0).sin());
+    mix::write_all(input, &[tone]);
+    for _ in 0..3 {
+        unsafe { apply(b, &left, 1.0, 1, input.as_raw(), output.as_raw()) };
+    }
     let [l, r]: [Block; 2] = mix::read_all(output).try_into().unwrap();
-    assert!(l[0] > 0.09 && r[0] < 0.001, "a source on the left: {} / {}", l[0], r[0]);
+    let energy = |b: &Block| b.iter().map(|v| v * v).sum::<f32>();
+    assert!(energy(&l) > 2.0 * energy(&r) && energy(&r) > 0.0, "a source on the left: {} / {}", energy(&l), energy(&r));
 
     let p = unsafe { slot!(proc_::CREATE_DELAY: unsafe extern "C" fn(i32) -> P)(1) };
     let set = slot!(proc_::SET_CONTROL_PARAMETER: unsafe extern "C" fn(P, StringToken, f32) -> i32);
