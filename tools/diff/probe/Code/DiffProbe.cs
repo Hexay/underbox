@@ -12,6 +12,7 @@ public sealed class DiffProbe : Component
 	static readonly Angles[] Tilts = { new( 0, 0, 0 ), new( 45, 0, 0 ), new( 0, 0, 45 ), new( 30, 45, 15 ), new( 60, 10, 0 ), new( 10, 10, 10 ), new( 89, 0, 0 ), new( 35, 45, 0 ) };
 	readonly List<Rigidbody> bodies = new();
 	GameObject errorProp;
+	(GameObject Wall, Rigidbody Frozen) massBodies;
 	int tick;
 
 	static string F( float v ) => v.ToString( "F3", CultureInfo.InvariantCulture );
@@ -33,6 +34,7 @@ public sealed class DiffProbe : Component
 		for ( int i = 0; i < Tilts.Length; i++ )
 			bodies.Add( Body( $"Tilt{i}", new Vector3( -600 + 150 * i, -800, 200 ), Rotation.From( Tilts[i] ), sphere: false, gravity: true ) );
 		errorProp = ProbeExtras.ErrorProp( new Vector3( 0, -1400, 300 ) );
+		massBodies = ProbeMass.Spawn();
 		bodies.Add( ProbeExtras.ErrorChair( new Vector3( 600, -1400, 0 ) ) );
 		Mark( $"START bodies={bodies.Count}" );
 	}
@@ -72,6 +74,8 @@ public sealed class DiffProbe : Component
 			ProbePush.Run();
 			ProbeRefresh.Run();
 			ProbeTrike.Run();
+			ProbeMass.Run();
+			ProbeMass.Scene( massBodies.Wall, massBodies.Frozen );
 		}
 		if ( tick == Ticks[^1] ) Mark( "END" );
 	}

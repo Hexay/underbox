@@ -17,6 +17,7 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
 | `REAIM` | orbmatch's push: balls at (−400, 0) and (−440, y) set toward the origin every step at 200 and `rear` u/s; `nofriction` zeroes friction |
 | `REFRESH` | `ProbeRefresh.cs`: ball B pushed into ball A (stopped before each step) at `vn`, slid at `vt`, optionally spun; A's velocity after the step is the normal used |
 | `TRIKE` | `ProbeTrike.cs`: the zoo trike (boxes, two cylinder wheels, two caster spheres, motorised hinges with joint collision) through a 10 × 100 × 25 box sign on a slab, gravity on |
+| `MASS` | `ProbeMass.cs`: mass, centre, inertia and density of static, keyframed and dynamic bodies (the sign's box, off-centre), across type changes and overrides; a scene collider and a frozen `Rigidbody` |
 
 ## Findings (before → after)
 
@@ -101,7 +102,33 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
     (0.25 and below rest `nosign`, but break `OVERLAP` and `CAR` at every softness tried, and the
     sign still lands on the trike). One PGS and one stabilization iteration is the only setting
     that throws the trike out like real (`dynamic`: base x 10–15, sign flat at 4.986) but it
-    still creeps alone and breaks 17's fits. Real's static `PhysicsBody.Mass` reads 0; ours 819.
+    still creeps alone and breaks 17's fits. Real's static `PhysicsBody.Mass` reads 0 (20).
+    **Also tried (not changed): a rigid relax pass.** Box2D solves joints and contacts without
+    softness in its relax pass; Rapier keeps a joint's softness (its CFM) in stabilization. At
+    our 80 Hz ζ 40 that CFM is 0.5% of the impulse, so Rapier's joints are already near rigid
+    there. A rigid sequential-impulse pass after Rapier's step (joints' locked axes and motors,
+    with or without the contacts and their friction, 1–20 sweeps), with joint softness 80/40,
+    60/2, 30/1, 60/0.7 or 120/5, and Rapier's geometric-mean friction combine, all leave the
+    lone trike creeping on its 0.01-friction wheels (`nosign` base x −6 to −13 by step 100,
+    −20 to −200 by 1000; real stays within 0.2 and sleeps by 100). The soft settings (30/1,
+    60/0.7) do land the `dynamic` sign flat beside the trike (z 4.986, as real) with the base
+    pushed +5.4 (real +16.2), but the lone trike still creeps. So the creep is a net force
+    from the wheel-in-base contacts against the joints, not the relax pass. Before (`print_trike`):
+    `nosign` t = 100 base (0.73, 1.53, 6.06) up 0.69; t = 1000 (15.8, 1.3, 9.4) tipped over.
+    `dynamic` t = 100 base (−0.98, 0.33) sign z 9.70 (on the trike). Unchanged.
+20. **Fixed. Mass queries on static and keyframed bodies.** `MASS`: a body that isn't dynamic
+    reports mass 0, inertia (0, 0, 0) with an identity frame, and its shapes' centroid as its
+    mass centre, even with an overridden centre (the override flag still reads true). Its
+    mass, centre and inertia overrides are kept and come back when it turns dynamic. A
+    dynamic body's inertia is the body-axis diagonal, unsorted, with an identity frame (the
+    sign: 725469, 49503, 689622), where Rapier's principal axes come sorted in a rotated frame.
+    Density is the first shape's in kg/m³ (2000 by default), 1100 for a body without shapes.
+    So a frozen `Rigidbody` (keyframed) reads `Mass` 0 and its `MassOverride` 50 returns on
+    unfreezing, as on real. Before: every static and keyframed body reported its shape mass
+    (the sign 819.35), inertia (49503, 689622, 725469) at frame (0.5, −0.5, 0.5, −0.5), density
+    0.0328 (kg/in³). After (`mass.rs` `reported_*`, used by the body and aggregate slots;
+    `mass::tests::only_dynamic_bodies_report_mass_and_inertia`): every `MASS` marker matches, to
+    float rounding (inertia 725469.00 against 725469.13).
 
 ## The zoo hoover (differential.md, 10)
 
@@ -123,8 +150,8 @@ than 5 units or tipping it: one stabilization iteration per substep with 1 or 3 
 persistence (16; 576, 184). The trike's bodies are jointed, so they keep fresh contacts (16).
 `TRIKE` (19) rebuilds the trike and sign in a private world: two gaps, the trike creeping under its
 own joint-vs-contact fight and a weaker push out of the sign. Next: why Rapier's joints never settle
-against contacts inside their own bodies (unverified lead: Box2D's relax pass solves joints rigidly,
-Rapier keeps their softness there), then the push-out. Real's tick-4 sample is
+against contacts inside their own bodies (a rigid relax pass is ruled out, 19), then the push-out.
+Real's tick-4 sample is
 not repeatable either: two runs gave `base` v = 41 and 8, `rear` 12 and 36, because the watcher
 samples on wall-clock seconds. Softer joints (Box2D's 60 Hz ζ 2, or 50 Hz ζ 2) kept 4–5 trike
 bodies awake for about 20 s, close to real's awake counts, but only because the trike creeps under

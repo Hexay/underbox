@@ -42,8 +42,13 @@ impl ShapeMeta {
     }
 }
 
+pub const CUBIC_INCHES_PER_CUBIC_METRE: f32 = 61_023.74;
+
 /// s&box's `default.surface` density, 2000 kg/m³, per cubic inch.
-pub const DEFAULT_DENSITY: f32 = 2000.0 / 61_023.74;
+pub const DEFAULT_DENSITY: f32 = 2000.0 / CUBIC_INCHES_PER_CUBIC_METRE;
+
+/// What native's body `GetDensity` reports for a body without shapes, kg/m³ (probe `MASS`).
+pub const SHAPELESS_BODY_DENSITY: f32 = 1100.0;
 
 /// How a pair of shapes interacts after rules and switches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

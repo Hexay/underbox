@@ -15,10 +15,6 @@ fn each(r: Ref, f: impl Fn(&mut physics::RigidBody)) {
     }
 }
 
-fn sum<R: std::iter::Sum<R> + Default>(r: Ref, f: impl Fn(&mut physics::RigidBody) -> R) -> R {
-    bodies(r).into_iter().map(|b| body::with_rb(b, &f)).sum()
-}
-
 fn body_handle(b: Option<body::Ref>) -> HandleId<class::IPhysicsBody> {
     b.and_then(body::get).map_or(HandleId::new(-1), |b| b.handle.id())
 }
@@ -31,24 +27,36 @@ fn find(r: Ref, pred: impl Fn(&str) -> bool) -> Option<body::Ref> {
     get(r).and_then(|g| g.bodies.iter().find(|(n, _)| pred(n)).map(|(_, b)| *b))
 }
 
+/// A body's mass as native reports it: 0 unless dynamic.
+fn mass(b: body::Ref) -> f32 {
+    body::with_sim(b, |sim, id| sim.reported_mass(id))
+}
+
+fn total_mass(r: Ref) -> f32 {
+    bodies(r).into_iter().map(mass).sum()
+}
+
 /// Mass-weighted centre of the bodies, in world space.
 fn mass_center(r: Ref) -> physics::Vector {
-    let (m, c) = bodies(r).into_iter().fold((0.0, physics::Vector::ZERO), |(m, c), b| body::with_rb(b, |rb| (m + rb.mass(), c + rb.center_of_mass() * rb.mass())));
+    let (m, c) = bodies(r).into_iter().fold((0.0, physics::Vector::ZERO), |(m, c), b| {
+        let mb = mass(b);
+        (m + mb, c + body::with_rb(b, |rb| rb.center_of_mass()) * mb)
+    });
     if m > 0.0 { c / m } else { physics::Vector::ZERO }
 }
 
-/// Scale every body's mass so they sum to `total`.
+/// Scale every dynamic body's mass so they sum to `total`.
 fn set_total_mass(r: Ref, total: f32) {
-    let current = sum(r, |rb| rb.mass());
+    let current = total_mass(r);
     if current <= 0.0 || total <= 0.0 {
         return;
     }
     let k = total / current;
     for b in bodies(r) {
-        body::with_sim(b, |sim, id| {
-            let mass = sim.body_mut(id).map_or(0.0, |rb| rb.mass());
-            sim.set_mass_overrides(id, |m| m.mass = Some(mass * k));
-        });
+        let m = mass(b);
+        if m > 0.0 {
+            body::with_sim(b, |sim, id| sim.set_mass_overrides(id, |o| o.mass = Some(m * k)));
+        }
     }
 }
 
@@ -71,7 +79,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, a::ADD_ANGULAR_VELOCITY, |g, v| each(g, |rb| rb.set_angvel(rb.angvel() + to_vec(v), true)));
     bind!(r, a::SET_LINEAR_DAMPING, |g, d| each(g, |rb| rb.set_linear_damping(d)));
     bind!(r, a::SET_ANGULAR_DAMPING, |g, d| each(g, |rb| rb.set_angular_damping(d)));
-    bind!(r, a::GET_TOTAL_MASS, |g| sum(g, |rb| rb.mass()));
+    bind!(r, a::GET_TOTAL_MASS, total_mass);
     bind!(r, a::SET_TOTAL_MASS, set_total_mass);
     bind!(r, a::GET_MASS_CENTER, |g| from_vec(mass_center(g)));
     // The root body's position, as native's aggregate origin.
