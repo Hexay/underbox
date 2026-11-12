@@ -67,7 +67,7 @@ impl View {
     }
 
     /// Clip → pixels of the viewport (y down), as `g_matViewToScreen` applies after the projection.
-    fn to_screen(&self) -> Mat4 {
+    fn screen_from_clip(&self) -> Mat4 {
         let [x, y, w, h] = self.viewport;
         Mat4::from_cols(Vec4::new(w / 2.0, 0.0, 0.0, 0.0), Vec4::new(0.0, -h / 2.0, 0.0, 0.0), Vec4::Z, Vec4::new(x + w / 2.0, y + h / 2.0, 0.0, 1.0))
     }
@@ -89,7 +89,7 @@ impl View {
             "g_matViewToProjection" => m(s.projection.transpose()),
             "g_vInvProjRow3" => Some(Value::Vec(s.projection.inverse().row(3))),
             "g_matProjectionToView" => m(s.projection.inverse()),
-            "g_matViewToScreen" | "g_matCurrFrameViewToPrevFrameProj" => m(self.to_screen() * s.projection),
+            "g_matViewToScreen" | "g_matCurrFrameViewToPrevFrameProj" => m(self.screen_from_clip() * s.projection),
             "g_matPrevProjectionToWorld" => m(forward_z(self.view_proj).inverse()),
             "g_matUnusedMultiview1" => pair(Value::Mat(forward_z(s.camera_relative()))),
             "g_vUnusedMultiview2" => pair(Value::Vec(pos.extend(0.0))),
