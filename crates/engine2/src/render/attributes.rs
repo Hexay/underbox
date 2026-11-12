@@ -213,6 +213,14 @@ pub fn sampler(r: Ref, name: &str) -> Option<CSamplerStateDesc> {
     })
 }
 
+/// The mip managed named for texture `name`, if it named one (-1, the default, means every mip).
+pub fn texture_slice(r: Ref, name: &str) -> Option<u32> {
+    on(r, |a| match a.get(Kind::Texture, StringToken::of(name)) {
+        Some(Value::Texture(t, mip)) if !t.is_null() && mip >= 0 => Some(mip.unsigned_abs()),
+        _ => None,
+    })
+}
+
 /// [`texture_mip`] by token.
 pub fn token_texture(r: Ref, name: StringToken) -> Option<(NativeRef<class::CTextureBase>, u32)> {
     on(r, |a| match a.get(Kind::Texture, name) {

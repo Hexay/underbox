@@ -133,7 +133,12 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     }
     let gpu = t.gpu.as_ref()?;
     let srgb = s.attributes.get(&b.name).is_some_and(|a| a.srgb);
-    (gpu.dimension() == view_dimension && sample_type_fits(gpu.desc.format, sample_type)).then(|| gpu.sample_view(srgb).clone())
+    let slice = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture_slice(*a, n)));
+    let view = || match slice().filter(|_| gpu.texture.mip_level_count() > 1) {
+        Some(mip) => gpu.mip_sample_view(srgb, mip),
+        None => gpu.sample_view(srgb).clone(),
+    };
+    (gpu.dimension() == view_dimension && sample_type_fits(gpu.desc.format, sample_type)).then(view)
 }
 
 /// Whether a texture of `format` can bind where a shader declares `want`.
@@ -154,13 +159,13 @@ fn bindless_samplers(gpu: &render::Gpu, b: &Binding, kind: wgpu::SamplerBindingT
 
 /// A bindless texture array: element `i` is the texture managed's index `i` names
 /// (render/bindless.rs) when it has the declared shape, else the default.
-fn bindless_views(gpu: &render::Gpu, b: &Binding, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Vec<wgpu::TextureView> {
+fn bindless_views(gpu: &render::Gpu, inputs: &Inputs, b: &Binding, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Vec<wgpu::TextureView> {
     let declared = program::array_len(b);
     // Partially bound arrays may stop past the highest index handed out; others fill the declared length.
     let partial = gpu.device.features().contains(wgpu::Features::PARTIALLY_BOUND_BINDING_ARRAY);
     let len = if partial { declared.min(bindless::len()) } else { declared };
     let fallback = defaults::texture(gpu, dimension, sample_type);
-    (0..len).map(|i| bindless::view(i, dimension, sample_type).unwrap_or_else(|| fallback.clone())).collect()
+    (0..len).map(|i| bindless::view(i, dimension, sample_type, inputs.targets).unwrap_or_else(|| fallback.clone())).collect()
 }
 
 /// Storage images whose bound texture has another format than the program declares, with that
@@ -229,7 +234,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
             bytes.resize(bytes.len().max(min_binding_size.map_or(0, |n| n.get() as usize)), 0);
             Resource::Buffer(buffer(gpu, &b.name, wgpu::BufferUsages::STORAGE, &bytes))
         }
-        B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, b, view_dimension, sample_type)),
+        B::Texture { sample_type, view_dimension, .. } if b.count.is_some() => Resource::Views(bindless_views(gpu, inputs, b, view_dimension, sample_type)),
         B::Sampler(kind) if b.count.is_some() => Resource::Samplers(bindless_samplers(gpu, b, kind)),
         B::Texture { .. } if b.name == FOG_VOLUME => Resource::View(managed_fog(s, inputs, b).unwrap_or_else(|| fog_volume::view(gpu, inputs.lighting))),
         B::Texture { sample_type, view_dimension, .. } => {

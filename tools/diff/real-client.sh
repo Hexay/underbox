@@ -1,6 +1,7 @@
 #!/bin/sh
 # Boot Facepunch's real engine2 client on a corpus scene under Xvfb + lavapipe and grab the window.
 # usage: [MANAGED=1] tools/diff/real-client.sh <corpus> <out-dir> [max-s=240] [artifact-root]
+# PROJECT=<.sbproj> boots that project instead of corpus/<corpus> (tools/diff/frame.sh's game copies).
 # MANAGED=1 draws through managed's scene renderer (+r_managed_scene 1), as tools/client-frame.sh.
 # Waits for `game.load success`, then GRACE (default 20) s, then grabs Xvfb's framebuffer every
 # second until SETTLE (default 4) grabs in a row are identical; writes <out-dir>/frame.xwd plus
@@ -18,7 +19,7 @@ ART=${4:-$(ls -td "$REAL_ENGINE2_CACHE"/*/game/bin/linuxsteamrt64 2>/dev/null | 
 GRACE=${GRACE:-20}
 SETTLE=${SETTLE:-4}
 SIZE=${SIZE:-1024x768}
-PROJ=$ROOT/corpus/$CORPUS/.sbproj
+PROJ=${PROJECT:-$ROOT/corpus/$CORPUS/.sbproj}
 if [ "${MANAGED:-}" = 1 ]; then set -- +r_managed_scene 1; else set --; fi
 SBOX=$(sh "$ROOT/tools/sbox-path.sh" "")
 rm -rf "$OUT"; mkdir -p "$OUT/fb"
@@ -42,7 +43,8 @@ printf 'pcm.!default { type null }\n' > "$OUT/asound.conf"
 LOG=$GAME/logs/dotnet.log
 rm -f "$LOG"
 (cd "$GAME" && DISPLAY=$D ALSA_CONFIG_PATH="$OUT/asound.conf" LD_PRELOAD=$STANDIN timeout -s TERM -k 10 "$SECS" \
-    $NOWEB dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1) &
+    $NOWEB dotnet sbox.dll -nosteam -novr -vulkan_allow_cpu -mcp +game "$PROJ" "$@" > "$OUT/client.out" 2>&1
+    echo "real-client: exit $?" >> "$OUT/client.out") &
 CLIENT=$!
 
 grab() {

@@ -55,9 +55,14 @@ pub fn entries() -> Vec<(u32, texture::Ref)> {
 
 /// The view for one element of a bindless array declared with `dimension` and `sample_type`: the
 /// texture `index` names when it is alive and has that shape, else `None` (the caller's default).
-pub fn view(index: u32, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType) -> Option<wgpu::TextureView> {
+/// A texture in `targets` gets `None` too: wgpu drops the whole submit when a pass samples its own
+/// attachment, even unread in an array (the depth prepass's normals target, walker).
+pub fn view(index: u32, dimension: wgpu::TextureViewDimension, sample_type: wgpu::TextureSampleType, targets: &[texture::Ref]) -> Option<wgpu::TextureView> {
     let (t, srgb) = at(index)?;
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
+    if targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {
+        return None;
+    }
     let gpu = t.gpu.as_ref()?;
     if gpu.dimension() != dimension || !crate::render::shading::bind::sample_type_fits(gpu.desc.format, sample_type) {
         return None;
