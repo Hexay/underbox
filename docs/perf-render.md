@@ -40,12 +40,17 @@ Showroom on the merged base; skinned in brackets. Real's from `run.sh perf <scen
 - **The view block** takes its `Space` apart once (`View::constants`).
 - **The stand-in** computes the bent normal only under its uniform flag.
 - **Bindless sampler arrays** are partially bound, one past the registered states.
-- **wgpu indirect validation is off.** It added a dispatch and a copy per indirect pass, and
-  native validates none. `WGPU_VALIDATION_INDIRECT_CALL=1` restores it.
+- **wgpu indirect validation stays on in the engine**, because managed (untrusted game code)
+  fills the indirect args and the check clamps bad ones. It costs a dispatch and a copy per
+  indirect pass, about 2.4 ms of engine CPU per showroom frame. `perf.sh` and `gpu.sh` default
+  `WGPU_VALIDATION_INDIRECT_CALL=0` to compare with real, which validates none.
 
 ## Before / after
 
-Merged base against this change: same build flags, 3 interleaved rounds, ours only.
+Merged base against this change: same build flags, 3 interleaved rounds, ours only. The base
+had indirect validation on; the after runs had it off (`WGPU_VALIDATION_INDIRECT_CALL=0`, now
+`perf.sh`'s default). That accounts for about 2.4 ms of the engine CPU drop on showroom and none
+of the main-thread or lavapipe drop.
 
 | Metric | showroom before | showroom after | skinned before | skinned after |
 | --- | --- | --- | --- | --- |
@@ -61,9 +66,9 @@ Merged base against this change: same build flags, 3 interleaved rounds, ours on
   since munmap stalls every lavapipe thread's page faults.
 - Peak RSS is a third of real's, so no heap work was done.
 - Rendering is unchanged: `run.sh frame` metrics on showroom, outdoor, fog, skinned, glass,
-  particles and decals equal docs/differential-render.md's latest column. `run.sh gpu` loses
-  wgpu's validation dispatches (showroom 25 → 17 dispatches, skinned 27 → 20), and the rest is
-  unchanged. Its "bindless textures" count for ours drops, because reused groups write no
+  particles and decals equal docs/differential-render.md's latest column. With
+  `gpu.sh`'s `WGPU_VALIDATION_INDIRECT_CALL=0`, `run.sh gpu` loses wgpu's validation dispatches
+  (showroom 25 → 17 dispatches, skinned 27 → 20), and the rest is unchanged. Its "bindless textures" count for ours drops, because reused groups write no
   descriptors in the captured frame.
 
 ## Left, and negative results

@@ -60,13 +60,9 @@ impl Gpu {
     /// Create one per process (tests share a static): the Vulkan loader frees a new instance's
     /// device-less ICDs without a lock that other instances' device calls take, which segfaults.
     pub fn headless() -> Result<Gpu, GpuError> {
-        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle_from_env();
-        // Indirect args come from the engine's own shaders, as on native, which validates none:
-        // wgpu's check is a dispatch and copy per indirect pass (docs/perf-render.md).
-        if std::env::var_os("WGPU_VALIDATION_INDIRECT_CALL").is_none() {
-            desc.flags.remove(wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL);
-        }
-        let instance = wgpu::Instance::new(desc);
+        // Indirect-call validation stays on: managed (untrusted game code) fills indirect args.
+        // `WGPU_VALIDATION_INDIRECT_CALL=0` turns it off, as the differential harness does.
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
         let options = wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::from_env().unwrap_or_default(),
             force_fallback_adapter: false,

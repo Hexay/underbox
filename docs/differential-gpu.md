@@ -123,8 +123,9 @@ are structure, not output. Fixed items say what changed and what is left.
    surviving ids as the instance stream; managed's `occlusion_cull_cs` fills them. The late
    prepass draws only those. Showroom, skinned and outdoor now line up pass for pass with real's
    prepasses (draw counts, instance counts, x0 late draws). wgpu's indirect validation (a dispatch
-   and an args copy per indirect pass) is off, as native validates none (`render/src/gpu.rs`;
-   `WGPU_VALIDATION_INDIRECT_CALL=1` turns it back on). Draws from the vertex cache and those with managed's instance ids stay direct, as real's
+   and an args copy per indirect pass) stays on in the engine, because managed game code fills
+   those args. `gpu.sh` and `perf.sh` default `WGPU_VALIDATION_INDIRECT_CALL=0`, so captures match
+   real's, which validates none. Pass `=1` to see it. Draws from the vertex cache and those with managed's instance ids stay direct, as real's
    skinned draws do. Opaque material draws aren't batched into instanced draws (real: one draw for
    showroom's three boxes). A depth-normal prepass (outdoor) still draws the material program
    with colour off; real writes RGBA normals.

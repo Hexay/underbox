@@ -28,6 +28,8 @@ OUT=$ROOT/target/diff/perf/$NAME
 [ "$SIDE" = server ] || OUT=$OUT-$SIDE
 rm -rf "$OUT"; mkdir -p "$OUT" "$UNDERBOX_GAME_COPIES"
 export LP_NUM_THREADS=${LP_NUM_THREADS:-4}
+# Real validates no indirect args; ours does by default (docs/perf-render.md). =1 measures that cost.
+export WGPU_VALIDATION_INDIRECT_CALL=${WGPU_VALIDATION_INDIRECT_CALL:-0}
 # A release engine2 against real's release build; UNDERBOX_ENGINE2=<so> uses that one instead.
 if [ -z "${UNDERBOX_ENGINE2:-}" ]; then
     echo "== building release engine2"

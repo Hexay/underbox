@@ -28,6 +28,8 @@ fi
 OUT=$ROOT/target/diff/gpu/$NAME
 CAP=$UNDERBOX_CACHE/underbox-gpu/$(basename -- "$ROOT")/$NAME
 mkdir -p "$OUT" "$CAP"
+# Real validates no indirect args; wgpu's check would add a dispatch and copy per indirect pass.
+export WGPU_VALIDATION_INDIRECT_CALL=${WGPU_VALIDATION_INDIRECT_CALL:-0}
 LAYER=$(sh "$ROOT/tools/diff/gpu-layer.sh")
 # Real's textures are named by matching their content against the seeded core (gpu_vtex.py).
 CORE=${ART:+$ART/game/core}
