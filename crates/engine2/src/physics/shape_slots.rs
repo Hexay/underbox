@@ -41,6 +41,14 @@ fn bbox((mins, maxs): (physics::Vector, physics::Vector)) -> BBox {
     BBox { mins: from_vec(mins), maxs: from_vec(maxs) }
 }
 
+/// What a shape's or body's `BuildBounds` returns: real pads the world bounds by 0.8 on every axis
+/// (managed's `Collider.GetWorldBounds` shrinks them back), and a body without shapes gets an
+/// inverted `±f32::MAX` box.
+pub(super) fn built_bounds(bounds: Option<(physics::Vector, physics::Vector)>) -> BBox {
+    const PAD: physics::Vector = physics::Vector::splat(0.8);
+    bbox(bounds.map_or((physics::Vector::MAX, physics::Vector::MIN), |(lo, hi)| (lo - PAD, hi + PAD)))
+}
+
 pub fn register(r: &mut Registry) {
     bind!(r, b::ADD_SPHERE_SHAPE, |body, center, radius, settings| {
         add(body, Type::Sphere, Geometry::Sphere { center: to_vec(center), radius }, settings)
@@ -111,7 +119,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::SET_TRIGGER, |r, v| with_sim(r, |sim, id| sim.set_trigger(id, v)));
     bind!(r, s::IS_TRIGGER, |r| with_collider(r, |c| c.is_sensor()));
     bind!(r, s::SET_FRICTION, |r, v| set_physical(r, false, v));
-    bind!(r, s::GET_FRICTION, |r| with_collider(r, |c| c.friction()));
+    // −1 while the shape takes its surface's friction, as real; managed resolves that itself.
+    bind!(r, s::GET_FRICTION, |r| if with_state(r, |st| st.inherits.0) { -1.0 } else { with_collider(r, |c| c.friction()) });
     bind!(r, s::SET_ELASTICITY, |r, v| set_physical(r, true, v));
     bind!(r, s::SET_ROLLING_RESISTANCE, |_, _| {});
     bind!(r, s::SET_HAS_NO_MASS, |r, v| update_meta(r, |m| m.massless = v));
@@ -119,9 +128,9 @@ pub fn register(r: &mut Registry) {
         let Some(other) = get(other) else { return false };
         with_sim(r, |sim, id| sim.is_touching(id, other.id, triggers))
     });
-    bind!(r, s::BUILD_BOUNDS, |r| with_sim(r, |sim, id| sim.shape_bounds(id).map(bbox)).unwrap_or_default());
+    bind!(r, s::BUILD_BOUNDS, |r| with_sim(r, |sim, id| sim.shape_bounds(id).map(|b| built_bounds(Some(b)))).unwrap_or_default());
     bind!(r, s::LOCAL_BOUNDS, |r| with_collider(r, |c| bbox({
-        let aabb = c.shared_shape().compute_local_aabb();
+        let aabb = c.shared_shape().compute_aabb(&c.position_wrt_parent().copied().unwrap_or_default());
         (aabb.mins, aabb.maxs)
     })));
     bind!(r, s::RESET_PROXY, |_| {});

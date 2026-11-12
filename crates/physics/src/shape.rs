@@ -81,12 +81,12 @@ impl Shape {
 }
 
 /// Which body pairs a collider meets. A trigger reports dynamic bodies, and a keyframed trigger
-/// static colliders too: real teleports sbox-walker's floor, resting under its keyframed
-/// `TriggerTeleport`. A static trigger stays silent for keyframed and static colliders
-/// (`contacts::reports`; `contacts_tests::*_trigger_*`).
+/// static and keyframed colliders too: on sbox-walker real's keyframed `TriggerTeleport` moves
+/// the static floor resting under it and a keyframed coin. A static trigger stays silent for
+/// keyframed and static colliders (`contacts::reports`; `contacts_tests::*_trigger_*`).
 fn pair_types(trigger: bool) -> ActiveCollisionTypes {
     let default = ActiveCollisionTypes::default();
-    if trigger { default | ActiveCollisionTypes::KINEMATIC_FIXED } else { default }
+    if trigger { default | ActiveCollisionTypes::KINEMATIC_FIXED | ActiveCollisionTypes::KINEMATIC_KINEMATIC } else { default }
 }
 
 impl World {
@@ -130,9 +130,8 @@ impl World {
         let surface = Surface { friction: c.friction(), elasticity: c.restitution(), trigger: c.is_sensor() };
         let Some(new) = shape.collider(surface).map(|b| b.build()) else { return };
         c.set_shape(new.shared_shape().clone());
-        if let Some(local) = new.position_wrt_parent() {
-            c.set_position_wrt_parent(*local);
-        }
+        // `new` has no parent, so its builder's pose is its `position`.
+        c.set_position_wrt_parent(*new.position());
         if let Some(body) = c.parent() {
             self.rebuild_mass(body);
         }

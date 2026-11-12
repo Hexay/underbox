@@ -96,6 +96,10 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::FINISH_UPDATE, |_| {});
     bind!(r, o::MERGE_FROM, merge_from);
     bind!(r, o::GET_M_FL_DELTA_TIME, |p| with(Ref::from_raw(p), |s| s.dt));
+    // TODO: real's are the posed bounds (the citizen's reach 3.75 below its render bounds); these
+    // are the model's render bounds, and their box moved by the object's transform.
+    bind!(r, o::GET_M_LOCAL_BOUNDS, |p| crate::scene::object::with(Ref::from_raw(p).cast(), |s| crate::model::bounds(s.model)));
+    bind!(r, o::GET_M_WORLD_BOUNDS, |p| crate::scene::object::with(Ref::from_raw(p).cast(), |s| s.world_bounds()));
 
     bind!(r, o::SET_WORLD_SPACE_RENDER_BONE_TRANSFORM, set_world);
     bind!(r, o::GET_WORLD_SPACE_RENDER_BONE_TRANSFORM, |r, i| world(r, idx(i)));

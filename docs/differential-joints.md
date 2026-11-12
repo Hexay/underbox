@@ -18,6 +18,7 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
 | `REFRESH` | `ProbeRefresh.cs`: ball B pushed into ball A (stopped before each step) at `vn`, slid at `vt`, optionally spun; A's velocity after the step is the normal used |
 | `TRIKE` | `ProbeTrike.cs`: the zoo trike (boxes, two cylinder wheels, two caster spheres, motorised hinges with joint collision) through a 10 × 100 × 25 box sign on a slab, gravity on |
 | `MASS` | `ProbeMass.cs`: mass, centre, inertia and density of static, keyframed and dynamic bodies (the sign's box, off-centre), across type changes and overrides; a scene collider and a frozen `Rigidbody` |
+| `INERTIA` | `ProbeBounds.cs`: a dynamic body with the error model's hull, gravity off |
 
 ## Findings (before → after)
 
@@ -129,6 +130,18 @@ hoover and orbmatch's bots. Harness and rules: docs/differential.md.
     0.0328 (kg/in³). After (`mass.rs` `reported_*`, used by the body and aggregate slots;
     `mass::tests::only_dynamic_bodies_report_mass_and_inertia`): every `MASS` marker matches, to
     float rounding (inertia 725469.00 against 725469.13).
+21. **Fixed. Principal inertia in body-axis order.** `INERTIA` (`ProbeBounds.cs`): the error
+    model's hull is slightly tilted, so its tensor isn't diagonal. Real returns its principal
+    moments in the order of the body axes they lie closest to, with a near-identity frame
+    (692785, 48626, 657604, frame x −0.0033); ours returned Rapier's ascending sort in a rotated
+    frame (48644, 657841, 693038, frame (0.50, −0.50, 0.50, −0.50)). After (`mass.rs`
+    `reported_inertia`, `mass::tests::principal_axes_follow_the_body_axes`): 693038, 48644,
+    657841, frame x −0.0032. The 0.04% left is the rebuilt hull (docs/differential.md, 7).
+22. **Fixed. Touches through recycled contacts.** A contact Rapier recycles (16) keeps the
+    distance of the step it was made in. With gravity −850 a test ball's first contact formed
+    0.39 above the slab and the pair never read as touching (no `TouchBegin`, `IsTouching`
+    false) while it rested. `contacts::touches` now measures the pair again. Every probe marker
+    (`CAR`, `PUSHOUT`, `STACKSLEEP`, `REAIM`, ...) is unchanged by it.
 
 ## The zoo hoover (differential.md, 10)
 

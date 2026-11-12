@@ -234,7 +234,8 @@ Ranked divergences:
    `32,0,700`, angles `89,0,0`) show real's floor centred on `TeleportTarget` (4,200,4): the
    keyframed `TriggerTeleport` box rests on the static floor and real teleports the floor's
    root. Ours reported trigger pairs only with a dynamic body; a keyframed trigger now reports
-   static colliders too (`shape::pair_types`, `contacts::reports`). That also explains the
+   static and keyframed colliders too (`shape::pair_types`, `contacts::reports`;
+   docs/differential-tap.md, "Fixed"). That also explains the
    coins: rolled 180°, their error models hang below the old floor, half sunk on ours.
    Unverified: a static trigger over a keyframed collider (walker's map under `MapInstance`)
    stays silent, as before.

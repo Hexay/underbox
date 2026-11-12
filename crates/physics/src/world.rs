@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 pub const INCHES_PER_METRE: f32 = 39.37;
 
 /// Native's world gravity until managed sets one (inches/s²).
-pub const DEFAULT_GRAVITY: Vector = Vector::new(0.0, 0.0, -800.0);
+pub const DEFAULT_GRAVITY: Vector = Vector::new(0.0, 0.0, -850.0);
 
 const MIN_SUBSTEPS: u32 = 4;
 

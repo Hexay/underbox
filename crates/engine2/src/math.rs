@@ -1,7 +1,7 @@
 //! Constructors for the ABI's math structs (which nest `System.Numerics` types), and conversions
 //! to the physics crate's glam types.
 
-use abi::structs::{Quaternion, Rotation, System_Numerics_Vector3, System_Numerics_Vector4, Transform, Vector3, Vector4};
+use abi::structs::{BBox, Quaternion, Rotation, System_Numerics_Vector3, System_Numerics_Vector4, Transform, Vector3, Vector4};
 
 pub fn vec3(x: f32, y: f32, z: f32) -> Vector3 {
     Vector3 { vec: System_Numerics_Vector3 { x, y, z } }
@@ -46,4 +46,11 @@ pub fn quat(r: Rotation) -> glam::Quat {
 
 pub fn from_rot(q: physics::Rotation) -> Rotation {
     Rotation { quat: Quaternion { x: q.x, y: q.y, z: q.z, w: q.w } }
+}
+
+/// `b` moved by `m`: the box around its eight transformed corners.
+pub fn moved_box(m: glam::Mat4, b: BBox) -> (glam::Vec3, glam::Vec3) {
+    let (lo, hi) = (v3(b.mins), v3(b.maxs));
+    let corner = |i: usize| glam::Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][i >> 2]);
+    (0..8).map(|i| m.transform_point3(corner(i))).fold((glam::Vec3::MAX, glam::Vec3::MIN), |(l, h), p| (l.min(p), h.max(p)))
 }

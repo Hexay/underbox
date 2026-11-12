@@ -13,6 +13,7 @@ public sealed class DiffProbe : Component
 	readonly List<Rigidbody> bodies = new();
 	GameObject errorProp;
 	(GameObject Wall, Rigidbody Frozen) massBodies;
+	ProbeBounds.Objects boundsObjects;
 	int tick;
 
 	static string F( float v ) => v.ToString( "F3", CultureInfo.InvariantCulture );
@@ -35,6 +36,7 @@ public sealed class DiffProbe : Component
 			bodies.Add( Body( $"Tilt{i}", new Vector3( -600 + 150 * i, -800, 200 ), Rotation.From( Tilts[i] ), sphere: false, gravity: true ) );
 		errorProp = ProbeExtras.ErrorProp( new Vector3( 0, -1400, 300 ) );
 		massBodies = ProbeMass.Spawn();
+		boundsObjects = ProbeBounds.Spawn();
 		bodies.Add( ProbeExtras.ErrorChair( new Vector3( 600, -1400, 0 ) ) );
 		Mark( $"START bodies={bodies.Count}" );
 	}
@@ -61,6 +63,7 @@ public sealed class DiffProbe : Component
 			foreach ( var b in bodies )
 				Mark( $"POS t={tick} {b.GameObject.Name} pos={V( b.WorldPosition )} vel={V( b.Velocity )} ang={V( b.WorldRotation.Angles().AsVector3() )} sleep={b.PhysicsBody.Sleeping}" );
 		}
+		if ( tick is 1 or 2 or 5 or 50 ) ProbeBounds.Report( tick, boundsObjects );
 		if ( tick == 5 )
 		{
 			Traces();

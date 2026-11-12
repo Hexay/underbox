@@ -106,13 +106,15 @@ differential docs before.
    real and not on ours. During `SourceEnginePreInit` real calls `Resource.OnResourceLoaded` for
    its error resources (`shaders/error.shader`, `materials/error.vmat`, `models/dev/error.vmesh`,
    …); ours never fires that callback.
-2. **Physics world gravity (both).** A new world's `GetGravity` is (0, 0, −850) on real and −800 on
-   ours (`physics::DEFAULT_GRAVITY`). The scene sets −850 straight after, so the step is unaffected,
-   but a private `PhysicsWorld` keeps the default.
-3. **Shape local bounds (probe).** `IPhysicsShape.LocalBounds` on a sphere set with
+2. **Fixed. Physics world gravity (both).** A new world's `GetGravity` is (0, 0, −850) on real and
+   was −800 on ours. The scene sets −850 straight after, but a private `PhysicsWorld` keeps the
+   default. Now `physics::DEFAULT_GRAVITY` is −850.
+3. **Fixed. Shape local bounds (probe).** `IPhysicsShape.LocalBounds` on a sphere set with
    `UpdateSphereShape(center (1.74, 0, 52.7), r 8)` is (−6.26, −8, 44.7)–(9.74, 8, 60.7) on real,
-   and ±8 around the origin on ours: `shape_slots.rs` takes the shape's AABB without the collider's
-   offset from its body. The error chair's 32-unit sphere is off the same way.
+   and was ±8 around the origin on ours, for two reasons: the slot took the shape's AABB without
+   its offset from the body, and `World::update_shape` never moved that offset at all (a built
+   collider without a parent keeps its pose in `position`), so an updated sphere also simulated at
+   its old centre. Both fixed (`world_tests::updating_a_shape_moves_its_offset`).
 4. **Tick 1 (probe).** The sliding box's first step: real gives it vz = +1.5, ours −0.006, and
    its position 0.03 higher. This is the "vertical pop" in docs/differential.md (4). The resting
    bodies' sub-0.01 drifts follow.
@@ -122,6 +124,34 @@ differential docs before.
 6. **Showroom content.** `PrecacheSound` of a missing `.vsnd` returns a handle on ours and null on
    real. `CSceneLightObject.GetRadius` is 200 on ours and 0 on real for the same light.
    `CModel.GetNumMaterialGroups` is 1 on ours and 0 on real.
+
+## Fixed
+
+From the tap and a scene-state dump, checked with `ProbeBounds.cs` (`BOUNDS`, `STATIC`,
+`FRICTION`, `GRAVITY`, `TRI`, `INERTIA` markers; real's values are ground truth):
+
+| What | Real | Ours before | Now |
+| --- | --- | --- | --- |
+| A body's and a shape's `BuildBounds` | world bounds padded by 0.8 on every axis (`Collider.GetWorldBounds` shrinks them back) | unpadded | padded (`shape_slots::built_bounds`) |
+| `BuildBounds` of a body without shapes | inverted (`f32::MAX` … `−f32::MAX`) | zero | inverted |
+| `PhysicsShape.Friction` with no collider value | −1 (`PlayerController` resolves it through the trace surface) | the surface's 0.8 | −1 |
+| `Sleeping` on a static body | true from creation, before any step | false | true |
+| `SceneObject.Bounds` of a model object | world space: the model's render bounds moved by the transform (a rotated, scaled box matches to 4 decimals) | model space (`scene/create.rs` stored them once) | world space (`object::State::world_bounds`), unless managed set bounds |
+| `SkinnedModelRenderer.Bounds` (`m_worldBounds`, `m_localBounds`) | the posed bounds | zero (fields never written) | the model's render bounds, moved for world |
+| A sphere's triangulation | 402 vertices, 800 triangles | a 62-vertex UV sphere | an octahedron cut 10 times per edge: 402 and 800 (`triangulate::octasphere`) |
+| Error model inertia | body-axis order | ascending | body-axis order (docs/differential-joints.md, 21) |
+| A keyframed trigger over a keyframed collider | reports it: on sbox-walker the keyframed `TriggerTeleport` moves a keyframed coin | silent | reports (`shape::pair_types`); a static trigger still ignores keyframed and static colliders |
+
+The walker check: `MAP=scenes/scenemap.scene SLOTS='IPhysicsBody_*' TICKS=0-12 tools/diff/run.sh tap
+<sbox-walker> both`. Before, 447 `IPhysicsBody_Set*` calls diverged from tick 1 (real teleports
+bodies ours left alone); after, none.
+
+Left: real's posed bounds aren't the render bounds. The citizen at yaw 45 reads local
+(−7.0, −29.1, −3.75)–(10.0, 29.1, 71.7) against render bounds (−5.2, −25.7, 0)–(8.6, 25.7, 71.7), and
+its world box is tighter than the local box rotated, so real builds it from posed world-space
+geometry. Ours loads the citizen as the error model on the server, so the probe can't compare it
+yet. Real's sphere vertices sit in another orientation (no vertex at the poles), so only the counts
+match.
 
 Noise that calibration doesn't remove: `ConVar.GetName` during registration pairs convars by
 position, so different registration orders read as `return`. The per-frame `PerformanceTrace` and

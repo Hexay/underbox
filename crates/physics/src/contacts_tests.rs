@@ -116,7 +116,7 @@ fn static_trigger_ignores_static_and_keyframed_but_sees_dynamic() {
 }
 
 #[test]
-fn keyframed_trigger_sees_static_but_not_keyframed() {
+fn keyframed_trigger_sees_static_and_keyframed() {
     let mut world = World::default();
     world.set_gravity(Vector::ZERO);
     let coin = world.add_body(BodyType::Keyframed, Pose::from_translation(Vector::new(50.0, 0.0, 5.0)));
@@ -124,7 +124,7 @@ fn keyframed_trigger_sees_static_but_not_keyframed() {
     let trigger = world.add_body(BodyType::Keyframed, Pose::from_translation(Vector::new(50.0, 0.0, 0.0)));
     let shape = Shape::Box { center: Vector::ZERO, rotation: Rotation::IDENTITY, half_extents: Vector::new(10.0, 10.0, 10.0) };
     world.add_shape(trigger, &shape, Surface { trigger: true, ..Default::default() }).unwrap();
-    assert_eq!(run(&mut world, 5), [], "keyframed pair stays silent");
+    assert_eq!(run(&mut world, 5), [EventKind::TriggerBegin], "the keyframed coin enters the keyframed trigger");
     slab(&mut world, false, &[]);
     assert_eq!(run(&mut world, 5), [EventKind::TriggerBegin], "the static slab enters the keyframed trigger");
 }

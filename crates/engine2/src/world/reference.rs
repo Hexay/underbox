@@ -55,10 +55,8 @@ fn transform(a: Affine3A) -> Transform {
 }
 
 
-/// `b` moved by `a`: the box around its eight transformed corners.
 fn moved(a: Affine3A, b: BBox) -> (Vec3, Vec3) {
-    let (lo, hi) = (crate::math::v3(b.mins), crate::math::v3(b.maxs));
-    (0..8).map(|i| a.transform_point3(Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][i >> 2]))).fold((Vec3::MAX, Vec3::MIN), |(l, h), p| (l.min(p), h.max(p)))
+    crate::math::moved_box(glam::Mat4::from(a), b)
 }
 
 /// Load the map `name` names (`maps/foo.vpk`) from `pak` (or loose files when `None`) into `scene`.

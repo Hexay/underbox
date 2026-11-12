@@ -22,10 +22,42 @@ fn append(out: &mut Mesh, pose: &Pose, (vertices, triangles): Mesh) {
     out.1.extend(triangles.into_iter().map(|t| t.map(|i| i + base)));
 }
 
+/// A sphere as real triangulates one: an octahedron with each edge cut in `n` (n = 10 gives
+/// real's 402 vertices and 800 triangles; its vertex positions differ slightly).
+fn octasphere(radius: f32, n: i32) -> Mesh {
+    let mut index = std::collections::HashMap::new();
+    let mut mesh = Mesh::default();
+    let mut vertex = |p: [i32; 3], mesh: &mut Mesh| {
+        *index.entry(p).or_insert_with(|| {
+            mesh.0.push(Vector::new(p[0] as f32, p[1] as f32, p[2] as f32).normalize() * radius);
+            mesh.0.len() as u32 - 1
+        })
+    };
+    for s in 0..8 {
+        let sign = [1, 2, 4].map(|bit| if s & bit == 0 { 1 } else { -1 });
+        let at = |i: i32, j: i32| [sign[0] * (n - i - j), sign[1] * i, sign[2] * j];
+        for i in 0..n {
+            for j in 0..n - i {
+                let mut tris = vec![[at(i, j), at(i + 1, j), at(i, j + 1)]];
+                if i + j + 1 < n {
+                    tris.push([at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
+                }
+                for t in tris {
+                    let [a, b, c] = t.map(|p| vertex(p, &mut mesh));
+                    let [pa, pb, pc] = [a, b, c].map(|v| mesh.0[v as usize]);
+                    let outward = (pb - pa).cross(pc - pa).dot(pa + pb + pc) > 0.0;
+                    mesh.1.push(if outward { [a, b, c] } else { [a, c, b] });
+                }
+            }
+        }
+    }
+    mesh
+}
+
 fn triangles_of(shape: &dyn Parry, pose: &Pose, out: &mut Mesh) {
     let n = ROUND_SUBDIVISIONS;
     let mesh = if let Some(b) = shape.as_ball() {
-        b.to_trimesh(n, n / 2)
+        octasphere(b.radius, 10)
     } else if let Some(c) = shape.as_cuboid() {
         c.to_trimesh()
     } else if let Some(c) = shape.as_capsule() {
@@ -110,5 +142,18 @@ mod tests {
         let touching = mesh.1.iter().filter(|t| touches(&bounds, t.map(|i| mesh.0[i as usize]))).count();
         assert!(touching > 0 && touching < 12);
         assert_eq!(outline(mesh).len(), 2 * 18, "12 box edges + 6 face diagonals");
+    }
+
+    #[test]
+    fn a_sphere_has_reals_vertex_and_triangle_counts() {
+        let mut mesh = Mesh::default();
+        triangles_of(&physics::rapier3d::parry::shape::Ball::new(8.0), &Pose::IDENTITY, &mut mesh);
+        assert_eq!((mesh.0.len(), mesh.1.len()), (402, 800));
+        assert!(mesh.0.iter().all(|v| (v.length() - 8.0).abs() < 1e-4));
+        let outward = |t: &[u32; 3]| {
+            let [a, b, c] = t.map(|i| mesh.0[i as usize]);
+            (b - a).cross(c - a).dot(a + b + c) > 0.0
+        };
+        assert!(mesh.1.iter().all(outward));
     }
 }

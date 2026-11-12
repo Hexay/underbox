@@ -21,14 +21,15 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::SET_TRANSFORM, |s, t| with(s, |st| st.transform = t));
     bind!(r, o::GET_C_TRANSFORM, |s| with(s, |st| Some(st.transform)).unwrap_or_else(crate::math::identity));
     bind!(r, o::SET_BOUNDS, |s, b| with(s, |st| st.bounds = b));
-    bind!(r, o::GET_BOUNDS, |s| with(s, |st| st.bounds));
+    bind!(r, o::GET_BOUNDS, |s| with(s, |st| st.world_bounds()));
     bind!(r, o::SET_BOUNDS_INFINITE, |s| {
         let (lo, hi) = (crate::math::vec3(f32::MIN, f32::MIN, f32::MIN), crate::math::vec3(f32::MAX, f32::MAX, f32::MAX));
         with(s, |st| (st.bounds.mins, st.bounds.maxs) = (lo, hi))
     });
     bind!(r, o::GET_BOUNDING_SPHERE_RADIUS, |s| {
         with(s, |st| {
-            let (a, b) = (st.bounds.mins.vec, st.bounds.maxs.vec);
+            let bounds = st.world_bounds();
+            let (a, b) = (bounds.mins.vec, bounds.maxs.vec);
             0.5 * ((b.x - a.x).powi(2) + (b.y - a.y).powi(2) + (b.z - a.z).powi(2)).sqrt()
         })
     });

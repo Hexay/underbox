@@ -5,7 +5,7 @@ use super::body::{apply_state, get, set_motion_locks, with_rb, with_sim, with_st
 use super::shape;
 use crate::math::{from_rot, from_vec, to_rot, to_vec, vec3};
 use abi::slots::i_physics_body as b;
-use abi::structs::{BBox, Transform};
+use abi::structs::Transform;
 use abi::{HandleId, Registry, bind};
 use physics::{BodyType, Pose, function};
 
@@ -71,7 +71,8 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, b::WAKE, |r| with_rb(r, |rb| rb.wake_up(true)));
     bind!(r, b::SLEEP, |r| with_rb(r, |rb| rb.sleep()));
-    bind!(r, b::IS_SLEEPING, |r| with_rb(r, |rb| rb.is_sleeping()));
+    // Real reports static bodies asleep from creation.
+    bind!(r, b::IS_SLEEPING, |r| with_rb(r, |rb| rb.is_fixed() || rb.is_sleeping()));
     bind!(r, b::ENABLE_AUTO_SLEEPING, |r| {
         with_state(r, |s| s.auto_sleep = true);
         apply_state(r);
@@ -97,9 +98,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::IS_ENABLED, |r| with_rb(r, |rb| rb.is_enabled()));
     bind!(r, b::SET_BULLET, |r, v| with_rb(r, |rb| rb.enable_ccd(v)));
     bind!(r, b::SET_MOTION_LOCKS, |r, x, y, z, pitch, yaw, roll| with_rb(r, |rb| set_motion_locks(rb, [x, y, z, pitch, yaw, roll])));
-    bind!(r, b::BUILD_BOUNDS, |r| with_sim(r, |sim, id| {
-        sim.body_bounds(id).map(|(lo, hi)| BBox { mins: from_vec(lo), maxs: from_vec(hi) })
-    }).unwrap_or_default());
+    bind!(r, b::BUILD_BOUNDS, |r| with_sim(r, |sim, id| sim.body(id).is_some().then(|| super::shape_slots::built_bounds(sim.body_bounds(id)))).unwrap_or_default());
     bind!(r, b::SET_MATERIAL_INDEX, |r, name: abi::StringToken| {
         let surface = super::surfaces::by_hash(name.0).unwrap_or(-1);
         let shapes = get(r).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
