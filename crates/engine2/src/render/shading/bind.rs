@@ -87,10 +87,10 @@ pub(super) fn uniform_value<P>(s: &Shading<P>, inputs: &Inputs, name: &str) -> O
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let attr = s.attributes.get(name);
     let source = || attr.and_then(|a| inputs.view.source(a.source.as_deref()?));
-    let default = || attr.and_then(|a| a.default);
     let matrix = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_matrix(*a, n))).map(Value::Mat);
     let vector = from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(source);
-    vector.map(Value::Vec).or_else(matrix).or_else(|| default().map(Value::Vec))
+    let unset_matrix = attr.is_some_and(|a| a.attribute.is_some() && a.default.is_none()).then_some(Value::Mat(Mat4::IDENTITY)); // real's world text sets no LayerMat
+    vector.map(Value::Vec).or_else(matrix).or_else(|| attr.and_then(|a| a.default).map(Value::Vec)).or(unset_matrix)
 }
 
 /// Managed's bytes for a whole block, sized to the block.

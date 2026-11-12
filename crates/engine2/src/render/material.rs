@@ -14,6 +14,9 @@ use std::sync::{Arc, Mutex};
 pub type Ref = NativeRef<class::IMaterial2>;
 type Texture = NativeRef<class::CTextureBase>;
 
+/// What a missing `.vmat` draws with: core's `materials/error.vmat` names it (stand-in in standin.rs).
+const ERROR_SHADER: &str = "shaders/error.shader";
+
 #[derive(Default)]
 struct Params {
     strings: HashMap<String, String>,
@@ -105,7 +108,7 @@ fn load(path: Option<&CStr>, guid: Guid) -> Ref {
             drop(p);
             material
         }
-        None => new(name.clone(), String::new(), true, guid),
+        None => new(name.clone(), ERROR_SHADER.into(), true, guid),
     });
     resource::new_handle(material)
 }

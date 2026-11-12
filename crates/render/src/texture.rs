@@ -96,6 +96,20 @@ impl Texture {
         layer_view(&self.texture, layer)
     }
 
+    /// Mip 0 as an attachment that encodes on write (native's `RENDER_SRGB` output), for render
+    /// targets whose format has an sRGB twin.
+    pub fn srgb_target_view(&self) -> Option<wgpu::TextureView> {
+        let format = srgb_twin(self.desc.format).filter(|_| self.desc.render_target)?;
+        Some(self.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            usage: Some(wgpu::TextureUsages::RENDER_ATTACHMENT),
+            mip_level_count: Some(1),
+            array_layer_count: Some(1),
+            ..Default::default()
+        }))
+    }
+
     /// The view a shader samples: decoded through [`Texture::srgb_view`] when `srgb` and the format
     /// has a twin, else the raw view.
     pub fn sample_view(&self, srgb: bool) -> &wgpu::TextureView {

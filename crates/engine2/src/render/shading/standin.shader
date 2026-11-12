@@ -165,6 +165,16 @@ PS
 	float4 g_vStandinDrawTint < Attribute( "StandinDrawTint" ); Default4( 1.0, 1.0, 1.0, 1.0 ); >;
 	// UNDERBOX_STANDIN_DEBUG (standin.rs): 1 paints sun visibility, 2 cascade 0's shadow-space position.
 	float g_flStandinDebug < Attribute( "StandinDebug" ); Default( 0.0 ); >;
+	// 1 for error.shader (standin.rs): albedo is a world-space red checker, fitted to real's frames.
+	float g_flStandinError < Attribute( "StandinError" ); Default( 0.0 ); >;
+	// 1 for generic.shader (standin.rs), whose tint is linear.
+	float g_flStandinLinearTint < Attribute( "StandinLinearTint" ); Default( 0.0 ); >;
+
+	float3 ErrorChecker( float3 vPositionWs )
+	{
+		float3 c = floor( vPositionWs / 2.0 );
+		return fmod( abs( c.x + c.y + c.z ), 2.0 ) < 1.0 ? float3( 0.42, 0.0, 0.0 ) : float3( 0.17, 0.0, 0.0 );
+	}
 
 	struct PS_OUTPUT
 	{
@@ -229,10 +239,13 @@ PS
 	{
 		PS_OUTPUT o;
 		float4 vAlbedo = g_tColor.Sample( g_sStandin, i.vTexCoord );
+		if ( g_flStandinError != 0.0 )
+			vAlbedo = float4( ErrorChecker( i.vPositionWs ), 1.0 );
 		float4 vInstanceTint = i.vTint * g_vStandinDrawTint;
 		float3 vTint = lerp( float3( 1.0, 1.0, 1.0 ), vInstanceTint.rgb, g_flModelTintAmount );
 		// complex's colour tint is gamma space (vr_shared_standard_vs_code.fxc).
-		float3 vColor = vAlbedo.rgb * SrgbGammaToLinear( g_vColorTint.rgb ) * vTint;
+		float3 vColorTint = g_flStandinLinearTint != 0.0 ? g_vColorTint.rgb : SrgbGammaToLinear( g_vColorTint.rgb );
+		float3 vColor = vAlbedo.rgb * vColorTint * vTint;
 
 		float3 vNormalWs = normalize( i.vNormalWs );
 		Surface s;

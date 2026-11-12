@@ -52,6 +52,8 @@ pub struct LayerState {
     pub shader_mode: Option<StringToken>,
     /// Whether `SetOutput` ran; layers without it draw into the view's own targets.
     pub output_set: bool,
+    /// `SetOutput`'s `RENDER_SRGB`: draws write through the colour target's sRGB view.
+    pub srgb_output: bool,
 }
 
 pub struct SceneLayer {
@@ -92,6 +94,10 @@ pub fn with<R: Default>(r: Ref, f: impl FnOnce(&mut LayerState) -> R) -> R {
 
 pub fn set_output(r: Ref, color: texture::Ref, depth: texture::Ref) {
     with(r, |s| (s.color, s.depth, s.output_set) = (color, depth, true));
+}
+
+pub fn srgb_output(r: Ref) -> bool {
+    with(r, |s| s.srgb_output)
 }
 
 /// The colour and depth targets the layer draws into: its output, else its view's.
@@ -148,6 +154,9 @@ pub fn register(r: &mut Registry) {
     bind!(r, l::GET_COLOR_TARGET, |r| targets(r).0);
     bind!(r, l::GET_DEPTH_TARGET, |r| targets(r).1);
     bind!(r, l::SET_OUTPUT, |r, c, d| set_output(r, view::rt_texture(c), view::rt_texture(d)));
-    bind!(r, l::SET_OUTPUT_1, |r, c, d, _color_space| set_output(r, view::rt_texture(c), view::rt_texture(d)));
+    bind!(r, l::SET_OUTPUT_1, |r, c, d, color_space| {
+        set_output(r, view::rt_texture(c), view::rt_texture(d));
+        with(r, |s| s.srgb_output = color_space == 1);
+    });
     bind!(r, l::SET_OVERLAY_STENCIL, |_, _| {});
 }

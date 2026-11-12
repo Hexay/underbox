@@ -49,6 +49,9 @@ pub struct Target {
     pub scissor: Option<NativeRect>,
     /// Depth runs near = 1 (`context::reverse_z`): shaders' declared depth functions apply as is.
     pub reverse_z: bool,
+    /// Native's sRGB write (`RENDER_SRGB` output, `BindColorAndDepthTarget`'s flag): an 8-bit
+    /// colour target stores what draws write sRGB-encoded.
+    pub srgb_write: bool,
 }
 
 pub fn placeholder() -> Option<&'static Placeholder> {
@@ -121,7 +124,7 @@ pub fn topology(prim: i64) -> PrimitiveTopology {
 pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw]) {
     let (Some(gpu), Some(placeholder)) = (device::gpu(), placeholder()) else { return };
     let (color, depth) = (texture::resolve(target.color), texture::resolve(target.depth));
-    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), depth_layer: target.depth_slice, ..Default::default() };
+    let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), depth_layer: target.depth_slice, srgb_write: target.srgb_write, ..Default::default() };
     if let (Some(c), Some(d)) = (targets.color, targets.depth)
         && (c.desc.width, c.desc.height) != (d.desc.width, d.desc.height)
     {
@@ -139,7 +142,7 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
         RasterState { depth_write: s.depth_write && targets.depth.is_some(), ..s }
     };
     let view = View { tone_map: lighting.tone_map.unwrap_or(1.0), ..view_of(&targets) };
-    let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color.map(|t| t.desc.format), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
+    let key = |d: &Draw, vertex: &[VertexBufferKey]| PipelineKey { color: targets.color_format(), depth: targets.depth.map(|t| t.desc.format), vertex: vertex.to_vec(), state: state(d) };
     let bound: Vec<_> = draws.iter().map(|d| d.shaded.as_ref().and_then(|s| shaded::bind(gpu, s, &view.with_view_proj(s.view_proj), lighting, &key(d, &s.vertex), &[target.color, target.depth]))).collect();
     let (defaults, ids) = shaded::streams(gpu);
     let draws: Vec<_> = draws
