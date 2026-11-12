@@ -253,12 +253,13 @@ Ranked divergences:
 9. **Fixed. Missing models drew the cube stand-in.** Native draws core's
    `models/dev/error.vmdl`; ours now does too, compiled when seeded, else from source
    (`model.rs` `error_content`).
-10. **Open, harness:** with `KEEP_HUD=true` (real draws HUD since 4) walker's `Scoreboard` overlay
-    (`#1115`, backdrop blur, hidden by an opacity transition) stays drawn on ours. Not compared.
+10. **Open, HUD:** with `KEEP_HUD=true` (7.1 / 5.9 / 5.7, SSIM 0.918) the `Scoreboard` overlay no
+    longer sticks on ours. Walker's coin counter draws grey outlined icons on ours where real
+    draws filled glowing dots, and the score digit sits about 10 px lower on ours.
 
 ## Follow-up lanes
 
-- **Walker (above):** the HUD with `KEEP_HUD=true` (10).
+- **Walker (above):** the HUD's coin icons and score position (10).
 
 - **Rendering:** `render/convars.rs` defines the
   texture quality group's convars with real's defaults (`r_max_anisotropy` 4,
