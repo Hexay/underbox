@@ -1,6 +1,6 @@
-	// Clustered decals as common/classes/Decals.hlsl resolves them, without its cluster walk (which
-	// needs wave ops): every decal is tested against every pixel. render/lighting/decals.rs packs
-	// GPUDecal (16 words) and GPUDecalExtraData; managed's SceneRenderer packs the same.
+	// Clustered decals as common/classes/Decals.hlsl resolves them, walking the pixel's cluster per lane
+	// rather than with its wave ops. render/lighting/decals.rs packs GPUDecal (16 words) and
+	// GPUDecalExtraData; managed's SceneRenderer packs the same.
 	// TODO: decal normal maps and parallax height maps.
 	StructuredBuffer<uint> DecalsBuffer < Attribute( "DecalsBuffer" ); >;
 	StructuredBuffer<uint> DecalsExtraDataBuffer < Attribute( "DecalsExtraDataBuffer" ); >;
@@ -27,13 +27,14 @@
 		return t.SampleGrad( g_sStandinDecal, uv, vGrad.xy, vGrad.zw );
 	}
 
-	void ApplyDecals( float3 vPositionWs, inout DecalSurface m )
+	void ApplyDecals( float3 vPositionWs, inout DecalSurface m, uint nCluster )
 	{
 		// Before the loop: the whole quad must take derivatives.
 		float3 vDx = ddx( vPositionWs ), vDy = ddy( vPositionWs );
-		for ( uint n = 0; n < (uint)NumLights.w; n++ )
+		ClusterRange r = Cluster::Query( ClusterItemType_Decal, nCluster );
+		for ( uint k = 0; k < r.Count; k++ )
 		{
-			uint b = n * 16u;
+			uint b = Cluster::LoadItem( r, k ) * 16u;
 			float4 q = float4( DecalWord( b, 3 ), DecalWord( b, 4 ), DecalWord( b, 5 ), DecalWord( b, 6 ) );
 			float3 vScale = float3( DecalWord( b, 7 ), DecalWord( b, 8 ), DecalWord( b, 9 ) );
 			float3 p = DecalRotate( vPositionWs + float3( DecalWord( b, 0 ), DecalWord( b, 1 ), DecalWord( b, 2 ) ), q ) * vScale;

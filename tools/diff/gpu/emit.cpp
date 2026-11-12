@@ -7,6 +7,7 @@ namespace gpu {
 static constexpr uint32_t kBindless = 16;          // larger arrays are listed once per frame, not per draw
 static constexpr size_t kBlobMax = 64 * 1024;      // uniform contents written out up to this size
 static constexpr size_t kHashMax = 4 * 1024 * 1024; // storage buffers hashed up to this size
+static constexpr size_t kStoreBlobMax = 512 * 1024; // and written out up to this size
 
 static void line(Frame& fr, const std::string& s) { fputs(s.c_str(), fr.f); fputc('\n', fr.f); }
 
@@ -21,28 +22,33 @@ static int pipe_id(Frame& fr, VkPipeline p) {
     return id;
 }
 
-static std::string blob(Device* d, Frame& fr, VkBuffer b, VkDeviceSize off, VkDeviceSize range) {
-    auto bytes = read_buffer(d, b, off, range);
-    if (bytes.empty()) return "null";
+static std::string put_blob(Frame& fr, const std::vector<uint8_t>& bytes, size_t max) {
     uint64_t h = fnv(bytes.data(), bytes.size());
-    if (bytes.size() <= kBlobMax && fr.blobs.insert(h).second)
+    if (bytes.size() <= max && fr.blobs.insert(h).second)
         line(fr, "{\"t\":\"blob\",\"h\":\"" + hex(h) + "\",\"hex\":\"" + hexbytes(bytes.data(), bytes.size()) + "\"}");
     return q(hex(h));
+}
+
+static std::string blob(Device* d, Frame& fr, VkBuffer b, VkDeviceSize off, VkDeviceSize range) {
+    auto bytes = read_buffer(d, b, off, range);
+    return bytes.empty() ? "null" : put_blob(fr, bytes, kBlobMax);
 }
 
 static std::string bindless(Frame& fr, const void* key, const std::vector<Desc>& v, const LayoutBinding& lb) {
     std::string k = hex((uint64_t)key ^ lb.binding);
     if (fr.bindless.insert({(uint64_t)key, lb.binding}).second) {
-        std::vector<std::string> imgs;
+        // Filled slots by index: shaders select them by the index, so it is the identity that matters.
+        std::vector<std::string> slots;
         size_t filled = 0;
-        for (auto& x : v) {
+        for (size_t i = 0; i < v.size(); i++) {
+            auto& x = v[i];
             if (!x.view && !x.buf && !x.sampler) continue;
             filled++;
-            auto vi = x.view ? objs().views.find(h64(x.view)) : objs().views.end();
-            if (vi != objs().views.end()) imgs.push_back(image_short(h64(vi->second.image)));
+            if (x.view) slots.push_back(arr({num((double)i), view_obj(x.view)}));
+            else if (x.sampler) slots.push_back(arr({num((double)i), sampler_obj(x.sampler)}));
         }
         line(fr, "{\"t\":\"bindless\",\"key\":\"" + k + "\",\"type\":" + q(nm(lb.type)) + ",\"count\":" + num(lb.count) +
-                     ",\"filled\":" + num((double)filled) + ",\"imgs\":" + arr(imgs) + "}");
+                     ",\"filled\":" + num((double)filled) + ",\"slots\":" + arr(slots) + "}");
     }
     return q(k);
 }
@@ -88,7 +94,11 @@ static std::string resources(Device* d, Frame& fr, const PipeInfo& p, const Bind
                     auto info = objs().buffers.find(h64(x.buf));
                     VkDeviceSize n = x.range != VK_WHOLE_SIZE ? x.range : info != objs().buffers.end() && off < info->second.size ? info->second.size - off : 0;
                     e.n("size", (double)n);
-                    if (n && n <= kHashMax) { auto bytes = read_buffer(d, x.buf, off, n); if (!bytes.empty()) e.str("hash", hex(fnv(bytes.data(), bytes.size()))); }
+                    if (n && n <= kHashMax) {
+                        auto bytes = read_buffer(d, x.buf, off, n);
+                        // Small storage buffers keep their contents: per-draw data (bindless indices) can live there.
+                        if (!bytes.empty()) e.raw("sblob", put_blob(fr, bytes, kStoreBlobMax));
+                    }
                     break;
                 }
                 default: break;
@@ -149,7 +159,8 @@ static void draw(Device* d, Frame& fr, const DrawRec& r, int index) {
     if (r.skipped) o.n("skipped", 1);
     o.n("pipe", pipe_id(fr, st.gfx.pipe));
     std::vector<std::string> sv;
-    for (auto& s : subs(d, r)) {
+    auto all = subs(d, r);
+    for (auto& s : all) {
         Obj x;
         x.n("n", s.n).n("inst", s.inst).n("first", s.first);
         if (s.vofs) x.n("vofs", s.vofs);
@@ -162,15 +173,25 @@ static void draw(Device* d, Frame& fr, const DrawRec& r, int index) {
     if (!st.pc.empty()) o.str("pc", hexbytes(st.pc.data(), st.pc.size()));
     auto pi = pipes().find(h64(st.gfx.pipe));
     if (pi != pipes().end()) {
-        std::vector<std::string> vb;
+        std::vector<std::string> vb, ivb;
         for (auto& b : pi->second->vb) {
             if (b.binding >= st.vbs.size()) continue;
             auto& v = st.vbs[b.binding];
             auto info = objs().buffers.find(h64(v.buf));
             VkDeviceSize size = info != objs().buffers.end() && v.off < info->second.size ? info->second.size - v.off : 0;
-            vb.push_back(arr({num(b.binding), num((double)(v.stride ? v.stride : b.stride)), num((double)size)}));
+            VkDeviceSize stride = v.stride ? v.stride : b.stride;
+            vb.push_back(arr({num(b.binding), num((double)stride), num((double)size)}));
+            if (b.inputRate != VK_VERTEX_INPUT_RATE_INSTANCE || all.empty() || !stride) continue;
+            // Per-instance data of the instances drawn: [binding, stride, first instance, blob].
+            uint32_t lo = UINT32_MAX, hi = 0;
+            for (auto& s : all) { lo = std::min(lo, s.finst); hi = std::max(hi, s.finst + s.inst); }
+            if (hi <= lo) continue;
+            auto bytes = read_buffer(d, v.buf, v.off + lo * stride, (VkDeviceSize)(hi - lo) * stride);
+            if (!bytes.empty()) ivb.push_back(arr({num(b.binding), num((double)stride), num(lo), put_blob(fr, bytes, kBlobMax)}));
         }
-        o.raw("vb", arr(vb)).raw("state", state_obj(*pi->second, st.dyn)).raw("res", resources(d, fr, *pi->second, st.gfx));
+        o.raw("vb", arr(vb));
+        if (!ivb.empty()) o.raw("ivb", arr(ivb));
+        o.raw("state", state_obj(*pi->second, st.dyn)).raw("res", resources(d, fr, *pi->second, st.gfx));
     }
     line(fr, o.done());
     fr.draws++;

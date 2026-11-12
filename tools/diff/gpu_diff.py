@@ -10,6 +10,7 @@ import struct
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 
+import gpu_tex
 from gpu import att, mesh, resources
 
 SEV = {"pass": 0, "attachment": 1, "draw count": 1, "draw": 2, "state": 2, "vertex format": 3, "textures": 3,
@@ -122,10 +123,8 @@ def compare_draw(ours, real, do, dr, w, divs):
         divs.add("vertex format", (str(vo), str(vr)), w, f"vertex attributes ours {vo} real {vr}")
     to, uo, _ = resources(ours, do.get("res"))
     tr, ur, _ = resources(real, dr.get("res"))
-    co, cr = Counter(t.split(" [")[0] for t in to), Counter(t.split(" [")[0] for t in tr)
-    if co != cr:
-        a, b = sorted((co - cr).elements()), sorted((cr - co).elements())
-        divs.add("textures", (str(a), str(b)), w, f"textures only on ours {a}, only on real {b}")
+    for k, msg in gpu_tex.compare(gpu_tex.used(ours, do), gpu_tex.used(real, dr)):
+        divs.add("textures", k, w, msg)
     so_, sr_ = Counter(t.split(" [", 1)[1] for t in to if " [" in t), Counter(t.split(" [", 1)[1] for t in tr if " [" in t)
     if so_ != sr_:
         a, b = sorted((so_ - sr_).elements()), sorted((sr_ - so_).elements())

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """GPU frame captures from tools/diff/gpu/ (docs/differential-gpu.md).
 
-usage: gpu.py list <frame.jsonl>                  normalized per-pass/per-draw listing
-       gpu.py diff <ours.jsonl> <real.jsonl>      where the two frames diverge (gpu_diff.py)
+usage: gpu.py list <frame.jsonl> [core]           normalized per-pass/per-draw listing
+       gpu.py diff <ours.jsonl> <real.jsonl> [core]  where the two frames diverge (gpu_diff.py)
+       gpu.py fields <frame.jsonl> [core]         constant fields that look like bindless indices (gpu_tex.py)
+       (core: the seeded real core, to name uploaded textures by content; gpu_vtex.py)
        gpu.py png <capture-dir> <out-dir>         render-target dumps as PNG
 """
 import json
@@ -13,6 +15,8 @@ import sys
 from collections import Counter
 
 sys.path[:0] = [os.path.dirname(os.path.abspath(__file__)), os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")]
+
+import gpu_tex  # noqa: E402
 
 
 class Frame:
@@ -29,6 +33,8 @@ class Frame:
             elif t == "blob":
                 self.blobs[r["h"]] = bytes.fromhex(r["hex"])
             elif t == "bindless":
+                r["index"] = {i: x for i, x in r.get("slots", []) if x}
+                r["imgs"] = [img(x.get("img")) for x in r["index"].values() if "img" in x]
                 self.bindless[r["key"]] = r
             elif t == "pass":
                 cur = dict(r, draws=[], clears=0)
@@ -60,6 +66,15 @@ def img(i):
         return "?"
     s = f"{i['fmt']} {i['w']}x{i['h']}" + (f"x{i['d']}" if i.get("d", 1) > 1 else "") + f" m{i['m']}"
     return s + (f" l{i['l']}" if i.get("l", 1) > 1 else "") + (f" s{i['s']}" if i.get("s", 1) > 1 else "")
+
+
+def content(i):
+    """What an image holds: its texture name (debug label or seeded-core match) or its upload hash."""
+    if not i:
+        return ""
+    if i.get("texture"):
+        return i["texture"]
+    return f"#{i['hash'][-8:]}" + (f"@m{i['hmip']}" if i.get("hmip") else "") if i.get("hash") else ""
 
 
 def att(a):
@@ -102,7 +117,8 @@ def resources(fr, res):
             continue
         for e in r.get("el", []):
             if "view" in e:
-                tex.append(img((e["view"] or {}).get("img")) + (f" {smp(e['smp'])}" if e.get("smp") else ""))
+                i = (e["view"] or {}).get("img")
+                tex.append(img(i) + (f" {content(i)}" if content(i) else "") + (f" {smp(e['smp'])}" if e.get("smp") else ""))
             elif "smp" in e:
                 tex.append(smp(e["smp"]))
             elif "blob" in e:
@@ -153,6 +169,9 @@ def draw_lines(fr, d):
              f"      {state_line(d.get('state'))}"]
     if tex:
         lines.append("      tex " + "; ".join(tex))
+    picked = [f"{how}: {gpu_tex.label(i)}" for how, i in gpu_tex.used(fr, d) if how.startswith("[")]
+    if picked:
+        lines.append("      bindless " + "; ".join(picked))
     if ubs or other or d.get("pc"):
         lines.append("      " + " ".join([f"ub {n}B:{h[:8]}" for n, h in ubs] + other + ([f"pc {len(d['pc']) // 2}B"] if d.get("pc") else [])))
     return lines
@@ -213,12 +232,24 @@ def png(cap, out):
         print(f"dump P{d['pass']} att {d['att']} draw {d['draw']} {d['fmt']} {d['w']}x{d['h']}: {dst}")
 
 
+def load(path, core):
+    """A capture with its textures named; gpu.sh keeps each side's capture in <name>/<ours|real>/."""
+    fr = Frame(path)
+    fr.engine = os.path.basename(os.path.dirname(os.path.abspath(path)))
+    gpu_tex.name(fr, core)
+    return fr
+
+
 def main(argv):
-    if len(argv) == 3 and argv[1] == "list":
-        print(listing(Frame(argv[2])))
-    elif len(argv) == 4 and argv[1] == "diff":
+    if len(argv) in (3, 4) and argv[1] == "list":
+        print(listing(load(argv[2], argv[3] if len(argv) == 4 else None)))
+    elif len(argv) in (4, 5) and argv[1] == "diff":
         import gpu_diff
-        print(gpu_diff.report(Frame(argv[2]), Frame(argv[3])))
+        core = argv[4] if len(argv) == 5 else None
+        print(gpu_diff.report(load(argv[2], core), load(argv[3], core)))
+    elif len(argv) in (3, 4) and argv[1] == "fields":
+        for (src, off, half), hits in gpu_tex.candidates(load(argv[2], argv[3] if len(argv) == 4 else None)):
+            print(f"{src}+{off}{half}: " + "; ".join(f"[{v}] {t}" for v, t in sorted(hits.items())[:6]))
     elif len(argv) == 4 and argv[1] == "png":
         png(argv[2], argv[3])
     else:

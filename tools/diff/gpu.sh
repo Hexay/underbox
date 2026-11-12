@@ -29,6 +29,8 @@ OUT=$ROOT/target/diff/gpu/$NAME
 CAP=$UNDERBOX_CACHE/underbox-gpu/$(basename -- "$ROOT")/$NAME
 mkdir -p "$OUT" "$CAP"
 LAYER=$(sh "$ROOT/tools/diff/gpu-layer.sh")
+# Real's textures are named by matching their content against the seeded core (gpu_vtex.py).
+CORE=${ART:+$ART/game/core}
 ICD=$(ls "$UNDERBOX_CACHE"/mesa-lvp/install/share/vulkan/icd.d/lvp_icd.*.json 2>/dev/null | head -n 1)
 [ -n "$ICD" ] || { echo "gpu: no local lavapipe; run tools/diff/lavapipe.sh" >&2; exit 3; }
 
@@ -65,7 +67,7 @@ side() {
     [ -z "$(find "$UNDERBOX_CACHE" -name '*.webstream' -print -quit)" ] || { echo "gpu: a .webstream appeared under \$UNDERBOX_CACHE" >&2; exit 4; }
     grep -h 'gpu-capture:' "$out/client.out" | tail -n 2 || true
     [ -f "$dir/done" ] || { echo "gpu: $s captured no frame (see $out/boot.txt)"; return 0; }
-    python3 -I "$ROOT/tools/diff/gpu.py" list "$dir/frame.jsonl" > "$OUT/$s.txt"
+    python3 -I "$ROOT/tools/diff/gpu.py" list "$dir/frame.jsonl" "$CORE" > "$OUT/$s.txt"
     python3 -I "$ROOT/tools/diff/gpu.py" png "$dir" "$OUT/dumps/$s"
     echo "$s: $(tail -n 1 "$dir/frame.jsonl" | cut -c1-120); listing $OUT/$s.txt"
 }
@@ -77,6 +79,6 @@ case $WHICH in
     *) echo "gpu: unknown engine '$WHICH'" >&2; exit 2 ;;
 esac
 [ -f "$CAP/ours/done" ] && [ -f "$CAP/real/done" ] || exit 0
-python3 -I "$ROOT/tools/diff/gpu.py" diff "$CAP/ours/frame.jsonl" "$CAP/real/frame.jsonl" > "$OUT/report.txt"
+python3 -I "$ROOT/tools/diff/gpu.py" diff "$CAP/ours/frame.jsonl" "$CAP/real/frame.jsonl" "$CORE" > "$OUT/report.txt"
 head -n "${N:-40}" "$OUT/report.txt"
 echo "gpu: full report in $OUT/report.txt"

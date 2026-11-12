@@ -158,9 +158,8 @@ Ranked divergences:
     the cluster's decal count was 0. Now `render/lighting/decals.rs` packs every rendering decal as
     native's `GPUDecal` and `GPUDecalExtraData` (managed's `LightBinnerFeature.Decals.cs` documents
     the packing: negated position, conjugate rotation, reciprocal scale, RGBE tint, sRGB colour
-    index), sets `NumLights.w`, and the stand-in resolves them as Decals.hlsl does, every decal per
-    pixel instead of the cluster walk (`shading/standin_decals.hlsl`). Before: 55.2 / 60.8 / 51.1,
-    SSIM 0.754.
+    index), sets `NumLights.w`, and the stand-in resolves them as Decals.hlsl does, through the
+    pixel's cluster (`shading/standin_decals.hlsl`). Before: 55.2 / 60.8 / 51.1, SSIM 0.754.
 17. **Fixed. Managed decals drew a black frame** (decals, `MANAGED=1`). Two causes. The decal's
     texture getters returned null for unset textures and managed's `Texture.FromNative` threw every
     frame; they now hand out an empty handle or a copy (`scene/decal.rs`). And `GetTextureViewIndex`
@@ -197,6 +196,10 @@ together, measured on one pair of fresh real frames:
 | glass | 0.11 / 0.27 / 0.35, 0.9996 | 0.10 / 0.26 / 0.35, 0.9998 |
 | particles | 0.31 / 0.47 / 0.21, 0.9983 | 0.26 / 0.42 / 0.16, 0.9992 |
 | decals | 0.25 / 0.32 / 0.53, 0.9957 | 0.21 / 0.28 / 0.51, 0.9966 |
+
+The material stand-in now takes its lights and decals from managed's clusters (docs/differential-gpu.md
+item 6) instead of every light per pixel. Frame hashes changed; showroom, outdoor, fog, glass and decals
+all hold the metrics above at two decimals and four for SSIM.
 
 Skinned and glass were content confounds: real rejected our synthetic `.vmdl_c` (error signs)
 and had no `glass.vmat_c` (error checker). What real needs from our compiled files, found by
