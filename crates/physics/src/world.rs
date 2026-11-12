@@ -6,7 +6,8 @@ use crate::rules::CollisionRules;
 use rapier3d::math::{Pose, Vector};
 use rapier3d::pipeline::PhysicsWorld;
 use rapier3d::prelude::{ColliderHandle, RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodyType};
-use std::collections::{HashMap, HashSet};
+// Fx, not SipHash: these are looked up per body and pair every step (docs/perf-physics.md).
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 /// Rapier's tolerances assume metres; s&box measures in inches.
 pub const INCHES_PER_METRE: f32 = 39.37;
@@ -89,15 +90,15 @@ impl Default for World {
             sleeping: true,
             max_speed: f32::MAX,
             rules: CollisionRules::default(),
-            meta: HashMap::new(),
-            mass: HashMap::new(),
+            meta: HashMap::default(),
+            mass: HashMap::default(),
             contacts: Contacts::default(),
             joints: Joints::default(),
-            sleep_thresholds: HashMap::new(),
-            awake: HashSet::new(),
+            sleep_thresholds: HashMap::default(),
+            awake: HashSet::default(),
             activity: Vec::new(),
-            step_start: HashMap::new(),
-            frozen: HashMap::new(),
+            step_start: HashMap::default(),
+            frozen: HashMap::default(),
         }
     }
 }
@@ -177,7 +178,7 @@ impl World {
     }
 
     fn collect_activity(&mut self) {
-        let mut awake = HashSet::with_capacity(self.awake.len());
+        let mut awake = HashSet::with_capacity_and_hasher(self.awake.len(), Default::default());
         for (h, rb) in self.inner.rigid_bodies().filter(|(_, rb)| rb.is_dynamic() && rb.is_enabled()) {
             let was = self.awake.contains(&h);
             if !rb.is_sleeping() {

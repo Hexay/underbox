@@ -66,6 +66,8 @@ showroom` leaves `VK_ICD_FILENAMES` alone, so both engines pick the hardware dri
 `-vulkan_allow_cpu` is then unused). Use `LP_NUM_THREADS` only with lavapipe. On a GPU,
 "frame wall ms" becomes meaningful and the lavapipe column should read zero.
 
+Server tick profile on `pile`, what was changed and before/after numbers: docs/perf-physics.md.
+
 ## Caveats
 
 - `PERF:TICK` logs a line per tick on both engines; its cost is in both numbers.

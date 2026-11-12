@@ -32,7 +32,8 @@ impl World {
         let raw = &mut self.inner;
         for (&id, &threshold) in &self.sleep_thresholds {
             let Some(rb) = raw.bodies.get(id) else { continue };
-            let eligible = corner_speed(rb, &raw.colliders) < threshold;
+            // The spin term is never negative, so a body this fast can skip the corners.
+            let eligible = rb.linvel().length() < threshold && corner_speed(rb, &raw.colliders) < threshold;
             if let Some(rb) = raw.bodies.get_mut(id) {
                 set_eligible(rb, eligible);
             }

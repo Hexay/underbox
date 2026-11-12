@@ -6,7 +6,7 @@
 use crate::world::World;
 use rapier3d::math::{Rotation, Vector};
 use rapier3d::prelude::{ActiveHooks, ColliderHandle, ContactPair};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 /// cos 10°: real refreshes a rolling pair at 10.4° of turn and keeps it at 9.4° (probe `REFRESH
 /// friction`).
@@ -76,7 +76,7 @@ impl World {
         for &id in &start.forced {
             self.refresh_hooks(id);
         }
-        let mut frozen = HashMap::with_capacity(self.frozen.len());
+        let mut frozen = HashMap::with_capacity_and_hasher(self.frozen.len(), Default::default());
         for pair in self.inner.narrow_phase.contact_pairs().filter(|p| p.has_any_active_contact() && self.unhooked(p)) {
             let key = (pair.collider1, pair.collider2);
             let Some(sig) = signature(pair) else { continue };

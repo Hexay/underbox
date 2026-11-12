@@ -7,3 +7,4 @@ description = "Native objects managed holds pointers to: typed, owned by Rust, f
 
 [dependencies]
 abi = { path = "../abi" }
+rustc-hash = "2"
