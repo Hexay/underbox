@@ -24,5 +24,5 @@ git -C "$SBOX" rev-parse HEAD > "$ROOT/abi/SBOX_PUBLIC_COMMIT"
 grep -rhoE '\[AssetType\([^]]*Extension *= *"[a-z0-9_]+"' "$SBOX/engine" --include=*.cs \
     | sed -E 's/.*Extension *= *"([a-z0-9_]+)".*/\1/' | sort -u > "$ROOT/abi/game_resource_extensions.txt"
 
-echo "== crates/abi/src/generated"
-cargo run -q --manifest-path "$ROOT/Cargo.toml" -p abigen -- "$ROOT/abi" "$ROOT/crates/abi/src/generated"
+echo "== crates/abi/src/generated, crates/tap/src/generated"
+cargo run -q --manifest-path "$ROOT/Cargo.toml" -p abigen -- "$ROOT/abi" "$ROOT/crates/abi/src/generated" "$ROOT/crates/tap/src/generated"
