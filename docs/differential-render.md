@@ -41,6 +41,13 @@ After 12–13, with real's core models seeded (native unless marked):
 | fog | 0.26 / 0.24 / 0.26, 0.9972 |
 | glass | 0.09 / 0.27 / 0.34, 0.9996 |
 
+After 14–15 (skinned with its third, morphed puppet; the others unchanged where not listed):
+
+| Scene | Metrics |
+| --- | --- |
+| skinned | 0.17 / 0.31 / 0.47, 0.9984; managed: real draws no morphed puppet (15) |
+| glass, managed | 0.09 / 0.27 / 0.07, 0.9997 (0.17 / 0.40 / 0.19, 0.9985 after 9–11) |
+
 Ranked divergences:
 
 1. **Fixed. Real's compiled textures didn't load on ours.** Real stores mips zstd-compressed
