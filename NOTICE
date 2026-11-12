@@ -30,6 +30,15 @@ binary redistributions must carry those notices.
   third_party/GameNetworkingSockets  Valve Corporation      BSD-3-Clause  Copyright (c) 2018, Valve Corporation
   third_party/box2d                  Erin Catto             MIT           Copyright (c) 2022 Erin Catto
   third_party/protobuf (v21.12)      Google Inc.            BSD-3-Clause  Copyright 2008 Google Inc.
+  third_party/steam-audio (v4.8.1)   Valve Corporation      Apache-2.0    Copyright 2017-2023 Valve Corporation
+  third_party/pffft                  Julien Pommier et al.  BSD-like (FFTPACK)  Copyright (c) 2013 Julien Pommier,
+                                                            (c) 2004 UCAR, (c) 2019 Hayati Ayguen, (c) 2020 Dario Mambro
+
+Steam Audio's binaural effect is built from a subset of its core (crates/steamaudio-sys), which
+compiles in its default HRTF from the CIPIC HRTF Database (Copyright (c) 2001 The Regents of the
+University of California) and Google's spherical harmonics library (Apache-2.0). Steam Audio and
+PFFFT keep their licence files under other names, so their texts, and the CIPIC notice, are in
+licenses/.
 
 Also built from source and linked statically, though fetched through Cargo rather than vendored:
 SDL3 (crates/window, via the sdl3-src crate), zlib licence, Copyright (C) 1997-2026 Sam Lantinga.

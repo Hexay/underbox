@@ -128,10 +128,10 @@ impl Sampler {
     pub fn read(&mut self, pitch: f32, out: &mut [Block]) {
         out.iter_mut().for_each(|b| *b = crate::SILENT);
         let step = self.source.rate() as f64 / RATE as f64 * (pitch.max(0.0) * self.time_scale) as f64;
-        let real_time = self.source.rate() as f64 / RATE as f64;
         let mut start = 0;
+        // Real engine2 counts the delay down in source frames at the pitched rate, so pitch 2 halves it.
         while start < BLOCK && self.delay > 0.0 {
-            self.delay = (self.delay - real_time).max(0.0);
+            self.delay = (self.delay - step).max(0.0);
             start += 1;
         }
         if self.finished || start == BLOCK {

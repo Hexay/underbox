@@ -64,7 +64,8 @@ public sealed class SoundScript : Component
 		At( _sine, 3, listener + Vector3.Forward * 200 );
 		At( _sine, 4, listener + Vector3.Forward * 800 );
 		Ui( _sine, 5, 0.5f, 1 );
-		Ui( _sine, 6, 1, 1.5f );
+		// The sampler counts the delay down at the pitched rate, so this starts at 6 s.
+		Ui( _sine, 6 * 1.5f, 1, 1.5f );
 		Ui( _noise, 7, 1, 1 );
 		_loop = Ui( _loopFile, 8, 1, 1 );
 		Log.Info( "SOUND:PLAY" );
