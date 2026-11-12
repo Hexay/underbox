@@ -68,6 +68,7 @@ pub struct World {
     awake: HashSet<RigidBodyHandle>,
     activity: Vec<Activity>,
     pub(crate) step_start: HashMap<RigidBodyHandle, crate::bounce::Start>,
+    pub(crate) frozen: HashMap<(ColliderHandle, ColliderHandle), crate::persist::Frozen>,
 }
 
 impl Default for World {
@@ -96,6 +97,7 @@ impl Default for World {
             awake: HashSet::new(),
             activity: Vec::new(),
             step_start: HashMap::new(),
+            frozen: HashMap::new(),
         }
     }
 }
@@ -148,8 +150,10 @@ impl World {
         self.drive_joints();
         self.arm_sleep();
         self.record_step_start();
+        let start = self.force_turned_contacts();
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
         self.inner.step_with_events(&hooks, &());
+        self.release_forced_contacts(start);
         self.bounce_approaching_contacts();
         self.clamp_speeds();
         self.measure_joints(1);

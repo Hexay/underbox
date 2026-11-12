@@ -102,8 +102,9 @@ and `ERR*` markers for a static prop given a missing model (its shapes, and rays
 `DEPTH` (bodies set down on a slab in a private world) and `SLEEP` (free bodies at a range of
 linear and angular speeds, sizes and shapes, gravity off: the step each falls asleep at).
 `ProbeJoint.cs` adds hinge motors, springs and friction, joints against their own contacts, and
-stack sleep timing; `ProbePush.cs` unjointed overlaps pushed apart and orbmatch's re-aimed push
-(docs/differential-joints.md). Orbmatch's bots log `MATCH:POS` every 5 ticks;
+stack sleep timing; `ProbePush.cs` unjointed overlaps pushed apart and orbmatch's re-aimed push;
+`ProbeRefresh.cs` when a persistent contact is refreshed; `ProbeTrike.cs` the zoo trike through its
+sign (docs/differential-joints.md). Orbmatch's bots log `MATCH:POS` every 5 ticks;
 the game watcher logs `GAME:RESTED` for every body at `SETTLED` in scenes of 20 bodies or fewer.
 
 `zoo` needs `SANDBOX=<Facepunch/sandbox checkout>`. Runs take 30 s to 3 min each.
@@ -119,10 +120,10 @@ Ranked by severity, with each one's state after the fixes (before → after):
    and events go in shape creation order (`contacts_tests::same_tick_events_follow_creation_order`).
    After: four runs give winner 0 and byte-identical `MATCH:` markers. Bots' final positions still
    differ from real's, unchanged by the sleep, depth and trace fixes below. The trailing bots'
-   push from tick 5 now matches real to tick 22 (persistent contacts, per-step restitution:
-   docs/differential-joints.md, 16); the bots part at tick 23, when real refreshes the pair's
-   contact three ticks before ours. `Bot0_0` ends at x = −138.6 on ours (before −180), −161.5 on
-   real; `Bot1_1` 10.8 apart. Open.
+   push from tick 5 now matches real within 0.01 to tick 70 (persistent contacts, per-step
+   restitution, real's 10° refresh: docs/differential-joints.md, 16 and 18); at tick 75 a bot
+   scores a tick apart. `Bot0_0` ends at x = −157.5 on ours (before −180, then −138.6), −161.5 on
+   real; `Bot1_1` 6.0 apart. Open.
 2. **Improved. A tilted box lands differently.** The probe box (pitch 20, yaw 30, roll 10) dropped
    onto the slab. Real settles 5.8 units from the drop point (194.4, 1.5, yaw 28.9) at 0.5 u/s by
    tick 50. Before: ours tumbled onto another face and ended 50 units away (151.2, −11.9, yaw 22.0),
@@ -223,7 +224,9 @@ same packages and miss the same package models. Differences:
     Not the hinge motors, which match real exactly: real throws the trike out of the error sign
     it starts inside, and it tumbles 50 units onto its side; ours pushes it 9 units out, upright.
     Unjointed push-out already matches real, and neither its residual speed nor the contact
-    fixes move the trike (docs/differential-joints.md, 16, 17 and the zoo hoover). Open.
+    fixes move the trike (docs/differential-joints.md, 16, 17 and the zoo hoover). The `TRIKE`
+    probe (19) shows ours can't even rest the trike alone: its joints never settle against the
+    wheels' contacts inside the base. Open.
 
 ## Rendering
 
@@ -231,11 +234,11 @@ Client frames (`run.sh frame`), their metrics, divergences and lanes: docs/diffe
 
 ## Follow-up lanes
 
-- **Joints, stack sleep, contacts (11–17):** docs/differential-joints.md.
-- **Zoo trike (10):** not unjointed push-out (17). Probe a hinged pair inside a hull, the trike's
-  own geometry.
-- **Orbmatch bots (1):** real refreshes a persistent contact on the rolling pair three ticks
-  before ours; find its drift rule (`REAIM`, docs/differential-joints.md, 16).
+- **Joints, stack sleep, contacts (11–19):** docs/differential-joints.md.
+- **Zoo trike (10):** the trike creeps under its own joints alone, then is pushed out of the sign
+  too weakly (`TRIKE`, docs/differential-joints.md, 19).
+- **Orbmatch bots (1):** matches to tick 70; the next gap is a score a tick apart. Real's
+  relative-turn extent (`r·√2`, 18) is not reproduced.
 - **Error-model render bounds (7):** give the stand-in mesh the sign's bounds (assets lane).
 - **Rendering:** docs/differential-render.md.
 - **Coverage:** net join and grubs. Add scenarios to `run.sh` and markers to the probe as lanes need them.
