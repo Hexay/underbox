@@ -54,6 +54,9 @@ pub struct LayerState {
     pub output_set: bool,
     /// `SetOutput`'s `RENDER_SRGB`: draws write through the colour target's sRGB view.
     pub srgb_output: bool,
+    /// `SetBoundingVolumeSizeCullThresholdInPercent`: draw objects at least this big on screen,
+    /// or, negative, smaller than its magnitude; 0 draws all (collect.rs `screen_percent`).
+    pub size_cull: f32,
 }
 
 pub struct SceneLayer {
@@ -142,7 +145,7 @@ pub fn register(r: &mut Registry) {
     // TODO: per-layer texture attributes (SetAttr) feed shader bindings once combos translate.
     bind!(r, l::SET_ATTR, |_, _, _, _, _| {});
     bind!(r, l::SET_LAYER_NO_CULL, |_, _| {});
-    bind!(r, l::SET_BOUNDING_VOLUME_SIZE_CULL_THRESHOLD_IN_PERCENT, |_, _| {});
+    bind!(r, l::SET_BOUNDING_VOLUME_SIZE_CULL_THRESHOLD_IN_PERCENT, |r, p| with(r, |s| s.size_cull = p));
     bind!(r, l::DISABLE_REFLECTIONS_AND_REFRACTIONS_FOR_OBJECTS_IN_THIS_LAYER, |_, _| {});
     bind!(r, l::SET_FADE_TARGET_LAYER, |_, _| {});
     bind!(r, l::SET_TONEMAP_OVERRIDE_SCALE_VALUE, |_, _| {});

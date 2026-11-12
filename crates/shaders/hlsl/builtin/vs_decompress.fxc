@@ -7,21 +7,21 @@
 
 bool g_bUncompressedTangentFrame < Attribute( "UncompressedTangentFrame" ); Default( 0 ); >;
 
-// Real's 10:10:10:2 frame as integers, fitted to its compiled models: see crates/assets
-// compiled/vertex.rs `unpack_frame`.
+// Real's 10:10:10:2 frame, fed as A2B10G10R10_UNORM as real feeds it, fitted to its compiled
+// models: see crates/assets compiled/vertex.rs `unpack_frame`.
 void _DecompressNormalTangent( float4 vPacked, out float3 vNormal, out float4 vTangentU_flSign )
 {
-	vNormal = OctohedralDecode( vPacked.xy / 1023.0 * 2.0 - 1.0 );
+	vNormal = OctohedralDecode( vPacked.xy * 2.0 - 1.0 );
 	float s = vNormal.z >= 0.0 ? 1.0 : -1.0;
 	float r = 1.0 / ( s + vNormal.z );
 	float3 b1 = float3( 1.0 - s * vNormal.x * vNormal.x * r, -s * vNormal.x * vNormal.y * r, -s * vNormal.x );
 	float3 b2 = cross( vNormal, b1 );
-	float d = vPacked.z / 1023.0;
+	float d = vPacked.z;
 	float side = sign( d - 0.5 );
 	float2 v = float2( -side * 4.0 * d + 1.0 + side * 2.0, 0.0 );
 	v.y = side * ( 1.0 - abs( v.x ) );
 	v = normalize( v );
-	vTangentU_flSign = float4( b1 * v.x + b2 * v.y, vPacked.w >= 2.0 ? 1.0 : -1.0 );
+	vTangentU_flSign = float4( b1 * v.x + b2 * v.y, vPacked.w >= 0.5 ? 1.0 : -1.0 );
 }
 
 void DecompressNormalTangent( float4 vNormalIn, float4 vTangentIn, out float3 vNormal, out float4 vTangentU_flSign )

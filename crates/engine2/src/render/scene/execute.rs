@@ -2,7 +2,7 @@
 //! layers draw the matching objects of the view's worlds (models through the placeholder, managed
 //! objects through `SceneCustomObject.RenderObject`); procedural layers call managed back.
 
-use super::collect::{Filter, collect};
+use super::collect::{Collected, Filter, collect};
 use super::layer::{self, Kind, flags};
 use super::view::{self, SceneView};
 use crate::mesh::layout::{Field, Layout};
@@ -19,6 +19,7 @@ use abi::StringToken;
 use glam::{Mat4, Vec3};
 use render::pass::{DrawUniforms, Load};
 use render::{BufferKind, Placeholder, RasterState, Semantic};
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
 /// Placeholder sky colour (linear; sRGB (0.45, 0.6, 0.85)), times the sky object's tint. TODO: the sky material.
@@ -94,8 +95,9 @@ pub fn run(v: view::Ref) {
         lighting.fog_volume = volumetric.and_then(|p| fog_volume::render(&worlds, view.view_proj, &lighting, &p, view.color.addr()));
     }
     immediate::set_view(ctx, view.view_proj, Arc::new(lighting));
+    let mut prepared = super::occlusion::prepare(&view, &layers);
     for l in layers {
-        run_layer(&view, v, ctx, l);
+        run_layer(&view, v, ctx, l, &mut prepared);
         if let Some(layer) = layer::get(l) {
             let t = target(&view, l);
             super::trace::probe(v.addr(), &layer, &t);
@@ -122,16 +124,27 @@ fn setup(ctx: context::Ref, v: view::Ref, l: layer::Ref, color: texture::Ref) ->
     }
 }
 
-fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
+/// What a render layer draws; `None` for other layers and those that draw nothing of the scene.
+pub(super) fn collect_layer(view: &SceneView, l: layer::Ref) -> Option<Collected> {
+    let layer = layer::get(l)?;
+    if !matches!(layer.kind, Kind::Render(_)) || super::trace::skipped(&layer.name) || layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 {
+        return None;
+    }
+    let (required, excluded, match_id) = {
+        let s = layer.state.lock().unwrap();
+        (s.required, s.excluded, s.match_id)
+    };
+    Some(collect(view, &Filter::of(l, required, excluded, match_id)))
+}
+
+/// Runs `l`, drawing what `prepared` holds for it in place of collecting (occlusion.rs).
+fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref, prepared: &mut HashMap<usize, Collected>) {
     let Some(layer) = layer::get(l) else { return };
     if super::trace::skipped(&layer.name) {
         return;
     }
     let t = target(view, l);
-    let (clear_color, required, excluded, match_id) = {
-        let s = layer.state.lock().unwrap();
-        (s.clear_color.vec, s.required, s.excluded, s.match_id)
-    };
+    let clear_color = layer.state.lock().unwrap().clear_color.vec;
     context::bind_target(ctx, &t);
     // Draws see the layer's attributes beneath the context's (HookLayers' `UIGammaOutput`), and
     // the view's beneath those (ClusteredCullingLayer's cluster lists).
@@ -149,10 +162,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref) {
             draw::execute(&t, &immediate::lighting(ctx), Load { color: (f & 0xFF != 0).then_some(color), depth: (f & 0x100 != 0).then_some(crate::render::depth::VIEW.clear()) }, &[]);
         }
         Kind::Render(_) => {
-            if layer::layer_flags(l) & flags::LIGHT_BINNER_SETUP != 0 {
-                return;
-            }
-            let (mut draws, managed) = collect(view, &Filter::of(l, required, excluded, match_id));
+            let Some((mut draws, managed)) = prepared.remove(&l.addr()).or_else(|| collect_layer(view, l)) else { return };
             // Beneath each object's own attributes, as for managed draws: the cluster lists and grid live on the view.
             if let Some(c) = context::get(ctx) {
                 draws.iter_mut().filter_map(|d| d.shaded.as_mut()).for_each(|s| s.context.attributes.push(c.attributes));
@@ -226,6 +236,7 @@ pub(crate) fn sky(tint: [f32; 4], material: Option<Arc<Material>>, view_proj: Ma
         state: RasterState { depth_write: false, ..Default::default() },
         shaded,
         caster: None,
+        cull: Default::default(),
     })
 }
 

@@ -108,6 +108,22 @@ void hk_CmdSetDepthBias(VkCommandBuffer cb, float c, float cl, float s) {
 }
 void hk_CmdSetStencilTestEnable(VkCommandBuffer cb, VkBool32 e) { UB_SET(D_STEST, y.sTest = e) device(cb)->CmdSetStencilTestEnable(cb, e); }
 void hk_CmdSetStencilReference(VkCommandBuffer cb, VkStencilFaceFlags f, uint32_t v) { UB_SET(D_SREF, y.sref = v) device(cb)->CmdSetStencilReference(cb, f, v); }
+template <class F> static void faces(VkStencilFaceFlags f, Dyn& y, F set) {
+    if (f & VK_STENCIL_FACE_FRONT_BIT) set(y.sface[0]);
+    if (f & VK_STENCIL_FACE_BACK_BIT) set(y.sface[1]);
+}
+void hk_CmdSetStencilOp(VkCommandBuffer cb, VkStencilFaceFlags f, VkStencilOp fail, VkStencilOp pass, VkStencilOp dfail, VkCompareOp c) {
+    UB_SET(D_SOP, faces(f, y, [&](VkStencilOpState& s) { s.failOp = fail, s.passOp = pass, s.depthFailOp = dfail, s.compareOp = c; }))
+    device(cb)->CmdSetStencilOp(cb, f, fail, pass, dfail, c);
+}
+void hk_CmdSetStencilCompareMask(VkCommandBuffer cb, VkStencilFaceFlags f, uint32_t m) {
+    UB_SET(D_SCMASK, faces(f, y, [&](VkStencilOpState& s) { s.compareMask = m; }))
+    device(cb)->CmdSetStencilCompareMask(cb, f, m);
+}
+void hk_CmdSetStencilWriteMask(VkCommandBuffer cb, VkStencilFaceFlags f, uint32_t m) {
+    UB_SET(D_SWMASK, faces(f, y, [&](VkStencilOpState& s) { s.writeMask = m; }))
+    device(cb)->CmdSetStencilWriteMask(cb, f, m);
+}
 void hk_CmdSetBlendConstants(VkCommandBuffer cb, const float c[4]) { UB_SET(D_BC, memcpy(y.bc, c, sizeof y.bc)) device(cb)->CmdSetBlendConstants(cb, c); }
 void hk_CmdSetPolygonModeEXT(VkCommandBuffer cb, VkPolygonMode m) { UB_SET(D_POLY, y.poly = m) device(cb)->CmdSetPolygonModeEXT(cb, m); }
 

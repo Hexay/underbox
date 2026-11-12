@@ -98,15 +98,45 @@ are structure, not output. Fixed items say what changed and what is left.
    formats (position, instance id, blend indices); skinned casters read the vertex cache. Order in
    every opaque pass is real's (`draw::sort_opaque`): rigid before vertex-cached, then larger index
    count first, stable otherwise. It isn't distance: on fog the ground is nearest yet real draws the
-   box first. Left: 67 of the cascades' 272 constant floats differ (ours' cascade fit). Contact
-   shadows (`screen_space_shadows_cs`) run and the stand-in reads their mask (item 9).
-3. **Depth format and stencil.** Real's main depth is `D32SfloatS8Uint` with stencil test on in the
-   opaque pass; ours is `D32Sfloat`, stencil off.
-4. **Depth prepass.** Real's is depth only, three passes of indirect draws after its GPU occlusion cull
-   (some with zero instances); ours writes a colour target too, direct draws.
-5. **Vertex streams.** Real's static meshes take position, `R16G16Sfloat` UV, `A2B10G10R10` packed
-   normal and tangent, plus per-instance `R32G32B32A32Sfloat`/`R32Uint`; ours feeds unpacked 32-bit
-   floats. Skinned meshes differ more (real: `R32Sfloat` weights, `R8G8B8A8Uint` indices).
+   box first. The cascade fit matches: real takes the sun's direction from its unnormalized
+   rotation (+X rotated, then normalized; `scene/light.rs`), and native's ortho projection holds
+   exact zeros where ours' decomposition left noise (`shading/view_space.rs`). Cascade constants
+   went from 67 of 272 floats differing to the 5 every view has (time, random floats); cascade 2
+   keeps 2 more below 1e-3. Contact shadows (`screen_space_shadows_cs`) run and the stand-in reads
+   their mask (item 9).
+3. **Depth format and stencil (fixed).** Main depth is `D32SfloatS8Uint` (image format 92,
+   `swap_chain::DEPTH_IMAGE_FORMAT`; D24S8 where the device lacks the feature), sampled and read
+   back through its depth aspect. The capture layer now records stencil ops, masks and reference
+   (`sops`). Real's states, now ours (`render/depth.rs` `stencil`): prepasses `Equal`, compare
+   mask 0x81, write mask 0, reference 0; opaque front faces `NotEqual`, mask 1, write mask 0xFE,
+   reference 3, back faces `Always`. Every op is `Keep`, so nothing writes stencil past its clear
+   to 0; only managed's overlay prepass would set bit 0x80. Left: real sets depth bias [0, 0, 0]
+   with bias enabled, which wgpu can't express (zero bias is "off").
+4. **Depth prepass (fixed).** Without `NeedsDepthNormals` (camera attributes now parent the view's,
+   where managed reads it) the prepass has no colour target and draws through the depth-only
+   stand-in, back faces culled, each mesh one instanced draw. `SetBoundingVolumeSizeCullThresholdInPercent`
+   splits Large (≥ 60 % of screen height) from Small (`scene/collect.rs`). Managed's
+   `SetOcclusionCull` buffers are filled before the layers run (`scene/occlusion.rs`): a run per
+   draw with its layer's phase (early, late, final), a cull instance per drawn instance (world
+   bounds; never culled with `NoOcclusionCulling`), arguments with no instances, the count where
+   `D_GPU_COUNT` reads it, and the dispatch. Those draws go `drawIndexedIndirect` with the cull's
+   surviving ids as the instance stream; managed's `occlusion_cull_cs` fills them. The late
+   prepass draws only those. Showroom, skinned and outdoor now line up pass for pass with real's
+   prepasses (draw counts, instance counts, x0 late draws). Left: wgpu's indirect validation adds a
+   `(1, 1, 1)` dispatch before each indirect pass, and the capture reads ours' indirect dispatch
+   args as `(1, y, 1)` with y the same for every indirect dispatch, cmaa2's too (wgpu's validated
+   copy). Draws from the vertex cache and those with managed's instance ids stay direct, as real's
+   skinned draws do. Opaque material draws aren't batched into instanced draws (real: one draw for
+   showroom's three boxes). A depth-normal prepass (outdoor) still draws the material program
+   with colour off; real writes RGBA normals.
+5. **Vertex streams (fixed for static meshes).** Compiled meshes draw from a 20-byte copy as real's:
+   position, `R16G16Sfloat` UV, `A2B10G10R10` packed normal and tangent (`gpu_mesh::draw_vertices`,
+   assets `pack_frame`, the inverse of `unpack_frame`); slots are real's: mesh, instance ids
+   (stride 4), defaults (stride 0, per instance). The stand-in decodes the frame as `vs_decompress`
+   (UNORM input) and passes the tangent on. Left, skinned: real skins these meshes from the mesh's
+   own float stream (`R32G32Sfloat` UV, float normal and tangent, `R8G8B8A8Unorm` colour, two
+   `R32Sfloat`, `R8G8B8A8Uint` indices; the prepass reads position, the two floats, ids and
+   indices); ours draws from the compute-skinned vertex cache.
 6. **Constants ours left zero (fixed).** The 592-byte buffer now matches byte for byte: native's
    default wind (also what `GetSceneWorldWind` returns), the camera as
    `g_vHighPrecisionLightingOffsetWs`, and infinite fog culling bounds. Real's 80-byte cluster block
@@ -152,14 +182,13 @@ are structure, not output. Fixed items say what changed and what is left.
    - Contact shadows run: managed makes the mask `ImageFormat.A8`, now `R8Unorm` with storage.
    - Defaults as real's: an unset cube is a 1×1 transparent-black sRGB cube; no fog volume is a
      2×2×2 opaque-black sRGB image through a linear view.
-   - Rigid prepass draws go through the depth stand-in, binding no textures as real's. Vertex-cache
-     draws keep their material program: on the depth program their prepass depth came out in rest
-     pose (skinned's open crates drew closed lids in the clear colour).
 
    Left: real's main draw reads a 512×3072 `R16G16B16A16Unorm` table (almost certainly
    vr_lighting.fxc's `BlueNoise`, read only under `D_OPAQUE_FADE`; not in core, so not
-   reproducible) and one unidentified texture (4×4 BC7 black on showroom, 32×32 RGBA on skinned's
-   crate). Skinned's prepass still binds the stand-in's set. gpu_tex names project textures by
-   label only, so skinned's crate doesn't pair by name.
+   reproducible) and `materials/black_matte_vmat_g.tcolor` (a material's generated colour);
+   skinned's crate draw also reads a 32×32 `R8G8B8A8Srgb` texture. The depth-only prepass binds no textures on either side, skinned's
+   vertex-cache draws included; a depth-normal prepass (outdoor) binds the material stand-in's
+   set, real's none (item 4). gpu_tex names project textures by label only, so skinned's crate
+   doesn't pair by name.
 
 Next steps: name real's shaders (their SPIR-V carries no source string) by matching stage interfaces.

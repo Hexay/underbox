@@ -4,7 +4,7 @@
 use super::object::{self, State};
 use super::world;
 use crate::handles::Kind;
-use crate::math::{from_rot, from_vec, to_rot, to_vec, vec3};
+use crate::math::{from_rot, to_vec, vec3};
 use crate::render::texture;
 use crate::resource;
 use abi::slots::{c_scene_light_object as l, g_p_scene_system as system};
@@ -100,8 +100,15 @@ fn create(w: world::Ref, light: Light) -> HandleId<class::CSceneLightObject> {
 
 /// `GetWorldDirection`: native's points at the light, so it is minus the light's forward axis (+X
 /// of its rotation); managed negates it back (`SceneMirror`, `ShadowMapper.FromNative`).
+/// Native rotates +X by the quaternion as stored, unnormalized, and normalizes the vector: with a
+/// scene's 4-digit rotations that differs from the unit quaternion's axis by ~4e-4, which moves the
+/// shadow cascades (docs/differential-gpu.md, item 2).
 fn toward_light(direction: Rotation) -> Vector3 {
-    from_vec(-(to_rot(direction) * physics::Vector::X))
+    let q = direction.quat;
+    let (x, y, z, w) = (q.x, q.y, q.z, q.w);
+    let forward = glam::Vec3::new(1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + w * z), 2.0 * (x * z - w * y));
+    let forward = forward.try_normalize().unwrap_or(glam::Vec3::X);
+    vec3(-forward.x, -forward.y, -forward.z)
 }
 
 /// A directional light shining along `direction` (+X when zero).

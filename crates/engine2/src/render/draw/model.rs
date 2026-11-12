@@ -42,8 +42,7 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
         let s = mesh.state();
         (vertices.or_else(|| s.vertices.clone())?, s.indices.clone())
     };
-    let vertex = gpu_mesh::vertex_keys(&vb.meta)?;
-    let vertices = gpu_mesh::vertices(&vb)?;
+    let (packed, packed_layout) = gpu_mesh::draw_vertices(&vb)?;
     let indices = ib.and_then(|ib| gpu_mesh::indices(&ib));
     let start = |v: i32| v.max(0) as u32;
     let range = match indices {
@@ -56,8 +55,11 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
     let state = RasterState { topology: topology(call.prim.into()), ..state };
     let uniforms = DrawUniforms { tint: call.tinted(uniforms.tint), ..uniforms };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
-    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &vb.meta, instance, view_proj, Default::default()));
-    Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded, caster: None })
+    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &packed_layout, instance, view_proj, Default::default()));
+    // The placeholder reads float normals only.
+    let (vertices, layout) = if shaded.is_some() { (packed, packed_layout) } else { (gpu_mesh::vertices(&vb)?, vb.meta.clone()) };
+    let vertex = gpu_mesh::vertex_keys(&layout)?;
+    Some(Draw { vertices, vertex_offset: 0, vertex, indices, range, base_vertex: 0, instances: 1, uniforms, state, shaded, caster: None, cull: Default::default() })
 }
 
 /// What shapes an object's draws, read before its state is locked: morph weights and, for an

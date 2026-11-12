@@ -20,6 +20,7 @@ mod mesh;
 pub mod pass;
 mod placeholder;
 mod program;
+mod readback;
 pub mod srgb;
 mod state;
 mod surface;

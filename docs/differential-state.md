@@ -62,8 +62,8 @@ from it, `Button`'s body bounds 3 units off in x, and the door sleeping by tick 
 
 1. **Fixed. Walker: real's trigger teleports a keyframed coin.** At tick 5 real moves `coin01 (25)` (a
    SphereCollider without a Rigidbody, so keyframed) to the teleport target (4, 200, 4); ours
-   leaves it at (−120, −200, 4.5). Before the keyframed-trigger fix (docs/differential-render.md,
-   walker 4) real also moved `Box[0]`, the floor, and the road cone on it fell (vz −51) on real
+   leaves it at (−120, −200, 4.5). Before the keyframed-trigger fix (docs/differential-walker.md,
+   4) real also moved `Box[0]`, the floor, and the road cone on it fell (vz −51) on real
    only; both now match. This settles that fix's "unverified" case: the trigger does report a
    keyframed collider on real.
 2. **Fixed. `SceneObject.Bounds` is model-local on ours** (every renderer, every scene). Real returns the

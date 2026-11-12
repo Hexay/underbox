@@ -27,9 +27,11 @@ COMMON
 
 struct VS_INPUT
 {
+	// vr_common_vs_input.fxc's order, which real's capture shows as its input locations.
 	float3 vPositionOs : POSITION < Semantic( PosXyz ); >;
-	float4 vNormalOs : NORMAL < Semantic( OptionallyCompressedTangentFrame ); >;
 	float2 vTexCoord : TEXCOORD0 < Semantic( LowPrecisionUv ); >;
+	float4 vNormalOs : NORMAL < Semantic( OptionallyCompressedTangentFrame ); >;
+	float4 vTangentUOs_flTangentVSign : TANGENT < Semantic( TangentU_SignV ); >;
 	uint nInstanceTransformID : TEXCOORD13 < Semantic( InstanceTransformUv ); >;
 	uint4 vBlendIndices : BLENDINDICES < Semantic( BlendIndices ); >;
 	uint nVertexID : SV_VertexID;
@@ -40,6 +42,7 @@ struct PS_INPUT
 	float3 vNormalWs : TEXCOORD0;
 	float2 vTexCoord : TEXCOORD1;
 	float3 vPositionWs : TEXCOORD2;
+	float4 vTangentUWs_flTangentVSign : TEXCOORD3;
 	float4 vTint : COLOR0;
 
 	#if ( PROGRAM == VFX_PROGRAM_VS )
@@ -70,6 +73,7 @@ VS
 			float3 vTangent;
 			float flSign;
 			DecodeCachedVertexTangentSpace( v, o.vNormalWs, vTangent, flSign );
+			o.vTangentUWs_flTangentVSign = float4( vTangent, flSign );
 			vPositionWs = v.vPosWs;
 		}
 		else
@@ -77,8 +81,10 @@ VS
 			float3x4 matObjectToWorld = GetTransformMatrix( i.nInstanceTransformID, i.vBlendIndices.x );
 			vPositionWs = mul( matObjectToWorld, float4( i.vPositionOs.xyz, 1.0 ) );
 			float3 vNormalOs;
-			DecompressNormal( i.vNormalOs, vNormalOs );
+			float4 vTangentOs;
+			DecompressNormalTangent( i.vNormalOs, i.vTangentUOs_flTangentVSign, vNormalOs, vTangentOs );
 			o.vNormalWs = mul( (float3x3)matObjectToWorld, vNormalOs );
+			o.vTangentUWs_flTangentVSign = float4( mul( (float3x3)matObjectToWorld, vTangentOs.xyz ), vTangentOs.w );
 		}
 		o.vPositionPs = Position3WsToPs( vPositionWs );
 		o.vPositionWs = vPositionWs;

@@ -50,6 +50,28 @@ impl Convention {
     }
 }
 
+/// The stencil tests native's scene layers draw objects with, as real's capture shows them on its
+/// `D32FS8` depth (docs/differential-gpu.md, item 3). Every op keeps, so neither writes: the
+/// stencil holds what its clear wrote (0) unless an overlay prepass marks it.
+pub mod stencil {
+    use render::Stencil;
+    use render::wgpu::{CompareFunction, StencilFaceState, StencilOperation as Op};
+
+    fn face(compare: CompareFunction) -> StencilFaceState {
+        StencilFaceState { compare, fail_op: Op::Keep, depth_fail_op: Op::Keep, pass_op: Op::Keep }
+    }
+
+    /// Depth prepasses: only where neither the overlay bit (0x80) nor bit 0 is set.
+    pub fn prepass() -> Stencil {
+        Stencil { front: face(CompareFunction::Equal), back: face(CompareFunction::Equal), read_mask: 0x81, write_mask: 0, reference: 0 }
+    }
+
+    /// Opaque forward layers: front faces where bit 0 is clear.
+    pub fn opaque() -> Stencil {
+        Stencil { front: face(CompareFunction::NotEqual), back: StencilFaceState::IGNORE, read_mask: 1, write_mask: 0xFE, reference: 3 }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,7 +18,9 @@ const OPTIONAL: wgpu::Features = wgpu::Features::TEXTURE_BINDING_ARRAY
     // Block-compressed textures upload as stored, as real engine2 keeps them.
     .union(wgpu::Features::TEXTURE_COMPRESSION_BC)
     // 32-bit float textures behind filtering samplers, as the depth chain is gathered (MSAAUtils.hlsl).
-    .union(wgpu::Features::FLOAT32_FILTERABLE);
+    .union(wgpu::Features::FLOAT32_FILTERABLE)
+    // Native's main depth (`D32FS8`).
+    .union(wgpu::Features::DEPTH32FLOAT_STENCIL8);
 
 /// One device and its queue. Everything else in this crate borrows it.
 pub struct Gpu {

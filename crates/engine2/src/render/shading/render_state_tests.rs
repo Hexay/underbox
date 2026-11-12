@@ -107,6 +107,7 @@ fn pass_draw(gpu: &render::Gpu, shader: &VfxShader, mat: material::Ref, pass: u6
         state: RasterState::default(),
         shaded: Some(shaded),
         caster: None,
+        cull: Default::default(),
     }
 }
 

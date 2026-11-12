@@ -1,5 +1,5 @@
-//! Textures and render targets: creation and views. Uploads, clears, copies and read-backs are in
-//! texture_io.rs.
+//! Textures and render targets: creation and views. Uploads, clears and copies are in texture_io.rs,
+//! read-back in readback.rs.
 
 use crate::Gpu;
 
@@ -88,7 +88,8 @@ impl Texture {
         let dimension = Some(desc.dimension());
         // Sampling only through the twin: sRGB formats can't be storage images, which the texture itself may allow.
         let sampled = |format| if format == desc.format { None } else { Some(wgpu::TextureUsages::TEXTURE_BINDING) };
-        let view = texture.create_view(&wgpu::TextureViewDescriptor { format: Some(linear), dimension, usage: sampled(linear), ..Default::default() });
+        let format = (!desc.format.is_depth_stencil_format()).then_some(linear);
+        let view = texture.create_view(&wgpu::TextureViewDescriptor { format, dimension, aspect: sample_aspect(desc.format), usage: sampled(linear), ..Default::default() });
         let srgb_view = (linear != srgb).then(|| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(srgb), dimension, usage: sampled(srgb), ..Default::default() }));
         let target_view = layer_view(&texture, 0);
         Texture { desc, texture, view, target_view, srgb_view }
@@ -144,6 +145,12 @@ impl Texture {
     pub fn mip_size(&self, mip: u32) -> (u32, u32) {
         ((self.desc.width >> mip).max(1), (self.desc.height >> mip).max(1))
     }
+}
+
+/// What shaders sample and read-backs copy: a depth-stencil format's depth alone (a view or copy
+/// of both aspects can't be bound or copied to a buffer).
+pub fn sample_aspect(format: wgpu::TextureFormat) -> wgpu::TextureAspect {
+    if format.has_depth_aspect() && format.has_stencil_aspect() { wgpu::TextureAspect::DepthOnly } else { wgpu::TextureAspect::All }
 }
 
 fn layer_view(texture: &wgpu::Texture, layer: u32) -> wgpu::TextureView {

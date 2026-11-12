@@ -47,7 +47,7 @@ pub fn create(v: view::Ref, d: &Desc) -> Ref {
     field!(set i32, s::GET_M_N_HEIGHT, a, h);
     field!(set i32, s::GET_M_N_UPSCALE_RENDER_WIDTH, a, w);
     field!(set i32, s::GET_M_N_UPSCALE_RENDER_HEIGHT, a, h);
-    field!(set i64, s::GET_M_N_DEPTH_FORMAT, a, 62);
+    field!(set i64, s::GET_M_N_DEPTH_FORMAT, a, crate::render::swap_chain::DEPTH_IMAGE_FORMAT.into());
     field!(set i32, s::GET_M_N_CLEAR_FLAGS, a, d.clear_flags);
     field!(set Vector4, s::GET_M_V_CLEAR_COLOR, a, d.clear_color);
     field!(set bool, s::GET_M_B_TOOLS_VIEW, a, d.tools_view);

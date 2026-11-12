@@ -117,8 +117,8 @@ native model one to one, so managed's pipeline code runs unchanged:
    as scalar params; they don't select static combos yet). Opaque layers take the non-blending
    draws; translucent layers (`LayerEnum` 1, or requiring `IsTranslucent`) the blending ones, per
    object back to front from the eye, blended, without depth writes and back faces culled unless
-   `F_RENDER_BACKFACES`; the depth prepass (`LayerEnum` 7) the opaque ones with colour writes off,
-   so the opaque layer's `LessEqual` passes the same depth. Light binner setup layers are
+   `F_RENDER_BACKFACES`; the depth prepass (`LayerEnum` 7) the opaque ones depth only (docs/
+   differential-gpu.md, item 4), so the opaque layer's `GreaterOrEqual` passes the same depth. Light binner setup layers are
    skipped; managed objects call back `RenderObject` (47); Procedural →
    managed's `void(ManagedRenderSetup_t)` pointer; Blit → texture copy, or a `render::Blitter`
    draw when formats or sizes differ (ResolveHDRToFinalSDR: Rgba16Float → Rgba8Unorm). Then

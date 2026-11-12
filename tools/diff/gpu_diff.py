@@ -15,7 +15,7 @@ from gpu import att, mesh, resources
 
 SEV = {"pass": 0, "attachment": 1, "draw count": 1, "draw": 2, "state": 2, "vertex format": 3, "textures": 3,
        "bindless": 4, "uniform": 4, "dispatch": 4, "push constants": 5, "draw order": 5, "transfers": 6}
-STATE = ("topo", "poly", "cull", "front", "dtest", "dwrite", "dcmp", "bias", "stencil", "samples", "a2c", "clamp")
+STATE = ("topo", "poly", "cull", "front", "dtest", "dwrite", "dcmp", "bias", "stencil", "sops", "samples", "a2c", "clamp")
 
 
 class Divs:

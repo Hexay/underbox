@@ -91,7 +91,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/run.sh <probe\|orbmatch\|sweeper\|zoo> [both\|ours\|real] [tol]` | Run a scenario on one or both engines; logs and `report.txt` go to `target/diff/<scenario>/` |
 | `tools/diff/compare.py <ours.log> <real.log>` | Rank divergences between two logs' `MATCH:`/`GAME:`/`DIFF:` markers |
 | `tools/diff/probe/` | A diff-only project: rigid bodies and traces logged as `DIFF:` markers at ticks 1–150 |
-| `tools/diff/run.sh frame <corpus> [both\|ours\|real]` | One client frame per engine (`frame.sh`); PNGs, `diff.png`, `metrics.txt` in `target/diff/frame/<corpus>/`. A game checkout in place of `<corpus>`: docs/differential-render.md "Real games" |
+| `tools/diff/run.sh frame <corpus> [both\|ours\|real]` | One client frame per engine (`frame.sh`); PNGs, `diff.png`, `metrics.txt` in `target/diff/frame/<corpus>/`. A game checkout in place of `<corpus>`: docs/differential-walker.md |
 | `tools/diff/real-client.sh <corpus> <out>` | Real's client under Xvfb + lavapipe; grabs the settled window from Xvfb's `-fbdir` framebuffer |
 | `tools/diff/real-env.sh` | Sourced by both client boots for real: lavapipe ICD, Steam stand-in and friends shim, web API cut off |
 | `tools/diff/lavapipe.sh` | Builds a user-local lavapipe from a pinned Mesa commit into `$UNDERBOX_CACHE/mesa-lvp` (once, about 10 min) |
@@ -100,6 +100,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/run.sh state <corpus\|game> [both\|ours\|real]` | Every object, component and body at fixed ticks (`state.sh`, `StateDump.cs`, `state.py`); docs/differential-state.md |
 | `tools/diff/run.sh tap <probe\|corpus\|game> [both\|ours\|real]` | Every interop call on each engine through the call tap, compared per tick and slot; docs/differential-tap.md |
 | `tools/diff/run.sh gpu <corpus\|game> [both\|ours\|real]` | One pinned frame's Vulkan passes, draws, state and uniforms per engine through a capture layer, matched by structure; docs/differential-gpu.md |
+| `tools/diff/run.sh perf <pile\|probe\|corpus\|game> [both\|ours\|real]` | Server tick or client frame CPU time, boot time and memory per engine over repeated runs (`perf.sh`, `PerfMark.cs`, `perf_sample.py`); docs/differential-perf.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the

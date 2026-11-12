@@ -1,24 +1,25 @@
-//! Moving texels in and out of a [`Texture`]: uploads (texel or 4x4 block rows), clears, copies
-//! and synchronous read-backs.
+//! Moving texels into and between [`Texture`]s: uploads (texel or 4x4 block rows), clears and
+//! copies. Read-back is in readback.rs.
 
-use crate::texture::extent;
-use crate::{Frame, Gpu, Texture};
+use crate::texture::{extent, sample_aspect};
+use crate::{Gpu, Texture};
 
 impl Texture {
-    /// Bytes per texel of mip 0; `None` for block-compressed or depth-stencil formats.
+    /// Bytes per texel of mip 0 (a depth-stencil format's depth); `None` for block-compressed
+    /// formats and depth that can't be copied.
     pub fn texel_size(&self) -> Option<u32> {
         let f = self.desc.format;
         if f.block_dimensions() != (1, 1) {
             return None;
         }
-        f.block_copy_size(None)
+        f.block_copy_size(Some(sample_aspect(f)))
     }
 
     /// (bytes per row, rows) of `mip` packed tightly: rows of texels, or of 4x4 blocks.
     fn rows(&self, mip: u32) -> Option<(u32, u32)> {
         let f = self.desc.format;
         let (bw, bh) = f.block_dimensions();
-        let block = f.block_copy_size(None)?;
+        let block = f.block_copy_size(Some(sample_aspect(f)))?;
         let (w, h) = self.mip_size(mip);
         Some((w.div_ceil(bw) * block, h.div_ceil(bh)))
     }
@@ -127,46 +128,5 @@ impl Texture {
         encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) });
         gpu.submit(encoder.finish());
         true
-    }
-
-    /// Copy mip 0 back to the CPU, tightly packed. Blocks until the GPU is done.
-    pub fn read_back(&self, gpu: &Gpu) -> Frame {
-        self.read_region(gpu, 0, [0, 0, self.desc.width, self.desc.height]).expect("read-back needs an uncompressed colour format")
-    }
-
-    /// Copy `[x, y, w, h]` of `mip` back to the CPU, tightly packed; `None` for a format without
-    /// a texel size or a rect outside the mip. Blocks until the GPU is done.
-    pub fn read_region(&self, gpu: &Gpu, mip: u32, [x, y, w, h]: [u32; 4]) -> Option<Frame> {
-        let texel = self.texel_size()?;
-        let (mw, mh) = self.mip_size(mip);
-        if mip >= self.desc.mips.max(1) || w == 0 || h == 0 || x + w > mw || y + h > mh {
-            return None;
-        }
-        let row = w * texel;
-        // Gotcha: buffer copies need rows padded to COPY_BYTES_PER_ROW_ALIGNMENT (256).
-        let padded = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let staging = gpu.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("readback"),
-            size: u64::from(padded * h),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        let mut encoder = gpu.device.create_command_encoder(&Default::default());
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &staging,
-                layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None },
-            },
-            extent(w, h),
-        );
-        gpu.submit(encoder.finish());
-        let bytes = crate::buffer::map_read(gpu, &staging);
-        let mut pixels = Vec::with_capacity((row * h) as usize);
-        for y in 0..h as usize {
-            let start = y * padded as usize;
-            pixels.extend_from_slice(&bytes[start..start + row as usize]);
-        }
-        Some(Frame { width: w, height: h, texel_size: texel, pixels })
     }
 }
