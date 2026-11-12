@@ -100,6 +100,7 @@ server boots, loads a local project and plays it.
 | `tools/diff/run.sh state <corpus\|game> [both\|ours\|real]` | Every object, component and body at fixed ticks (`state.sh`, `StateDump.cs`, `state.py`); docs/differential-state.md |
 | `tools/diff/run.sh tap <probe\|corpus\|game> [both\|ours\|real]` | Every interop call on each engine through the call tap, compared per tick and slot; docs/differential-tap.md |
 | `tools/diff/run.sh gpu <corpus\|game> [both\|ours\|real]` | One pinned frame's Vulkan passes, draws, state and uniforms per engine through a capture layer, matched by structure; docs/differential-gpu.md |
+| `tools/diff/run.sh perf <pile\|probe\|corpus\|game> [both\|ours\|real]` | Server tick or client frame CPU time, boot time and memory per engine over repeated runs (`perf.sh`, `PerfMark.cs`, `perf_sample.py`); docs/differential-perf.md |
 
 `compare.py` pairs markers by shape (the text with numbers replaced by `#`) and occurrence. **High**
 means an event happens on one engine only. **Medium** means paired numbers differ by more than the
