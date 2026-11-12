@@ -10,6 +10,7 @@
 //! - [`Frame`]: a read-back image with hashing and tolerant comparison, for frame-hash tests.
 
 mod batch;
+mod bind_cache;
 mod blit;
 mod buffer;
 mod compute;

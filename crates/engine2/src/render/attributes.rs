@@ -4,7 +4,7 @@
 use abi::slots::c_render_attributes as ra;
 use abi::structs::{CSamplerStateDesc, Matrix, Vector2, Vector3, Vector4};
 use abi::{NativeRef, Registry, StringToken, bind, class};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::sync::{Arc, Mutex};
 
 pub type Ref = NativeRef<class::CRenderAttributes>;
