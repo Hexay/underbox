@@ -115,6 +115,7 @@ added, removed or retyped, and the interop hash. Generated code is never edited 
 - **M2 client:** window/input, render, shader pipeline, audio, UI. The corpus is drawn, with
   frame-hash tests.
 - **M3 long tail:** VR (OpenXR), video, HTML surface, UGC, and every remaining slot to `Contracted`.
+  What's left: see docs/gaps.md.
 
 ## Lessons from engine-shim
 

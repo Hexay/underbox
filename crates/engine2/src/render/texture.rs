@@ -14,7 +14,7 @@ pub type Ref = NativeRef<class::CTextureBase>;
 /// `RuntimeTextureSpecificationFlags.TSPEC_RENDER_TARGET`.
 const TSPEC_RENDER_TARGET: u32 = 0x0001;
 pub const TSPEC_CUBE_TEXTURE: u32 = 0x0020;
-const TSPEC_VOLUME_TEXTURE: u32 = 0x0040;
+pub const TSPEC_VOLUME_TEXTURE: u32 = 0x0040;
 pub const TSPEC_TEXTURE_ARRAY: u32 = 0x0080;
 
 pub struct Texture {
@@ -60,9 +60,8 @@ impl Texture {
 
 static LOADED: ByName<Texture> = ByName::new();
 
-/// The texture at a resource path. Nothing loads compiled textures yet (TODO: assets subsystem),
-/// so every path but the ones we generate (texture_generated.rs) is native's error texture: a
-/// valid handle that reports `IsError`.
+/// The texture at a resource path: its compiled `_c`, else one we generate (texture_generated.rs),
+/// else native's error texture, a valid handle that reports `IsError`.
 pub fn load(path: Option<&CStr>, guid: Guid) -> Ref {
     let name = path.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let texture = LOADED.find_or_insert(&name, || {
@@ -126,7 +125,7 @@ enum Storage {
 }
 
 /// The GPU side of a 2D, 2D array or cube texture, when a device exists and the format maps.
-/// Volumes stay CPU-only for now (TODO).
+/// TODO: volume textures on the GPU (CPU-only here).
 fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8], storage: Storage) -> Option<render::Texture> {
     let gpu = device::gpu()?;
     let format = formats::to_wgpu(c.m_n_image_format)?;
@@ -231,15 +230,33 @@ pub fn register(r: &mut Registry) {
     bind!(r, device_slots::ASYNC_SET_TEXTURE_DATA2, set_data);
 }
 
-/// Replace the texels in `rect` (only whole-texture uploads are kept for now).
-fn set_data(t: Ref, bytes: &mut [u8], _rect: Rect3D) {
+/// Replace the texels in `rect` with tightly packed `bytes`: the whole texture when they cover
+/// it, else a box of mip 0 (uncompressed formats; z is the slice or array layer).
+pub(crate) fn set_data(t: Ref, bytes: &mut [u8], rect: Rect3D) {
     on(t, |t| {
         let mut d = t.data.lock().unwrap();
+        let gpu = device::gpu().zip(t.gpu.as_ref());
         if bytes.len() == d.len() {
             d.copy_from_slice(bytes);
-            if let (Some(gpu), Some(tex)) = (device::gpu(), &t.gpu) {
+            if let Some((gpu, tex)) = gpu {
                 tex.upload(gpu, bytes);
             }
+            return;
+        }
+        let Some(image::Layout::Pixel { bytes: texel }) = image::layout(t.config.m_n_image_format.into()) else { return };
+        let [x, y, z, w, h, depth] = [rect.x, rect.y, rect.z, rect.width, rect.height, rect.depth.max(1)].map(|v| v.max(0) as usize);
+        let (tw, th) = (t.config.m_n_width.max(1) as usize, t.config.m_n_height.max(1) as usize);
+        let row = w * texel as usize;
+        let fits = |layer: usize| (((z + layer) * th + y + h - 1) * tw + x + w) * texel as usize <= d.len();
+        if w == 0 || h == 0 || x + w > tw || y + h > th || bytes.len() < row * h * depth || !fits(depth - 1) {
+            return;
+        }
+        for (i, src) in bytes.chunks_exact(row).take(h * depth).enumerate() {
+            let at = (((z + i / h) * th + y + i % h) * tw + x) * texel as usize;
+            d[at..at + row].copy_from_slice(src);
+        }
+        if let Some((gpu, tex)) = gpu {
+            tex.upload_region(gpu, [x, y, z].map(|v| v as u32), [w, h, depth].map(|v| v as u32), &bytes[..row * h * depth]);
         }
     });
 }

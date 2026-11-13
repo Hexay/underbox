@@ -27,6 +27,11 @@ fn find(r: Ref, pred: impl Fn(&str) -> bool) -> Option<body::Ref> {
     get(r).and_then(|g| g.bodies.iter().find(|(n, _)| pred(n)).map(|(_, b)| *b))
 }
 
+/// `SetSurfaceProperties`: every shape of every body uses the surface `name`.
+pub(super) fn set_surface(r: Ref, name: StringToken) {
+    bodies(r).into_iter().for_each(|b| super::body_slots::set_surface(b, name));
+}
+
 /// A body's mass as native reports it: 0 unless dynamic.
 fn mass(b: body::Ref) -> f32 {
     body::with_sim(b, |sim, id| sim.reported_mass(id))
@@ -84,8 +89,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, a::GET_MASS_CENTER, |g| from_vec(mass_center(g)));
     // The root body's position, as native's aggregate origin.
     bind!(r, a::GET_ORIGIN, |g| from_vec(bodies(g).first().map(|b| body::read_rb(*b, |rb| rb.translation())).unwrap_or_default()));
-    // TODO: surface properties need g_pPhysicsSystem's surface controller.
-    bind!(r, a::SET_SURFACE_PROPERTIES, |_, _| {});
+    bind!(r, a::SET_SURFACE_PROPERTIES, set_surface);
     bind!(r, a::GET_WORLD, |g| get(g).and_then(|g| world::get(g.world)).map_or(HandleId::new(-1), |w| w.handle.id()));
 
     bind!(r, a::GET_BODY_COUNT, |g| get(g).map_or(0, |g| g.bodies.len() as i32));

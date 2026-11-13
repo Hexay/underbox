@@ -1,8 +1,7 @@
 //! AnimGraph1 sources (`.vanmgrph`, KV3 `CAnimationGraph`): the parameter list, which is what
 //! managed's legacy `SetAnimParameter`/`GetFloat`... read and write, and the sequence nodes' tag
 //! spans (`crate::tag_spans`).
-// TODO: evaluate the node graph (CStateMachineAnimNode, CBlendAnimNode...); it needs clip data
-// from FBX sources we can't import yet, so legacy graphs hold parameters and tag spans only.
+// TODO: evaluate the node graph (state machines, blends); it needs clips from FBX sources (vmdl.rs).
 
 use super::{kv_bool, kv_f32, kv_vec3};
 use crate::params::{ParamDef, Value};

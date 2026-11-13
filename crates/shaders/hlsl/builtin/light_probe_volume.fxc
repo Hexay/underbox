@@ -1,7 +1,6 @@
 // underbox replacement for Valve's light_probe_volume.fxc. Also compiled into compute and vertex
 // programs, so no implicit-derivative sampling here.
-// TODO: sample baked probe volumes once the renderer binds them (layout to be defined with it);
-// until then there is no baked indirect light and no baked direct-light indices.
+// TODO: sample baked probe volumes (none bound): no baked indirect light or direct-light indices.
 #ifndef LIGHT_PROBE_VOLUME_FXC
 #define LIGHT_PROBE_VOLUME_FXC
 

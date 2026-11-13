@@ -17,6 +17,13 @@ fn set_touch(r: super::body::Ref, on: bool) {
     }
 }
 
+/// Every shape of the body uses the surface named `name` (unknown: `default`).
+pub fn set_surface(r: super::body::Ref, name: abi::StringToken) {
+    let surface = super::surfaces::by_hash(name.0).unwrap_or(-1);
+    let shapes = get(r).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
+    shapes.into_iter().for_each(|s| shape::set_surface(s, surface));
+}
+
 pub fn register(r: &mut Registry) {
     bind!(r, b::GET_WORLD, |r| get(r).and_then(|b| super::world::get(b.world)).map_or(HandleId::new(-1), |w| w.handle.id()));
     bind!(r, b::MANAGED_OBJECT, |r| get(r).map_or(HandleId::new(-1), |b| b.handle.id()));
@@ -99,11 +106,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::SET_BULLET, |r, v| with_rb(r, |rb| rb.enable_ccd(v)));
     bind!(r, b::SET_MOTION_LOCKS, |r, x, y, z, pitch, yaw, roll| with_rb(r, |rb| set_motion_locks(rb, [x, y, z, pitch, yaw, roll])));
     bind!(r, b::BUILD_BOUNDS, |r| with_sim(r, |sim, id| sim.body(id).is_some().then(|| super::shape_slots::built_bounds(sim.body_bounds(id)))).unwrap_or_default());
-    bind!(r, b::SET_MATERIAL_INDEX, |r, name: abi::StringToken| {
-        let surface = super::surfaces::by_hash(name.0).unwrap_or(-1);
-        let shapes = get(r).map(|b| b.shapes.lock().unwrap().clone()).unwrap_or_default();
-        shapes.into_iter().for_each(|s| shape::set_surface(s, surface));
-    });
+    bind!(r, b::SET_MATERIAL_INDEX, set_surface);
     bind!(r, b::SET_CONTACT_RECYCLING, |_, _| {});
     bind!(r, b::RESET_PROXY, |_| {});
 }

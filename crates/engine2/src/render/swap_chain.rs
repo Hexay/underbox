@@ -112,9 +112,11 @@ fn destroy(h: Handle) {
     }
 }
 
-/// Show the frame: copy it to the window when there is one, and offer it to the frame capture.
+/// Show the frame: copy it to the window when there is one, offer it to the frame capture, and
+/// publish its render stats.
 pub fn present(h: Handle) -> bool {
     let (Some(gpu), Some(chain)) = (device::gpu(), get(h)) else { return false };
+    super::stats::end_frame();
     let mut c = chain.lock().unwrap();
     c.presented += 1;
     let color = texture::resolve(c.color);

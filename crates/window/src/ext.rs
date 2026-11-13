@@ -37,8 +37,7 @@ pub fn begin_external_drag(_window: Window, _files: &CStr, _text: &CStr) -> i32 
     0
 }
 
-/// Window-chrome extensions with no SDL equivalent. TODO: Windows (DWM attributes, extended
-/// window styles, ITaskbarList3) through the HWND from [`crate::handle`].
+/// Window-chrome extensions with no SDL equivalent. TODO: Windows (DWM, extended styles, ITaskbarList3).
 pub fn set_mouse_transparent(_window: Window, _transparent: bool) {}
 pub fn set_can_maximize(_window: Window, _can_maximize: bool) {}
 pub fn set_has_shadow(_window: Window, _has_shadow: bool) {}

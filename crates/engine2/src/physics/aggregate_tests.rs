@@ -124,6 +124,22 @@ fn sliding_bodies_report_scrape_contacts_with_their_surfaces() {
 }
 
 #[test]
+fn set_surface_properties_reaches_every_shape() {
+    fake_managed();
+    let w = new_world();
+    let r = aggregate::spawn(w, ragdoll_model(), identity(), 1).unwrap();
+    super::surfaces::add("aggregate_test_rubber", "default", "");
+    super::aggregate_slots::set_surface(r, abi::StringToken::of("aggregate_test_rubber"));
+    let want = super::surfaces::by_hash(abi::StringToken::of("aggregate_test_rubber").0).unwrap();
+    for (_, b) in aggregate::get(r).unwrap().bodies.iter() {
+        for s in body::get(*b).unwrap().shapes.lock().unwrap().iter() {
+            assert_eq!(super::shape::with_state(*s, |st| st.surface_at(None)), want);
+        }
+    }
+    aggregate::destroy(r);
+}
+
+#[test]
 fn static_motion_and_missing_world() {
     fake_managed();
     let w = new_world();
