@@ -72,6 +72,35 @@ showroom` leaves `VK_ICD_FILENAMES` alone, so both engines pick the hardware dri
 Server tick profile on `pile`, what was changed and before/after numbers: docs/perf-physics.md.
 Client frame profile on `showroom` and `skinned`, the same: docs/perf-render.md.
 
+## Sweep, 2026-11-13
+
+`run.sh perf <scenario> both` for all four, one at a time, 5 rounds each, before and after the
+main-thread round in docs/perf-render.md. Every metric with ours/real above 1.05 in either sweep
+(medians; the 1-minute load at start → end):
+
+| Scenario | Metric | Before: ours / real, ratio, load | After: ours / real, ratio, load |
+| --- | --- | --- | --- |
+| skinned | frame main thread ms | 7.04 / 4.15, 1.70, 23.7 → 23.4 | 4.76 / 3.93, 1.21, 28.1 → 17.7 NOISY; repeat 4.65 / 3.46, 1.34, 11.6 → 23.7 NOISY |
+| showroom | frame main thread ms | 5.39 / 4.63, 1.16, 15.2 → 23.7 NOISY | 3.99 / 4.04, 0.99, 17.7 → 17.8 |
+| pile | tick cpu median ms | 2.44 / 2.13, 1.14, 23.1 → 13.3 NOISY | 2.60 / 2.13, 1.22, 21.1 → 21.1 |
+| pile | tick cpu total s | 1.64 / 1.62, 1.02 | 1.75 / 1.56, 1.12 |
+| skinned | marker lag ms | 1.17 / 1.00, 1.18 | 1.08 / 1.04, 1.04; repeat 0.57 |
+| showroom | marker lag ms | 0.79 / 0.94, 0.84 | 0.99 / 0.63, 1.56 |
+| pile | marker lag ms | 0.80 / 0.80, 1.01 | 0.89 / 0.82, 1.08 |
+
+Everything else was at or under 1.05 in both sweeps: boot wall and CPU (0.6–0.97), peak and steady
+RSS (0.32–0.87), lavapipe CPU (skinned 1.00–1.01, showroom 0.95), engine CPU (0.78–0.92) and probe's
+tick (0.71–0.75).
+
+- **Main thread** was the gap under our control; fixed (docs/perf-render.md, "Main thread: bind
+  groups that missed the cache"). Real's own skinned main thread read 3.46–4.15 across sweeps, a
+  spread as wide as what is left.
+- **Pile tick** is Rapier's solver (docs/perf-physics.md, "What's left"); its tuning is fitted to
+  real's behaviour, so not touched. Nothing here changed server code paths.
+- **Marker lag** is how long managed's log line takes to reach the file the sampler reads. The CPU
+  at a marker is interpolated at its own timestamp, so lag doesn't move CPU figures. It swings
+  0.2–1.8 ms run to run on both engines and its ratio flips between sweeps; it's noise.
+
 ## Caveats
 
 - `PERF:TICK` logs a line per tick on both engines; its cost is in both numbers.

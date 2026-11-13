@@ -66,8 +66,11 @@ pub struct Texture {
     pub srgb_view: Option<wgpu::TextureView>,
     /// One-mip views made on request ([`Texture::mip_view`]), kept so bind groups that use them
     /// repeat across frames (bind_cache.rs).
-    mip_views: Mutex<HashMap<(wgpu::TextureFormat, u32, Option<wgpu::TextureUsages>), wgpu::TextureView>>,
+    mip_views: Mutex<HashMap<MipViewKey, wgpu::TextureView>>,
 }
+
+/// A one-mip view's format, mip and usage.
+type MipViewKey = (wgpu::TextureFormat, u32, Option<wgpu::TextureUsages>);
 
 /// `format`'s sRGB-decoding twin, when it has one and isn't sRGB already.
 pub fn srgb_twin(format: wgpu::TextureFormat) -> Option<wgpu::TextureFormat> {

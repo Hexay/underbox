@@ -115,13 +115,51 @@ changes fog's screen-edge columns by up to 15, now nearer real's; every other fr
 - Frame against real: skinned 0.06 / 0.18 / 0.33 → 0.03 / 0.17 / 0.34 (SSIM 0.9998), and fog
   0.13 / 0.16 / 0.21, 0.9992 → 0.11 / 0.09 / 0.25, 0.9993.
 
+## Main thread: bind groups that missed the cache
+
+Sweep: docs/differential-perf.md. Main thread against real's was 1.70 on skinned, 1.16 on showroom.
+`perf record -t <main tid>`: `RenderAttributes::get` 12%, `StringToken::of` 5%, SipHash 5%,
+lavapipe creating and freeing descriptor sets 12%. Logging the bind cache's misses showed 45 new
+groups every steady frame on skinned:
+
+| Misses a frame | Cause | Fix |
+| --- | --- | --- |
+| 30 (stand-in, stand-in depth) and 3 (skinning_cs) | a new "skinned transforms" storage buffer per skinned mesh per frame | last frame's buffer for the same draw is rewritten (`skin/native.rs`) |
+| 12 (downsample_spd, screen_space_shadows, cmaa2, depthresolve) | a new one-mip view per bind (storage images, mip samples) | views cached per texture (`Texture::mip_view`) |
+| per pass, blit, morph composite | groups made with `create_bind_group`, fresh buffers | through the cache, upload slices; a pass makes the placeholder group only when a draw is unshaded |
+
+Lookups: `RenderAttributes` keeps a per-token mask of the kinds set (`attributes/store.rs`), so a
+numeric lookup that misses costs one probe per parent level instead of eight, and walks the chain
+without cloning `Arc`s. `bind.rs` hashes a name's tokens once per search over the attribute
+objects, and `Shading::attributes` uses FxHash. Order is kept: each kind is searched up the chain
+before the next.
+
+Interleaved `run.sh perf skinned ours`, `REPEATS=1`, 3 rounds per pair, main thread ms (medians):
+
+| Step | Before | After |
+| --- | --- | --- |
+| Pass, blit and morph groups through the cache | 6.59 | 6.40 |
+| One-probe lookups, tokens hashed once | 6.42 | 5.51 |
+| Transform buffers and mip views reused | 5.75 | 4.81 |
+
+Steady-state misses went from 45 a frame to 0. Engine and lavapipe CPU didn't move beyond noise.
+Frames are unchanged: the base and the new build render byte-identical skinned and showroom
+frames, against real 0.03 / 0.17 / 0.34, SSIM 0.9998 (skinned) and 0.07 / 0.23 / 0.36, 0.9993
+(showroom); the golden frames pass.
+
+Tried, not kept: an upload-buffer ring (a frame overflowing one 4 MB chunk would get a new
+buffer each frame). No frame overflowed, and the miss count didn't move.
+
 ## Left, and negative results
 
 - **Skinned raster is within noise of real.** About 1 ms is left in the blit's nearest sample
   (`r16g16b16a16_float` key 20: 1.7 ms against real's ~1.0).
-- **Main thread is still above real's**, more so on skinned. What's left is attribute lookups
-  by name per draw (`uniform_value`, `names`), malloc in bind-group building, and wgpu's pass
-  encoding.
+- **Main thread is 1.2–1.3× real's on skinned, level on showroom.** The profile is flat now:
+  malloc and free about 14% across callers, the attribute walk 4%, `StringToken::of` 2% (callers
+  that still pass `&str`), the objects registry 2%, wgpu's pass encoding.
+- **Dwarf call graphs stop at libengine2's first frame**, even with a 64 KB stack copy, and this
+  Zen 5 box has no LBR call stacks. Attribute driver work by counting it at the engine boundary
+  (a temporary log of bind-cache misses here) instead.
 - **Removing wgpu's shader runtime checks gained about 2% of lavapipe**, so it was reverted.
   Bounds, binding-array and image checks are already left to driver robustness on Vulkan; what
   remained (index clamping, loop bounding, integer division) is cheap.
