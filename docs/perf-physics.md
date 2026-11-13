@@ -163,11 +163,43 @@ instructions. Real ran slower than in round 2 (2.09–2.26 ms), so compare ratio
 Behaviour: deterministic (two runs of each build identical at tolerance 0 on probe, orbmatch and
 zoo; example hashes repeat). Static-wall example hashes are unchanged; keyframed ones are now
 `57a4a5e26da5184e` / `5a3c86598a03dbd0`. Probe (1789 markers) and orbmatch (132) markers are
-identical to the unpatched build's, so 324 and 54 divergences. The zoo moved: unpatched (with
+identical to the unpatched build's, so 324 and 54 divergences. The zoo's wall-clock markers moved
+(sampling, not physics: next section): unpatched (with
 round 2's changes) it logs 50 markers and 33 divergences, its trike still awake at the first
 `GAME:TICK`s (awake 9, 8, 4 against real's 6, 5, 5) and four `GAME:AWAKE` lines real doesn't log;
 patched, 45 markers and 32 divergences (awake 8, 5, 0), `GAME:RESTED` unchanged. `tools/test.sh
 physics` passes unchanged (landing, stack, car fits included), so no iteration refit.
+
+## Round 3: did the read-only getters change behaviour?
+
+No. Round 3's zoo shift (45 → 50 markers, 32 → 33 divergences, extra `GAME:AWAKE` lines) is
+sampling: `GAME:TICK` and `GAME:AWAKE` are logged on wall-clock seconds, so a debug server's
+speed under load decides which step each sample lands on. Two zoo runs each, ours against one real
+run (real awake 16, 6, 5, 5):
+
+| Build | Markers | Divergences | `GAME:TICK` awake | `GAME:AWAKE` |
+| --- | --- | --- | --- | --- |
+| 6f1cb9d (before) | 45, 45 | 32, 32 | 16 8 5 0 / 16 9 8 0 | 0, 0 |
+| 84ba437 (getters) | 50, 51 | 33, 33 | 16 9 8 4 / 16 11 8 5 | 4, 5 |
+| 4450c9d (colouring) | 55, 61 | 37, 43 | 16 16 8 8 5 / 16 16 16 10 8 | 8, 10 |
+
+Every difference within and between those builds is in those two markers; `GAME:RESTED` and the
+rest are identical at tolerance 0. Step-based, `run.sh state` on the zoo (`SCENE=scenes/zoo.scene`,
+12 ticks from 1 to 750) gives bit-identical bodies for all six runs (the only noise is
+`hoover_a`'s render-side scene model at tick 50, in repeat runs of a single build too). Awake
+dynamic bodies per tick are the same on all three builds: 16 to tick 25, then 8, 5, 0 at ticks 50,
+100, 150. Real: 6, 5, 5 at those ticks, still 4 at 750. The trike's gap is the open hoover
+divergence (docs/differential.md, 10), not this change.
+
+Why nothing moved: `RigidBodySet::get_mut` only queues the body. Without change flags,
+`handle_user_changes_to_rigid_bodies` wakes nothing; it bumps the active-set and joint-assembly
+epochs, so the solver's cached joint selection and builders are rebuilt instead of reused. Rebuilt
+and reused give the same numbers. Headless, the trike (`trike_tests`, `dynamic` and `nosign`, 1000
+steps) touched through `get_mut` every step, or through `activation_mut` (the SLEEP flag the old
+`arm_sleep` set), is bit-identical to untouched, on both the unpatched and the patched Rapier.
+Real's getters don't wake either: the probe reads `Body.Sleeping` every step and real still
+sleeps those bodies at step 25 (`ProbeRest.cs`, `SLEEP`). Read the zoo by `GAME:RESTED` or a state
+dump, never by `GAME:TICK` awake counts.
 
 ## What's left
 
