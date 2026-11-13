@@ -2,7 +2,7 @@
 //! (`OnPhysicsJointBreak`), and touch/trigger events (`IPhysicsWorld.ProcessIntersections`).
 //! Everything is gathered with the world locked and delivered after it's released.
 
-use super::{body, joint, shape, world};
+use super::{body, body_cache, joint, shape, world};
 use crate::math::{from_rot, from_vec, vec3};
 use abi::callbacks::sandbox_physics_physics_engine as engine;
 use abi::rt::delegates::{IntersectionNotification, IntersectionSide, IntersectionSink};
@@ -21,7 +21,7 @@ pub fn step(r: world::Ref, dt: f32, substeps: u32) {
             .into_iter()
             .filter_map(|a| {
                 let rb = sim.body(a.body)?;
-                let handle = objects::with(body::from_user_data(a.user_data), |b: &body::Body| b.handle.id())?;
+                let handle = body_cache::resolve(body::from_user_data(a.user_data), |e| e.body.handle.id())?;
                 let transform = Transform { position: from_vec(rb.translation()), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(*rb.rotation()) };
                 Some((handle, transform, from_vec(rb.linvel()), from_vec(rb.angvel()), a.fell_asleep))
             })
