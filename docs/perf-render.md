@@ -86,11 +86,39 @@ The GPU morph composite, real's vertex-cache streams and `-fspv-preserve-interfa
   them too) rather than the composite pass; not A/B'd alone. Frame wall moved with load (20–30) and isn't compared.
 - Frame metrics on the seven scenes equal docs/differential-render.md's latest column.
 
+## Skinned raster against real: samplers and the blit
+
+Lavapipe's raster time per JIT function came from a Mesa `PROFILE` build: its perf map, with
+`MESA_SHADER_CACHE_DISABLE=true` so cached shaders get named. On both sides the main stand-in
+fragment shader and the shadow-compare sampling cost the same (~29 and ~18 ms). The excess was
+in four places:
+
+| Hot spot | Ours | Real | Fix |
+| --- | --- | --- | --- |
+| Stand-in AO sampled anisotropically | 5.9 | 2.1 | `g_sTrilinearWrap`, as `vr_shared_standard_ps_code` |
+| CMAA composite, linear/repeat | 2.6 | 0.45 | Vfx `Filter`/`Address*` annotations honoured (`shading/sampler_state.rs`) |
+| `MSAAUtils::SampleRed`'s `g_sPointClamp`, linear | 1.8 | 0.34 | same |
+| Final blit: `pow` encode, uniform branches, `textureLoad` | ~6.4 | ~2.5 | sRGB target view, one entry point per transfer, nearest sample |
+
+Previously every Vfx sampler was linear/repeat apart from anisotropy and compare. Clamping
+changes fog's screen-edge columns by up to 15, now nearer real's; every other frame moves by ≤1 LSB
+(the blit's sRGB rounding). Medians of interleaved `run.sh perf skinned` runs, ms:
+
+| Metric | Before (3 runs) | After (5 runs, noisy load) | Real before / after |
+| --- | --- | --- | --- |
+| Lavapipe CPU | 103 | 93.4 | 91.8 / 88.3 |
+| Ours / real | 1.12 | 1.06 | |
+| Engine CPU | 85.2 | 80.2 | 94.6 / 90.0 |
+
+- Against real's 91.7 from "Skinning and morphs as real's", 93.4 is 1.02. Real's own median
+  moves by ±3 between sessions.
+- Frame against real: skinned 0.06 / 0.18 / 0.33 → 0.03 / 0.17 / 0.34 (SSIM 0.9998), and fog
+  0.13 / 0.16 / 0.21, 0.9992 → 0.11 / 0.09 / 0.25, 0.9993.
+
 ## Left, and negative results
 
-- **Skinned raster is still about 10% over real**, and not because of skinning: both skin in
-  compute and draw from the vertex cache through the same streams ("Skinning and morphs" below).
-  The stand-in's fragment cost is the remaining suspect; unmeasured.
+- **Skinned raster is within noise of real.** About 1 ms is left in the blit's nearest sample
+  (`r16g16b16a16_float` key 20: 1.7 ms against real's ~1.0).
 - **Main thread is still above real's**, more so on skinned. What's left is attribute lookups
   by name per draw (`uniform_value`, `names`), malloc in bind-group building, and wgpu's pass
   encoding.

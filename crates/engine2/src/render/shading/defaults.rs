@@ -1,15 +1,16 @@
 //! Stand-ins a material program binds when the draw doesn't supply a resource: a 1×1 texture per
 //! (view dimension, sample type) — white for float textures, zero otherwise, and transparent
 //! black for cubes as real's `SCENE_TXTR_BLACK_CUBE_1x1` (sRGB) — and default
-//! samplers (trilinear wrap, anisotropic where the vfx asks for `ANISO`; comparison samplers compare with the vfx `ComparisonFunc`,
-//! greater-equal by default, as reverse-Z maps want).
+//! samplers (the vfx declaration's filter and addressing, trilinear wrap without one; comparison
+//! samplers compare with the vfx `ComparisonFunc`, greater-equal by default, as reverse-Z maps want).
 
+use super::sampler_state::SamplerState;
 use render::wgpu::{self, SamplerBindingType, TextureSampleType, TextureViewDimension as D};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 static TEXTURES: LazyLock<Mutex<HashMap<(D, TextureSampleType), wgpu::TextureView>>> = LazyLock::new(Default::default);
-type SamplerKey = (SamplerBindingType, Option<wgpu::CompareFunction>, u16);
+type SamplerKey = (SamplerBindingType, Option<wgpu::CompareFunction>, u16, SamplerState);
 static SAMPLERS: LazyLock<Mutex<HashMap<SamplerKey, wgpu::Sampler>>> = LazyLock::new(Default::default);
 
 fn format(sample: TextureSampleType, cube: bool) -> (wgpu::TextureFormat, u32) {
@@ -65,26 +66,28 @@ pub fn texture(gpu: &render::Gpu, dim: D, sample: TextureSampleType) -> wgpu::Te
     TEXTURES.lock().unwrap().entry((dim, sample)).or_insert_with(|| create(gpu, dim, sample)).clone()
 }
 
-/// The default sampler for a binding of `kind`; `anisotropic` for a vfx `Filter( ANISO )`, up to
-/// `r_max_anisotropy`.
-pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu::CompareFunction>, anisotropic: bool) -> wgpu::Sampler {
-    let anisotropy = if anisotropic && kind == SamplerBindingType::Filtering { crate::render::convars::max_anisotropy() } else { 1 };
+/// The sampler a binding of `kind` gets from its vfx declaration: `state`, anisotropic up to
+/// `r_max_anisotropy`; a non-filtering binding samples nearest whatever it declares.
+pub fn sampler(gpu: &render::Gpu, kind: SamplerBindingType, compare: Option<wgpu::CompareFunction>, mut state: SamplerState) -> wgpu::Sampler {
+    let anisotropy = if state.anisotropic && kind == SamplerBindingType::Filtering { crate::render::convars::max_anisotropy() } else { 1 };
+    if kind == SamplerBindingType::NonFiltering {
+        state.filter = [wgpu::FilterMode::Nearest; 2];
+        state.mip = wgpu::MipmapFilterMode::Nearest;
+    }
+    // wgpu requires all-linear filtering for anisotropy.
+    if anisotropy > 1 {
+        state.filter = [wgpu::FilterMode::Linear; 2];
+        state.mip = wgpu::MipmapFilterMode::Linear;
+    }
     let mut cache = SAMPLERS.lock().unwrap();
     cache
-        .entry((kind, compare, anisotropy))
+        .entry((kind, compare, anisotropy, state))
         .or_insert_with(|| {
-            let filter = if kind == SamplerBindingType::NonFiltering { wgpu::FilterMode::Nearest } else { wgpu::FilterMode::Linear };
+            let border_ok = gpu.device.features().contains(wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER);
             gpu.device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some("default"),
-                address_mode_u: wgpu::AddressMode::Repeat,
-                address_mode_v: wgpu::AddressMode::Repeat,
-                address_mode_w: wgpu::AddressMode::Repeat,
-                mag_filter: filter,
-                min_filter: filter,
-                mipmap_filter: if kind == SamplerBindingType::NonFiltering { wgpu::MipmapFilterMode::Nearest } else { wgpu::MipmapFilterMode::Linear },
                 compare: (kind == SamplerBindingType::Comparison).then_some(compare.unwrap_or(crate::render::depth::SHADOW.compare())),
                 anisotropy_clamp: anisotropy,
-                ..Default::default()
+                ..state.descriptor(border_ok)
             })
         })
         .clone()

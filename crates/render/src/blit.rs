@@ -5,7 +5,9 @@ use crate::state::{PipelineKey, RasterState};
 use crate::{Gpu, Program, Texture};
 
 pub struct Blitter {
-    program: Program,
+    /// By [`Transfer`].
+    programs: [Program; 3],
+    nearest: wgpu::Sampler,
 }
 
 /// The sRGB transfer a blit applies (`RenderTools.BlitTexture`'s `nSrgbTransfer`).
@@ -23,9 +25,13 @@ impl Blitter {
     pub fn new(gpu: &Gpu) -> Blitter {
         let entry = |binding, ty| wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::FRAGMENT, ty, count: None };
         let texture = wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: false }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false };
-        let uniform = wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: wgpu::BufferSize::new(32) };
-        let layout = gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("blit"), entries: &[entry(0, texture), entry(1, uniform)] });
-        Blitter { program: Program::new(gpu, "blit", include_str!("blit.wgsl"), vec![layout], ("vs_main", "fs_main")) }
+        let uniform = wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: wgpu::BufferSize::new(16) };
+        let sampler = wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering);
+        let layout = gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("blit"), entries: &[entry(0, texture), entry(1, uniform), entry(2, sampler)] });
+        let program = |fs| Program::new(gpu, "blit", include_str!("blit.wgsl"), vec![layout.clone()], ("vs_main", fs));
+        let clamp = wgpu::AddressMode::ClampToEdge;
+        let nearest = gpu.device.create_sampler(&wgpu::SamplerDescriptor { label: Some("blit"), address_mode_u: clamp, address_mode_v: clamp, ..Default::default() });
+        Blitter { programs: [program("fs_copy"), program("fs_encode"), program("fs_decode")], nearest }
     }
 
     /// Draw `src_rect` of `src` into `dst_rect` of `dst` (both `[x, y, w, h]` in texels). False
@@ -36,26 +42,34 @@ impl Blitter {
         if !float(src) || !float(dst) || src.dimension() != wgpu::TextureViewDimension::D2 || w == 0 || h == 0 || x + w > dst.desc.width || y + h > dst.desc.height || src_rect[2] == 0 || src_rect[3] == 0 {
             return false;
         }
-        let [sx, sy, sw, sh] = src_rect.map(|v| v as f32);
-        let params = [sx, sy, sw, sh, transfer as u32 as f32, 0.0, 0.0, 0.0];
+        // Encode through the target's sRGB view, as native's blit writes an sRGB target; lavapipe's
+        // format conversion costs less than the shader's pow.
+        let srgb_target = (transfer == Transfer::Encode).then(|| dst.srgb_target_view()).flatten();
+        let (target, format, transfer) = match &srgb_target {
+            Some(view) => (view, dst.desc.format.add_srgb_suffix(), Transfer::None),
+            None => (&dst.target_view, dst.desc.format, transfer),
+        };
+        let program = &self.programs[transfer as usize];
+        let params = src_rect.map(|v| v as f32);
         let uniform = crate::Buffer::with_data(gpu, "blit params", crate::BufferKind::Uniform, bytemuck::cast_slice(&params));
         let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("blit"),
-            layout: &self.program.bind_group_layouts[0],
+            layout: &program.bind_group_layouts[0],
             entries: &[
                 wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&src.view) },
                 wgpu::BindGroupEntry { binding: 1, resource: uniform.buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.nearest) },
             ],
         });
         let state = RasterState { depth_write: false, ..Default::default() };
-        let key = PipelineKey { color: Some(dst.desc.format), depth: None, vertex: Vec::new(), state };
-        let pipeline = self.program.pipeline_for(gpu, &key);
+        let key = PipelineKey { color: Some(format), depth: None, vertex: Vec::new(), state };
+        let pipeline = program.pipeline_for(gpu, &key);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blit"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &dst.target_view,
+                    view: target,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },

@@ -46,7 +46,8 @@
 
 	float AmbientOcclusion( float2 vTexCoord )
 	{
-		return g_tAmbientOcclusion.Sample( g_sStandin, vTexCoord ).r;
+		// vr_shared_standard_ps_code.fxc's sampler: trilinear, not the stand-in's anisotropic one.
+		return g_tAmbientOcclusion.Sample( g_sTrilinearWrap, vTexCoord ).r;
 	}
 
 	float3 EnvMapSpecular( Surface s, uint nCluster )
