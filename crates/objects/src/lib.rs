@@ -41,6 +41,13 @@ pub fn get<C, T: Any + Send + Sync>(r: NativeRef<C>) -> Option<Arc<T>> {
     value.downcast().ok()
 }
 
+/// Run `f` on the object at `r` under the registry's read lock, skipping [`get`]'s `Arc` clone.
+/// `f` must not create or destroy objects.
+pub fn with<C, T: Any + Send + Sync, R>(r: NativeRef<C>, f: impl FnOnce(&T) -> R) -> Option<R> {
+    let objects = OBJECTS.read().unwrap();
+    objects.get(&r.addr())?.value.downcast_ref::<T>().map(f)
+}
+
 /// Swap the value of the live object at `r`, keeping its address and fields. False if there was none.
 pub fn replace<C, T: Any + Send + Sync>(r: NativeRef<C>, value: T) -> bool {
     OBJECTS.write().unwrap().get_mut(&r.addr()).map(|e| e.value = Arc::new(value)).is_some()

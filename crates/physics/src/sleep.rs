@@ -34,6 +34,9 @@ impl World {
             let Some(rb) = raw.bodies.get(id) else { continue };
             // The spin term is never negative, so a body this fast can skip the corners.
             let eligible = rb.linvel().length() < threshold && corner_speed(rb, &raw.colliders) < threshold;
+            if is_eligible(rb) == Some(eligible) {
+                continue;
+            }
             if let Some(rb) = raw.bodies.get_mut(id) {
                 set_eligible(rb, eligible);
             }
@@ -56,6 +59,19 @@ impl World {
                 }
             }
         }
+    }
+}
+
+/// What `set_eligible` last wrote, if it wrote anything.
+fn is_eligible(rb: &RigidBody) -> Option<bool> {
+    let a = rb.activation();
+    let never = RigidBodyActivation::cannot_sleep();
+    if a.normalized_linear_threshold == ALWAYS && a.angular_threshold == RigidBodyActivation::default_angular_threshold() {
+        Some(true)
+    } else if a.normalized_linear_threshold == never.normalized_linear_threshold && a.angular_threshold == never.angular_threshold {
+        Some(false)
+    } else {
+        None
     }
 }
 
