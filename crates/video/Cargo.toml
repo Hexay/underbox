@@ -1,0 +1,16 @@
+[package]
+name = "video"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "video playback and recording: mp4/webm demuxing, AV1 and H.264 decoding, H.264 encoding"
+
+[dependencies]
+libc = "0.2"
+matroska-demuxer = "0.8"
+mp4 = "0.14"
+openh264 = { version = "0.9", default-features = false, features = ["source"] }
+opus = "0.4"
+rav1d = { version = "1.1", default-features = false, features = ["bitdepth_8"] }
+re_mp4 = "0.5"
+symphonia = { version = "0.5", default-features = false, features = ["aac"] }

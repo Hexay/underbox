@@ -13,7 +13,7 @@ mod mixer;
 mod pcm_wave;
 pub mod sound;
 mod stats;
-mod stream;
+pub(crate) mod stream;
 mod voice;
 
 #[cfg(test)]

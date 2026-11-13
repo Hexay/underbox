@@ -32,7 +32,7 @@ Under the boots' load, their shared-render-state races flaked: a black sky in 1 
 lanes run side by side:
 
 - cargo, one step at a time: the other crate tests, clippy, coverage.
-- boots, `VERIFY_JOBS` at once (default 4): match, map, the 17 golden frames.
+- boots, `VERIFY_JOBS` at once (default 4): match, map, the golden frames (`boot_steps` in verify.sh).
 
 Boots install a copy of that one build (`UNDERBOX_ENGINE2`), so none of them waits on the cargo
 lane's lock. `tools/verify-step.sh` runs each step with `OUT=target/verify/<step>`, so a frame's

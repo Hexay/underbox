@@ -233,6 +233,11 @@ pub fn register(r: &mut Registry) {
 
 /// Replace the texels in `rect` (only whole-texture uploads are kept for now).
 fn set_data(t: Ref, bytes: &mut [u8], _rect: Rect3D) {
+    replace(t, bytes);
+}
+
+/// Replace every texel of mip 0, CPU copy and GPU image; ignored if the size doesn't match.
+pub(crate) fn replace(t: Ref, bytes: &[u8]) {
     on(t, |t| {
         let mut d = t.data.lock().unwrap();
         if bytes.len() == d.len() {

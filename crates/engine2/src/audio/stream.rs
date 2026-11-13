@@ -10,7 +10,7 @@ use audio::stream::Stream;
 use std::ffi::c_void;
 use std::sync::Arc;
 
-type Ref = NativeRef<class::CAudioStreamManaged>;
+pub(crate) type Ref = NativeRef<class::CAudioStreamManaged>;
 
 struct Managed {
     stream: Arc<Stream>,
@@ -21,10 +21,23 @@ struct Managed {
 const NAME: &str = "audiostream";
 
 fn create(channels: i32, rate: u32) -> HandleId<class::CAudioStreamManaged> {
-    let stream = Arc::new(Stream::new(channels.clamp(1, 16) as usize, rate));
+    adopt(Arc::new(Stream::new(channels.clamp(1, 16) as usize, rate))).1
+}
+
+/// A managed handle over a stream native already writes (a video's audio track).
+pub(crate) fn adopt(stream: Arc<Stream>) -> (Ref, HandleId<class::CAudioStreamManaged>) {
     let table = objects::create_shared(Sfx::ready(NAME, Source::Stream(stream.clone())));
     let r: Ref = objects::create(Managed { stream, table, handle: Handle::default() });
-    objects::get::<_, Managed>(r).map_or(HandleId::new(-1), |m| m.handle.register(r, Kind::AudioStream))
+    (r, objects::get::<_, Managed>(r).map_or(HandleId::new(-1), |m| m.handle.register(r, Kind::AudioStream)))
+}
+
+/// Free the handle and the object (`Destroy`); voices already playing keep the stream.
+pub(crate) fn destroy(r: Ref) {
+    if let Some(m) = objects::get::<_, Managed>(r) {
+        m.handle.free();
+        objects::destroy(m.table);
+    }
+    objects::destroy(r);
 }
 
 fn with<R: Default>(r: Ref, f: impl FnOnce(&Stream) -> R) -> R {
@@ -41,13 +54,7 @@ fn write(r: Ref, data: RawPtr<c_void>, frames: u32, channels: u32) {
 
 pub fn register(r: &mut Registry) {
     bind!(r, s::CREATE, create);
-    bind!(r, s::DESTROY, |r| {
-        if let Some(m) = objects::get::<_, Managed>(r) {
-            m.handle.free();
-            objects::destroy(m.table);
-        }
-        objects::destroy(r);
-    });
+    bind!(r, s::DESTROY, destroy);
     bind!(r, s::WRITE_AUDIO_DATA, write);
     bind!(r, s::QUEUED_SAMPLE_COUNT, |r| with(r, |s| s.queued_frames() as u32));
     bind!(r, s::MAX_WRITE_SAMPLE_COUNT, |r| with(r, |s| s.free_frames() as u32));

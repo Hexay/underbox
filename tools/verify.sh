@@ -32,7 +32,7 @@ cargo_steps() {
 boot_steps() {
     echo "match sh tools/match.sh"
     echo "map sh tools/map.sh"
-    for c in showroom mapworld skinned outdoor fog hud glass particles decals; do
+    for c in showroom mapworld skinned outdoor fog hud glass particles decals video; do
         n=frame-$c
         [ "$c" = showroom ] && n=frame
         echo "$n env CORPUS=$c sh tools/client-frame.sh"

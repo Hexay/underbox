@@ -21,6 +21,12 @@ serde_json = "1"
 [profile.dev.package.naga]
 opt-level = 3
 
+# Unoptimized decoders take seconds per frame: docs/video.md.
+[profile.dev.package.rav1d]
+opt-level = 3
+[profile.dev.package.openh264-sys2]
+opt-level = 3
+
 # Shader translation's string scanning; see docs/dev-loop.md (test targets).
 [profile.dev.package.shaders]
 opt-level = 3
