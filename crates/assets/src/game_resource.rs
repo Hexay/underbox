@@ -17,8 +17,7 @@ pub fn engine_extensions() -> impl Iterator<Item = &'static str> {
 }
 
 /// Compile a GameResource's source JSON. `source` is its path relative to the content root.
-// TODO: Facepunch rewrites the JSON first (AssetSystem.CompileGameResource's ScanJson: paths,
-// embedded resources); we store it as authored.
+// TODO: AssetSystem.CompileGameResource's ScanJson rewrite (paths, embedded resources); stored as authored.
 pub fn compile(json: &str, source: &str, version: u16) -> Vec<u8> {
     let mut data = json.trim_start_matches('\u{feff}').as_bytes().to_vec();
     data.push(0);

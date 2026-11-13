@@ -56,6 +56,18 @@ impl Texture {
         self.write_mip(gpu, 0, layers, data);
     }
 
+    /// Replace the `[w, h, layers]` box of mip 0 at `[x, y, first layer]` with tightly packed texel rows.
+    pub fn upload_region(&self, gpu: &Gpu, [x, y, z]: [u32; 3], [w, h, layers]: [u32; 3], data: &[u8]) {
+        let Some(texel) = self.texel_size() else { return };
+        gpu.flush();
+        gpu.queue.write_texture(
+            wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z }, aspect: wgpu::TextureAspect::All },
+            data,
+            wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * texel), rows_per_image: Some(h) },
+            wgpu::Extent3d { width: w, height: h, depth_or_array_layers: layers },
+        );
+    }
+
     /// Fill mips 1 and up from `chain`: each level's layers tightly packed, level after level. Stops
     /// at the first level `chain` runs short of; returns how many levels it wrote.
     pub fn upload_smaller_mips(&self, gpu: &Gpu, chain: &[u8]) -> u32 {

@@ -1,4 +1,4 @@
-//! One render pass of placeholder-shaded draws into a colour and/or depth target. Every draw
+//! One render pass of draws, each shaded by its own program or the placeholder. Every draw
 //! carries its own vertex/index buffers, raster state and per-draw uniforms (dynamic offsets).
 
 use crate::placeholder::{DRAW_UNIFORM_SIZE, Placeholder};

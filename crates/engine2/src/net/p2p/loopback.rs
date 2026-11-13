@@ -84,7 +84,7 @@ impl PeerMessages for Endpoint {
     }
 
     fn receive(&self, _: i32, _: &mut [*mut c_void]) -> i32 {
-        unimplemented!("the transport reads copies")
+        unreachable!("the transport reads copies")
     }
 
     fn receive_copied(&self, channel: i32, max: usize) -> Vec<(SteamId, Vec<u8>)> {

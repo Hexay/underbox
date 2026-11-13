@@ -1,7 +1,6 @@
 //! The animation side of ModelDoc `.vmdl` sources: attachments, hitbox sets, animation names and
 //! the anim graph, following `Prefab` nodes into `.vmdl_prefab` files.
-// TODO: bones and clip keys live in the FBX/DMX files `RenderMeshFile`/`AnimFile` name; until we
-// import those, skeletons and clips come only from runtime builders.
+// TODO: import the FBX/DMX files holding bones and clip keys; skeletons come from runtime builders.
 
 use super::{angles, kv_bool, kv_f32, kv_vec3};
 use crate::model::{Attachment, Hitbox, HitboxSet, HitboxShape, Influence, ModelAnim};

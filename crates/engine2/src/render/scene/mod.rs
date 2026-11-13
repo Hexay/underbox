@@ -15,6 +15,7 @@ pub mod skybox;
 pub mod system;
 pub(crate) mod trace;
 pub mod view;
+mod well_known;
 
 #[cfg(test)]
 mod layer_tests;

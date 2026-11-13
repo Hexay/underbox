@@ -5,8 +5,8 @@
 //! - [`Texture`], [`Buffer`]: GPU resources; render targets are textures with `RENDER_ATTACHMENT`.
 //! - [`Program`]: a shader program (one module, or one per stage) and its bind-group layouts,
 //!   with pipelines cached per [`PipelineKey`]; [`ComputeProgram`] for compute stages.
-//! - [`Placeholder`] + [`pass::execute`]: the placeholder-shaded draw path every draw takes until
-//!   translated combos exist; [`ForwardPass`] is the same for [`Mesh`]es.
+//! - [`Placeholder`] + [`pass::execute`]: draws shaded by their own program or, failing that, the
+//!   placeholder; [`ForwardPass`] draws [`Mesh`]es with the placeholder.
 //! - [`Frame`]: a read-back image with hashing and tolerant comparison, for frame-hash tests.
 
 mod batch;

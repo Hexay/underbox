@@ -112,7 +112,7 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     let base = b.name.strip_suffix("_cmp").unwrap_or(&b.name);
     let from_managed = || shadow::cascade_of(base).and_then(|n| shadow::managed_cascade(&inputs.constant_buffer("DirectionalLightCB")?, n));
     let t = attribute().or_else(from_material).or_else(from_managed).or_else(|| shadow_slots::texture(base)).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
-    // An error texture (every compiled texture, for now) would paint the draw magenta.
+    // An error texture (a missing file) would paint the draw magenta; the default stands in.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
     if inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {
         return None;

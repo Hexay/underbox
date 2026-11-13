@@ -142,7 +142,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::MAKE_FRAME_BUFFER_COPY, |c, t, x, y, w, h| {
         copy_from_target(c, t, Some([x.max(0) as u32, y.max(0) as u32, w.max(0) as u32, h.max(0) as u32]), false);
     });
-    // TODO: the sRGB transfer flag; the blit draw writes linear values as they are.
     bind!(r, tools::BLIT_TEXTURE, |c, src, x, y, w, h, srgb| {
         crate::render::submits::log(c, &format!("blit from {}", crate::render::scene::trace::describe(src)));
         blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb)

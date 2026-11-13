@@ -32,7 +32,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, sky::GET_FOG_MIN_END, |s: Sky| field!(get f32, sky::GET_FOG_MIN_END, s.addr()));
     bind!(r, sky::GET_FOG_MAX_START, |s: Sky| field!(get f32, sky::GET_FOG_MAX_START, s.addr()));
     bind!(r, sky::GET_FOG_MAX_END, |s: Sky| field!(get f32, sky::GET_FOG_MAX_END, s.addr()));
-    // TODO: sky lighting feeds ambient light once the renderer lights with more than one direction.
+    // Managed never calls these; ambient comes from the camera and env maps (render/lighting).
     bind!(r, sky::SET_LIGHTING_CONSTANT_COLOR_HEMISPHERE, |_, _| {});
     bind!(r, sky::SET_LIGHTING_SAMPLES, |_, _, _, _| {});
 }

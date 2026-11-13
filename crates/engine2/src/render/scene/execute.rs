@@ -22,7 +22,7 @@ use render::{BufferKind, Placeholder, RasterState, Semantic};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
-/// Placeholder sky colour (linear; sRGB (0.45, 0.6, 0.85)), times the sky object's tint. TODO: the sky material.
+/// The sky without a live `SkyTexture` (linear; sRGB (0.45, 0.6, 0.85)), times the sky object's tint.
 const SKY: [f32; 4] = [0.170_645, 0.318_547, 0.692_071, 1.0];
 
 /// Clear, sky, opaque and translucent layers: what a view gets when managed adds no layers (no managed
@@ -80,6 +80,7 @@ fn hdr_target(color: texture::Ref) -> texture::Ref {
 
 pub fn run(v: view::Ref) {
     let Some(view) = view::get(v) else { return };
+    crate::render::stats::view_rendered();
     let ctx = context::create(0);
     let (layers, worlds, child) = {
         let s = view.state.lock().unwrap();

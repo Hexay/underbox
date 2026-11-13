@@ -2,8 +2,8 @@
 
 use render::wgpu::TextureFormat as F;
 
-/// TODO: s&box's gamma formats (RGBA8888, BGRA8888) should sample as sRGB once materials draw;
-/// they map to UNORM for now so cleared and read-back bytes match exactly.
+/// Gamma formats (RGBA8888, BGRA8888) map to UNORM so cleared and read-back bytes match exactly;
+/// sRGB sampling comes from the texture's storage and view (texture.rs `Storage`).
 pub fn to_wgpu(format: i32) -> Option<F> {
     Some(match format {
         // RGBA8888, LINEAR_RGBA8888, RGBA8888_LINEAR, RGBX8888.

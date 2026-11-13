@@ -79,7 +79,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, dict::PRE_SHUTDOWN, |_| {});
     bind!(r, dict::SUPPRESS_COM_INITIALIZATION, |_| {});
     bind!(r, dict::DISABLE_MOD_PATH_CHECK, |_| {});
-    // SDL is the client's window and input layer; it starts with the window (TODO: window subsystem).
+    // SDL starts per subsystem (app/sdl/system.rs) and with the first window (window crate).
     bind!(r, dict::INIT_SDL, |_, _flags| true);
     bind!(r, dict::SHUTDOWN_SDL, |_| {});
     bind!(r, dict::ADD_SYSTEM, add_system);

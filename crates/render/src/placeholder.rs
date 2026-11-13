@@ -1,4 +1,4 @@
-//! The placeholder program every draw uses until translated combos exist: position, vertex colour
+//! The fallback program for draws whose material program doesn't build or bind: position, vertex colour
 //! and normal in, lit by one fixed light, times a per-draw tint. Attributes a mesh lacks are read
 //! from a constant defaults buffer bound at stride 0 (white, no normal).
 
