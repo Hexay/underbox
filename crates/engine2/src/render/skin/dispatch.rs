@@ -97,8 +97,10 @@ fn ints(p: RawPtr<c_void>, n: usize) -> Vec<u32> {
     unsafe { p.cast::<i32>().as_slice(n) }.iter().map(|v| v.max(&0).unsigned_abs()).collect()
 }
 
-/// `DispatchModelMeshSkinning`'s per-instance arrays.
+/// `DispatchModelMeshSkinning`'s per-instance arrays and the deformation buffers they index.
 struct Instances {
+    volumes: buffers::Handle,
+    anchors: buffers::Handle,
     slots: RawPtr<c_void>,
     offsets: RawPtr<c_void>,
     volume_offsets: RawPtr<c_void>,
@@ -117,17 +119,17 @@ impl Instances {
 
 /// `DispatchModelMeshSkinning`: deformed when managed passes both a volume and an anchor buffer
 /// (`RenderContext.DispatchSkinning`).
-fn dispatch(mode: material_mode::Ref, m: crate::model::Ref, mesh: i32, transforms: buffers::Handle, instances: &Instances, volumes: buffers::Handle, anchors: buffers::Handle, morph: bool) -> bool {
+fn dispatch(mode: material_mode::Ref, m: crate::model::Ref, mesh: i32, transforms: buffers::Handle, instances: &Instances, morph: bool) -> bool {
     let (Some(model), Some(transforms)) = (crate::model::get(m), buffers::get(transforms)) else { return false };
     let Some(skin) = usize::try_from(mesh).ok().and_then(|i| super::mesh_skin(&model, m, i)) else { return false };
-    let deform = buffers::get(volumes).zip(buffers::get(anchors)).map(|(volumes, anchors)| Deformation { volumes, anchors });
+    let deform = buffers::get(instances.volumes).zip(buffers::get(instances.anchors)).map(|(volumes, anchors)| Deformation { volumes, anchors });
     let shader = material_mode::material(mode).map_or_else(|| SHADER.to_owned(), |m| m.shader().to_owned());
     run(&shader, &skin, &transforms, &instances.jobs(), morph, deform.as_ref()).inspect_err(|e| compute::warn_once(&shader, e)).is_ok()
 }
 
 pub fn register(r: &mut Registry) {
     bind!(r, tools::DISPATCH_MODEL_MESH_SKINNING, |_c, mode, m, mesh, transforms, slots, offsets, n, _weights, volumes, volume_offsets, volume_counts, anchors, anchor_offsets, morph| {
-        let instances = Instances { slots, offsets, volume_offsets, volume_counts, anchor_offsets, n };
-        dispatch(mode, m, mesh, transforms, &instances, volumes, anchors, morph)
+        let instances = Instances { volumes, anchors, slots, offsets, volume_offsets, volume_counts, anchor_offsets, n };
+        dispatch(mode, m, mesh, transforms, &instances, morph)
     });
 }
