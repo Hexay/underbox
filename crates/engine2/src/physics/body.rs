@@ -31,7 +31,7 @@ pub struct State {
 pub struct Body {
     pub world: world::Ref,
     /// `world`'s object, so a slot call skips a second registry lookup (docs/perf-physics.md).
-    sim_world: Weak<world::PhysicsWorld>,
+    pub(super) sim_world: Weak<world::PhysicsWorld>,
     pub id: BodyId,
     pub handle: Handle,
     pub shapes: Mutex<Vec<shape::Ref>>,
@@ -47,15 +47,9 @@ pub fn from_user_data(data: u128) -> Ref {
     Ref::from_raw(data as usize as *mut _)
 }
 
-/// A live body's world and id. The registry lock is released before the caller locks the world.
-fn sim_of(r: Ref) -> Option<(Arc<world::PhysicsWorld>, BodyId)> {
-    objects::with(r, |b: &Body| Some((b.sim_world.upgrade()?, b.id))).flatten()
-}
-
 /// Run `f` on a live body in its simulation (the world locked). Never call managed inside `f`.
 pub fn with_sim<R: Default>(r: Ref, f: impl FnOnce(&mut physics::World, BodyId) -> R) -> R {
-    let Some((world, id)) = sim_of(r) else { return R::default() };
-    f(&mut world.sim.lock().unwrap(), id)
+    super::body_cache::resolve(r, |e| f(&mut e.world.sim.lock().unwrap(), e.id)).unwrap_or_default()
 }
 
 /// As [`with_sim`], for just the Rapier body.
@@ -66,8 +60,7 @@ pub fn with_rb<R: Default>(r: Ref, f: impl FnOnce(&mut RigidBody) -> R) -> R {
 /// As [`with_rb`], read-only. Getters use it: `body_mut` queues the body as user-modified, which
 /// costs Rapier a pass over it and an island re-sync every step (docs/perf-physics.md).
 pub fn read_rb<R: Default>(r: Ref, f: impl FnOnce(&RigidBody) -> R) -> R {
-    let Some((world, id)) = sim_of(r) else { return R::default() };
-    world.sim.lock().unwrap().body(id).map(f).unwrap_or_default()
+    super::body_cache::resolve(r, |e| e.world.sim.lock().unwrap().body(e.id).map(f)).flatten().unwrap_or_default()
 }
 
 pub fn with_state<R: Default>(r: Ref, f: impl FnOnce(&mut State) -> R) -> R {
@@ -159,4 +152,5 @@ pub fn delete(r: Ref) {
     }
     body.handle.free();
     objects::destroy(r);
+    super::body_cache::forget();
 }

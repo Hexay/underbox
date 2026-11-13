@@ -3,6 +3,7 @@
 //! The floor and walls are keyframed, as the scene's collider-only GameObjects are; `static`
 //! makes them fixed bodies instead (the cheaper setup the first profile used).
 //! usage: cargo run --release -p physics --example pile [ticks=750] [warmup=250] [keyframed|static]
+//! `PILE_TRACE=1` prints each measured step's time and awake body count to stderr.
 
 use physics::{BodyType, Pose, Rotation, Shape, Surface, Vector, World};
 use std::time::Instant;
@@ -105,10 +106,13 @@ fn main() {
         }
         let t = Instant::now();
         world.step(0.02, 1);
-        world.take_activity();
+        let awake = world.take_activity().iter().filter(|a| !a.fell_asleep).count();
         events += hash_events(&mut event_hash, &mut world);
         if tick > warmup {
             times.push(t.elapsed().as_secs_f64() * 1e3);
+            if std::env::var_os("PILE_TRACE").is_some() {
+                eprintln!("{tick} {:.3} {awake}", times.last().unwrap());
+            }
         }
     }
     let cpu = (cpu_ns() - cpu_start) as f64 / 1e6;
