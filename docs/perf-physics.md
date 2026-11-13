@@ -1,7 +1,7 @@
 # Server tick profile (pile)
 
 Part of docs/differential-perf.md. Scenario `pile` (328 dynamic bodies inside a keyframed floor and
-walls, headless dedicated server, `taskset 0-7`), 2026-11-12, shared box at load 15–60.
+walls, headless dedicated server, `taskset 0-7`), 2026-11-12 and 13, shared box at load 15–60.
 
 ## Tools
 
@@ -125,10 +125,53 @@ Behaviour is unchanged. Example hashes match the old build for static and keyfra
 orbmatch and zoo markers of the old and new builds are identical at tolerance 0 (1789, 132 and 45
 markers). Divergences from real stay at 324 (probe), 54 (orbmatch) and 32 (zoo).
 
+## Round 3: kinematic bodies colour like fixed ones
+
+Rapier is patched (third_party/rapier3d, `[patch.crates-io]`; the patch, why it's sound and what
+was left alone: third_party/rapier3d/UNDERBOX.md). The colouring treats a kinematic body as it
+treats a fixed one, so contacts with the keyframed floor take only the dynamic body's colour mask.
+On the headless keyframed pile, 186 of about 427 contacts a step used to overflow into 1-lane
+serial chunks (334 chunks); now none overflow and the layout is the static pile's (about 111
+chunks). Floor contacts now sit in the top colour band, solved last each sweep, as fixed
+geometry's already were.
+
+Headless pile, interleaved, 3 rounds, load ~25:
+
+| Walls | Before: step median, CPU per 500 steps | After |
+| --- | --- | --- |
+| keyframed | 1.34 ms, 549–552 ms | 0.75–0.77 ms, 327–338 ms |
+| static | 0.55–0.58 ms, 279–299 ms | 0.54–0.60 ms, 270–293 ms |
+
+Instructions for a whole 750-step run: keyframed 8.64 G → 5.34 G, static 4.70 G on both builds.
+Keyframed is still about 0.2 ms behind static; its solver layout now matches static's, and its
+trajectory differs (other contacts), so the rest is elsewhere (not profiled further).
+
+Interleaved `run.sh perf pile both`, `REPEATS=1` × 3 rounds per build, load 25–32, instructions from
+`perf stat -p` between the first `PERF:TICK` and `PERF:DONE`:
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Tick CPU median | 3.52–3.72 ms | 2.99–3.05 ms |
+| Total CPU, 500 ticks | 2.06–2.22 s | 1.92–1.98 s |
+| Main thread | 1.64–1.77 s | 1.45–1.49 s |
+| Instructions | 8.86–9.50 G | 6.96–7.29 G |
+| Ratio to real, median | 1.34–1.50× | 1.15–1.21× |
+
+Real in the same runs: 2.34–2.77 ms median, 1.69–1.98 s total, main 0.86–1.02 s, 4.90–5.61 G
+instructions. Real ran slower than in round 2 (2.09–2.26 ms), so compare ratios within a round.
+
+Behaviour: deterministic (two runs of each build identical at tolerance 0 on probe, orbmatch and
+zoo; example hashes repeat). Static-wall example hashes are unchanged; keyframed ones are now
+`57a4a5e26da5184e` / `5a3c86598a03dbd0`. Probe (1789 markers) and orbmatch (132) markers are
+identical to the unpatched build's, so 324 and 54 divergences. The zoo moved: unpatched (with
+round 2's changes) it logs 50 markers and 33 divergences, its trike still awake at the first
+`GAME:TICK`s (awake 9, 8, 4 against real's 6, 5, 5) and four `GAME:AWAKE` lines real doesn't log;
+patched, 45 markers and 32 divergences (awake 8, 5, 0), `GAME:RESTED` unchanged. `tools/test.sh
+physics` passes unchanged (landing, stack, car fits included), so no iteration refit.
+
 ## What's left
 
-The gap is Rapier on the keyframed floor. Next step: treat kinematic bodies like fixed ones in
-solver colouring (a Rapier patch: they take no impulse, so their contacts don't conflict). That
-changes the solve order, so it needs the differential gates and probably a refit of the iteration
-counts in docs/differential.md. After that, a fork-join step on worker threads, as real does, helps
-wall time but not CPU.
+Our main thread is still about 1.6× real's, and real spreads its physics over `GlobPool` workers.
+Rapier's `parallel` feature was dropped while the serial tail held the step (round 2); with the
+tail gone it is worth measuring again for wall time, though the tick is measured in CPU. The
+keyframed pile's remaining 0.2 ms over static is unexplained.
