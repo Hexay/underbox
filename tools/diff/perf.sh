@@ -33,6 +33,7 @@ export WGPU_VALIDATION_INDIRECT_CALL=${WGPU_VALIDATION_INDIRECT_CALL:-0}
 # A release engine2 against real's release build; UNDERBOX_ENGINE2=<so> uses that one instead.
 if [ -z "${UNDERBOX_ENGINE2:-}" ]; then
     echo "== building release engine2"
+    sh "$ROOT/tools/submodules.sh"
     env -u CARGO_INCREMENTAL cargo build -q --release --manifest-path "$ROOT/Cargo.toml" -p engine2 -j4
     export UNDERBOX_ENGINE2="${CARGO_TARGET_DIR:-$ROOT/target}/release/libengine2.so"
 fi

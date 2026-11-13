@@ -4,7 +4,7 @@
 //! per-vertex `vec4`s (morph.wgsl).
 
 use crate::state::{PipelineKey, RasterState, VertexBufferKey};
-use crate::{Buffer, BufferKind, Gpu, Program, Texture};
+use crate::{Buffer, Gpu, Program, Texture};
 
 pub struct Morpher {
     program: Program,
@@ -67,13 +67,13 @@ impl Morpher {
             .map(|b| {
                 let vertices: Vec<f32> = b.quads.iter().flat_map(|q| corners(q, size)).collect();
                 let indices: Vec<u32> = (0..b.quads.len() as u32).flat_map(|q| [0, 1, 2, 0, 2, 3].map(|i| q * 4 + i)).collect();
-                let group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                let group = gpu.bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("morph composite"),
                     layout: &self.program.bind_group_layouts[0],
                     entries: &[wgpu::BindGroupEntry { binding: 0, resource: b.source.buffer.as_entire_binding() }],
                 });
-                let vb = Buffer::with_data(gpu, "morph quads", BufferKind::Vertex, bytemuck::cast_slice(&vertices));
-                let ib = Buffer::with_data(gpu, "morph quad indices", BufferKind::Index, bytemuck::cast_slice(&indices));
+                let vb = gpu.upload(bytemuck::cast_slice(&vertices), 0);
+                let ib = gpu.upload(bytemuck::cast_slice(&indices), 0);
                 (group, vb, ib, indices.len() as u32)
             })
             .collect();
@@ -88,8 +88,8 @@ impl Morpher {
             pass.set_pipeline(&pipeline);
             for (group, vb, ib, n) in &draws {
                 pass.set_bind_group(0, group, &[]);
-                pass.set_vertex_buffer(0, vb.buffer.slice(..));
-                pass.set_index_buffer(ib.buffer.slice(..), wgpu::IndexFormat::Uint32);
+                pass.set_vertex_buffer(0, vb.buffer.slice(vb.offset..vb.offset + vb.size));
+                pass.set_index_buffer(ib.buffer.slice(ib.offset..ib.offset + ib.size), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..*n, 0, 0..1);
             }
         }

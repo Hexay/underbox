@@ -2,6 +2,8 @@
 //! read-back in readback.rs.
 
 use crate::Gpu;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -62,6 +64,9 @@ pub struct Texture {
     /// The same texels read through the format's sRGB form (decoded on sample), for formats
     /// that have one (8-bit RGBA/BGRA and the BC formats).
     pub srgb_view: Option<wgpu::TextureView>,
+    /// One-mip views made on request ([`Texture::mip_view`]), kept so bind groups that use them
+    /// repeat across frames (bind_cache.rs).
+    mip_views: Mutex<HashMap<(wgpu::TextureFormat, u32, Option<wgpu::TextureUsages>), wgpu::TextureView>>,
 }
 
 /// `format`'s sRGB-decoding twin, when it has one and isn't sRGB already.
@@ -92,7 +97,7 @@ impl Texture {
         let view = texture.create_view(&wgpu::TextureViewDescriptor { format, dimension, aspect: sample_aspect(desc.format), usage: sampled(linear), ..Default::default() });
         let srgb_view = (linear != srgb).then(|| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(srgb), dimension, usage: sampled(srgb), ..Default::default() }));
         let target_view = layer_view(&texture, 0);
-        Texture { desc, texture, view, target_view, srgb_view }
+        Texture { desc, texture, view, target_view, srgb_view, mip_views: Mutex::default() }
     }
 
     pub fn dimension(&self) -> wgpu::TextureViewDimension {
@@ -130,15 +135,24 @@ impl Texture {
         let f = self.desc.format;
         let format = if srgb && self.srgb_view.is_some() { f.add_srgb_suffix() } else { f.remove_srgb_suffix() };
         let usage = (format != f).then_some(wgpu::TextureUsages::TEXTURE_BINDING);
+        self.mip_view(format, mip, usage)
+    }
+
+    /// Mip `mip` alone (clamped to the last) through `format`, every layer, limited to `usage`.
+    pub fn mip_view(&self, format: wgpu::TextureFormat, mip: u32, usage: Option<wgpu::TextureUsages>) -> wgpu::TextureView {
         let mip = mip.min(self.texture.mip_level_count() - 1);
-        self.texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            dimension: Some(self.dimension()),
-            usage,
-            base_mip_level: mip,
-            mip_level_count: Some(1),
-            ..Default::default()
-        })
+        let mut views = self.mip_views.lock().unwrap();
+        let view = views.entry((format, mip, usage)).or_insert_with(|| {
+            self.texture.create_view(&wgpu::TextureViewDescriptor {
+                format: Some(format),
+                dimension: Some(self.dimension()),
+                usage,
+                base_mip_level: mip,
+                mip_level_count: Some(1),
+                ..Default::default()
+            })
+        });
+        view.clone()
     }
 
     /// The size of `mip`.
