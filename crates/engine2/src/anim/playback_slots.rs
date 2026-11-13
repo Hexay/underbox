@@ -94,8 +94,5 @@ pub fn register(r: &mut Registry) {
         callback::tag_events(cb.as_ptr() as usize, &tags);
     });
 
-    // Morph overrides are in `super::flex`.
-    // Deformation volumes only change rendered vertices.
-    bind!(r, o::SET_DEFORMATION_VOLUMES, |_, _, _| {});
-    bind!(r, o::SET_DEFORMATION_ANCHORS, |_, _, _| {});
+    // Morph overrides are in `super::flex`; deformation volumes in render/skin/deform.rs.
 }

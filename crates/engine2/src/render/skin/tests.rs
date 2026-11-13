@@ -9,7 +9,7 @@ use glam::Vec3;
 use std::sync::Once;
 
 /// The fixture's compiled files and sbox-public's core shaders, on the search paths.
-fn mount() -> Option<()> {
+pub(super) fn mount() -> Option<()> {
     static MOUNT: Once = Once::new();
     let core = crate::render::shading::tests::core_dir()?;
     MOUNT.call_once(|| {
@@ -67,7 +67,7 @@ fn the_rigged_mesh_reports_its_skin() {
 }
 
 /// What skinning_cs wrote for `n` vertices from `offset`: positions.
-fn cached_positions(gpu: &render::Gpu, offset: u32, n: usize) -> Vec<Vec3> {
+pub(super) fn cached_positions(gpu: &render::Gpu, offset: u32, n: usize) -> Vec<Vec3> {
     let bytes = cache::buffer().unwrap().read(gpu, u64::from(offset) * cache::VERTEX_BYTES, n as u64 * cache::VERTEX_BYTES);
     let f = |at: usize| f32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
     (0..n).map(|v| Vec3::new(f(v * 24), f(v * 24 + 4), f(v * 24 + 8))).collect()
@@ -89,7 +89,7 @@ fn skinning_cs_poses_and_morphs_into_the_vertex_cache() {
     let offset = cache::allocate(skin.vertices).unwrap();
     let entries = native::entries(&bones, [1.0; 4], offset, skin.weights, subrects.first().copied());
     let transforms = Arc::new(render::Buffer::with_data(gpu, "test transforms", render::BufferKind::Storage, &entries));
-    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], true).expect("skinning_cs builds and dispatches");
+    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset, ..Job::default() }], true, None).expect("skinning_cs builds and dispatches");
     let got = cached_positions(gpu, offset, 24);
     for (i, v) in mesh.vertices().iter().enumerate() {
         let lift = if (20..24).contains(&i) { fixture::SMILE_LIFT } else { 0.0 };
@@ -114,6 +114,25 @@ fn vertex_animation_programs_take_reals_inputs() {
     assert_eq!(semantics(standin::PATH), ["TEXCOORD0", "TEXCOORD15", "TEXCOORD13"]);
 }
 
+/// Managed's `SetMorphSubrect` writes into a zeroed morph entry; real then skins every vertex to NaN.
+#[test]
+fn a_morph_entry_without_a_basis_skins_to_nan() {
+    let Some(()) = mount() else { return eprintln!("skipped: no sbox-public checkout") };
+    let Some(gpu) = device::create() else { return eprintln!("skipped: no GPU") };
+    let r = rigged();
+    let model = crate::model::get(r).unwrap();
+    let skin = mesh_skin(&model, r, 0).unwrap();
+    let weights: crate::render::draw::morph::Weights = [("smile".to_owned(), 1.0)].into();
+    let [x, w, y, h] = morphs::compose(&[(&weights, &model.content.meshes[0].mesh)])[0];
+    let offset = cache::allocate(skin.vertices).unwrap();
+    let mut entries = native::entries(&[Mat4::IDENTITY; 3], [1.0; 4], offset, skin.weights, None);
+    let managed: Vec<u8> = [0.0, 0.0, x, w, 0.0, 0.0, 0.0, y, 0.0, 0.0, 0.0, h].iter().flat_map(|f: &f32| f.to_le_bytes()).collect();
+    entries[64..112].copy_from_slice(&managed);
+    let transforms = Arc::new(render::Buffer::with_data(gpu, "managed morph entry", render::BufferKind::Storage, &entries));
+    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset, ..Job::default() }], true, None).unwrap();
+    assert!(cached_positions(gpu, offset, 24).iter().all(|p| p.is_nan()), "every vertex is NaN");
+}
+
 #[test]
 fn two_weight_vertices_blend_their_bones() {
     let Some(()) = mount() else { return eprintln!("skipped: no sbox-public checkout") };
@@ -125,7 +144,7 @@ fn two_weight_vertices_blend_their_bones() {
     let bones = [Mat4::IDENTITY, Mat4::from_translation(Vec3::new(0.0, 40.0, 0.0)), Mat4::IDENTITY];
     let offset = cache::allocate(skin.vertices).unwrap();
     let transforms = Arc::new(render::Buffer::with_data(gpu, "puppet transforms", render::BufferKind::Storage, &native::entries(&bones, [1.0; 4], offset, skin.weights, None)));
-    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], false).unwrap();
+    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset, ..Job::default() }], false, None).unwrap();
     let got = cached_positions(gpu, offset, 24);
     for (i, v) in model.content.meshes[0].mesh.vertices().iter().enumerate().take(20) {
         // Weights are unorm bytes: 0.5 is 128/255 of the spine.

@@ -29,9 +29,36 @@ Native's model, which managed's `MeshRenderFeature.Skinning.cs` mirrors:
   first. Each target × region is one additive quad, zero-weight targets included; position deltas
   go in the left half and normal deltas at the same texel in the right. Regions are shelf-packed
   from texel (1, 1), a texel apart. Our `morph.fxc` `Morph()` loads the atlas at the subrect named
-  in the morph entry (u, width, v, height in atlas uv).
+  in the morph entry: x, width, y, height in texels, as real's `GetMorphSubrect` answers and its
+  native path writes (`Row0.zw`, `Row1.w`, `Row2.w`).
+- The morph entry's other fields differ by path, and real's closed `morph.fxc` depends on them.
+  Real native writes the subrect over a copy of bone 0's entry and sets `Row1.w` and `Row2.w` of
+  the base entry (its skinned capture); `skin::native::entries` does the same. Managed's
+  `TransformBuffer.SetMorphSubrect` writes it into a zeroed entry, and real then skins every
+  vertex of the mesh to NaN (position, normal, wrinkle; read from its vertex cache with
+  `UNDERBOX_GPU_STORE_MAX`). So under `+r_managed_scene 1` real draws no morphed mesh at all, with
+  a clip or with static `Morphs` alike. Ours reproduces that: an entry whose basis (`Row0.xy`,
+  `Row1.xyz`, `Row2.xyz`) is all zero gives NaN (`a_morph_entry_without_a_basis_skins_to_nan`).
+  The rule is fitted to those captures, not read from real's shader.
+- Deformation volumes (managed's `ModelDeformer`, `skin/deform.rs`): an ordered stack of masked
+  model-space operations (inflate, squash/stretch, transform, suck, project; inside a sphere, box,
+  capsule or everywhere) that skinning_cs applies after morphs and before bones
+  (`Deformation.hlsl`, combo `D_DEFORMATION_VOLUME`). They are scene components, not compiled
+  model data. Each is a 208-byte `SceneDeformationVolumeData`; with anchors (one model-space point
+  per bone, `DeformationMode.Rigid`) a vertex moves as the stack moves its bones' anchors instead.
+  - Managed's renderer packs the frame's volumes and anchors itself and passes them, with
+    per-instance ranges, to `DispatchModelMeshSkinning` (`InstanceParams_t` words 4–6).
+  - Engine-drawn objects keep what `SetDeformationVolumes`/`SetDeformationAnchors` stored on the
+    object (`anim::object::Deformers`, kept across model changes) and dispatch with them; anchors
+    go after an unused first one, as managed's do.
+  - Not done: deformed one-bone models (`mesh_skin` is `None` below two bones, so they stay
+    rigid) and native's bounds padding for deformed objects.
+  - The skinned corpus's `Deformed` puppet carries a box `Transform` deformer twisting its top
+    45°; real draws it the same (docs/differential-render.md, 15). GPU repro:
+    `sh tools/test.sh engine2 deform_tests`.
 - Managed drives all of this through `RenderTools` (`GetModelMeshSkinning*`,
-  `AllocateVertexCache`, `DispatchModelMeshSkinning`, `QueueModelMeshMorph`, `GenerateMorphs`).
+  `AllocateVertexCache`, `DispatchModelMeshSkinning`, `QueueModelMeshMorph`, `GenerateMorphs`,
+  `GetMorphSubrect`).
   Engine-drawn objects go through `skin/native.rs`.
 - A mesh is skinned when its model has more than one bone and its layout carries 8-bit bone
   indices (`Layout::sbox_skinned_vertex`).

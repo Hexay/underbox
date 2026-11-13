@@ -9,7 +9,8 @@
 //!   `D_CS_VERTEX_ANIMATION` combo: the vertex shader reads the cache at the entry's offset plus
 //!   the vertex's `nVertexCacheIndex` stream (shading/vertex.rs);
 //! - morphs are composited first ([`morphs`]): a GPU pass of additive quads into one texture,
-//!   which skinning_cs samples through our `morph.fxc` `Morph()` at the morph entry's subrect.
+//!   which skinning_cs samples through our `morph.fxc` `Morph()` at the morph entry's subrect;
+//! - deformation volumes ([`deform`]) reshape the morphed vertex before the bones move it.
 //!
 //! Managed drives this through the `RenderTools` slots here; engine-drawn objects through
 //! [`native`]. A mesh is skinned when its model has more than one bone and its layout has bone
@@ -17,9 +18,12 @@
 //! skinned from `Layout::skinned_draw_vertex`, real's stream).
 
 pub mod cache;
+pub mod deform;
 mod dispatch;
 pub mod morphs;
 pub mod native;
+#[cfg(test)]
+mod deform_tests;
 #[cfg(test)]
 mod tests;
 
@@ -149,5 +153,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::ALLOCATE_VERTEX_CACHE, |n| cache::allocate(n.max(0) as u32).map_or(-1, |o| o as i32));
     bind!(r, tools::GET_VERTEX_CACHE_BUFFER, cache::handle);
     dispatch::register(r);
+    deform::register(r);
     morphs::register(r);
 }

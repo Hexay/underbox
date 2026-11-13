@@ -5,10 +5,12 @@
 
 #include "transform_buffer.fxc"
 
-// Where this instance's morph composite is (see Morph below), as managed's SetMorphSubrect stores it.
+// Where this instance's morph composite is (see Morph below), and whether its morph entry carries
+// a basis: native writes the subrect over bone 0's entry, managed's SetMorphSubrect over a zeroed one.
 struct MorphSubrectData_t
 {
 	float4 vAtlasRect;
+	bool bBasis;
 };
 
 #ifdef D_MORPH
@@ -17,18 +19,29 @@ MorphSubrectData_t CalculateMorphSubrectData( uint nBaseSlot )
 	TransformBufferData_t d = g_TransformBuffer[ nBaseSlot + 1 ];
 	MorphSubrectData_t o;
 	o.vAtlasRect = float4( d.Row0.z, d.Row0.w, d.Row1.w, d.Row2.w );
+	o.bBasis = any( d.Row0.xy != 0 ) || any( d.Row1.xyz != 0 ) || any( d.Row2.xyz != 0 );
 	return o;
 }
 
 // The composite atlas (engine2 render/skin/morphs.rs), MorphTextureAtlasWidth × half that: position
 // deltas (w: wrinkle) in the left half, normal deltas at the same texel in the right. vAtlasRect is
-// the region (u, width, v, height) in atlas uv; vertex n sits at (n % width, n / width) in it.
+// the region (x, width, y, height) in texels; vertex n sits at (n % width, n / width) in it.
 Texture2D<float4> g_tMorphComposite < Attribute( "MorphComposite" ); >;
 
 void Morph( inout float3 vPosition, inout float3 vNormal, inout float flWrinkle, uint nVertex, MorphSubrectData_t data )
 {
-	float2 vAtlas = float2( g_nMorphTextureAtlasWidth, g_nMorphTextureAtlasWidth / 2 );
-	uint4 vRect = uint4( data.vAtlasRect * vAtlas.xxyy + 0.5 );
+	// Gotcha: real's morph.fxc turns every vertex of a basis-less entry into NaN, so managed's renderer
+	// draws no morphed mesh on real (docs/skinning.md, the morph entry).
+	if ( !data.bBasis )
+	{
+		// Built from data: WGSL rejects a NaN constant.
+		float flNaN = asfloat( asuint( data.vAtlasRect.x ) | 0x7FC00000u );
+		vPosition = flNaN;
+		vNormal = flNaN;
+		flWrinkle = flNaN;
+		return;
+	}
+	uint4 vRect = uint4( data.vAtlasRect + 0.5 );
 	if ( vRect.y == 0 || nVertex >= vRect.y * vRect.w )
 		return;
 	int2 vTexel = int2( vRect.x + nVertex % vRect.y, vRect.z + nVertex / vRect.y );

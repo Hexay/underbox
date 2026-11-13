@@ -62,6 +62,17 @@ pub struct AnimState {
     pub on_graph1: usize,
     /// Clip events passed by updates, until `RunAnimationEvents` hands them to managed.
     pub pending: Vec<anim::clip::Fired>,
+    /// `SetDeformationVolumes` / `SetDeformationAnchors`; kept across model changes, as managed
+    /// only sends them when they change.
+    pub deformers: Deformers,
+}
+
+/// Packed `SceneDeformationVolumeData` (render/skin/deform.rs) and one model-space anchor per
+/// model bone (none: deformed as usual, not rigidly).
+#[derive(Clone, Default)]
+pub struct Deformers {
+    pub volumes: Vec<u8>,
+    pub anchors: Vec<[f32; 4]>,
 }
 
 struct Entry {
@@ -91,9 +102,9 @@ pub fn with<R: Default>(r: Ref, f: impl FnOnce(&mut AnimState) -> R) -> R {
     let model = crate::scene::object::with(r.cast(), |s| s.model);
     let mut s = s.lock().unwrap();
     if s.model != model {
-        let keep = (s.on_controller, s.on_graph1);
+        let keep = (s.on_controller, s.on_graph1, std::mem::take(&mut s.deformers));
         *s = AnimState::new(model);
-        (s.on_controller, s.on_graph1) = keep;
+        (s.on_controller, s.on_graph1, s.deformers) = keep;
     }
     f(&mut s)
 }
@@ -130,6 +141,7 @@ impl AnimState {
             on_controller: 0,
             on_graph1: 0,
             pending: Vec::new(),
+            deformers: Deformers::default(),
         }
     }
 
