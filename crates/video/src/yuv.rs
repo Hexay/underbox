@@ -49,7 +49,7 @@ pub fn to_rgba(p: &Planes, m: Matrix, full_range: bool) -> Vec<u8> {
     for (row, line) in out.chunks_exact_mut(p.width * 4).enumerate() {
         let ys = &p.y[row * p.y_stride..];
         let crow = if p.ss_y { row / 2 } else { row } * p.uv_stride;
-        for (x, px) in line.chunks_exact_mut(4).enumerate() {
+        for (x, px) in line.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             let y = (ys[x] as i32 - y_off) * luma;
             let (cb, cr) = if grey {
                 (0, 0)

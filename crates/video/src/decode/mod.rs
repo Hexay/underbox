@@ -18,14 +18,14 @@ pub struct Frame {
 }
 
 pub enum VideoDecoder {
-    H264(h264::Decoder),
+    H264(Box<h264::Decoder>),
     Av1(av1::Decoder),
 }
 
 impl VideoDecoder {
     pub fn new(codec: &VideoCodec) -> Result<Self, String> {
         Ok(match codec {
-            VideoCodec::H264(c) => Self::H264(h264::Decoder::new(c.clone())?),
+            VideoCodec::H264(c) => Self::H264(Box::new(h264::Decoder::new(c.clone())?)),
             VideoCodec::Av1 => Self::Av1(av1::Decoder::new()?),
         })
     }

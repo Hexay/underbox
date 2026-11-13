@@ -32,13 +32,16 @@ pub fn near(a: [u8; 3], b: [u8; 3], tolerance: u8) -> bool {
     a.iter().zip(b).all(|(x, y)| x.abs_diff(y) <= tolerance)
 }
 
-/// `n` frames at `fps` as H.264: the avcC record and (seconds, keyframe, sample).
-pub fn h264(width: u32, height: u32, fps: u32, n: usize) -> (Vec<u8>, Vec<(f64, bool, Vec<u8>)>) {
+/// (seconds, keyframe, sample).
+pub type Sample = (f64, bool, Vec<u8>);
+
+/// `n` frames at `fps` as H.264: the avcC record and its samples.
+pub fn h264(width: u32, height: u32, fps: u32, n: usize) -> (Vec<u8>, Vec<Sample>) {
     h264_of(width, height, fps, (0..n).map(|i| frame(width, height, i)))
 }
 
 /// Given RGBA frames as H.264, as [`h264`].
-fn h264_of(width: u32, height: u32, fps: u32, frames: impl Iterator<Item = Vec<u8>>) -> (Vec<u8>, Vec<(f64, bool, Vec<u8>)>) {
+fn h264_of(width: u32, height: u32, fps: u32, frames: impl Iterator<Item = Vec<u8>>) -> (Vec<u8>, Vec<Sample>) {
     let mut enc = H264Encoder::new(width, height, fps, 2_000_000).unwrap();
     let (mut record, mut packets) = (Vec::new(), Vec::new());
     for (i, rgba) in frames.enumerate() {
