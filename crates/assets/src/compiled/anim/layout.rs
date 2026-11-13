@@ -7,18 +7,24 @@ use ::kv::Value;
 
 pub const POSITION: i64 = 0;
 pub const ANGLE: i64 = 1;
-pub const SCALE: i64 = 2;
-pub const MORPH: i64 = 3;
+pub const MORPH: i64 = 2;
+pub const SCALE: i64 = 3;
 
 /// The decode-key element id of target `i` (bone or controller) of `channel`: real interleaves
-/// positions (even) and angles (odd), then lists scales, then morphs.
-pub fn element(channel: i64, i: usize, bones: usize) -> usize {
+/// positions (even) and angles (odd), then lists morphs, then scales (its citizen's key).
+pub fn element(channel: i64, i: usize, bones: usize, morphs: usize) -> usize {
     match channel {
         POSITION => 2 * i,
         ANGLE => 2 * i + 1,
-        SCALE => 2 * bones + i,
-        _ => 3 * bones + i,
+        MORPH => 2 * bones + i,
+        _ => 2 * bones + morphs + i,
     }
+}
+
+/// `channel`'s index in [`decode_key`]'s `m_dataChannelArray` (a segment's `m_nLocalChannel`):
+/// the constants' own, less one for Scale when there's no morph channel.
+pub fn channel_index(channel: i64, morphs: usize) -> i64 {
+    if channel == SCALE && morphs == 0 { SCALE - 1 } else { channel }
 }
 
 /// Target `i`'s bit in its channel's `m_nElementMaskArray`; a segment's `m_nLocalElementMasks`
@@ -52,14 +58,15 @@ pub fn decode_key(rig: &Rig) -> Value {
             ("m_szGrouping", text("")),
             ("m_szDescription", text("")),
             ("m_szElementNameArray", list(names.iter().map(|n| text(n)))),
-            ("m_nElementIndexArray", list((0..names.len()).map(|i| int_value(element(ch, i, n) as i64)))),
+            ("m_nElementIndexArray", list((0..names.len()).map(|i| int_value(element(ch, i, n, flex.len()) as i64)))),
             ("m_nElementMaskArray", list((0..names.len()).map(|i| int_value(mask(i))))),
         ])
     };
-    let mut channels = vec![channel("BoneChannel", "Position", 3, POSITION, &names), channel("BoneChannel", "Angle", 4, ANGLE, &names), channel("BoneChannel", "Scale", 1, SCALE, &names)];
+    let mut channels = vec![channel("BoneChannel", "Position", 3, POSITION, &names), channel("BoneChannel", "Angle", 4, ANGLE, &names)];
     if !flex.is_empty() {
         channels.push(channel("MorphChannel", "data", 1, MORPH, &flex));
     }
+    channels.push(channel("BoneChannel", "Scale", 1, SCALE, &names));
     obj(vec![
         ("m_name", text("")),
         ("m_boneArray", list(bones)),

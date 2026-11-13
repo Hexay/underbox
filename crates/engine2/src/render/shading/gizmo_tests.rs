@@ -37,7 +37,7 @@ fn render_covered(kind: standin::Kind, prim: i64, vertices: &[Vertex], values: &
     let mat = material::create_raw(Some(c"gizmo test"), Some(c"shaders/gizmo/gizmo_line.shader"), true);
     let values = values.iter().map(|(k, v)| (k.to_string(), Vec4::splat(*v))).collect::<HashMap<_, _>>();
     let instance = super::bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
-    d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default() });
+    d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default(), cached_mesh: None });
     rebind(gpu, &mut d);
     let color = texture::create_target("gizmo", SIZE, SIZE, 0);
     draw::execute(&Target { color, ..Default::default() }, &Lighting::fallback(), Load { color: Some(render::wgpu::Color::BLACK), depth: None }, &[d]);

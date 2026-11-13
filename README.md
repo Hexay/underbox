@@ -115,8 +115,8 @@ sh tools/verify.sh               # the full gate: tests, clippy, boots, golden f
 
 - [PLAN.md](docs/PLAN.md): scope, architecture, milestones, open questions
 - [dev-loop.md](docs/dev-loop.md): every script and how the boot scripts share state
-- [real-games.md](docs/real-games.md), [sample-games.md](docs/sample-games.md): game runs and their evidence
-- [renderer.md](docs/renderer.md), [lighting.md](docs/lighting.md), [fog.md](docs/fog.md), [skinning.md](docs/skinning.md)
+- [real-games.md](docs/real-games.md), [real-games-rendering.md](docs/real-games-rendering.md), [sample-games.md](docs/sample-games.md): game runs and their evidence
+- [renderer.md](docs/renderer.md), [lighting.md](docs/lighting.md), [fog.md](docs/fog.md), [skinning.md](docs/skinning.md), [windowing.md](docs/windowing.md)
 - [audio.md](docs/audio.md), [play-and-sound.md](docs/play-and-sound.md), [steam.md](docs/steam.md), [release.md](docs/release.md)
 
 ## Contributing

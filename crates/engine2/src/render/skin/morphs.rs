@@ -1,16 +1,142 @@
-//! Morph composites for skinning_cs: each queued (object, mesh) gets two `float4`s per vertex,
-//! the summed position delta (w: wrinkle, 0) and normal delta of its weighted targets, packed one
-//! after another in one buffer. A subrect is `(first float4, float4 count, 0, 0)`, read back by
-//! our `morph.fxc`. Native composites on the GPU (`morph_composite`, no source); the sums are
-//! the same.
+//! Morph composites as native's (docs/skinning.md, "Morphs"): each frame's morphed meshes get a
+//! region of one 2048×1024 `Rgba16Float` texture, summed by additive quads, one per morph target
+//! (`render::Morpher`): position deltas in the left half, normal deltas at the same place in the
+//! right half. A region `w` texels wide holds vertex `y * w + x` at texel (x, y) from its corner.
+//! Its subrect, which managed stores in the morph entry and our `morph.fxc` reads, is
+//! (u offset, u range, v offset, v range) of the position block.
 
 use crate::mesh::render_mesh::RenderMesh;
 use crate::render::draw::morph::{self, Weights};
-use crate::render::device;
+use crate::render::{device, texture};
 use abi::slots::render_tools as tools;
 use abi::structs::Vector4;
 use abi::{Registry, bind};
-use std::sync::{Arc, Mutex};
+use render::{MorphBatch, MorphQuad};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex, OnceLock, Weak};
+
+pub const WIDTH: u32 = 2048;
+pub const HEIGHT: u32 = 1024;
+const HALF: u32 = WIDTH / 2;
+/// managed's `ImageFormat.RGBA16161616F`.
+const RGBA16F: i32 = 24;
+
+/// A mesh's targets on the GPU: target `t`'s position deltas at float4 `2tn`, normals at `2tn + n`.
+struct Source {
+    mesh: Weak<RenderMesh>,
+    shape: Vec<(String, usize)>,
+    vertices: u32,
+    buffer: Arc<render::Buffer>,
+}
+
+fn source(mesh: &Arc<RenderMesh>) -> Option<(Arc<render::Buffer>, Vec<String>, u32)> {
+    static SOURCES: LazyLock<Mutex<HashMap<usize, Source>>> = LazyLock::new(Default::default);
+    let s = mesh.state();
+    let n = s.vertices.as_ref().map_or(0, |v| v.count());
+    let shape: Vec<(String, usize)> = s.morphs.iter().map(|m| (m.name.clone(), m.deltas.len())).collect();
+    let mut sources = SOURCES.lock().unwrap();
+    sources.retain(|_, src| src.mesh.strong_count() > 0);
+    let key = Arc::as_ptr(mesh) as usize;
+    if let Some(src) = sources.get(&key).filter(|src| src.shape == shape && src.vertices as usize == n && src.mesh.upgrade().is_some_and(|m| Arc::ptr_eq(&m, mesh))) {
+        return Some((src.buffer.clone(), shape.into_iter().map(|t| t.0).collect(), src.vertices));
+    }
+    let mut data = vec![0f32; s.morphs.len() * 2 * n * 4];
+    for (t, m) in s.morphs.iter().enumerate() {
+        for d in m.deltas.iter().filter(|d| d.vertex >= 0 && (d.vertex as usize) < n) {
+            let at = (2 * t * n + d.vertex as usize) * 4;
+            data[at..at + 3].copy_from_slice(&d.position);
+            data[at + n * 4..at + n * 4 + 3].copy_from_slice(&d.normal);
+        }
+    }
+    data.resize(data.len().max(4), 0.0);
+    let bytes: Vec<u8> = data.iter().flat_map(|f| f.to_le_bytes()).collect();
+    let buffer = Arc::new(render::Buffer::with_data(device::gpu()?, "morph targets", render::BufferKind::Storage, &bytes));
+    sources.insert(key, Source { mesh: Arc::downgrade(mesh), shape: shape.clone(), vertices: n as u32, buffer: buffer.clone() });
+    Some((buffer, shape.into_iter().map(|t| t.0).collect(), n as u32))
+}
+
+/// This frame's composite so far: whether it was cleared, and where the next region goes
+/// (shelves from (1, 1), a texel apart, as real's).
+struct Frame {
+    used: bool,
+    x: u32,
+    y: u32,
+    shelf: u32,
+}
+
+const START: Frame = Frame { used: false, x: 1, y: 1, shelf: 0 };
+
+impl Frame {
+    fn place(&mut self, w: u32, h: u32) -> Option<[u32; 2]> {
+        if self.x + w + 1 > HALF {
+            (self.x, self.y, self.shelf) = (1, self.y + self.shelf + 1, 0);
+        }
+        if self.y + h + 1 > HEIGHT {
+            return None;
+        }
+        let at = [self.x, self.y];
+        (self.x, self.shelf) = (self.x + w + 1, self.shelf.max(h));
+        Some(at)
+    }
+}
+
+static FRAME: Mutex<Frame> = Mutex::new(START);
+
+/// The composite texture, made on first use.
+pub fn texture() -> texture::Ref {
+    static TEXTURE: OnceLock<usize> = OnceLock::new();
+    let addr = *TEXTURE.get_or_init(|| texture::create_target("morph composite", WIDTH, HEIGHT, RGBA16F).as_raw() as usize);
+    texture::Ref::from_raw(addr as *mut std::ffi::c_void)
+}
+
+fn morpher(gpu: &render::Gpu) -> &'static render::Morpher {
+    static MORPHER: OnceLock<render::Morpher> = OnceLock::new();
+    MORPHER.get_or_init(|| render::Morpher::new(gpu))
+}
+
+/// Whether any of `mesh`'s targets has weight.
+pub fn active(mesh: &RenderMesh, weights: &Weights) -> bool {
+    mesh.state().morphs.iter().any(|m| weights.get(&m.name).is_some_and(|w| *w != 0.0))
+}
+
+/// Composite `items` into this frame's texture in one pass (the frame's first clears it): each
+/// item's subrect, zero when it didn't fit.
+pub fn compose(items: &[(&Weights, &Arc<RenderMesh>)]) -> Vec<[f32; 4]> {
+    let none = || vec![[0.0; 4]; items.len()];
+    let Some(gpu) = device::gpu() else { return none() };
+    let Some(target) = texture::resolve(texture()) else { return none() };
+    let Some(target) = target.gpu.as_ref() else { return none() };
+    let mut frame = FRAME.lock().unwrap();
+    let clear = !frame.used;
+    frame.used = true;
+    let (mut subrects, mut sources, mut placed) = (Vec::new(), Vec::new(), Vec::new());
+    for (weights, mesh) in items {
+        let region = source(mesh).and_then(|(buffer, names, n)| {
+            let w = n.clamp(1, HALF - 2);
+            let h = n.div_ceil(w).max(1);
+            frame.place(w, h).map(|[x, y]| (buffer, names, n, [x, y, w, h]))
+        });
+        let Some((buffer, names, n, rect)) = region else {
+            subrects.push([0.0; 4]);
+            continue;
+        };
+        let [x, y, w, h] = rect;
+        subrects.push([x as f32 / WIDTH as f32, w as f32 / WIDTH as f32, y as f32 / HEIGHT as f32, h as f32 / HEIGHT as f32]);
+        let weight = |name: &String| weights.get(name).copied().unwrap_or(0.0);
+        let quads = |bundle: u32, dx: u32| names.iter().enumerate().map(|(t, name)| MorphQuad { dst: [x + dx, y, w, h], first: (2 * t as u32 + bundle) * n, vertices: n, weight: weight(name) }).collect::<Vec<_>>();
+        placed.push((quads(0, 0), quads(1, HALF)));
+        sources.push(buffer);
+    }
+    let (positions, normals): (Vec<_>, Vec<_>) = placed.into_iter().unzip();
+    let batches: Vec<MorphBatch> = sources.iter().zip(positions).map(|(s, quads)| MorphBatch { source: s, quads }).chain(sources.iter().zip(normals).map(|(s, quads)| MorphBatch { source: s, quads })).collect();
+    morpher(gpu).composite(gpu, target, clear, &batches);
+    subrects
+}
+
+/// A new frame: the next composite clears the texture and places regions from the corner.
+pub fn begin_frame() {
+    *FRAME.lock().unwrap() = START;
+}
 
 struct Queued {
     weights: Weights,
@@ -20,46 +146,11 @@ struct Queued {
 #[derive(Default)]
 struct State {
     queued: Vec<Queued>,
-    /// The last [`generate`]'s buffer and subrects, by queue handle.
-    buffer: Option<Arc<render::Buffer>>,
+    /// The last [`generate`]'s subrects, by queue handle.
     subrects: Vec<[f32; 4]>,
 }
 
-static STATE: Mutex<State> = Mutex::new(State { queued: Vec::new(), buffer: None, subrects: Vec::new() });
-
-/// Whether any of `mesh`'s targets has weight.
-pub fn active(mesh: &RenderMesh, weights: &Weights) -> bool {
-    mesh.state().morphs.iter().any(|m| weights.get(&m.name).is_some_and(|w| *w != 0.0))
-}
-
-/// The composite of `items` as float4 words, and each item's subrect.
-pub fn compose(items: &[(&Weights, &RenderMesh)]) -> (Vec<f32>, Vec<[f32; 4]>) {
-    let (mut data, mut subrects) = (Vec::new(), Vec::new());
-    for (weights, mesh) in items {
-        let first = data.len() / 4;
-        let s = mesh.state();
-        let n = s.vertices.as_ref().map_or(0, |v| v.count());
-        data.resize(data.len() + n * 8, 0.0);
-        for m in &s.morphs {
-            let Some(w) = weights.get(&m.name).copied().filter(|w| *w != 0.0) else { continue };
-            for d in m.deltas.iter().filter(|d| (d.vertex as usize) < n && d.vertex >= 0) {
-                let at = (first + 2 * d.vertex as usize) * 4;
-                (0..3).for_each(|i| data[at + i] += d.position[i] * w);
-                (0..3).for_each(|i| data[at + 4 + i] += d.normal[i] * w);
-            }
-        }
-        subrects.push([first as f32, (2 * n) as f32, 0.0, 0.0]);
-    }
-    (data, subrects)
-}
-
-/// `data` as a storage buffer (at least one float4).
-pub fn upload(data: &[f32]) -> Option<Arc<render::Buffer>> {
-    let gpu = device::gpu()?;
-    let mut bytes: Vec<u8> = data.iter().flat_map(|f| f.to_le_bytes()).collect();
-    bytes.resize(bytes.len().max(16), 0);
-    Some(Arc::new(render::Buffer::with_data(gpu, "morph composite", render::BufferKind::Storage, &bytes)))
-}
+static STATE: Mutex<State> = Mutex::new(State { queued: Vec::new(), subrects: Vec::new() });
 
 /// `QueueModelMeshMorph`: a handle for [`subrect`] after [`generate`], or -1 when no target of
 /// the mesh has weight.
@@ -72,19 +163,12 @@ fn queue(o: crate::scene::object::Ref, m: crate::model::Ref, mesh: i32) -> i32 {
     s.queued.len() as i32 - 1
 }
 
-/// `GenerateMorphs`: composite everything queued since the last call.
+/// `GenerateMorphs`: composite everything queued since the last call, in one pass.
 fn generate() {
     let queued = std::mem::take(&mut STATE.lock().unwrap().queued);
-    let items: Vec<_> = queued.iter().map(|q| (&q.weights, &*q.mesh)).collect();
-    let (data, subrects) = compose(&items);
-    let buffer = upload(&data);
-    let mut s = STATE.lock().unwrap();
-    (s.buffer, s.subrects) = (buffer, subrects);
-}
-
-/// The last composite (what a morphed `DispatchModelMeshSkinning` reads).
-pub fn current() -> Option<Arc<render::Buffer>> {
-    STATE.lock().unwrap().buffer.clone()
+    let items: Vec<_> = queued.iter().map(|q| (&q.weights, &q.mesh)).collect();
+    let subrects = compose(&items);
+    STATE.lock().unwrap().subrects = subrects;
 }
 
 fn subrect(h: i32) -> [f32; 4] {

@@ -3,6 +3,7 @@
 //! (render/skin).
 
 use super::morph::{self, ObjectMorphs};
+use super::shaded::ContextBindings;
 use super::{Draw, gpu_mesh, shaded, topology};
 use crate::mesh::buffers::VertexBuffer;
 use crate::mesh::material_ref::MaterialRef;
@@ -33,11 +34,12 @@ pub fn tint(v: Vector4) -> [f32; 4] {
 /// One mesh draw call, if its buffers upload and its layout has a position. `view_proj` is
 /// what `uniforms.mvp` was made from; the material program takes the two apart.
 pub fn draw_call(mesh: &RenderMesh, call: &DrawCall, uniforms: DrawUniforms, view_proj: Mat4, state: RasterState) -> Option<Draw> {
-    draw_call_of(mesh, None, call, uniforms, view_proj, state)
+    draw_call_of(mesh, None, call, uniforms, view_proj, state, ContextBindings::default())
 }
 
-/// [`draw_call`] from `vertices` in place of the mesh's own vertex buffer, when given.
-fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &DrawCall, uniforms: DrawUniforms, view_proj: Mat4, state: RasterState) -> Option<Draw> {
+/// [`draw_call`] from `vertices` in place of the mesh's own vertex buffer when given, its
+/// material resolved and bound with `context`.
+fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &DrawCall, uniforms: DrawUniforms, view_proj: Mat4, state: RasterState, context: ContextBindings) -> Option<Draw> {
     let (vb, ib) = {
         let s = mesh.state();
         (vertices.or_else(|| s.vertices.clone())?, s.indices.clone())
@@ -55,7 +57,7 @@ fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &D
     let state = RasterState { topology: topology(call.prim.into()), ..state };
     let uniforms = DrawUniforms { tint: call.tinted(uniforms.tint), ..uniforms };
     let instance = Instance { world: uniforms.model, tint: uniforms.tint };
-    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &packed_layout, instance, view_proj, Default::default()));
+    let shaded = call.material.as_ref().and_then(|m| m.material()).and_then(|m| shaded::resolve(m, &packed_layout, instance, view_proj, context));
     // The placeholder reads float normals only.
     let (vertices, layout) = if shaded.is_some() { (packed, packed_layout) } else { (gpu_mesh::vertices(&vb)?, vb.meta.clone()) };
     let vertex = gpu_mesh::vertex_keys(&layout)?;
@@ -100,17 +102,15 @@ pub fn object(s: &crate::scene::object::State, deform: &Deform, view_proj: Mat4)
         let world = matrix(&s.transform);
         let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) };
         let posed = deform.pose.as_ref().and_then(|p| Some((p, skin::mesh_skin(&model, s.model, i)?)));
-        let skinned = posed.and_then(|(pose, sk)| skin::native::skinned(deform.key, i, &sk, s.model, pose, call.tinted(tint(s.tint)),deform.morphs.as_ref().and_then(|m| Some((m.mesh(i)?, mesh)))));
+        let morphs = deform.morphs.as_ref().and_then(|m| Some((m.mesh(i)?, &model.content.meshes[i].mesh)));
+        let skinned = posed.and_then(|(pose, sk)| skin::native::skinned(deform.key, i, &sk, s.model, pose, call.tinted(tint(s.tint)), morphs));
         let Some(attrs) = skinned else {
             let vertices = deform.morphs.as_ref().and_then(|m| morph::vertices(m, i, mesh));
-            out.extend(draw_call_of(mesh, vertices, call, uniforms, view_proj, RasterState::default()));
+            out.extend(draw_call_of(mesh, vertices, call, uniforms, view_proj, RasterState::default(), ContextBindings::default()));
             return;
         };
-        let mut draw = draw_call_of(mesh, None, call, DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..uniforms }, view_proj, RasterState::default());
-        if let Some(shaded) = draw.as_mut().and_then(|d| d.shaded.as_mut()) {
-            shaded.context.attributes.push(attrs);
-        }
-        out.extend(draw);
+        let context = ContextBindings { attributes: vec![attrs], ..Default::default() };
+        out.extend(draw_call_of(mesh, None, call, DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..uniforms }, view_proj, RasterState::default(), context));
     });
     out.into_iter().map(cull_placeholder).collect()
 }

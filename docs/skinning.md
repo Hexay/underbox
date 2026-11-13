@@ -14,10 +14,22 @@ Native's model, which managed's `MeshRenderFeature.Skinning.cs` mirrors:
   - one entry per bone at slot + 2 + b, each world pose × inverse bind pose, stored as rows.
 - Meshes with one blend weight and no morphs skin in the vertex shader (`GetTransformMatrix(slot,
   bone)`). Everything else runs `skinning_cs` (translated from sbox-public) into the vertex cache
-  (`skin/cache.rs`, 24 bytes per vertex). The stand-in then draws from the cache whenever the base
-  entry has a cache offset and blend weights.
-- Morphs are summed on the CPU per object per frame into one composite buffer (`skin/morphs.rs`).
-  Our `morph.fxc` `Morph()` reads that buffer at the subrect named in the morph entry.
+  (`skin/cache.rs`, 24 bytes per vertex), as real does: real skins in compute, never in the
+  vertex stage. Its input is the mesh's own draw stream, real's 68-byte float layout
+  (`Layout::skinned_draw_vertex`, `gpu_mesh::draw_layout`).
+- Cache draws set `D_CS_VERTEX_ANIMATION` (`skin::VERTEX_ANIMATION`). That variant of the stand-in
+  and of the depth stand-in reads the cache at `nVertexCacheOffset + nVertexCacheIndex`, as
+  `vr_common_vs_code.fxc` does. `nVertexIndex`/`nVertexCacheIndex` (`TEXCOORD14`/`15`) come from a
+  shared 0, 1, 2... float stream in real's vertex slots 2 and 3 (`shading/vertex.rs`). Shadow and
+  prepass draws keep the draw's own transform entry and switch to the depth variant
+  (`caster::on_depth`): a caster instance's entry has no cache offset, which is what drew the
+  prepass in rest pose before.
+- Morphs composite on the GPU as real's do: one render pass per batch into a 2048×1024
+  `R16G16B16A16Sfloat` atlas (`skin/morphs.rs`, `render/src/morph.rs`), cleared by the frame's
+  first. Each target × region is one additive quad, zero-weight targets included; position deltas
+  go in the left half and normal deltas at the same texel in the right. Regions are shelf-packed
+  from texel (1, 1), a texel apart. Our `morph.fxc` `Morph()` loads the atlas at the subrect named
+  in the morph entry (u, width, v, height in atlas uv).
 - Managed drives all of this through `RenderTools` (`GetModelMeshSkinning*`,
   `AllocateVertexCache`, `DispatchModelMeshSkinning`, `QueueModelMeshMorph`, `GenerateMorphs`).
   Engine-drawn objects go through `skin/native.rs`.

@@ -41,7 +41,7 @@ fn tonemapped_with(exposure: f32, variant: &shaders::Variant) -> Option<[u8; 4]>
     let mat = material::create_raw(Some(c"tonemap test"), Some(c"shaders/tonemapping/tonemapping.shader"), true);
     material::set_texture(mat, "ColorBuffer", src);
     let instance = super::bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
-    let shaded = Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values: HashMap::new(), instance, view_proj: Mat4::IDENTITY, context: Default::default() };
+    let shaded = Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values: HashMap::new(), instance, view_proj: Mat4::IDENTITY, context: Default::default(), cached_mesh: None };
     let d = Draw {
         vertices: Arc::new(render::Buffer::with_data(gpu, "blit", BufferKind::Vertex, &bytes)),
         vertex_offset: 0,

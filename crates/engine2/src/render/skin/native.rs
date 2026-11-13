@@ -5,6 +5,7 @@
 
 use super::{Job, MeshSkin, cache, dispatch, morphs, rows};
 use crate::handles::Kind;
+use crate::mesh::render_mesh::RenderMesh;
 use crate::render::attributes::{self, Value};
 use crate::render::buffers;
 use crate::render::draw::morph::Weights;
@@ -77,7 +78,7 @@ pub fn begin_frame() {
 /// Mesh `index` of object `key`, skinned this frame (the first ask dispatches): the attributes
 /// its draw binds. `None` when skinning fails; the draw then stays rigid.
 #[allow(clippy::too_many_arguments)]
-pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::Ref, pose: &Pose, tint: [f32; 4], morph: Option<(&Weights, &crate::mesh::render_mesh::RenderMesh)>) -> Option<attributes::Ref> {
+pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::Ref, pose: &Pose, tint: [f32; 4], morph: Option<(&Weights, &Arc<RenderMesh>)>) -> Option<attributes::Ref> {
     let drawn = (key, index, tint.map(f32::to_bits));
     let earlier = {
         let frame = FRAME.lock().unwrap();
@@ -93,11 +94,9 @@ pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::R
             let inverse = super::inverse_bind_poses(model);
             let bones: Vec<Mat4> = inverse.iter().enumerate().map(|(b, inv)| pose.0.get(b).copied().unwrap_or(Mat4::IDENTITY) * *inv).collect();
             let offset = cache::allocate(skin.vertices)?;
-            let composite = morph.filter(|(w, m)| morphs::active(m, w)).map(|(w, m)| morphs::compose(&[(w, m)]));
-            let subrect = composite.as_ref().and_then(|(_, s)| s.first().copied());
-            let morph_buffer = composite.and_then(|(data, _)| morphs::upload(&data));
+            let subrect = morph.filter(|(w, m)| morphs::active(m, w)).and_then(|(w, m)| morphs::compose(&[(w, m)]).first().copied());
             let transforms = Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &entries(&bones, tint, offset, skin.weights, subrect)));
-            dispatch::run(dispatch::SHADER, skin, &transforms, &[Job { slot: 0, offset }], morph_buffer.as_ref()).inspect_err(|e| crate::render::compute::warn_once(dispatch::SHADER, e)).ok()?;
+            dispatch::run(dispatch::SHADER, skin, &transforms, &[Job { slot: 0, offset }], subrect.is_some()).inspect_err(|e| crate::render::compute::warn_once(dispatch::SHADER, e)).ok()?;
             FRAME.lock().unwrap().get_or_insert_with(Frame::default).skinned.insert((key, index), Skinned { bones, offset, weights: skin.weights, subrect });
             transforms
         }
@@ -105,6 +104,7 @@ pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::R
     let handle = buffers::insert(transforms);
     let a = attributes::create();
     attributes::set(a, "g_TransformBuffer", Value::Buffer(handle.value));
+    attributes::set(a, super::VERTEX_ANIMATION, Value::Combo(1));
     let mut frame = FRAME.lock().unwrap();
     let f = frame.get_or_insert_with(Frame::default);
     f.handles.push(handle);

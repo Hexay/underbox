@@ -54,7 +54,7 @@ fn sky_standin_samples_the_face_it_looks_at() {
         let mut d = execute::sky([1.0; 4], None, view_proj, Default::default()).unwrap();
         let instance = super::bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
         let values = HashMap::from([("g_vSkyTint".to_owned(), Vec4::ONE)]);
-        d.shaded = Some(Shaded { shading: s.clone(), vertex: inputs.keys.clone(), material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default() });
+        d.shaded = Some(Shaded { shading: s.clone(), vertex: inputs.keys.clone(), material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default(), cached_mesh: None });
         let color = texture::create_target("sky", 16, 16, 0);
         draw::execute(&Target { color, ..Default::default() }, &Lighting::fallback(), Load { color: Some(render::wgpu::Color::BLACK), depth: None }, &[d]);
         let frame = texture::resolve(color).unwrap().gpu.as_ref().unwrap().read_back(gpu);

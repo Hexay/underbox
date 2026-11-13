@@ -1,5 +1,5 @@
 //! `globalSdl`: SDL3's API one function per slot, answered by real SDL3 through the `window`
-//! crate (why SDL and not winit: docs/renderer.md, "Windows and input"). A dedicated server never
+//! crate (why SDL and not winit: docs/windowing.md). A dedicated server never
 //! brings SDL video up: the gate below refuses it, and its event queue reads empty.
 
 mod input;

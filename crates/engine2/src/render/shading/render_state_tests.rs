@@ -94,7 +94,7 @@ fn pass_draw(gpu: &render::Gpu, shader: &VfxShader, mat: material::Ref, pass: u6
     let inputs = vertex::inputs(&s.vertex_inputs, &Layout { name: "xyz".into(), stride: 12, fields }).unwrap();
     let bytes: Vec<u8> = xy.iter().flat_map(|p| [p[0], p[1], 0.0]).flat_map(f32::to_le_bytes).collect();
     let instance = super::super::bind::Instance { world: Mat4::IDENTITY, tint: [1.0; 4] };
-    let shaded = Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values: Default::default(), instance, view_proj: Mat4::IDENTITY, context: Default::default() };
+    let shaded = Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values: Default::default(), instance, view_proj: Mat4::IDENTITY, context: Default::default(), cached_mesh: None };
     Draw {
         vertices: Arc::new(render::Buffer::with_data(gpu, "states", BufferKind::Vertex, &bytes)),
         vertex_offset: 0,

@@ -28,9 +28,12 @@ COMMON
 struct VS_INPUT
 {
 	float3 vPositionOs : POSITION < Semantic( PosXyz ); >;
+	#if ( D_CS_VERTEX_ANIMATION )
+		float nVertexIndex : TEXCOORD14 < Semantic( MorphIndex ); >;
+		float nVertexCacheIndex : TEXCOORD15 < Semantic( MorphIndex ); >;
+	#endif
 	uint nInstanceTransformID : TEXCOORD13 < Semantic( InstanceTransformUv ); >;
 	uint4 vBlendIndices : BLENDINDICES < Semantic( BlendIndices ); >;
-	uint nVertexID : SV_VertexID;
 };
 
 struct PS_INPUT
@@ -47,16 +50,16 @@ VS
 	#include "instancing.fxc"
 	#include "vs_decompress.fxc"
 
-	// A skinned entry's vertices were placed by skinning_cs in the vertex cache (standin.shader).
+	// A vertex-animation draw's vertices were placed by skinning_cs in the vertex cache (standin.shader).
 	PS_INPUT MainVs( const VS_INPUT i )
 	{
 		PS_INPUT o;
-		ExtraShaderData_t extra = GetExtraPerInstanceShaderData( i.nInstanceTransformID );
-		float3 vPositionWs;
-		if ( g_TransformBuffer[ i.nInstanceTransformID ].BlendWeightCount != 0 && extra.nVertexCacheOffset != 0xFFFFFFFFu )
-			vPositionWs = FetchCachedVertex( extra.nVertexCacheOffset + i.nVertexID ).vPosWs;
-		else
-			vPositionWs = mul( GetTransformMatrix( i.nInstanceTransformID, i.vBlendIndices.x ), float4( i.vPositionOs.xyz, 1.0 ) );
+		#if ( D_CS_VERTEX_ANIMATION )
+			ExtraShaderData_t extra = GetExtraPerInstanceShaderData( i.nInstanceTransformID );
+			float3 vPositionWs = FetchCachedVertex( extra.nVertexCacheOffset + uint( i.nVertexCacheIndex ) ).vPosWs;
+		#else
+			float3 vPositionWs = mul( GetTransformMatrix( i.nInstanceTransformID, i.vBlendIndices.x ), float4( i.vPositionOs.xyz, 1.0 ) );
+		#endif
 		o.vPositionPs = Position3WsToPs( vPositionWs );
 		return o;
 	}

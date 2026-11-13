@@ -57,11 +57,11 @@ impl Segments<'_> {
         let index = DECODERS.iter().position(|(d, _)| *d == decoder.name()).expect("writer decoder") as i16;
         let length = (8 + targets.len() * 2 + data.len()).min(i16::MAX as usize) as i16;
         let mut bytes: Vec<u8> = [index, cardinality, targets.len() as i16, length].iter().flat_map(|v| v.to_le_bytes()).collect();
-        bytes.extend(targets.iter().flat_map(|&t| (layout::element(channel, t, self.bones) as i16).to_le_bytes()));
+        bytes.extend(targets.iter().flat_map(|&t| (layout::element(channel, t, self.bones, self.controllers) as i16).to_le_bytes()));
         bytes.extend_from_slice(data);
         let at = self.out.len() as i64;
         let masks = targets.iter().fold(0, |m, &t| m | layout::mask(t));
-        let fields = [("m_nUniqueFrameIndex", int_value(at)), ("m_nLocalElementMasks", int_value(masks)), ("m_nLocalChannel", int_value(channel)), ("m_container", Value::Binary(bytes))];
+        let fields = [("m_nUniqueFrameIndex", int_value(at)), ("m_nLocalElementMasks", int_value(masks)), ("m_nLocalChannel", int_value(layout::channel_index(channel, self.controllers))), ("m_container", Value::Binary(bytes))];
         self.out.push(obj(fields.into()));
         at
     }

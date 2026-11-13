@@ -2,7 +2,7 @@
 //!
 //! Managed s&box calls SDL3's API one function per `globalSdl` slot and reads SDL's own structs
 //! (events, display modes), scancodes, keycodes and gamepad ids, so this crate exposes SDL with as
-//! little in between as possible. Why SDL rather than winit: docs/renderer.md, "Windows and input".
+//! little in between as possible. Why SDL rather than winit: docs/windowing.md.
 //!
 //! Handles are SDL's own pointers. SDL validates window, gamepad and cursor pointers against its
 //! object registry before touching them, so those wrappers are safe to build from any value;

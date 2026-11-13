@@ -129,14 +129,16 @@ are structure, not output. Fixed items say what changed and what is left.
    skinned draws do. Opaque material draws aren't batched into instanced draws (real: one draw for
    showroom's three boxes). A depth-normal prepass (outdoor) still draws the material program
    with colour off; real writes RGBA normals.
-5. **Vertex streams (fixed for static meshes).** Compiled meshes draw from a 20-byte copy as real's:
+5. **Vertex streams (fixed).** Compiled meshes draw from a 20-byte copy as real's:
    position, `R16G16Sfloat` UV, `A2B10G10R10` packed normal and tangent (`gpu_mesh::draw_vertices`,
    assets `pack_frame`, the inverse of `unpack_frame`); slots are real's: mesh, instance ids
    (stride 4), defaults (stride 0, per instance). The stand-in decodes the frame as `vs_decompress`
-   (UNORM input) and passes the tangent on. Left, skinned: real skins these meshes from the mesh's
-   own float stream (`R32G32Sfloat` UV, float normal and tangent, `R8G8B8A8Unorm` colour, two
-   `R32Sfloat`, `R8G8B8A8Uint` indices; the prepass reads position, the two floats, ids and
-   indices); ours draws from the compute-skinned vertex cache.
+   (UNORM input) and passes the tangent on. Skinned meshes draw, and feed `skinning_cs`, from real's
+   68-byte float stream (`R32G32Sfloat` UV, float normal and tangent, `R8G8B8A8Unorm` colour,
+   `R8G8B8A8Uint` indices and `R8G8B8A8Unorm` weights at 60 and 64). Their draws take the
+   `D_CS_VERTEX_ANIMATION` inputs real's do: the two `R32Sfloat` vertex-index streams in slots 2 and
+   3 (`TEXCOORD14`/`15`) before the defaults; the shadow and prepass draws read position, the two
+   floats, ids and indices (docs/skinning.md).
 6. **Constants ours left zero (fixed).** The 592-byte buffer now matches byte for byte: native's
    default wind (also what `GetSceneWorldWind` returns), the camera as
    `g_vHighPrecisionLightingOffsetWs`, and infinite fog culling bounds. Real's 80-byte cluster block
@@ -146,8 +148,14 @@ are structure, not output. Fixed items say what changed and what is left.
    own (`scene/execute.rs`), so its main-draw 80-byte block is byte-identical to real's (24×16×48,
    near 10, far 10000, 1024×768) and it reads managed's 73728-byte cluster lists. The 304-byte buffer
    is byte-identical. The 4128-byte light array holds NaN in real's unused slots, 0 on ours.
-7. **Morph targets.** Real composites morphs in a 2048×1024 `R16G16B16A16Sfloat` pass of two additive
-   draws before shadows; ours has no such pass (compute).
+7. **Morph targets and skinning (fixed).** Real skins in compute (`skinning_cs` into the vertex cache),
+   not in the vertex stage, and composites morphs first in a 2048×1024 `R16G16B16A16Sfloat` pass of two
+   additive draws, positions then normals. Ours now does the same (docs/skinning.md): the composite
+   pass is its P0, and vertex-cache draws, shadows and the prepass take real's `D_CS_VERTEX_ANIMATION`
+   inputs. DXC builds with `-fspv-preserve-interface`, so programs keep the inputs they never read, as
+   real's do; the depth program's five now match. Left: real composites the morphed puppet twice (24
+   indices to our 12) and skins each object twice; and DXC still strips the material stand-in's unread
+   inputs (3 attributes to real's 9), apparently on a path that ignores the flag.
 8. **Final output (mostly fixed).** A pass that neither clears nor draws isn't recorded (showroom:
    18 passes with the shadow views, real 21). `TargetSupportsSrgbWrite` is true for 8-bit targets, so managed's UI no
    longer takes the float path (the "UI Gamma Seed" / "Composite" blits through `R16G16B16A16Sfloat`);

@@ -39,10 +39,10 @@ fn instances(jobs: &[Job], weights: u32) -> Vec<u8> {
     out
 }
 
-/// Skin `jobs` of `skin`'s mesh with `transforms`, morphing from `morph` when given.
-pub fn run(shader: &str, skin: &MeshSkin, transforms: &Arc<render::Buffer>, jobs: &[Job], morph: Option<&Arc<render::Buffer>>) -> Result<(), String> {
+/// Skin `jobs` of `skin`'s mesh with `transforms`, morphed from this frame's composite when `morph`.
+pub fn run(shader: &str, skin: &MeshSkin, transforms: &Arc<render::Buffer>, jobs: &[Job], morph: bool) -> Result<(), String> {
     let gpu = device::gpu().ok_or("no device")?;
-    let input = crate::render::draw::gpu_mesh::vertices(&skin.vb).ok_or("no vertex buffer")?;
+    let input = crate::render::draw::gpu_mesh::draw_vertices(&skin.vb).ok_or("no vertex buffer")?.0;
     let output = cache::buffer().ok_or("no vertex cache")?;
     let mut scratch = Vec::new();
     let mut handle = |b: Arc<render::Buffer>| {
@@ -54,16 +54,17 @@ pub fn run(shader: &str, skin: &MeshSkin, transforms: &Arc<render::Buffer>, jobs
     attributes::set(a, "g_TransformBuffer", Value::Buffer(handle(transforms.clone())));
     attributes::set(a, "InputVB", Value::Buffer(handle(input)));
     attributes::set(a, "OutputVB", Value::Buffer(handle(output)));
-    if let Some(m) = morph {
-        attributes::set(a, "MorphComposite", Value::Buffer(handle(m.clone())));
+    if morph {
+        attributes::set(a, "MorphComposite", Value::Texture(super::morphs::texture(), 0));
     }
     let i = skin.input;
+    let atlas = if morph { super::morphs::WIDTH } else { 0 };
     // Gotcha: uint members fill from floats (shading/layout.rs); u32::MAX as f32 saturates back to NONE.
-    for (name, v) in [("VertexCount", skin.vertices), ("VertexSize", i.stride), ("BoneIdxOffset", i.bone_index), ("BoneIdxBits", 8), ("BoneWeightOffset", i.bone_weight), ("NormalOffset", i.normal), ("TangentSpaceOffset", i.tangent), ("MorphTextureAtlasWidth", 0)] {
+    for (name, v) in [("VertexCount", skin.vertices), ("VertexSize", i.stride), ("BoneIdxOffset", i.bone_index), ("BoneIdxBits", 8), ("BoneWeightOffset", i.bone_weight), ("NormalOffset", i.normal), ("TangentSpaceOffset", i.tangent), ("MorphTextureAtlasWidth", atlas)] {
         attributes::set(a, name, Value::Float(if v == NONE { u32::MAX as f32 } else { v as f32 }));
     }
     attributes::set(a, "UncompressedTangentFrame", Value::Bool(i.uncompressed));
-    attributes::set(a, "D_MORPH", Value::Combo(u8::from(morph.is_some())));
+    attributes::set(a, "D_MORPH", Value::Combo(u8::from(morph)));
     let mut result = Ok(());
     for chunk in jobs.chunks(MAX_INSTANCES) {
         attributes::set(a, "InstanceCount", Value::Float(chunk.len() as f32));
@@ -91,8 +92,7 @@ fn dispatch(mode: material_mode::Ref, m: crate::model::Ref, mesh: i32, transform
     let n = n.max(0) as usize;
     let jobs: Vec<Job> = ints(slots, n).into_iter().zip(ints(offsets, n)).map(|(slot, offset)| Job { slot, offset }).collect();
     let shader = material_mode::material(mode).map_or_else(|| SHADER.to_owned(), |m| m.shader().to_owned());
-    let composite = if morph { super::morphs::current() } else { None };
-    run(&shader, &skin, &transforms, &jobs, composite.as_ref()).inspect_err(|e| compute::warn_once(&shader, e)).is_ok()
+    run(&shader, &skin, &transforms, &jobs, morph).inspect_err(|e| compute::warn_once(&shader, e)).is_ok()
 }
 
 pub fn register(r: &mut Registry) {
