@@ -1,7 +1,7 @@
 //! `IPhysicsBody`'s slots: type, pose, velocity, forces, sleep and switches. Mass is in
 //! `body_mass.rs`, shapes in `shape_slots.rs`, queries in `body_query.rs`.
 
-use super::body::{apply_state, get, set_motion_locks, with_rb, with_sim, with_state};
+use super::body::{apply_state, get, read_rb, set_motion_locks, with_rb, with_sim, with_state};
 use super::shape;
 use crate::math::{from_rot, from_vec, to_rot, to_vec, vec3};
 use abi::slots::i_physics_body as b;
@@ -20,7 +20,7 @@ fn set_touch(r: super::body::Ref, on: bool) {
 pub fn register(r: &mut Registry) {
     bind!(r, b::GET_WORLD, |r| get(r).and_then(|b| super::world::get(b.world)).map_or(HandleId::new(-1), |w| w.handle.id()));
     bind!(r, b::MANAGED_OBJECT, |r| get(r).map_or(HandleId::new(-1), |b| b.handle.id()));
-    bind!(r, b::GET_TYPE, |r| with_rb(r, |rb| BodyType::of(rb) as i64));
+    bind!(r, b::GET_TYPE, |r| read_rb(r, |rb| BodyType::of(rb) as i64));
     bind!(r, b::SET_TYPE, |r, t| {
         if let Some(kind) = BodyType::from_raw(t) {
             with_sim(r, |sim, id| sim.set_body_type(id, kind));
@@ -39,26 +39,26 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::IS_GRAVITY_ENABLED, |r| with_state(r, |s| s.gravity_enabled));
 
     bind!(r, b::SET_POSITION, |r, p| with_rb(r, |rb| rb.set_translation(to_vec(p), true)));
-    bind!(r, b::GET_POSITION, |r| with_rb(r, |rb| from_vec(rb.translation())));
+    bind!(r, b::GET_POSITION, |r| read_rb(r, |rb| from_vec(rb.translation())));
     bind!(r, b::SET_ORIENTATION, |r, q| with_rb(r, |rb| rb.set_rotation(to_rot(q), true)));
-    bind!(r, b::GET_ORIENTATION, |r| with_rb(r, |rb| Some(from_rot(*rb.rotation()))).unwrap_or_else(|| crate::math::identity().rotation));
+    bind!(r, b::GET_ORIENTATION, |r| read_rb(r, |rb| Some(from_rot(*rb.rotation()))).unwrap_or_else(|| crate::math::identity().rotation));
     bind!(r, b::SET_TRANSFORM, |r, p, q| with_rb(r, |rb| rb.set_position(Pose::from_parts(to_vec(p), to_rot(q)), true)));
     bind!(r, b::GET_TRANSFORM, |r| {
-        let pose = with_rb(r, |rb| Some((rb.translation(), *rb.rotation())));
+        let pose = read_rb(r, |rb| Some((rb.translation(), *rb.rotation())));
         pose.map_or_else(crate::math::identity, |(p, q)| Transform { position: from_vec(p), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(q) })
     });
     bind!(r, b::SET_TARGET_TRANSFORM, |r, p, q, _dt| with_rb(r, |rb| rb.set_next_kinematic_position(Pose::from_parts(to_vec(p), to_rot(q)))));
 
     bind!(r, b::SET_LINEAR_VELOCITY, |r, v| with_rb(r, |rb| rb.set_linvel(to_vec(v), true)));
-    bind!(r, b::GET_LINEAR_VELOCITY, |r| with_rb(r, |rb| from_vec(rb.linvel())));
+    bind!(r, b::GET_LINEAR_VELOCITY, |r| read_rb(r, |rb| from_vec(rb.linvel())));
     bind!(r, b::ADD_LINEAR_VELOCITY, |r, v| with_rb(r, |rb| rb.set_linvel(rb.linvel() + to_vec(v), true)));
-    bind!(r, b::GET_VELOCITY_AT_POINT, |r, p| with_rb(r, |rb| from_vec(rb.velocity_at_point(to_vec(p)))));
+    bind!(r, b::GET_VELOCITY_AT_POINT, |r, p| read_rb(r, |rb| from_vec(rb.velocity_at_point(to_vec(p)))));
     bind!(r, b::SET_ANGULAR_VELOCITY, |r, v| with_rb(r, |rb| rb.set_angvel(to_vec(v), true)));
-    bind!(r, b::GET_ANGULAR_VELOCITY, |r| with_rb(r, |rb| from_vec(rb.angvel())));
+    bind!(r, b::GET_ANGULAR_VELOCITY, |r| read_rb(r, |rb| from_vec(rb.angvel())));
     bind!(r, b::SET_LINEAR_DAMPING, |r, v| with_rb(r, |rb| rb.set_linear_damping(v)));
-    bind!(r, b::GET_LINEAR_DAMPING, |r| with_rb(r, |rb| rb.linear_damping()));
+    bind!(r, b::GET_LINEAR_DAMPING, |r| read_rb(r, |rb| rb.linear_damping()));
     bind!(r, b::SET_ANGULAR_DAMPING, |r, v| with_rb(r, |rb| rb.set_angular_damping(v)));
-    bind!(r, b::GET_ANGULAR_DAMPING, |r| with_rb(r, |rb| rb.angular_damping()));
+    bind!(r, b::GET_ANGULAR_DAMPING, |r| read_rb(r, |rb| rb.angular_damping()));
 
     bind!(r, b::APPLY_LINEAR_IMPULSE, |r, i| with_rb(r, |rb| rb.apply_impulse(to_vec(i), true)));
     bind!(r, b::APPLY_LINEAR_IMPULSE_AT_WORLD_SPACE, |r, i, p| with_rb(r, |rb| rb.apply_impulse_at_point(to_vec(i), to_vec(p), true)));
@@ -72,7 +72,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::WAKE, |r| with_rb(r, |rb| rb.wake_up(true)));
     bind!(r, b::SLEEP, |r| with_rb(r, |rb| rb.sleep()));
     // Real reports static bodies asleep from creation.
-    bind!(r, b::IS_SLEEPING, |r| with_rb(r, |rb| rb.is_fixed() || rb.is_sleeping()));
+    bind!(r, b::IS_SLEEPING, |r| read_rb(r, |rb| rb.is_fixed() || rb.is_sleeping()));
     bind!(r, b::ENABLE_AUTO_SLEEPING, |r| {
         with_state(r, |s| s.auto_sleep = true);
         apply_state(r);
@@ -95,7 +95,7 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, b::ENABLE, |r| with_rb(r, |rb| rb.set_enabled(true)));
     bind!(r, b::DISABLE, |r| with_rb(r, |rb| rb.set_enabled(false)));
-    bind!(r, b::IS_ENABLED, |r| with_rb(r, |rb| rb.is_enabled()));
+    bind!(r, b::IS_ENABLED, |r| read_rb(r, |rb| rb.is_enabled()));
     bind!(r, b::SET_BULLET, |r, v| with_rb(r, |rb| rb.enable_ccd(v)));
     bind!(r, b::SET_MOTION_LOCKS, |r, x, y, z, pitch, yaw, roll| with_rb(r, |rb| set_motion_locks(rb, [x, y, z, pitch, yaw, roll])));
     bind!(r, b::BUILD_BOUNDS, |r| with_sim(r, |sim, id| sim.body(id).is_some().then(|| super::shape_slots::built_bounds(sim.body_bounds(id)))).unwrap_or_default());
