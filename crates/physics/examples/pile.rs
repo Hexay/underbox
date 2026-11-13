@@ -1,6 +1,8 @@
 //! Headless `tools/diff/pile` (docs/perf-physics.md): the same 328 bodies stepped as a scene steps
 //! them, timed per step, with a hash of every body's final state for determinism checks.
-//! usage: cargo run --release -p physics --example pile [ticks=750] [warmup=250]
+//! The floor and walls are keyframed, as the scene's collider-only GameObjects are; `static`
+//! makes them fixed bodies instead (the cheaper setup the first profile used).
+//! usage: cargo run --release -p physics --example pile [ticks=750] [warmup=250] [keyframed|static]
 
 use physics::{BodyType, Pose, Rotation, Shape, Surface, Vector, World};
 use std::time::Instant;
@@ -20,11 +22,11 @@ fn angles(pitch: f32, yaw: f32) -> Rotation {
     Rotation::from_rotation_z(yaw.to_radians()) * Rotation::from_rotation_y(pitch.to_radians())
 }
 
-fn build(world: &mut World) -> Vec<physics::BodyId> {
-    add(world, BodyType::Static, Vector::new(0.0, 0.0, -8.0), Rotation::IDENTITY, cuboid(Vector::new(1200.0, 1200.0, 16.0)));
+fn build(world: &mut World, walls: BodyType) -> Vec<physics::BodyId> {
+    add(world, walls, Vector::new(0.0, 0.0, -8.0), Rotation::IDENTITY, cuboid(Vector::new(1200.0, 1200.0, 16.0)));
     for (x, y) in [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
         let size = Vector::new(if x == 0.0 { 1200.0 } else { 16.0 }, if y == 0.0 { 1200.0 } else { 16.0 }, 400.0);
-        add(world, BodyType::Static, Vector::new(600.0 * x, 600.0 * y, 200.0), Rotation::IDENTITY, cuboid(size));
+        add(world, walls, Vector::new(600.0 * x, 600.0 * y, 200.0), Rotation::IDENTITY, cuboid(size));
     }
     let mut bodies = Vec::new();
     let mut body = |world: &mut World, pos: Vector, sphere: bool| {
@@ -85,8 +87,9 @@ fn cpu_ns() -> u64 {
 fn main() {
     let arg = |i: usize, default: usize| std::env::args().nth(i).and_then(|a| a.parse().ok()).unwrap_or(default);
     let (ticks, warmup) = (arg(1, 750), arg(2, 250));
+    let walls = if std::env::args().nth(3).as_deref() == Some("static") { BodyType::Static } else { BodyType::Keyframed };
     let mut world = World::default();
-    let bodies = build(&mut world);
+    let bodies = build(&mut world, walls);
     let mut times = Vec::with_capacity(ticks);
     let (mut events, mut event_hash, mut cpu_start) = (0, 0xcbf2_9ce4_8422_2325, 0);
     for tick in 1..=ticks {
@@ -113,7 +116,7 @@ fn main() {
     times.sort_by(f64::total_cmp);
     let pick = |q: f64| times.get(((times.len() as f64 - 1.0) * q) as usize).copied().unwrap_or(0.0);
     println!(
-        "PILE bodies={} ticks={} median={:.3}ms p95={:.3}ms wall={total:.1}ms cpu={cpu:.1}ms events={events} hash={:016x} events_hash={event_hash:016x}",
+        "PILE bodies={} walls={walls:?} ticks={} median={:.3}ms p95={:.3}ms wall={total:.1}ms cpu={cpu:.1}ms events={events} hash={:016x} events_hash={event_hash:016x}",
         bodies.len(),
         times.len(),
         pick(0.5),
