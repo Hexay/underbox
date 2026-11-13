@@ -131,6 +131,10 @@ pub fn set_buffer(r: Ref, name: StringToken, handle: usize) {
     on(r, |a| a.set(Kind::Buffer, name, Value::Buffer(handle)));
 }
 
+pub fn set_texture(r: Ref, name: StringToken, t: NativeRef<class::CTextureBase>) {
+    on(r, |a| a.set(Kind::Texture, name, Value::Texture(t, -1)));
+}
+
 pub fn set_parent(r: Ref, parent: Ref) {
     let parent = objects::get::<_, RenderAttributes>(parent);
     on(r, |s| s.set_parent(parent));

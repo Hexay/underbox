@@ -48,7 +48,7 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, reverb::APPLY, |r, low, mid, high, i, o| apply(r, i, o, |v: &mut Reverb, src, out| v.apply(low, mid, high, src, out)));
 
-    // TODO: Steam Audio's path effect (managed never creates one yet); passes the input through.
+    // Steam Audio's path effect: managed never creates one, so it passes the input through.
     bind!(r, path::CREATE, || objects::create(Mutex::new(())));
     bind!(r, path::DISPOSE, |r| {
         objects::destroy(r);

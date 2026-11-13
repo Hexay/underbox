@@ -113,6 +113,19 @@ pub fn targets(r: Ref) -> (texture::Ref, texture::Ref) {
     view::get(layer.view).map(|v| (v.color, v.depth)).unwrap_or_default()
 }
 
+/// `SetAttr`: the layer's draws bind `target` as the texture `name`.
+pub fn set_attr(r: Ref, name: StringToken, target: texture::Ref) {
+    if let Some(layer) = get(r) {
+        attributes::set_texture(layer.attributes, name, target);
+    }
+}
+
+/// The layer's texture `name`, as a handle managed owns.
+fn texture_value(r: Ref, name: StringToken) -> Option<texture::Ref> {
+    let t = attributes::token_texture_ref(get(r)?.attributes, name)?;
+    Some(crate::resource::handed_out::<_, texture::Texture>(Some(t)))
+}
+
 pub fn layer_flags(r: Ref) -> i64 {
     field!(get i64, l::GET_M_N_LAYER_FLAGS, r.addr())
 }
@@ -142,8 +155,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, l::ADD_SEMAPHORE_DEPENDENCY, |_, _| {});
     bind!(r, l::SET_SEMAPHORE, |_, _| {});
     bind!(r, l::GET_RENDER_ATTRIBUTES_PTR, |r| get(r).map(|l| l.attributes).unwrap_or_default());
-    // TODO: per-layer texture attributes (SetAttr) feed shader bindings once combos translate.
-    bind!(r, l::SET_ATTR, |_, _, _, _, _| {});
+    // MSAA mode and input/output role don't matter here: targets are single-sampled, passes in order.
+    bind!(r, l::SET_ATTR, |r, name, target, _msaa, _role| set_attr(r, name, view::rt_texture(target)));
     bind!(r, l::SET_LAYER_NO_CULL, |_, _| {});
     bind!(r, l::SET_BOUNDING_VOLUME_SIZE_CULL_THRESHOLD_IN_PERCENT, |r, p| with(r, |s| s.size_cull = p));
     bind!(r, l::DISABLE_REFLECTIONS_AND_REFRACTIONS_FOR_OBJECTS_IN_THIS_LAYER, |_, _| {});
@@ -152,8 +165,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, l::SET_SHADER_MODE, |r, mode| with(r, |s| s.shader_mode = Some(mode)));
     bind!(r, l::SET_WIREFRAME_OVERRIDE, |_| {});
     bind!(r, l::SET_CLEAR_COLOR, |r, c, _target| with(r, |s| s.clear_color = c));
-    bind!(r, l::GET_TEXTURE_VALUE, |_, _, default| default);
-    bind!(r, l::GET_TEXTURE_VALUE_1, |_, _| texture::Ref::default());
+    bind!(r, l::GET_TEXTURE_VALUE, |r, name, default| texture_value(r, name).unwrap_or(default));
+    bind!(r, l::GET_TEXTURE_VALUE_1, |r, name| texture_value(r, name).unwrap_or_default());
     bind!(r, l::GET_COLOR_TARGET, |r| targets(r).0);
     bind!(r, l::GET_DEPTH_TARGET, |r| targets(r).1);
     bind!(r, l::SET_OUTPUT, |r, c, d| set_output(r, view::rt_texture(c), view::rt_texture(d)));

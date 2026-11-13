@@ -121,3 +121,15 @@ fn depth_prepass_writes_depth_only() {
     assert_eq!(after_depth.hash(), alone_depth.hash());
     assert_eq!(d(&depth), d(&alone_depth), "the prepass writes the opaque layer's depth");
 }
+
+/// `SetAttr` binds a view target under a name for the layer's draws.
+#[test]
+fn set_attr_names_a_target_for_the_layer() {
+    let l = layer::create(view::Ref::default(), "Decals".into(), Default::default(), layer::Kind::Label, 0, 0);
+    let depth = texture::create_target("scene depth", 4, 4, 0);
+    layer::set_attr(l, StringToken::of("SceneDepth"), depth);
+    let attrs = layer::get(l).unwrap().attributes;
+    assert_eq!(crate::render::attributes::token_texture_ref(attrs, StringToken::of("SceneDepth")).map(|t| t.addr()), Some(depth.addr()));
+    layer::destroy(l);
+    crate::resource::destroy_handle(depth);
+}

@@ -156,6 +156,7 @@ pub fn topology(prim: i64) -> PrimitiveTopology {
 /// `lighting`.
 pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw]) {
     let (Some(gpu), Some(placeholder)) = (device::gpu(), placeholder()) else { return };
+    crate::render::stats::drew(draws);
     let (color, depth) = (texture::resolve(target.color), texture::resolve(target.depth));
     let mut targets = Targets { color: color.as_ref().and_then(|t| t.gpu.as_ref()), depth: depth.as_ref().and_then(|t| t.gpu.as_ref()), depth_layer: target.depth_slice, srgb_write: target.srgb_write, ..Default::default() };
     if let (Some(c), Some(d)) = (targets.color, targets.depth)

@@ -109,8 +109,7 @@ pub fn register(r: &mut Registry) {
     glue::register(r);
 }
 
-/// The tree as KV3 text. TODO: native saves `KV3_ENCODING_BINARY_AUTO_COMPRESSED`; text is a
-/// valid encoding for any KV3 loader, but larger.
+/// The tree as KV3 text, valid for any KV3 loader. TODO: native's binary auto-compressed encoding.
 pub fn save(r: Ref) -> String {
     let value = get(r).map_or(kv::Value::Null, |n| to_value(&n));
     kv::write::kv3(&value)

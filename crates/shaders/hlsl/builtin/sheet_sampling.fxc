@@ -1,6 +1,5 @@
 // underbox replacement for Valve's sheet_sampling.fxc (sprite-sheet sequences, Sheet.hlsl).
-// TODO: decode the sheet texture once its layout is defined with the texture compiler; until then
-// every sequence is one full-texture frame.
+// TODO: decode the sheet texture (no GPU sheet layout yet); every sequence is one full-texture frame.
 #ifndef SHEET_SAMPLING_FXC
 #define SHEET_SAMPLING_FXC
 

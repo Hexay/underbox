@@ -1,7 +1,6 @@
 //! `MeshGlue.Serialize*`: a model's blocks for managed's `Model.Save` (MBUF, MDAT, DATA, PHYS),
 //! returned as owned `CUtlBuffer`s; null when there's nothing to write (managed skips the block).
-// TODO: Source 2's binary block layouts. These are KV3 text with the same content, which our
-// own loader can read back but real engine2 can't.
+// TODO: Source 2's binary block layouts; these KV3 text blocks load in ours, not in real engine2.
 
 use super::render_mesh::RenderMesh;
 use crate::model::physics::data::{JointDesc, Part, PhysicsData};
