@@ -4,7 +4,8 @@
 # usage: tools/diff/gpu.sh <corpus|game-checkout> [both|ours|real] [artifact-root]   (or tools/diff/run.sh gpu ...)
 # Env: GRACE (s after game.load before the trigger, default 20), SECS (per boot, 300), DUMP=<n>[:<draw>]
 # (copy out pass P<n>'s attachments, as of that draw; numbering as in the side's listing; DUMP_OURS and
-# DUMP_REAL set one side), MANAGED=1, UNDERBOX_GPU_VERTS=<n> (each draw's first n vertices as "vvb"), plus
+# DUMP_REAL set one side), MANAGED=1, UNDERBOX_GPU_VERTS=<n> (each draw's first n vertices as "vvb"),
+# UNDERBOX_GPU_STORE_MAX=<bytes> (keep storage buffers up to that size, default 512 KiB), plus
 # frame.sh's game-checkout pins.
 # Out: target/diff/gpu/<name>/{ours,real}.txt (listings), report.txt, dumps/*.png; raw captures in
 # $UNDERBOX_CACHE/underbox-gpu/<worktree>/<name>/<side>/.

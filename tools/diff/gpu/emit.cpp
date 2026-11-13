@@ -11,6 +11,15 @@ static constexpr size_t kBlobMax = 64 * 1024;      // uniform contents written o
 static constexpr size_t kHashMax = 4 * 1024 * 1024; // storage buffers hashed up to this size
 static constexpr size_t kStoreBlobMax = 512 * 1024; // and written out up to this size
 
+// UNDERBOX_GPU_STORE_MAX (bytes) raises both, e.g. to read a whole vertex cache or native's transform buffer.
+static size_t store_blob_max() {
+    static const size_t n = [] {
+        const char* s = getenv("UNDERBOX_GPU_STORE_MAX");
+        return s ? (size_t)strtoull(s, nullptr, 10) : kStoreBlobMax;
+    }();
+    return n;
+}
+
 static void line(Frame& fr, const std::string& s) { fputs(s.c_str(), fr.f); fputc('\n', fr.f); }
 
 static int pipe_id(Frame& fr, VkPipeline p) {
@@ -96,10 +105,10 @@ static std::string resources(Device* d, Frame& fr, const PipeInfo& p, const Bind
                     auto info = objs().buffers.find(h64(x.buf));
                     VkDeviceSize n = x.range != VK_WHOLE_SIZE ? x.range : info != objs().buffers.end() && off < info->second.size ? info->second.size - off : 0;
                     e.n("size", (double)n);
-                    if (n && n <= kHashMax) {
+                    if (n && n <= std::max(kHashMax, store_blob_max())) {
                         auto bytes = read_buffer(d, x.buf, off, n);
                         // Small storage buffers keep their contents: per-draw data (bindless indices) can live there.
-                        if (!bytes.empty()) e.raw("sblob", put_blob(fr, bytes, kStoreBlobMax));
+                        if (!bytes.empty()) e.raw("sblob", put_blob(fr, bytes, store_blob_max()));
                     }
                     break;
                 }

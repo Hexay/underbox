@@ -153,14 +153,18 @@ Ranked divergences:
     blends every weight. Bisected on the skinned scene's third puppet, `puppet_morphed` (smile
     ramps over "bow"): without `morph_texture` 0.68 / 0.70 / 0.73, 0.9907 (its sides follow the
     spine fully); with it 0.17 / 0.31 / 0.47, 0.9984. MRPH's `m_nLookupType` and
-    `m_nEncodingType`, which ours now writes as real does, made no difference. **Open:** through
-    managed's renderer real still draws no morphed puppet at all (managed 0.97 / 1.25 / 1.09,
-    0.9887), and logs nothing about it. Its capture shows the puppet composited, skinned and drawn
-    (one-instance draws), so it lands degenerate. Narrowed on real (MANAGED=1 against native, scratch
-    copies of the scene): real's citizen with `Morphs` set draws the same (SSIM 0.9993); so does
-    the morphed puppet with `smile` set and no clip, and the plain puppet playing `bow`. Only `bow`
-    driving the morph through its flex channel fails. The decode key now orders channels as real's
-    citizen does (Position, Angle, MorphChannel, Scale; morph elements before scales); no change.
+    `m_nEncodingType`, which ours now writes as real does, made no difference. **Managed: fixed,
+    as real behaves.** Through managed's renderer real draws no morphed mesh at all, with the clip
+    or with static `smile`. An earlier note here said static morphs drew; a fresh frame and capture
+    show that puppet missing too. Real's vertex cache holds NaN for every morphed vertex. Managed
+    writes the subrect into a zeroed morph entry, native writes it over bone 0's, and real's closed
+    `morph.fxc` needs the latter (docs/skinning.md). Ours now writes native's entry, uses real's
+    texel subrects, and skins a basis-less entry to NaN as real does. Managed 0.85 / 1.14 / 0.98,
+    0.9892 → 0.34 / 0.21 / 0.09, 0.9996; native unchanged at 0.03 / 0.17 / 0.34, 0.9998. Left on
+    managed: the top faces' draw-call tint (`TOP_TINT`), which real's managed path doesn't apply.
+    The scene then gained a fourth puppet, `Deformed` (a box `ModelDeformer` twisting its top 45°):
+    native 0.07 / 0.22 / 0.39 outside real's "Connection refused" toast, managed 0.43 / 0.24 /
+    0.11, 0.9995; its own region 1.16 / 0.80 / 0.51 native.
 13. **Fixed. Real's compiled models went dark on ours.** Real's core models store `NORMAL` as
     `R10G10B10A2_UNORM` (format 24), which ours didn't decode at all (zero normals). skinning_cs
     shows only the split (x, y, z 10 bits, w 2); `vs_decompress.fxc` is closed, so the decode was
@@ -253,9 +257,7 @@ Running a game checkout instead of a corpus scene, and walker's divergences: doc
   `r_texture_stream_max_resolution` -1, `r_texture_stream_resolution_bias_min` 1.0). Nothing
   reads the streaming two yet, and managed sampler states don't clamp to `r_max_anisotropy`
   (`render/samplers.rs`), though real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
-- **Content:** why real's managed renderer draws no morphed puppet (15): only a clip's flex
-  channel driving the morph fails. Next: real content whose clip drives morphs without an anim
-  graph, to tell real's managed path from our flex encoding.
+- **Managed draw-call tint (15):** real's managed path leaves the puppets' top faces untinted.
 - **Decals (16):** normal and height (parallax) maps, sheeted decal textures
   (`GetSheetSequenceTextureData`), and the exclusion mask aren't applied; the corpus uses none.
   Decal edges (19).

@@ -3,7 +3,7 @@
 //! (`render::Morpher`): position deltas in the left half, normal deltas at the same place in the
 //! right half. A region `w` texels wide holds vertex `y * w + x` at texel (x, y) from its corner.
 //! Its subrect, which managed stores in the morph entry and our `morph.fxc` reads, is
-//! (u offset, u range, v offset, v range) of the position block.
+//! (x, width, y, height) of the position block in texels, as real's `GetMorphSubrect` answers.
 
 use crate::mesh::render_mesh::RenderMesh;
 use crate::render::draw::morph::{self, Weights};
@@ -121,7 +121,7 @@ pub fn compose(items: &[(&Weights, &Arc<RenderMesh>)]) -> Vec<[f32; 4]> {
             continue;
         };
         let [x, y, w, h] = rect;
-        subrects.push([x as f32 / WIDTH as f32, w as f32 / WIDTH as f32, y as f32 / HEIGHT as f32, h as f32 / HEIGHT as f32]);
+        subrects.push([x, w, y, h].map(|t| t as f32));
         let weight = |name: &String| weights.get(name).copied().unwrap_or(0.0);
         let quads = |bundle: u32, dx: u32| names.iter().enumerate().map(|(t, name)| MorphQuad { dst: [x + dx, y, w, h], first: (2 * t as u32 + bundle) * n, vertices: n, weight: weight(name) }).collect::<Vec<_>>();
         placed.push((quads(0, 0), quads(1, HALF)));

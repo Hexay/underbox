@@ -105,6 +105,56 @@
       ]
     },
     {
+      "__guid": "5e8b1f42-3a6c-4d07-9b15-0c2d3e4f5a61",
+      "Flags": 0,
+      "Name": "Deformed",
+      "Position": "50,48,0",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.SkinnedModelRenderer",
+          "__guid": "6f9c2a53-4b7d-4e18-8c26-1d3e4f5a6b72",
+          "BodyGroups": 18446744073709551615,
+          "CreateBoneObjects": false,
+          "Model": "models/compiled/puppet.vmdl",
+          "PlaybackRate": 1,
+          "RenderType": "On",
+          "Tint": "0.8,1,0.7,1",
+          "UseAnimGraph": false
+        }
+      ],
+      "Children": [
+        {
+          "__guid": "7a0d3b64-5c8e-4f29-9d37-2e4f5a6b7c83",
+          "Flags": 0,
+          "Name": "Twist",
+          "Position": "0,0,16",
+          "Enabled": true,
+          "Components": [
+            {
+              "__type": "Sandbox.ModelDeformer",
+              "__guid": "8b1e4c75-6d9f-403a-8e48-3f5a6b7c8d94",
+              "__enabled": true,
+              "Falloff": 0,
+              "NormalMode": "Accurate",
+              "Operation": "Transform",
+              "Priority": 0,
+              "RotationOffset": "0,45,0",
+              "ScaleFactor": "1,1,1",
+              "SceneVolume": {
+                "Type": "Box",
+                "Sphere": { "Center": "0,0,0", "Radius": 12 },
+                "Box": { "Mins": "-12,-12,-4", "Maxs": "12,12,4" },
+                "Capsule": { "CenterA": "0,0,-4", "CenterB": "0,0,4", "Radius": 12 }
+              },
+              "Translation": "0,0,0",
+              "Weight": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
       "__guid": "c4f2a6b9-7fd3-47e0-82cb-f39e6f708192",
       "Flags": 0,
       "Name": "Camera",
