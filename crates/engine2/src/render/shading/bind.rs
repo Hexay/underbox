@@ -129,7 +129,7 @@ pub fn sample_type_fits(format: wgpu::TextureFormat, want: wgpu::TextureSampleTy
 fn bindless_samplers(gpu: &render::Gpu, b: &Binding, kind: wgpu::SamplerBindingType) -> Vec<wgpu::Sampler> {
     let declared = program::array_len(b) as usize;
     let len = if partially_bound(gpu) { declared.min(samplers::count() + 1) } else { declared };
-    let fallback = defaults::sampler(gpu, kind, None, false);
+    let fallback = defaults::sampler(gpu, kind, None, Default::default());
     let real = |i| samplers::desc(i).filter(|_| kind != wgpu::SamplerBindingType::Comparison).map(|d| samplers::sampler(gpu, &d, kind));
     (0..len).map(|i| real(i).unwrap_or_else(|| fallback.clone())).collect()
 }
@@ -224,7 +224,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         B::Sampler(kind) => {
             let set = (kind != wgpu::SamplerBindingType::Comparison).then(|| inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::sampler(*a, n)))).flatten();
             let attr = s.attributes.get(&b.name);
-            let fallback = || defaults::sampler(gpu, kind, attr.and_then(|a| a.compare), attr.is_some_and(|a| a.anisotropic));
+            let fallback = || defaults::sampler(gpu, kind, attr.and_then(|a| a.compare), attr.map(|a| a.sampler).unwrap_or_default());
             Resource::Sampler(set.map_or_else(fallback, |d| samplers::sampler(gpu, &d, kind)))
         }
         other => return Err(format!("{}: unsupported binding {other:?}", b.name)),

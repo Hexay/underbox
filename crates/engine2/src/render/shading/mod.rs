@@ -12,6 +12,7 @@ mod shadow_slots;
 pub mod layout;
 pub mod program;
 pub mod render_state;
+pub mod sampler_state;
 mod stages;
 pub mod standin;
 pub mod texel_words;
