@@ -227,12 +227,17 @@ pub fn register(r: &mut Registry) {
     bind!(r, device_slots::GET_TEXTURE_POOL_STATS, |a, b, c| {
         (*a, *b, *c) = (0, 0, 0);
     });
-    bind!(r, device_slots::ASYNC_SET_TEXTURE_DATA2, set_data);
+    bind!(r, device_slots::ASYNC_SET_TEXTURE_DATA2, |t, bytes, rect| set_data(t, bytes, rect));
+}
+
+/// Replace every texel of mip 0 (a video frame); ignored if the size doesn't match.
+pub(crate) fn replace(t: Ref, bytes: &[u8]) {
+    set_data(t, bytes, Rect3D { x: 0, y: 0, z: 0, width: 0, height: 0, depth: 0 });
 }
 
 /// Replace the texels in `rect` with tightly packed `bytes`: the whole texture when they cover
 /// it, else a box of mip 0 (uncompressed formats; z is the slice or array layer).
-pub(crate) fn set_data(t: Ref, bytes: &mut [u8], rect: Rect3D) {
+pub(crate) fn set_data(t: Ref, bytes: &[u8], rect: Rect3D) {
     on(t, |t| {
         let mut d = t.data.lock().unwrap();
         let gpu = device::gpu().zip(t.gpu.as_ref());

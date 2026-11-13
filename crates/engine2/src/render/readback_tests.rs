@@ -44,7 +44,7 @@ fn rect_updates_replace_only_the_rect() {
     (config.m_n_width, config.m_n_height, config.m_n_depth, config.m_n_num_mip_levels, config.m_n_image_format) = (3, 2, 1, 1, RGBA8888);
     let t = texture::create(None, true, config, &mut [0; 24]);
     let rect = abi::structs::Rect3D { x: 1, y: 0, z: 0, width: 2, height: 2, depth: 1 };
-    texture::set_data(t, &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], rect);
+    texture::set_data(t, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], rect);
     let want = [[0; 4], [1, 2, 3, 4], [5, 6, 7, 8], [0; 4], [9, 10, 11, 12], [13, 14, 15, 16]].concat();
     assert_eq!(texture::resolve(t).unwrap().cpu_mip0().unwrap().pixels, want);
     let mut out = vec![0u8; 24];

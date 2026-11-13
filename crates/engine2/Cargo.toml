@@ -35,6 +35,7 @@ rustc-hash = "2"
 serde.workspace = true
 serde_json.workspace = true
 shaders = { path = "../shaders" }
+video = { path = "../video" }
 window = { path = "../window" }
 world = { path = "../world" }
 

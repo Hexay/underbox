@@ -1,0 +1,94 @@
+{
+  "__guid": "7c41e2a9-5d3b-4f60-9a18-2e7b5c9d0f31",
+  "GameObjects": [
+    {
+      "__guid": "8d52f3ba-6e4c-4071-8b29-3f8c6dae1042",
+      "Flags": 0,
+      "Name": "Sun",
+      "Rotation": "0.1513,0.4205,-0.3218,0.8344",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.DirectionalLight",
+          "__guid": "9e6304cb-7f5d-4182-9c3a-4091e7bf2153",
+          "LightColor": "1,0.97,0.9,1",
+          "Shadows": false,
+          "SkyColor": "0.25,0.3,0.35,1"
+        }
+      ]
+    },
+    {
+      "__guid": "af7415dc-8061-4293-8d4b-51a2f8c03264",
+      "Flags": 0,
+      "Name": "Box",
+      "Position": "0,0,0",
+      "Rotation": "0,0,0.2588,0.9659",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.ModelRenderer",
+          "__guid": "b08526ed-9172-43a4-9e5c-62b30ad14375",
+          "BodyGroups": 18446744073709551615,
+          "Model": "models/dev/box.vmdl",
+          "RenderType": "On",
+          "Tint": "0.9,0.9,0.9,1"
+        }
+      ]
+    },
+    {
+      "__guid": "c19637fe-a283-45b5-8f6d-73c41be25486",
+      "Flags": 0,
+      "Name": "Camera",
+      "Position": "-200,0,60",
+      "Rotation": "0,0.1305,0,0.9914",
+      "Enabled": true,
+      "Components": [
+        {
+          "__type": "Sandbox.CameraComponent",
+          "__guid": "d2a7480f-b394-46c6-9a7e-84d52cf36597",
+          "BackgroundColor": "0.33,0.46,0.52,1",
+          "ClearFlags": "All",
+          "FieldOfView": 70,
+          "IsMainCamera": true,
+          "Orthographic": false,
+          "OrthographicHeight": 1204,
+          "Priority": 1,
+          "RenderExcludeTags": "",
+          "RenderTags": "",
+          "TargetEye": "None",
+          "Viewport": "0,0,1,1",
+          "ZFar": 10000,
+          "ZNear": 10
+        },
+        {
+          "__type": "Sandbox.ScreenPanel",
+          "__guid": "e3b85910-c4a5-47d7-8b8f-95e63d0478a8",
+          "AutoScreenScale": false,
+          "Opacity": 1,
+          "Scale": 1,
+          "ZIndex": 100
+        },
+        {
+          "__type": "VideoHud",
+          "__guid": "f4c96a21-d5b6-48e8-9c90-a6f74e1589b9"
+        }
+      ]
+    }
+  ],
+  "SceneProperties": {
+    "FixedUpdateFrequency": 50,
+    "MaxFixedUpdates": 5,
+    "NetworkFrequency": 60,
+    "NetworkInterpolation": true,
+    "PhysicsSubSteps": 1,
+    "ThreadedAnimation": true,
+    "TimeScale": 1,
+    "UseFixedUpdate": true,
+    "Metadata": {}
+  },
+  "ResourceVersion": 2,
+  "Title": null,
+  "Description": null,
+  "__references": [],
+  "__version": 2
+}

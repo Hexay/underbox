@@ -47,6 +47,19 @@ licenses/.
 
 Also built from source and linked statically, though fetched through Cargo rather than vendored:
 SDL3 (crates/window, via the sdl3-src crate), zlib licence, Copyright (C) 1997-2026 Sam Lantinga.
+OpenH264 (crates/video, via the openh264-sys2 crate), BSD-2-Clause, Copyright (c) 2013, Cisco
+Systems. It is compiled from source here; Cisco's H.264 patent licence covers only the binaries
+Cisco distributes, so no patent licence comes with this build (docs/video.md).
+libopus (crates/audio and crates/video, via the opusic-sys crate), BSD-3-Clause, Copyright
+2001-2023 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin, Timothy B. Terriberry, CSIRO,
+Gregory Maxwell, Mark Borgerding, Erik de Castro Lopo, Mozilla, Amazon.
+
+Rust crates with notices to keep in binary redistributions, used by crates/video: rav1d (a port
+of dav1d), BSD-2-Clause, Copyright 2018-2019 VideoLAN and dav1d authors, 2023-2024 VideoLAN,
+dav1d authors, and Internet Security Research Group; re_mp4, MIT, Copyright (c) 2020 Alfred
+Gutierrez, (c) 2024 rerun.io; mp4, MIT, Copyright (c) 2020 Alfred Gutierrez; matroska-demuxer,
+Zlib OR MIT OR Apache-2.0, Copyright (c) 2021 Nils Hasenbanck. symphonia (AAC) is MPL-2.0, its
+source unchanged at crates.io.
 
 s&box is a trademark of Facepunch Studios Ltd. This project is not affiliated with or endorsed by
 Facepunch Studios or Valve Corporation.

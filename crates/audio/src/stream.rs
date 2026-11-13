@@ -49,6 +49,11 @@ impl Stream {
         self.capacity().saturating_sub(self.queued_frames())
     }
 
+    /// Drop everything queued (a seek in what feeds it).
+    pub fn clear(&self) {
+        self.state.lock().unwrap().queue.clear();
+    }
+
     pub fn set_paused(&self, paused: bool) {
         self.state.lock().unwrap().paused = paused;
     }
