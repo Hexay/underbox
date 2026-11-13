@@ -93,20 +93,22 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         return;
     }
     let stride = DRAW_UNIFORM_SIZE.next_multiple_of(u64::from(gpu.device.limits().min_uniform_buffer_offset_alignment));
-    let mut bytes = vec![0u8; (stride as usize) * draws.len().max(1)];
-    for (i, d) in draws.iter().enumerate().filter(|(_, d)| d.shaded.is_none()) {
-        let at = stride as usize * i;
-        bytes[at..at + DRAW_UNIFORM_SIZE as usize].copy_from_slice(bytemuck::cast_slice(&d.uniforms.bytes()));
-    }
-    let uniforms = gpu.upload(&bytes, 0);
     let program = &placeholder.program;
-    let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("draw uniforms"),
-        layout: &program.bind_group_layouts[0],
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &uniforms.buffer, offset: uniforms.offset, size: wgpu::BufferSize::new(DRAW_UNIFORM_SIZE) }),
-        }],
+    let bind_group = draws.iter().any(|d| d.shaded.is_none()).then(|| {
+        let mut bytes = vec![0u8; (stride as usize) * draws.len()];
+        for (i, d) in draws.iter().enumerate().filter(|(_, d)| d.shaded.is_none()) {
+            let at = stride as usize * i;
+            bytes[at..at + DRAW_UNIFORM_SIZE as usize].copy_from_slice(bytemuck::cast_slice(&d.uniforms.bytes()));
+        }
+        let uniforms = gpu.upload(&bytes, 0);
+        gpu.bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("draw uniforms"),
+            layout: &program.bind_group_layouts[0],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &uniforms.buffer, offset: uniforms.offset, size: wgpu::BufferSize::new(DRAW_UNIFORM_SIZE) }),
+            }],
+        })
     });
     let store = wgpu::StoreOp::Store;
     let srgb_view = targets.color.filter(|_| targets.srgb_write).and_then(Texture::srgb_target_view);
@@ -157,7 +159,7 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
                 }
                 None => {
                     pass.set_pipeline(&program.pipeline_for(gpu, &key));
-                    pass.set_bind_group(0, &bind_group, &[(stride * i as u64) as u32]);
+                    pass.set_bind_group(0, bind_group.as_ref(), &[(stride * i as u64) as u32]);
                     pass.set_vertex_buffer(1, placeholder.defaults.buffer.slice(..));
                 }
             }

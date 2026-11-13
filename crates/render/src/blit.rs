@@ -51,13 +51,13 @@ impl Blitter {
         };
         let program = &self.programs[transfer as usize];
         let params = src_rect.map(|v| v as f32);
-        let uniform = crate::Buffer::with_data(gpu, "blit params", crate::BufferKind::Uniform, bytemuck::cast_slice(&params));
-        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let uniform = gpu.upload(bytemuck::cast_slice(&params), 0);
+        let bind_group = gpu.bind_group(&wgpu::BindGroupDescriptor {
             label: Some("blit"),
             layout: &program.bind_group_layouts[0],
             entries: &[
                 wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&src.view) },
-                wgpu::BindGroupEntry { binding: 1, resource: uniform.buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: uniform.binding() },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.nearest) },
             ],
         });

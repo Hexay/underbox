@@ -15,6 +15,7 @@ use crate::render::{attributes, bindless, buffers as gpu_buffers, fog, fog_volum
 use crate::resource::Resource as _;
 use glam::{Mat4, Vec4};
 use render::wgpu::{self, BindingType as B};
+use abi::StringToken;
 use shaders::reflect::Binding;
 use std::collections::HashMap;
 
@@ -68,13 +69,25 @@ pub(super) fn names<'a, P>(s: &'a Shading<P>, name: &'a str) -> impl Iterator<It
     std::iter::once(name).chain(s.attributes.get(name).and_then(|a| a.attribute.as_deref()))
 }
 
+/// [`names`] as attribute tokens, hashed once for a search over several attribute objects.
+fn tokens<P>(s: &Shading<P>, name: &str) -> std::iter::Take<std::array::IntoIter<StringToken, 2>> {
+    let alias = s.attributes.get(name).and_then(|a| a.attribute.as_deref());
+    [StringToken::of(name), alias.map_or(StringToken(0), StringToken::of)].into_iter().take(1 + usize::from(alias.is_some()))
+}
+
+/// The first of `inputs`' attribute objects that answers to one of `name`'s tokens, through `get`.
+fn from_attributes<P, T>(s: &Shading<P>, inputs: &Inputs, name: &str, get: impl Fn(attributes::Ref, StringToken) -> Option<T>) -> Option<T> {
+    let t = tokens(s, name);
+    inputs.attributes.iter().find_map(|a| t.clone().find_map(|n| get(*a, n)))
+}
+
 pub(super) fn uniform_value<P>(s: &Shading<P>, inputs: &Inputs, name: &str) -> Option<Value> {
-    let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_value(*a, n)));
+    let attribute = || from_attributes(s, inputs, name, attributes::token_value);
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let attr = s.attributes.get(name);
     let source = || attr.and_then(|a| inputs.view.source(a.source.as_deref()?));
-    let matrix = || inputs.attributes.iter().find_map(|a| names(s, name).find_map(|n| attributes::shader_matrix(*a, n))).map(Value::Mat);
-    let vector = from_attributes().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(source);
+    let matrix = || from_attributes(s, inputs, name, attributes::token_shader_matrix).map(Value::Mat);
+    let vector = attribute().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(source);
     let unset_matrix = attr.is_some_and(|a| a.attribute.is_some() && a.default.is_none()).then_some(Value::Mat(Mat4::IDENTITY)); // real's world text sets no LayerMat
     vector.map(Value::Vec).or_else(matrix).or_else(|| attr.and_then(|a| a.default).map(Value::Vec)).or(unset_matrix)
 }
@@ -92,13 +105,13 @@ enum Resource {
 /// cascade or the lighting's (shadow maps), else a `BindTexture` slot at its binding.
 fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
     let B::Texture { sample_type, view_dimension, multisampled: false } = b.ty else { return None };
-    let from_attributes = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture(*a, n)));
+    let attribute = || from_attributes(s, inputs, &b.name, attributes::token_texture_ref);
     let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
     let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
     // A map also read without comparison has a `_cmp` clone for the compares (shaders' comparison pass).
     let base = b.name.strip_suffix("_cmp").unwrap_or(&b.name);
     let from_managed = || shadow::cascade_of(base).and_then(|n| shadow::managed_cascade(&inputs.constant_buffer("DirectionalLightCB")?, n));
-    let t = from_attributes().or_else(from_material).or_else(from_managed).or_else(|| shadow_slots::texture(base)).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
+    let t = attribute().or_else(from_material).or_else(from_managed).or_else(|| shadow_slots::texture(base)).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (every compiled texture, for now) would paint the draw magenta.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
     if inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {
@@ -106,7 +119,7 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     }
     let gpu = t.gpu.as_ref()?;
     let srgb = s.attributes.get(&b.name).is_some_and(|a| a.srgb);
-    let slice = || inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::texture_slice(*a, n)));
+    let slice = || from_attributes(s, inputs, &b.name, attributes::token_texture_slice);
     let view = || match slice().filter(|_| gpu.texture.mip_level_count() > 1) {
         Some(mip) => gpu.mip_sample_view(srgb, mip),
         None => gpu.sample_view(srgb).clone(),
@@ -174,8 +187,7 @@ fn storage_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding, format: wgpu::T
     if gpu.desc.format != format || !gpu.texture.usage().contains(wgpu::TextureUsages::STORAGE_BINDING) {
         return Err(format!("{}: {:?} isn't writable as {format:?}", b.name, gpu.desc.format));
     }
-    let mip = mip.min(gpu.texture.mip_level_count() - 1);
-    Ok(gpu.texture.create_view(&wgpu::TextureViewDescriptor { base_mip_level: mip, mip_level_count: Some(1), ..Default::default() }))
+    Ok(gpu.mip_view(format, mip, None))
 }
 
 fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -> Result<Resource, String> {
@@ -222,7 +234,7 @@ fn resource<P>(gpu: &render::Gpu, s: &Shading<P>,inputs: &Inputs, b: &Binding) -
         }
         B::StorageTexture { format, view_dimension: wgpu::TextureViewDimension::D2, .. } => Resource::View(storage_view(s, inputs, b, format)?),
         B::Sampler(kind) => {
-            let set = (kind != wgpu::SamplerBindingType::Comparison).then(|| inputs.attributes.iter().find_map(|a| names(s, &b.name).find_map(|n| attributes::sampler(*a, n)))).flatten();
+            let set = (kind != wgpu::SamplerBindingType::Comparison).then(|| from_attributes(s, inputs, &b.name, attributes::token_sampler)).flatten();
             let attr = s.attributes.get(&b.name);
             let fallback = || defaults::sampler(gpu, kind, attr.and_then(|a| a.compare), attr.map(|a| a.sampler).unwrap_or_default());
             Resource::Sampler(set.map_or_else(fallback, |d| samplers::sampler(gpu, &d, kind)))

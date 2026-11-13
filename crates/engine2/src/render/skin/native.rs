@@ -56,23 +56,46 @@ struct Skinned {
     subrect: Option<[f32; 4]>,
 }
 
+/// Keyed by tint too: a mesh's draw calls can carry their own (`DrawCall::tint`).
+type Drawn = (usize, usize, [u32; 4]);
+
 #[derive(Default)]
 struct Frame {
     skinned: HashMap<(usize, usize), Skinned>,
-    /// Keyed by tint too: a mesh's draw calls can carry their own (`DrawCall::tint`).
-    drawn: HashMap<(usize, usize, [u32; 4]), attributes::Ref>,
+    drawn: HashMap<Drawn, attributes::Ref>,
     handles: Vec<buffers::Handle>,
+    transforms: HashMap<Drawn, Arc<render::Buffer>>,
+    /// Last frame's transform buffers, rewritten for the same draw: a new buffer each frame
+    /// changes every bind group that reads it (render/bind_cache.rs).
+    reuse: HashMap<Drawn, Arc<render::Buffer>>,
 }
 
 static FRAME: Mutex<Option<Frame>> = Mutex::new(None);
 
-/// A new frame: last frame's skinned meshes and their buffers are released.
+/// A new frame: last frame's skinned meshes and their handles are released.
 pub fn begin_frame() {
-    let Some(f) = FRAME.lock().unwrap().take() else { return };
+    let mut frame = FRAME.lock().unwrap();
+    let Some(f) = frame.take() else { return };
     f.drawn.into_values().for_each(|a| {
         objects::destroy(a);
     });
     f.handles.into_iter().for_each(buffers::destroy);
+    *frame = Some(Frame { reuse: f.transforms, ..Frame::default() });
+}
+
+/// `drawn`'s transform buffer holding `data`: last frame's when it has that size, else a new one.
+fn transform_buffer(gpu: &render::Gpu, drawn: Drawn, data: &[u8]) -> Arc<render::Buffer> {
+    let mut frame = FRAME.lock().unwrap();
+    let f = frame.get_or_insert_with(Frame::default);
+    let buffer = match f.reuse.remove(&drawn).filter(|b| b.size() == data.len().next_multiple_of(4) as u64) {
+        Some(b) => {
+            b.write(gpu, 0, data);
+            b
+        }
+        None => Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, data)),
+    };
+    f.transforms.insert(drawn, buffer.clone());
+    buffer
 }
 
 /// Mesh `index` of object `key`, skinned this frame (the first ask dispatches): the attributes
@@ -89,13 +112,13 @@ pub fn skinned(key: usize, index: usize, skin: &MeshSkin, model: crate::model::R
     };
     let gpu = crate::render::device::gpu()?;
     let transforms = match earlier {
-        Some(data) => Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &data)),
+        Some(data) => transform_buffer(gpu, drawn, &data),
         None => {
             let inverse = super::inverse_bind_poses(model);
             let bones: Vec<Mat4> = inverse.iter().enumerate().map(|(b, inv)| pose.0.get(b).copied().unwrap_or(Mat4::IDENTITY) * *inv).collect();
             let offset = cache::allocate(skin.vertices)?;
             let subrect = morph.filter(|(w, m)| morphs::active(m, w)).and_then(|(w, m)| morphs::compose(&[(w, m)]).first().copied());
-            let transforms = Arc::new(render::Buffer::with_data(gpu, "skinned transforms", render::BufferKind::Storage, &entries(&bones, tint, offset, skin.weights, subrect)));
+            let transforms = transform_buffer(gpu, drawn, &entries(&bones, tint, offset, skin.weights, subrect));
             dispatch::run(dispatch::SHADER, skin, &transforms, &[Job { slot: 0, offset }], subrect.is_some()).inspect_err(|e| crate::render::compute::warn_once(dispatch::SHADER, e)).ok()?;
             FRAME.lock().unwrap().get_or_insert_with(Frame::default).skinned.insert((key, index), Skinned { bones, offset, weights: skin.weights, subrect });
             transforms

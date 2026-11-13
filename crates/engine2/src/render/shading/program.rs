@@ -8,7 +8,7 @@ use glam::Vec4;
 use render::wgpu;
 use shaders::reflect::{Binding, VertexInput};
 use shaders::{CompiledStage, Compiler, Stage, Variant, VfxShader};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 /// What a vfx global answers to: its `Attribute( "Name" )` and `Default*( ... )`.
 #[derive(Clone, Debug, Default)]
@@ -154,7 +154,7 @@ fn parse_default(args: &str) -> Option<Vec4> {
 }
 
 fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
-    let mut out = HashMap::new();
+    let mut out = HashMap::default();
     for a in shader.programs.iter().flat_map(|p| &p.annotations) {
         let attribute = a.get("Attribute").map(|s| s.trim().trim_matches('"').to_owned());
         let default = ["Default", "Default1", "Default2", "Default3", "Default4"].iter().find_map(|k| a.get(k).and_then(parse_default));

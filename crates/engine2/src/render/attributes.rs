@@ -1,77 +1,16 @@
 //! `CRenderAttributes`: named values shaders read (floats, vectors, textures, combos...), each
 //! type in its own namespace as native keeps them, with a parent consulted for missing values.
 
+mod store;
+
 use abi::slots::c_render_attributes as ra;
 use abi::structs::{CSamplerStateDesc, Matrix, Vector2, Vector3, Vector4};
 use abi::{NativeRef, Registry, StringToken, bind, class};
-use rustc_hash::FxHashMap as HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use store::{Kind, NUMERIC};
+pub use store::{RenderAttributes, Value};
 
 pub type Ref = NativeRef<class::CRenderAttributes>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum Kind {
-    Float,
-    Vector2,
-    Vector3,
-    Vector4,
-    Matrix,
-    String,
-    Int,
-    Combo,
-    Bool,
-    Texture,
-    Sampler,
-    Buffer,
-    Ptr,
-    IntVector4,
-    ConstantBuffer,
-}
-
-#[derive(Clone)]
-pub enum Value {
-    Float(f32),
-    Vector2(Vector2),
-    Vector3(Vector3),
-    Vector4(Vector4),
-    Matrix(Matrix),
-    String(String),
-    Int(i32),
-    Combo(u8),
-    Bool(bool),
-    /// The texture's handle as managed passed it, and the mip it asked for.
-    Texture(NativeRef<class::CTextureBase>, i32),
-    Sampler(CSamplerStateDesc),
-    Buffer(usize),
-    Ptr(usize),
-    IntVector4([i32; 4]),
-    /// A whole constant block's bytes (`SetConstantBufferData`), by block name.
-    ConstantBuffer(Arc<[u8]>),
-}
-
-#[derive(Default)]
-pub struct RenderAttributes {
-    values: Mutex<HashMap<(Kind, u32), Value>>,
-    parent: Mutex<Option<Arc<RenderAttributes>>>,
-}
-
-impl RenderAttributes {
-    fn set(&self, kind: Kind, name: StringToken, value: Value) {
-        self.values.lock().unwrap().insert((kind, name.0), value);
-    }
-
-    fn get(&self, kind: Kind, name: StringToken) -> Option<Value> {
-        if let Some(v) = self.values.lock().unwrap().get(&(kind, name.0)) {
-            return Some(v.clone());
-        }
-        let parent = self.parent.lock().unwrap().clone();
-        parent.and_then(|p| p.get(kind, name))
-    }
-
-    fn delete(&self, kind: Kind, name: StringToken) {
-        self.values.lock().unwrap().remove(&(kind, name.0));
-    }
-}
 
 /// A new, empty attributes object as managed holds it.
 pub fn create() -> Ref {
@@ -98,7 +37,12 @@ pub fn int(r: Ref, name: StringToken) -> Option<i32> {
 }
 
 pub fn matrix(r: Ref, name: &str) -> Option<Matrix> {
-    on(r, |a| match a.get(Kind::Matrix, StringToken::of(name)) {
+    token_matrix(r, StringToken::of(name))
+}
+
+/// [`matrix`] by token.
+pub fn token_matrix(r: Ref, name: StringToken) -> Option<Matrix> {
+    on(r, |a| match a.get(Kind::Matrix, name) {
         Some(Value::Matrix(m)) => Some(m),
         _ => None,
     })
@@ -107,7 +51,12 @@ pub fn matrix(r: Ref, name: &str) -> Option<Matrix> {
 /// A matrix value as a `float4x4` constant reads it: native uploads managed's row-major bytes
 /// into column-major HLSL, so the shader's `mul( M, v )` applies managed's row-vector transform.
 pub fn shader_matrix(r: Ref, name: &str) -> Option<glam::Mat4> {
-    let n = matrix(r, name)?.numerics;
+    token_shader_matrix(r, StringToken::of(name))
+}
+
+/// [`shader_matrix`] by token.
+pub fn token_shader_matrix(r: Ref, name: StringToken) -> Option<glam::Mat4> {
+    let n = token_matrix(r, name)?.numerics;
     Some(glam::Mat4::from_cols_array(&[n.m11, n.m12, n.m13, n.m14, n.m21, n.m22, n.m23, n.m24, n.m31, n.m32, n.m33, n.m34, n.m41, n.m42, n.m43, n.m44]))
 }
 
@@ -147,7 +96,7 @@ pub fn shader_value(r: Ref, name: &str) -> Option<glam::Vec4> {
 /// [`shader_value`] by token.
 pub fn token_value(r: Ref, t: StringToken) -> Option<glam::Vec4> {
     on(r, |a| {
-        [Kind::Vector4, Kind::Vector3, Kind::Vector2, Kind::Float, Kind::Int, Kind::Bool, Kind::Combo, Kind::IntVector4].iter().find_map(|k| match a.get(*k, t)? {
+        a.first(&NUMERIC, t).and_then(|(_, value)| match value {
             Value::Vector4(v) => Some(glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, v.vec.w)),
             Value::Vector3(v) => Some(glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, 0.0)),
             Value::Vector2(v) => Some(glam::Vec4::new(v.vec.x, v.vec.y, 0.0, 0.0)),
@@ -184,7 +133,7 @@ pub fn set_buffer(r: Ref, name: StringToken, handle: usize) {
 
 pub fn set_parent(r: Ref, parent: Ref) {
     let parent = objects::get::<_, RenderAttributes>(parent);
-    on(r, |s| *s.parent.lock().unwrap() = parent);
+    on(r, |s| s.set_parent(parent));
 }
 
 /// The GPU buffer handle named `name` (with parents), as `SetBufferValue` stored it.
@@ -200,6 +149,11 @@ pub fn texture(r: Ref, name: &str) -> Option<NativeRef<class::CTextureBase>> {
     texture_mip(r, name).map(|(t, _)| t)
 }
 
+/// [`texture_mip`] by token, without the mip.
+pub fn token_texture_ref(r: Ref, name: StringToken) -> Option<NativeRef<class::CTextureBase>> {
+    token_texture(r, name).map(|(t, _)| t)
+}
+
 /// [`texture`] with the mip managed set it for (0 when it asked for none).
 pub fn texture_mip(r: Ref, name: &str) -> Option<(NativeRef<class::CTextureBase>, u32)> {
     token_texture(r, StringToken::of(name))
@@ -207,7 +161,12 @@ pub fn texture_mip(r: Ref, name: &str) -> Option<(NativeRef<class::CTextureBase>
 
 /// The sampler state named `name` (with parents).
 pub fn sampler(r: Ref, name: &str) -> Option<CSamplerStateDesc> {
-    on(r, |a| match a.get(Kind::Sampler, StringToken::of(name)) {
+    token_sampler(r, StringToken::of(name))
+}
+
+/// [`sampler`] by token.
+pub fn token_sampler(r: Ref, name: StringToken) -> Option<CSamplerStateDesc> {
+    on(r, |a| match a.get(Kind::Sampler, name) {
         Some(Value::Sampler(s)) => Some(s),
         _ => None,
     })
@@ -215,7 +174,12 @@ pub fn sampler(r: Ref, name: &str) -> Option<CSamplerStateDesc> {
 
 /// The mip managed named for texture `name`, if it named one (-1, the default, means every mip).
 pub fn texture_slice(r: Ref, name: &str) -> Option<u32> {
-    on(r, |a| match a.get(Kind::Texture, StringToken::of(name)) {
+    token_texture_slice(r, StringToken::of(name))
+}
+
+/// [`texture_slice`] by token.
+pub fn token_texture_slice(r: Ref, name: StringToken) -> Option<u32> {
+    on(r, |a| match a.get(Kind::Texture, name) {
         Some(Value::Texture(t, mip)) if !t.is_null() && mip >= 0 => Some(mip.unsigned_abs()),
         _ => None,
     })
@@ -277,12 +241,12 @@ pub fn register(r: &mut Registry) {
     // Bindless descriptors are the GPU's; the empty device has none to bind.
     bind!(r, ra::SET_GLOBAL_BINDLESS_DESCRIPTOR_SET, |_| {});
 
-    bind!(r, ra::IS_EMPTY, |a| on(a, |s| s.values.lock().unwrap().is_empty()));
-    bind!(r, ra::CLEAR, |a, _free_memory, _clear_parent| on(a, |s| s.values.lock().unwrap().clear()));
+    bind!(r, ra::IS_EMPTY, |a| on(a, |s| s.is_empty()));
+    bind!(r, ra::CLEAR, |a, _free_memory, _clear_parent| on(a, |s| s.clear()));
     bind!(r, ra::SET_PARENT, set_parent);
     bind!(r, ra::MERGE_TO_PTR, |a, into| {
-        let from = on(a, |s| s.values.lock().unwrap().clone());
-        on(into, |s| s.values.lock().unwrap().extend(from))
+        let Some(into) = objects::get::<_, RenderAttributes>(into) else { return };
+        on(a, |s| s.merge_into(&into))
     });
     bind!(r, ra::ARE_EQUAL, |a, b, _ignore_combos| a == b);
 }
