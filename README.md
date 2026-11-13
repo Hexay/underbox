@@ -108,7 +108,7 @@ sh tools/verify.sh               # the full gate: tests, clippy, boots, golden f
 | `crates/physics`, `box2d-sys`, `anim`, `audio` | Rapier and Box2D v3 physics, animation graphs, audio mixer |
 | `crates/gns`, `platform` | GameNetworkingSockets, Steam and offline platform backends |
 | `corpus/` | small test games and scenes with golden frame hashes |
-| `third_party/` | GameNetworkingSockets, Box2D and protobuf as git submodules |
+| `third_party/` | GameNetworkingSockets, Box2D and protobuf as git submodules; a patched Rapier (`rapier3d/UNDERBOX.md`) |
 | `docs/`, `research/` | design notes and file-format research |
 
 ## Docs

@@ -1,6 +1,11 @@
 [workspace]
 members = ["crates/*", "tools/abigen"]
+exclude = ["third_party/rapier3d"]
 resolver = "3"
+
+# Rapier with kinematic bodies colored like fixed ones: third_party/rapier3d/UNDERBOX.md.
+[patch.crates-io]
+rapier3d = { path = "third_party/rapier3d" }
 
 [workspace.package]
 edition = "2024"
