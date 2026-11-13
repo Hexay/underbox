@@ -104,6 +104,17 @@ fn find(touches: &[Touch], key: (Rank, Rank)) -> Option<&Touch> {
     touches.binary_search_by_key(&key, |t| t.key).ok().map(|i| &touches[i])
 }
 
+/// Each of `from`'s touches with its match in `other`; both sorted by key without repeats.
+fn merged<'a>(from: &'a [Touch], other: &'a [Touch]) -> impl Iterator<Item = (&'a Touch, Option<&'a Touch>)> {
+    let mut j = 0;
+    from.iter().map(move |t| {
+        while other.get(j).is_some_and(|o| o.key < t.key) {
+            j += 1;
+        }
+        (t, other.get(j).filter(|o| o.key == t.key))
+    })
+}
+
 impl Contacts {
     /// Diff this step's touching pairs against the last step's, queueing events.
     pub fn update(&mut self, world: &PhysicsWorld, hooks: &Hooks) {
@@ -129,8 +140,8 @@ impl Contacts {
         });
         let wants = |a, b, bit| [a, b].iter().any(|c| hooks.meta.get(c).is_some_and(|m: &ShapeMeta| m.functions & bit != 0));
         self.began.clear();
-        for t in &now {
-            let was = find(&self.touching, t.key).map(|w| w.kind);
+        for (t, was) in merged(&now, &self.touching) {
+            let was = was.map(|w| w.kind);
             if t.kind == Contact::Solid && was.is_none() {
                 self.began.push((t.a, t.b));
             }
@@ -144,7 +155,7 @@ impl Contacts {
                 self.events.push(event(world, k, t.a, t.b));
             }
         }
-        for t in self.touching.iter().filter(|t| find(&now, t.key).is_none()) {
+        for (t, _) in merged(&self.touching, &now).filter(|(_, kept)| kept.is_none()) {
             match t.kind {
                 Contact::Trigger => self.events.push(event(world, EventKind::TriggerEnd, t.a, t.b)),
                 Contact::Solid if wants(t.a, t.b, function::TOUCH) => self.events.push(event(world, EventKind::TouchEnd, t.a, t.b)),

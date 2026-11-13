@@ -201,9 +201,80 @@ Real's getters don't wake either: the probe reads `Body.Sleeping` every step and
 sleeps those bodies at step 25 (`ProbeRest.cs`, `SLEEP`). Read the zoo by `GAME:RESTED` or a state
 dump, never by `GAME:TICK` awake counts.
 
+## Round 4: where the gap is
+
+Cycle samples (`perf record -e cycles:u -c 200000`, 8 s of ticks, load 15–30), per thread:
+
+| | Ours | Real |
+| --- | --- | --- |
+| Engine on main | 13.8 k (Rapier 9 k, wrapper 2.1 k, slots 2–3 k) | 2.1 k |
+| Engine on `GlobPool` | | 3.5 k |
+| Managed JIT code on main | 6.1 k | 6.1 k |
+| CLR on main | 1.8 k | 2.0 k |
+
+Everything but physics is a wash; our physics costs about 2.3× real's, all threads counted.
+Headless (rapier's `profiler` counters, timers around the wrapper), a keyframed step is 0.75 ms:
+Rapier 0.56 ms (solver 0.43, collision detection 0.09), `Contacts::update` 0.12 (half of it
+`touches`' geometry), and `arm_sleep`, `force_turned_contacts`, `release_forced_contacts` and the
+bounce pass 0.015–0.02 each. In the server Rapier costs about 1.5× its headless time: managed
+work between steps evicts its data.
+
+**Slots.** Each of the 1312 getter calls a tick took the registry's read lock, hashed into it,
+called `Any::type_id`, upgraded the body's `Weak` world, locked the world and dropped the `Arc`:
+six locked instructions and four cold cache lines. Its samples sit on those instructions (the
+lock prefix waits for the managed stores before it), not on the hashing.
+
+**Keyframed vs static.** Not overhead: with fixed walls 50–120 bodies sleep between kicks, with
+keyframed ones none do (`PILE_TRACE=1`), as Rapier's islands join every body touching a
+non-fixed one. With all bodies awake both cost the same per step. Real's pile has 0 of 328
+bodies asleep at all 9 dumped ticks (`run.sh state` on `tools/diff/pile`), like ours.
+
+## Round 4: changes
+
+- **Body slots resolve per thread** (`engine2/src/physics/body_cache.rs`): a thread-local map
+  from body ref to its world, body and id, all strong refs. Deleting any body bumps an epoch
+  after the registry drops it, and a thread drops its whole map on its next call once the epoch
+  moved. A hit costs no registry lock, no refcount traffic and leaves `Body` untouched; the world
+  lock stays. `OnActive` gathering resolves the handle through it too. Slot samples 3.2 k → 2.0 k.
+- **Touch diff is a merge** (`contacts.rs` `merged`): last step's and this step's sorted pairs
+  are walked together instead of binary-searched both ways. Instructions for a 750-step run:
+  keyframed 5.31 → 5.19 G, static 4.66 → 4.55 G.
+
+## Round 4: tried, not kept
+
+- **Thin LTO** (`lto = "thin"`): headless cycles −3%, instructions 5.31 → 5.23 G; in the
+  server Rapier's samples didn't move beyond the noise (8.7–9.6 k against 8.9–9.1 k), and a cold
+  release build took 4.5 min. Fat LTO with one codegen unit: the same −3% headless.
+- **Rapier `parallel`, re-measured** for wall time with the serial tail gone: bit-identical at 1,
+  2 and 4 threads, but at load ~27 the median was 0.67–0.81 ms against 0.77 serial, total wall
+  355–441 ms against 346–395, CPU 341–398 ms against 339–340. The tick is measured in CPU, which
+  workers only add to.
+- **PGO:** rustc's LLVM is 23, the box's `llvm-profdata` 21; not attempted.
+
+## Round 4: results
+
+Interleaved `run.sh perf pile both`, `REPEATS=1` × 3 rounds per build, load 22–27:
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Tick CPU median | 3.02–3.19 ms | 2.87–2.97 ms |
+| Total CPU, 500 ticks | 1.99–2.06 s | 1.88–1.95 s |
+| Main thread | 1.48–1.55 s | 1.40–1.44 s |
+| Ratio to real, median | 1.31–1.36× | 1.19–1.28× |
+
+Real in the same runs: 2.22–2.44 ms median, main 0.78–0.94 s. At load 15–18 the same before
+build read 2.56–2.75 ms and 1.19× (REPEATS=3): the ratio grows with load, as ours is the more
+cache-bound. The 1.05× goal is not met; what's left is Rapier's solver against real's.
+
+Behaviour: `run.sh state` on the pile (9 dumps, ticks 1–750) is byte-identical before and after;
+probe (1789) and orbmatch (132) markers of the two builds agree at tolerance 0; example hashes
+are unchanged for both wall types; `tools/test.sh physics` and `tools/test.sh engine2 physics`
+pass.
+
 ## What's left
 
-Our main thread is still about 1.6× real's, and real spreads its physics over `GlobPool` workers.
-Rapier's `parallel` feature was dropped while the serial tail held the step (round 2); with the
-tail gone it is worth measuring again for wall time, though the tick is measured in CPU. The
-keyframed pile's remaining 0.2 ms over static is unexplained.
+Rapier's step, not interop or the wrapper: 0.43 ms of solver for ~440 contacts × 4 substeps × 5
+sweeps (2 PGS, 3 stabilization), fitted to real's landings and resting depths. Fewer sweeps or
+another solver would change behaviour. Within the wrapper, `touches`' GJK pass (0.06 ms) is the
+largest piece; the narrow-phase manifold can't stand in for it, as its distances are from before
+the solver moved the bodies.

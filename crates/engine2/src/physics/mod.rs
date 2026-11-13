@@ -6,6 +6,7 @@ mod aggregate_slots;
 #[cfg(test)]
 mod aggregate_tests;
 pub mod body;
+mod body_cache;
 mod body_mass;
 mod body_query;
 mod body_slots;
