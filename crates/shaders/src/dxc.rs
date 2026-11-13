@@ -11,7 +11,9 @@ pub const DXC_TAG: &str = "v1.9.2609";
 /// `-fspv-reflect` for input semantics (stripped again in `spirv::strip_reflection`). Buffers use
 /// strict std140/std430 (`-fvk-use-gl-layout`), which is WGSL's layout: DXC's default "relaxed"
 /// Vulkan layout and `-fvk-use-dx-layout` both put vectors at offsets WGSL rejects.
-pub const ARGS: &[&str] = &["-spirv", "-HV", "2018", "-fspv-target-env=vulkan1.1", "-fvk-use-gl-layout", "-fspv-reflect"];
+/// `-fspv-preserve-interface` keeps stage inputs a program never reads, as real's compiler does:
+/// its pipelines fetch every `VS_INPUT` member (a vertex-cache draw's position and indices too).
+pub const ARGS: &[&str] = &["-spirv", "-HV", "2018", "-fspv-target-env=vulkan1.1", "-fvk-use-gl-layout", "-fspv-reflect", "-fspv-preserve-interface"];
 
 pub struct Dxc {
     lib: hassle_rs::Dxc,

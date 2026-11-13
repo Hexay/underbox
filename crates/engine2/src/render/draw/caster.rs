@@ -2,7 +2,7 @@
 //! (`shading/standin_depth.shader`, real's closed `depth_only.shader`), which binds the shadow
 //! view's 1088-byte per-view constants and reads world transforms from `g_TransformBuffer` like
 //! the main view's programs. Every rigid draw of the same mesh range becomes one instanced draw;
-//! vertex-cache (skinned) draws keep their own bindings and switch program.
+//! vertex-cache (skinned) draws keep their own bindings and switch program ([`on_depth`]).
 
 use super::{Draw, device, sort_opaque, vertex_cached};
 use crate::mesh::layout::{Field, Layout, format};
@@ -46,6 +46,15 @@ fn vertex_keys(depth: &Shading, mesh: &VertexBufferKey) -> Option<Vec<VertexBuff
     vertex::inputs(&depth.vertex_inputs, &layout).map(|i| i.keys)
 }
 
+/// A vertex-cache draw's depth program (its `D_CS_VERTEX_ANIMATION` variant, from the draw's
+/// attributes) and vertex inputs from its mesh layout. It keeps the draw's own transform buffer: a
+/// caster instance's would hold no cache offset.
+fn on_depth(s: &super::shaded::Shaded) -> Option<(Arc<Shading>, Vec<VertexBufferKey>)> {
+    let depth = shading::program(device::gpu()?, standin::DEPTH_PATH, &s.context.attributes)?;
+    let keys = vertex::inputs(&depth.vertex_inputs, s.cached_mesh.as_ref()?)?.keys;
+    Some((depth, keys))
+}
+
 /// `draws` seen through `view_proj` as casters: same-mesh rigid draws merged into instanced
 /// draws, vertex-cache draws on the depth program, in real's opaque order ([`sort_opaque`]).
 pub fn instanced(draws: Vec<Draw>, view_proj: Mat4) -> Vec<Draw> {
@@ -54,12 +63,10 @@ pub fn instanced(draws: Vec<Draw>, view_proj: Mat4) -> Vec<Draw> {
     let mut out = Vec::new();
     for mut d in draws {
         let keys = d.vertex.first().and_then(|k| vertex_keys(&depth, k));
-        let cached = vertex_cached(&d);
-        match (d.shaded.take(), keys) {
-            (Some(s), Some(keys)) if cached => {
-                out.push(Draw { shaded: Some(super::shaded::Shaded { shading: depth.clone(), vertex: keys, ..s }), ..d });
-            }
-            (None, Some(keys)) => {
+        let cached = vertex_cached(&d).then(|| d.shaded.as_ref().and_then(on_depth)).flatten();
+        match (d.shaded.take(), keys, cached) {
+            (Some(s), _, Some((shading, vertex))) => out.push(Draw { shaded: Some(super::shaded::Shaded { shading, vertex, ..s }), ..d }),
+            (None, Some(keys), _) => {
                 let instance = Instance { world: d.uniforms.model, tint: d.uniforms.tint };
                 match groups.iter_mut().find(|(g, _, _)| same_mesh(g, &d)) {
                     Some((g, _, instances)) => {
@@ -69,7 +76,7 @@ pub fn instanced(draws: Vec<Draw>, view_proj: Mat4) -> Vec<Draw> {
                     None => groups.push((d, keys, vec![instance])),
                 }
             }
-            (shaded, _) => out.push(Draw { shaded, ..d }),
+            (shaded, _, _) => out.push(Draw { shaded, ..d }),
         }
     }
     let uniforms = |d: &Draw| render::pass::DrawUniforms { mvp: view_proj, model: Mat4::IDENTITY, ..d.uniforms };

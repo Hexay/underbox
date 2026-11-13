@@ -61,7 +61,7 @@ The health HUD wraps "100" onto two lines ("10" / "0"). That's missing content, 
 `.health` is `width: 100px` in `font-family: Poppins` at 64px, Poppins ships with s&box's Steam
 content (`Font 'Poppins' not found`), and the system fallback, DejaVu Sans, sets "100" 122px wide
 (Liberation Sans: 107px). RichTextKit breaks a word that overflows the line at a character, as in
-docs/real-games.md's icon-font case.
+docs/real-games-rendering.md's icon-font case.
 
 
 No textures or models: the Citizen, coins, road cone and door are error models, and the floor and

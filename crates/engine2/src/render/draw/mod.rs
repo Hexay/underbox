@@ -61,9 +61,10 @@ pub struct Indirect {
     pub ids_offset: u64,
 }
 
-/// Whether `d` draws from the skinning vertex cache: only its material program's bindings read it.
+/// Whether `d` draws from the skinning vertex cache: its program takes the vertex index streams
+/// (the `D_CS_VERTEX_ANIMATION` variant, render/skin).
 pub fn vertex_cached(d: &Draw) -> bool {
-    d.shaded.as_ref().is_some_and(|s| !s.context.attributes.is_empty())
+    d.shaded.as_ref().is_some_and(|s| crate::render::shading::vertex::streams(&s.vertex).contains(&crate::render::shading::vertex::Stream::VertexIndex))
 }
 
 /// Opaque and shadow draws in real's order, as its captures show it (docs/differential-gpu.md):
@@ -183,14 +184,14 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
         _ => None,
     };
     let bound: Vec<_> = draws.iter().map(bind).collect();
-    let (defaults, ids) = shaded::streams(gpu);
+    let streams = shaded::streams(gpu);
     let draws: Vec<_> = draws
         .iter()
         .zip(&bound)
         .map(|(d, groups)| {
             let as_caster = depth.as_ref().zip(groups.as_ref()).filter(|_| d.shaded.is_none() && d.caster.is_some());
             let culled = d.cull.indirect.as_ref().map(|c| (&c.ids.buffer, c.ids_offset));
-            let as_caster = as_caster.map(|(c, g)| Shaded { program: &c.program, bind_groups: g, buffers: vec![culled.unwrap_or((&ids.buffer, 0)), (&defaults.buffer, 0)] });
+            let as_caster = as_caster.map(|(c, g)| Shaded { program: &c.program, bind_groups: g, buffers: streams.bound(&d.vertex, culled.unwrap_or((&streams.ids.buffer, 0))) });
             let material = d.shaded.as_ref().zip(groups.as_ref());
             MeshDraw {
                 indirect: d.cull.indirect.as_ref().map(|c| (&c.args.buffer, c.args_offset)),
@@ -203,8 +204,8 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
                 uniforms: d.uniforms,
                 state: state(d),
                 shaded: material.map(|(s, groups)| {
-                    let ids = culled.or(s.context.instance_ids.as_ref().map(|(b, offset)| (&b.buffer, *offset))).unwrap_or((&ids.buffer, 0));
-                    Shaded { program: &s.shading.program, bind_groups: groups, buffers: vec![ids, (&defaults.buffer, 0)] }
+                    let ids = culled.or(s.context.instance_ids.as_ref().map(|(b, offset)| (&b.buffer, *offset))).unwrap_or((&streams.ids.buffer, 0));
+                    Shaded { program: &s.shading.program, bind_groups: groups, buffers: streams.bound(&s.vertex, ids) }
                 }).or(as_caster),
             }
         })

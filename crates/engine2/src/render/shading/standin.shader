@@ -32,9 +32,13 @@ struct VS_INPUT
 	float2 vTexCoord : TEXCOORD0 < Semantic( LowPrecisionUv ); >;
 	float4 vNormalOs : NORMAL < Semantic( OptionallyCompressedTangentFrame ); >;
 	float4 vTangentUOs_flTangentVSign : TANGENT < Semantic( TangentU_SignV ); >;
+	#if ( D_CS_VERTEX_ANIMATION )
+		float4 vBlendWeight : BLENDWEIGHT < Semantic( BlendWeight ); >;
+		float nVertexIndex : TEXCOORD14 < Semantic( MorphIndex ); >;
+		float nVertexCacheIndex : TEXCOORD15 < Semantic( MorphIndex ); >;
+	#endif
 	uint nInstanceTransformID : TEXCOORD13 < Semantic( InstanceTransformUv ); >;
 	uint4 vBlendIndices : BLENDINDICES < Semantic( BlendIndices ); >;
-	uint nVertexID : SV_VertexID;
 };
 
 struct PS_INPUT
@@ -60,23 +64,23 @@ VS
 	float4 g_vTexCoordScale < Attribute( "g_vTexCoordScale" ); Default4( 1.0, 1.0, 0.0, 0.0 ); >;
 	float4 g_vTexCoordOffset < Attribute( "g_vTexCoordOffset" ); Default4( 0.0, 0.0, 0.0, 0.0 ); >;
 
-	// A skinned entry (render/skin) with a vertex-cache block was skinned by skinning_cs; one
-	// without skins here by its first bone; a rigid entry's bone is ignored.
+	// A vertex-animation draw (render/skin) reads what skinning_cs placed in the vertex cache, as
+	// vr_common_vs_code.fxc does; a rigid entry's bone is ignored.
 	PS_INPUT MainVs( const VS_INPUT i )
 	{
 		PS_INPUT o;
 		ExtraShaderData_t extra = GetExtraPerInstanceShaderData( i.nInstanceTransformID );
 		float3 vPositionWs;
-		if ( g_TransformBuffer[ i.nInstanceTransformID ].BlendWeightCount != 0 && extra.nVertexCacheOffset != 0xFFFFFFFFu )
+		#if ( D_CS_VERTEX_ANIMATION )
 		{
-			CachedAnimatedVertex_t v = FetchCachedVertex( extra.nVertexCacheOffset + i.nVertexID );
+			CachedAnimatedVertex_t v = FetchCachedVertex( extra.nVertexCacheOffset + uint( i.nVertexCacheIndex ) );
 			float3 vTangent;
 			float flSign;
 			DecodeCachedVertexTangentSpace( v, o.vNormalWs, vTangent, flSign );
 			o.vTangentUWs_flTangentVSign = float4( vTangent, flSign );
 			vPositionWs = v.vPosWs;
 		}
-		else
+		#else
 		{
 			float3x4 matObjectToWorld = GetTransformMatrix( i.nInstanceTransformID, i.vBlendIndices.x );
 			vPositionWs = mul( matObjectToWorld, float4( i.vPositionOs.xyz, 1.0 ) );
@@ -86,6 +90,7 @@ VS
 			o.vNormalWs = mul( (float3x3)matObjectToWorld, vNormalOs );
 			o.vTangentUWs_flTangentVSign = float4( mul( (float3x3)matObjectToWorld, vTangentOs.xyz ), vTangentOs.w );
 		}
+		#endif
 		o.vPositionPs = Position3WsToPs( vPositionWs );
 		o.vPositionWs = vPositionWs;
 		o.vTexCoord = i.vTexCoord * g_vTexCoordScale.xy + g_vTexCoordOffset.xy;

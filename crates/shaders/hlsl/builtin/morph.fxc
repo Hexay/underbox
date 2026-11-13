@@ -20,19 +20,22 @@ MorphSubrectData_t CalculateMorphSubrectData( uint nBaseSlot )
 	return o;
 }
 
-// The renderer's composite (engine2 render/skin/morphs.rs): per vertex a position delta (w:
-// wrinkle) and a normal delta; vAtlasRect.x is the instance's first float4, .y how many it has.
-StructuredBuffer<float4> g_MorphComposite < Attribute( "MorphComposite" ); >;
+// The composite atlas (engine2 render/skin/morphs.rs), MorphTextureAtlasWidth × half that: position
+// deltas (w: wrinkle) in the left half, normal deltas at the same texel in the right. vAtlasRect is
+// the region (u, width, v, height) in atlas uv; vertex n sits at (n % width, n / width) in it.
+Texture2D<float4> g_tMorphComposite < Attribute( "MorphComposite" ); >;
 
 void Morph( inout float3 vPosition, inout float3 vNormal, inout float flWrinkle, uint nVertex, MorphSubrectData_t data )
 {
-	if ( 2 * nVertex + 1 >= uint( data.vAtlasRect.y ) )
+	float2 vAtlas = float2( g_nMorphTextureAtlasWidth, g_nMorphTextureAtlasWidth / 2 );
+	uint4 vRect = uint4( data.vAtlasRect * vAtlas.xxyy + 0.5 );
+	if ( vRect.y == 0 || nVertex >= vRect.y * vRect.w )
 		return;
-	uint nAt = uint( data.vAtlasRect.x ) + 2 * nVertex;
-	float4 vDelta = g_MorphComposite[ nAt ];
+	int2 vTexel = int2( vRect.x + nVertex % vRect.y, vRect.z + nVertex / vRect.y );
+	float4 vDelta = g_tMorphComposite.Load( int3( vTexel, 0 ) );
 	vPosition += vDelta.xyz;
 	flWrinkle += vDelta.w;
-	vNormal += g_MorphComposite[ nAt + 1 ].xyz;
+	vNormal += g_tMorphComposite.Load( int3( vTexel + int2( g_nMorphTextureAtlasWidth / 2, 0 ), 0 ) ).xyz;
 }
 #endif
 

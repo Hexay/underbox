@@ -4,15 +4,17 @@
 //! - an animated object writes a base transform entry, a morph entry and one entry per bone
 //!   (world pose × inverse bind pose) into a transform buffer (`transform_buffer.fxc`);
 //! - meshes with one blend weight are skinned in the vertex shader (`GetTransformMatrix(slot,
-//!   bone)`); meshes with more, or with morphs, run `skinning_cs` into the vertex cache
-//!   ([`cache`], 24 bytes per vertex) and draw from there (the stand-in reads it when its entry
-//!   has a cache offset and blend weights);
-//! - morphs are composited per object first ([`morphs`]): CPU-summed deltas in one buffer per
-//!   frame, read by our `morph.fxc` `Morph()` at the subrect in the morph entry.
+//!   bone)`); meshes with more, or with morphs, run `skinning_cs` from the mesh's own vertex
+//!   stream into the vertex cache ([`cache`], 24 bytes per vertex), and their draws take the
+//!   `D_CS_VERTEX_ANIMATION` combo: the vertex shader reads the cache at the entry's offset plus
+//!   the vertex's `nVertexCacheIndex` stream (shading/vertex.rs);
+//! - morphs are composited first ([`morphs`]): a GPU pass of additive quads into one texture,
+//!   which skinning_cs samples through our `morph.fxc` `Morph()` at the morph entry's subrect.
 //!
 //! Managed drives this through the `RenderTools` slots here; engine-drawn objects through
 //! [`native`]. A mesh is skinned when its model has more than one bone and its layout has bone
-//! indices in a form skinning_cs reads (compiled meshes: `Layout::sbox_skinned_vertex`).
+//! indices in a form skinning_cs reads (compiled meshes: `Layout::sbox_skinned_vertex`, drawn and
+//! skinned from `Layout::skinned_draw_vertex`, real's stream).
 
 pub mod cache;
 mod dispatch;
@@ -22,7 +24,7 @@ pub mod native;
 mod tests;
 
 use crate::mesh::buffers::VertexBuffer;
-use crate::mesh::layout::format;
+use crate::mesh::layout::{Layout, format};
 use crate::model::Model;
 use abi::slots::render_tools as tools;
 use abi::{RawPtr, Registry, bind};
@@ -46,6 +48,9 @@ pub struct Input {
 
 pub const NONE: u32 = u32::MAX;
 
+/// The combo a draw from the vertex cache takes (`instancing.fxc`; managed's `MeshRenderFeature`).
+pub const VERTEX_ANIMATION: &str = "D_CS_VERTEX_ANIMATION";
+
 /// What skinning a model mesh takes (`RenderTools.GetModelMeshSkinning`).
 #[derive(Clone)]
 pub struct MeshSkin {
@@ -57,37 +62,35 @@ pub struct MeshSkin {
     pub vb: Arc<VertexBuffer>,
 }
 
-fn field(vb: &VertexBuffer, semantic: &str, formats: &[u32]) -> Option<(u32, u32)> {
-    vb.meta.fields.iter().find(|f| f.semantic == semantic && f.index == 0 && formats.contains(&f.format) && f.offset % 4 == 0).map(|f| (f.offset as u32, f.format))
+fn field(layout: &Layout, semantic: &str, formats: &[u32]) -> Option<(u32, u32)> {
+    layout.fields.iter().find(|f| f.semantic == semantic && f.index == 0 && formats.contains(&f.format) && f.offset % 4 == 0).map(|f| (f.offset as u32, f.format))
 }
 
-/// skinning_cs's view of `vb`: a float position first, 8-bit bone indices, optional unorm weights.
-fn input(vb: &VertexBuffer) -> Option<Input> {
-    let (position, _) = field(vb, "position", &[format::RGB32F, format::RGBA32F])?;
-    let (bone_index, _) = field(vb, "blendindices", &[format::RGBA8_UINT])?;
-    let (normal, normal_format) = field(vb, "normal", &[format::RGB32F, format::RGBA32F, format::R32_UINT]).unwrap_or((NONE, 0));
+/// skinning_cs's view of a `layout` vertex: a float position first, 8-bit bone indices, optional
+/// unorm weights.
+fn input(layout: &Layout) -> Option<Input> {
+    let (position, _) = field(layout, "position", &[format::RGB32F, format::RGBA32F])?;
+    let (bone_index, _) = field(layout, "blendindices", &[format::RGBA8_UINT])?;
+    let (normal, normal_format) = field(layout, "normal", &[format::RGB32F, format::RGBA32F, format::R32_UINT]).unwrap_or((NONE, 0));
     let uncompressed = normal_format != format::R32_UINT;
-    let tangent = field(vb, "tangent", &[format::RGBA32F]).filter(|_| uncompressed).map_or(NONE, |f| f.0);
-    let bone_weight = field(vb, "blendweight", &[format::RGBA8_UNORM]).map_or(NONE, |f| f.0);
-    (position == 0 && normal != NONE).then_some(Input { stride: vb.stride() as u32, normal, tangent, bone_index, bone_weight, uncompressed })
+    let tangent = field(layout, "tangent", &[format::RGBA32F]).filter(|_| uncompressed).map_or(NONE, |f| f.0);
+    let bone_weight = field(layout, "blendweight", &[format::RGBA8_UNORM]).map_or(NONE, |f| f.0);
+    (position == 0 && normal != NONE).then_some(Input { stride: layout.stride as u32, normal, tangent, bone_index, bone_weight, uncompressed })
 }
 
-fn weights_used(vb: &VertexBuffer, input: &Input) -> u32 {
-    if input.bone_weight == NONE {
-        return 1;
-    }
+fn weights_used(vb: &VertexBuffer) -> u32 {
+    let Some(at) = field(&vb.meta, "blendweight", &[format::RGBA8_UNORM]).map(|f| f.0 as usize) else { return 1 };
     let bytes = vb.read();
-    let at = input.bone_weight as usize;
-    bytes.chunks_exact(input.stride as usize).map(|v| v[at..at + 4].iter().filter(|w| **w != 0).count() as u32).max().unwrap_or(1).max(1)
+    bytes.chunks_exact(vb.stride().max(1)).map(|v| v[at..at + 4].iter().filter(|w| **w != 0).count() as u32).max().unwrap_or(1).max(1)
 }
 
-/// Mesh `mesh` of `model`'s skinning; `None` when it draws rigidly.
+/// Mesh `mesh` of `model`'s skinning; `None` when it draws rigidly. `input` describes the stream
+/// it draws from (gpu_mesh::draw_vertices), which skinning_cs reads too.
 pub fn mesh_skin(model: &Model, handle: crate::model::Ref, mesh: usize) -> Option<MeshSkin> {
     let bones = crate::anim::data::of(handle).anim.skeleton.len() as u32;
     let vb = model.content.meshes.get(mesh)?.mesh.state().vertices.clone()?;
-    let input = input(&vb).filter(|_| bones > 1)?;
-    let weights = weights_used(&vb, &input);
-    Some(MeshSkin { vertices: vb.count() as u32, bones, weights, input, vb })
+    let input = input(&crate::render::draw::gpu_mesh::draw_layout(&vb)).filter(|_| bones > 1)?;
+    Some(MeshSkin { vertices: vb.count() as u32, bones, weights: weights_used(&vb), input, vb })
 }
 
 /// Rows of `m` as native's `matrix3x4_t`.
@@ -132,9 +135,11 @@ fn skinning_bones(m: crate::model::Ref, mesh: i32, poses: RawPtr<c_void>, master
     true
 }
 
-/// A new frame: the vertex cache empties and last frame's engine-drawn skins are released.
+/// A new frame: the vertex cache and morph composite start over and last frame's engine-drawn
+/// skins are released.
 pub fn begin_frame() {
     cache::begin_frame();
+    morphs::begin_frame();
     native::begin_frame();
 }
 

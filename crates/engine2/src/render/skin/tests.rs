@@ -56,7 +56,7 @@ fn the_rigged_mesh_reports_its_skin() {
     let model = crate::model::get(r).expect("rigged model loads");
     let skin = mesh_skin(&model, r, 0).expect("a skinned mesh");
     assert_eq!((skin.vertices, skin.bones, skin.weights), (24, 3, 1));
-    assert_eq!((skin.input.bone_index, skin.input.bone_weight, skin.input.normal), (76, 80, 16));
+    assert_eq!((skin.input.bone_index, skin.input.bone_weight, skin.input.normal), (60, 64, 12), "real's 68-byte draw stream");
     let (mut bones, mut weights) = (0i32, 0i32);
     let n = skinning(r, 0, RawPtr::from_raw((&raw mut bones).cast()), RawPtr::from_raw((&raw mut weights).cast()));
     assert_eq!((n, bones, weights), (24, 3, 1));
@@ -85,11 +85,11 @@ fn skinning_cs_poses_and_morphs_into_the_vertex_cache() {
     let spine = Mat4::from_translation(Vec3::new(100.0, 0.0, 0.0)) * Mat4::from_rotation_z(std::f32::consts::FRAC_PI_2);
     let bones = [Mat4::IDENTITY, spine, Mat4::from_translation(Vec3::new(0.0, 0.0, 50.0))];
     let weights: crate::render::draw::morph::Weights = [("smile".to_owned(), 1.0)].into();
-    let (data, subrects) = morphs::compose(&[(&weights, &mesh)]);
+    let subrects = morphs::compose(&[(&weights, &mesh)]);
     let offset = cache::allocate(skin.vertices).unwrap();
     let entries = native::entries(&bones, [1.0; 4], offset, skin.weights, subrects.first().copied());
     let transforms = Arc::new(render::Buffer::with_data(gpu, "test transforms", render::BufferKind::Storage, &entries));
-    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], morphs::upload(&data).as_ref()).expect("skinning_cs builds and dispatches");
+    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], true).expect("skinning_cs builds and dispatches");
     let got = cached_positions(gpu, offset, 24);
     for (i, v) in mesh.vertices().iter().enumerate() {
         let lift = if (20..24).contains(&i) { fixture::SMILE_LIFT } else { 0.0 };
@@ -97,6 +97,21 @@ fn skinning_cs_poses_and_morphs_into_the_vertex_cache() {
         let want = bones[bone].transform_point3(Vec3::from(v.position) + Vec3::new(0.0, 0.0, lift));
         assert!((got[i] - want).length() < 1e-3, "vertex {i}: got {}, want {want}", got[i]);
     }
+}
+
+/// Real's vertex-cache pipelines fetch every `VS_INPUT` member, read or not (its skinned capture).
+/// DXC keeps the material stand-in's unread inputs out despite `-fspv-preserve-interface`, so
+/// that one only checks the inputs it reads.
+#[test]
+fn vertex_animation_programs_take_reals_inputs() {
+    let Some(()) = mount() else { return eprintln!("skipped: no sbox-public checkout") };
+    let Some(gpu) = device::create() else { return eprintln!("skipped: no GPU") };
+    use crate::render::shading::{self, standin};
+    let a = crate::render::attributes::create();
+    crate::render::attributes::set(a, VERTEX_ANIMATION, crate::render::attributes::Value::Combo(1));
+    let semantics = |path| shading::program(gpu, path, &[a]).unwrap().vertex_inputs.iter().map(|i| i.semantic.clone()).collect::<Vec<_>>();
+    assert_eq!(semantics(standin::DEPTH_PATH), ["POSITION", "TEXCOORD14", "TEXCOORD15", "TEXCOORD13", "BLENDINDICES"]);
+    assert_eq!(semantics(standin::PATH), ["TEXCOORD0", "TEXCOORD15", "TEXCOORD13"]);
 }
 
 #[test]
@@ -110,7 +125,7 @@ fn two_weight_vertices_blend_their_bones() {
     let bones = [Mat4::IDENTITY, Mat4::from_translation(Vec3::new(0.0, 40.0, 0.0)), Mat4::IDENTITY];
     let offset = cache::allocate(skin.vertices).unwrap();
     let transforms = Arc::new(render::Buffer::with_data(gpu, "puppet transforms", render::BufferKind::Storage, &native::entries(&bones, [1.0; 4], offset, skin.weights, None)));
-    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], None).unwrap();
+    run(dispatch::SHADER, &skin, &transforms, &[Job { slot: 0, offset }], false).unwrap();
     let got = cached_positions(gpu, offset, 24);
     for (i, v) in model.content.meshes[0].mesh.vertices().iter().enumerate().take(20) {
         // Weights are unorm bytes: 0.5 is 128/255 of the spine.

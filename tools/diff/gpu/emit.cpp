@@ -1,5 +1,7 @@
 // A submitted command buffer's events as JSON lines, resolved against device memory after the submit.
 #include "json.h"
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 namespace gpu {
@@ -173,7 +175,8 @@ static void draw(Device* d, Frame& fr, const DrawRec& r, int index) {
     if (!st.pc.empty()) o.str("pc", hexbytes(st.pc.data(), st.pc.size()));
     auto pi = pipes().find(h64(st.gfx.pipe));
     if (pi != pipes().end()) {
-        std::vector<std::string> vb, ivb;
+        std::vector<std::string> vb, ivb, vvb;
+        static const VkDeviceSize verts = [] { const char* e = getenv("UNDERBOX_GPU_VERTS"); return e ? (VkDeviceSize)strtoull(e, nullptr, 10) : 0; }();
         for (auto& b : pi->second->vb) {
             if (b.binding >= st.vbs.size()) continue;
             auto& v = st.vbs[b.binding];
@@ -181,6 +184,13 @@ static void draw(Device* d, Frame& fr, const DrawRec& r, int index) {
             VkDeviceSize size = info != objs().buffers.end() && v.off < info->second.size ? info->second.size - v.off : 0;
             VkDeviceSize stride = v.stride ? v.stride : b.stride;
             vb.push_back(arr({num(b.binding), num((double)stride), num((double)size)}));
+            if (b.inputRate == VK_VERTEX_INPUT_RATE_VERTEX && verts && !all.empty() && stride) {
+                // The first UNDERBOX_GPU_VERTS vertices from the first draw's vertex offset: [binding, stride, first, blob].
+                VkDeviceSize first = (VkDeviceSize)std::max(0, all[0].vofs);
+                VkDeviceSize left = size > first * stride ? size - first * stride : 0;
+                auto bytes = left ? read_buffer(d, v.buf, v.off + first * stride, std::min<VkDeviceSize>(left, verts * stride)) : std::vector<uint8_t>();
+                if (!bytes.empty()) vvb.push_back(arr({num(b.binding), num((double)stride), num((double)first), put_blob(fr, bytes, kBlobMax)}));
+            }
             if (b.inputRate != VK_VERTEX_INPUT_RATE_INSTANCE || all.empty() || !stride) continue;
             // Per-instance data of the instances drawn: [binding, stride, first instance, blob].
             uint32_t lo = UINT32_MAX, hi = 0;
@@ -191,6 +201,7 @@ static void draw(Device* d, Frame& fr, const DrawRec& r, int index) {
         }
         o.raw("vb", arr(vb));
         if (!ivb.empty()) o.raw("ivb", arr(ivb));
+        if (!vvb.empty()) o.raw("vvb", arr(vvb));
         o.raw("state", state_obj(*pi->second, st.dyn)).raw("res", resources(d, fr, *pi->second, st.gfx));
     }
     line(fr, o.done());

@@ -155,7 +155,12 @@ Ranked divergences:
     spine fully); with it 0.17 / 0.31 / 0.47, 0.9984. MRPH's `m_nLookupType` and
     `m_nEncodingType`, which ours now writes as real does, made no difference. **Open:** through
     managed's renderer real still draws no morphed puppet at all (managed 0.97 / 1.25 / 1.09,
-    0.9887), and logs nothing about it.
+    0.9887), and logs nothing about it. Its capture shows the puppet composited, skinned and drawn
+    (one-instance draws), so it lands degenerate. Narrowed on real (MANAGED=1 against native, scratch
+    copies of the scene): real's citizen with `Morphs` set draws the same (SSIM 0.9993); so does
+    the morphed puppet with `smile` set and no clip, and the plain puppet playing `bow`. Only `bow`
+    driving the morph through its flex channel fails. The decode key now orders channels as real's
+    citizen does (Position, Angle, MorphChannel, Scale; morph elements before scales); no change.
 13. **Fixed. Real's compiled models went dark on ours.** Real's core models store `NORMAL` as
     `R10G10B10A2_UNORM` (format 24), which ours didn't decode at all (zero normals). skinning_cs
     shows only the split (x, y, z 10 bits, w 2); `vs_decompress.fxc` is closed, so the decode was
@@ -248,8 +253,9 @@ Running a game checkout instead of a corpus scene, and walker's divergences: doc
   `r_texture_stream_max_resolution` -1, `r_texture_stream_resolution_bias_min` 1.0). Nothing
   reads the streaming two yet, and managed sampler states don't clamp to `r_max_anisotropy`
   (`render/samplers.rs`), though real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
-- **Content:** why real's managed renderer draws no morphed puppet (15). Next: does real draw
-  its own citizen under `MANAGED=1` on lavapipe? If not, it's real's, not our content.
+- **Content:** why real's managed renderer draws no morphed puppet (15): only a clip's flex
+  channel driving the morph fails. Next: real content whose clip drives morphs without an anim
+  graph, to tell real's managed path from our flex encoding.
 - **Decals (16):** normal and height (parallax) maps, sheeted decal textures
   (`GetSheetSequenceTextureData`), and the exclusion mask aren't applied; the corpus uses none.
   Decal edges (19).

@@ -128,7 +128,7 @@ fn native_compiled_files_load_from_their_embedded_source() {
     assert!(load::apply(&v, &resource_file(compiled::sprv_payload(&[]), None), None, 0).is_err(), "no shader at all");
 }
 
-/// A program body in the layout real files have (docs/real-games.md): VCS header (65 or 68, ABI 2),
+/// A program body in the layout real files have (docs/real-games-rendering.md): VCS header (65 or 68, ABI 2),
 /// program hash and shared hash, reflection text, then combos as `-3` and a zstd frame needing
 /// dictionary 0x2bc2fa87, which no file carries.
 fn real_layout_body(vcs: i32) -> Vec<u8> {

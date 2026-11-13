@@ -119,6 +119,27 @@ impl Layout {
         Arc::new(Layout { name: "SkinnedVertex".into(), stride: at + 8, fields })
     }
 
+    /// What real's skinned meshes hold, its skinning_cs reads and its draws bind (68 bytes, from
+    /// its capture): float position, normal, tangent, two float UVs, colour, bone indices and
+    /// weights. The GPU copy of a [`Layout::sbox_skinned_vertex`] mesh (gpu_mesh.rs).
+    pub fn skinned_draw_vertex() -> Arc<Layout> {
+        let field = |semantic: &str, index, format, offset| Field { semantic: semantic.into(), index, format, offset };
+        Arc::new(Layout {
+            name: "SkinnedDrawVertex".into(),
+            stride: 68,
+            fields: vec![
+                field("position", 0, format::RGB32F, 0),
+                field("normal", 0, format::RGB32F, 12),
+                field("tangent", 0, format::RGBA32F, 24),
+                field("texcoord", 0, format::RG32F, 40),
+                field("texcoord", 1, format::RG32F, 48),
+                field("color", 0, format::RGBA8_UNORM, 56),
+                field("blendindices", 0, format::RGBA8_UINT, 60),
+                field("blendweight", 0, format::RGBA8_UNORM, 64),
+            ],
+        })
+    }
+
     /// Which `VertexStreams` this layout carries.
     pub fn streams(&self) -> i32 {
         self.fields.iter().fold(0, |m, f| {

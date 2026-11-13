@@ -56,14 +56,28 @@ pub fn vertices(b: &Arc<VertexBuffer>) -> Option<Arc<render::Buffer>> {
     upload(b, BufferKind::Vertex)
 }
 
-/// The vertex stream a draw reads and its layout. Compiled geometry ([`Layout::sbox_vertex`])
-/// draws from [`Layout::packed_vertex`], as real's does; skinning and the CPU keep the full
-/// vertices ([`vertices`]).
-pub fn draw_vertices(b: &Arc<VertexBuffer>) -> Option<(Arc<render::Buffer>, Arc<Layout>)> {
-    if *b.meta != *Layout::sbox_vertex() {
-        return Some((vertices(b)?, b.meta.clone()));
+/// The layout of the stream a draw of `b` reads ([`draw_vertices`]).
+pub fn draw_layout(b: &VertexBuffer) -> Arc<Layout> {
+    if *b.meta == *Layout::sbox_vertex() {
+        Layout::packed_vertex()
+    } else if *b.meta == *Layout::sbox_skinned_vertex() {
+        Layout::skinned_draw_vertex()
+    } else {
+        b.meta.clone()
     }
-    Some((upload_to(&PACKED, b, BufferKind::Vertex, |bytes| pack(&b.meta, bytes))?, Layout::packed_vertex()))
+}
+
+/// The vertex stream a draw reads and its layout, as real's: compiled geometry draws from
+/// [`Layout::packed_vertex`], compiled skinned geometry from [`Layout::skinned_draw_vertex`]
+/// (which skinning_cs reads too); the CPU keeps the full vertices ([`vertices`]).
+pub fn draw_vertices(b: &Arc<VertexBuffer>) -> Option<(Arc<render::Buffer>, Arc<Layout>)> {
+    let layout = draw_layout(b);
+    let buffer = match layout.name.as_str() {
+        "PackedVertex" => upload_to(&PACKED, b, BufferKind::Vertex, |bytes| pack(&b.meta, bytes))?,
+        "SkinnedDrawVertex" => upload_to(&PACKED, b, BufferKind::Vertex, |bytes| pack_skinned(&b.meta, bytes))?,
+        _ => vertices(b)?,
+    };
+    Some((buffer, layout))
 }
 
 fn pack(layout: &Layout, bytes: &[u8]) -> Vec<u8> {
@@ -72,6 +86,21 @@ fn pack(layout: &Layout, bytes: &[u8]) -> Vec<u8> {
         v.position.iter().for_each(|p| out.extend_from_slice(&p.to_le_bytes()));
         v.tex0[..2].iter().for_each(|t| out.extend_from_slice(&half::f16::from_f32(*t).to_le_bytes()));
         out.extend_from_slice(&assets::compiled::vertex::pack_frame(v.normal, v.tangent).to_le_bytes());
+    }
+    out
+}
+
+fn pack_skinned(layout: &Layout, bytes: &[u8]) -> Vec<u8> {
+    let raw = |s: &str| layout.fields.iter().find(|f| f.semantic == s).map_or(0, |f| f.offset);
+    let (indices, weights) = (raw("blendindices"), raw("blendweight"));
+    let mut out = Vec::with_capacity(bytes.len() / layout.stride.max(1) * 68);
+    for chunk in bytes.chunks_exact(layout.stride.max(1)) {
+        let v = layout.decode(chunk);
+        let floats = v.position.iter().chain(&v.normal).chain(&v.tangent).chain(&v.tex0[..2]).chain(&v.tex1[..2]);
+        floats.for_each(|f| out.extend_from_slice(&f.to_le_bytes()));
+        out.extend_from_slice(&v.color);
+        out.extend_from_slice(&chunk[indices..indices + 4]);
+        out.extend_from_slice(&chunk[weights..weights + 4]);
     }
     out
 }

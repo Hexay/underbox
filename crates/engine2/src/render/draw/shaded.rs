@@ -17,7 +17,7 @@ use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 pub struct Shaded {
     pub shading: Arc<Shading>,
-    /// Slot 0 from the mesh, slot 1 defaults, slot 2 instance ids ([`vertex::inputs`]).
+    /// Slot 0 from the mesh, then the shared [`Streams`] ([`vertex::inputs`]).
     pub vertex: Vec<VertexBufferKey>,
     pub material: Arc<Material>,
     /// Values the draw adds over the material's (stand-in flags, normal packing).
@@ -25,6 +25,8 @@ pub struct Shaded {
     pub instance: binding::Instance,
     pub view_proj: Mat4,
     pub context: ContextBindings,
+    /// The mesh layout, kept for vertex-cache draws: their depth program reads fields this one doesn't.
+    pub cached_mesh: Option<Arc<Layout>>,
 }
 
 /// What a context binds for its draws besides the material (`SetRenderState`, `BindTexture`).
@@ -48,7 +50,8 @@ pub fn resolve(material: Arc<Material>, layout: &Layout, instance: binding::Inst
     };
     let mut values: HashMap<String, Vec4> = extra.into_iter().map(|(k, v)| (k.to_owned(), Vec4::splat(v))).collect();
     values.insert("UncompressedTangentFrame".into(), Vec4::splat(f32::from(u8::from(inputs.uncompressed_normals))));
-    Some(Shaded { shading, vertex: inputs.keys, material, values, instance, view_proj, context })
+    let cached_mesh = vertex::streams(&inputs.keys).contains(&vertex::Stream::VertexIndex).then(|| Arc::new(layout.clone()));
+    Some(Shaded { shading, vertex: inputs.keys, material, values, instance, view_proj, context, cached_mesh })
 }
 
 impl Shaded {
@@ -65,18 +68,43 @@ impl Shaded {
     }
 }
 
-/// Slot 1 (attribute defaults, stride 0) and slot 2 (instance ids from 0) for every shaded draw.
-pub fn streams(gpu: &render::Gpu) -> &'static (render::Buffer, render::Buffer) {
-    static STREAMS: OnceLock<(render::Buffer, render::Buffer)> = OnceLock::new();
+/// The shared streams behind a shaded draw's slots after the mesh's ([`vertex::Stream`]).
+pub struct Streams {
+    pub defaults: render::Buffer,
+    /// Instance ids from 0.
+    pub ids: render::Buffer,
+    /// Vertex indices from 0, as floats.
+    pub indices: render::Buffer,
+}
+
+impl Streams {
+    /// The buffers bound after the mesh for `keys`, with `ids` as the instance-id stream.
+    pub fn bound<'a>(&'a self, keys: &[VertexBufferKey], ids: (&'a wgpu::Buffer, u64)) -> Vec<(&'a wgpu::Buffer, u64)> {
+        let buffer = |s| match s {
+            vertex::Stream::InstanceIds => ids,
+            vertex::Stream::VertexIndex => (&self.indices.buffer, 0),
+            vertex::Stream::Defaults => (&self.defaults.buffer, 0),
+        };
+        vertex::streams(keys).into_iter().map(buffer).collect()
+    }
+}
+
+pub fn streams(gpu: &render::Gpu) -> &'static Streams {
+    static STREAMS: OnceLock<Streams> = OnceLock::new();
     STREAMS.get_or_init(|| {
         let ids: Vec<u8> = (0..MAX_INSTANCES).flat_map(u32::to_le_bytes).collect();
         let defaults: Vec<u8> = vertex::DEFAULTS.iter().flat_map(|f| f.to_le_bytes()).collect();
-        (render::Buffer::with_data(gpu, "material defaults", BufferKind::Vertex, &defaults), render::Buffer::with_data(gpu, "instance ids", BufferKind::Vertex, &ids))
+        let indices: Vec<u8> = (0..MAX_VERTEX_INDEX).flat_map(|i| (i as f32).to_le_bytes()).collect();
+        let buffer = |label, data: &[u8]| render::Buffer::with_data(gpu, label, BufferKind::Vertex, data);
+        Streams { defaults: buffer("material defaults", &defaults), ids: buffer("instance ids", &ids), indices: buffer("vertex indices", &indices) }
     })
 }
 
 /// Instance ids the shared id stream holds; more instances in one draw read past it.
 pub const MAX_INSTANCES: u32 = 1024;
+/// Vertex indices the shared index stream holds (real's holds as many); larger vertex-cache
+/// meshes read past it.
+pub const MAX_VERTEX_INDEX: u32 = 1 << 17;
 
 /// The draw's bind groups, with its pipeline for `key` built: both under one validation scope.
 pub fn bind(gpu: &render::Gpu, d: &Shaded, view: &View, lighting: &Lighting, key: &PipelineKey, targets: &[texture::Ref]) -> Option<Vec<wgpu::BindGroup>> {

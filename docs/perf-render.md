@@ -71,10 +71,26 @@ of the main-thread or lavapipe drop.
   (showroom 25 → 17 dispatches, skinned 27 → 20), and the rest is unchanged. Its "bindless textures" count for ours drops, because reused groups write no
   descriptors in the captured frame.
 
+## Skinning and morphs as real's
+
+The GPU morph composite, real's vertex-cache streams and `-fspv-preserve-interface`
+(docs/skinning.md, docs/differential-gpu.md item 7). Medians of 5 interleaved runs per binary, ms:
+
+| Metric | showroom before | showroom after | skinned before | skinned after |
+| --- | --- | --- | --- | --- |
+| Engine CPU | 86.5 | 85.0 | 86.3 | 86.3 |
+| Lavapipe CPU | 131 | 133 | 99.5 | 102 |
+
+- Real, 3 runs: showroom engine 84.1, lavapipe 120; skinned engine 99.1, lavapipe 91.7.
+- Lavapipe's ~2 ms rise is on both scenes, so likely the unread inputs now fetched (real fetches
+  them too) rather than the composite pass; not A/B'd alone. Frame wall moved with load (20–30) and isn't compared.
+- Frame metrics on the seven scenes equal docs/differential-render.md's latest column.
+
 ## Left, and negative results
 
-- **Skinned raster is still 10% over real.** Ours draws from the compute-skinned vertex cache;
-  real skins from the mesh's float stream (docs/differential-gpu.md item 5).
+- **Skinned raster is still about 10% over real**, and not because of skinning: both skin in
+  compute and draw from the vertex cache through the same streams ("Skinning and morphs" below).
+  The stand-in's fragment cost is the remaining suspect; unmeasured.
 - **Main thread is still above real's**, more so on skinned. What's left is attribute lookups
   by name per draw (`uniform_value`, `names`), malloc in bind-group building, and wgpu's pass
   encoding.

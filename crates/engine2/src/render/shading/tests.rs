@@ -69,7 +69,7 @@ pub(crate) fn standin_cube(tint: [f32; 4], lighting: &Lighting) -> Option<render
     let mat = material::load_path("materials/test/standin.vmat");
     let values = HashMap::from([("UncompressedTangentFrame".to_owned(), Vec4::ONE)]);
     let instance = bind::Instance { world: Mat4::IDENTITY, tint };
-    d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default() });
+    d.shaded = Some(Shaded { shading: s, vertex: inputs.keys, material: material::resolve(mat).unwrap(), values, instance, view_proj, context: Default::default(), cached_mesh: None });
 
     let (color, depth) = (texture::create_target("standin", 64, 64, 0), texture::create_target("standin depth", 64, 64, 62));
     let target = Target { color, depth, ..Default::default() };
