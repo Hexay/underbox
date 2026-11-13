@@ -21,7 +21,7 @@ pub fn step(r: world::Ref, dt: f32, substeps: u32) {
             .into_iter()
             .filter_map(|a| {
                 let rb = sim.body(a.body)?;
-                let handle = body::get(body::from_user_data(a.user_data))?.handle.id();
+                let handle = objects::with(body::from_user_data(a.user_data), |b: &body::Body| b.handle.id())?;
                 let transform = Transform { position: from_vec(rb.translation()), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(*rb.rotation()) };
                 Some((handle, transform, from_vec(rb.linvel()), from_vec(rb.angvel()), a.fell_asleep))
             })

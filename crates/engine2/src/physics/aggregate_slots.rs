@@ -40,7 +40,7 @@ fn total_mass(r: Ref) -> f32 {
 fn mass_center(r: Ref) -> physics::Vector {
     let (m, c) = bodies(r).into_iter().fold((0.0, physics::Vector::ZERO), |(m, c), b| {
         let mb = mass(b);
-        (m + mb, c + body::with_rb(b, |rb| rb.center_of_mass()) * mb)
+        (m + mb, c + body::read_rb(b, |rb| rb.center_of_mass()) * mb)
     });
     if m > 0.0 { c / m } else { physics::Vector::ZERO }
 }
@@ -72,7 +72,7 @@ pub fn register(r: &mut Registry) {
 
     bind!(r, a::WAKE_UP, |g| each(g, |rb| rb.wake_up(true)));
     bind!(r, a::PUT_TO_SLEEP, |g| each(g, |rb| rb.sleep()));
-    bind!(r, a::IS_ASLEEP, |g| bodies(g).into_iter().all(|b| body::with_rb(b, |rb| rb.is_sleeping())));
+    bind!(r, a::IS_ASLEEP, |g| bodies(g).into_iter().all(|b| body::read_rb(b, |rb| rb.is_sleeping())));
     bind!(r, a::SET_VELOCITY, |g, v| each(g, |rb| rb.set_linvel(to_vec(v), true)));
     bind!(r, a::ADD_VELOCITY, |g, v| each(g, |rb| rb.set_linvel(rb.linvel() + to_vec(v), true)));
     bind!(r, a::SET_ANGULAR_VELOCITY, |g, v| each(g, |rb| rb.set_angvel(to_vec(v), true)));
@@ -83,7 +83,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, a::SET_TOTAL_MASS, set_total_mass);
     bind!(r, a::GET_MASS_CENTER, |g| from_vec(mass_center(g)));
     // The root body's position, as native's aggregate origin.
-    bind!(r, a::GET_ORIGIN, |g| from_vec(bodies(g).first().map(|b| body::with_rb(*b, |rb| rb.translation())).unwrap_or_default()));
+    bind!(r, a::GET_ORIGIN, |g| from_vec(bodies(g).first().map(|b| body::read_rb(*b, |rb| rb.translation())).unwrap_or_default()));
     // TODO: surface properties need g_pPhysicsSystem's surface controller.
     bind!(r, a::SET_SURFACE_PROPERTIES, |_, _| {});
     bind!(r, a::GET_WORLD, |g| get(g).and_then(|g| world::get(g.world)).map_or(HandleId::new(-1), |w| w.handle.id()));
