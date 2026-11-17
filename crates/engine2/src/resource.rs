@@ -84,6 +84,12 @@ impl<T: Send + Sync + 'static> ByName<T> {
     }
 }
 
+impl<T: Send + Sync + 'static> Default for ByName<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Send + Sync + 'static> Sweep for ByName<T> {
     fn sweep(&self) -> usize {
         // Dropped unlocked: a resource's drop may release others of its type.
