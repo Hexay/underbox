@@ -21,8 +21,11 @@ pub struct Attr {
     pub sampler: SamplerState,
     /// A texture's `SrgbRead( true )`: sampled through its sRGB view.
     pub srgb: bool,
-    /// An engine-supplied value's `Source( ... )`: `Viewport` (shading/view.rs).
+    /// An engine-supplied value's `Source( ... )`: `Viewport` (shading/view.rs), `TextureDim`
+    /// (shading/texture_dim.rs).
     pub source: Option<String>,
+    /// The `SourceArg( ... )` a `Source` takes: the texture `TextureDim` measures.
+    pub source_arg: Option<String>,
 }
 
 fn compare_func(s: &str) -> Option<wgpu::CompareFunction> {
@@ -162,7 +165,8 @@ fn attributes(shader: &VfxShader) -> HashMap<String, Attr> {
         let sampler = SamplerState::parse(a.get("Filter"), ["AddressU", "AddressV", "AddressW"].map(|k| a.get(k)));
         let srgb = a.get("SrgbRead").is_some_and(|v| matches!(v.trim(), "true" | "1"));
         let source = a.get("Source").map(|s| s.trim().to_owned());
-        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, sampler, srgb, source });
+        let source_arg = a.get("SourceArg").map(|s| s.trim().to_owned());
+        out.entry(a.name.clone()).or_insert(Attr { attribute, default, compare, sampler, srgb, source, source_arg });
     }
     out
 }
@@ -200,10 +204,11 @@ pub fn build_with(gpu: &render::Gpu, compiler: &Compiler, shader: &VfxShader, la
 /// every vertex divided by it and nothing drew.
 #[test]
 fn source_annotations_take_the_view_value() {
-    let src = "MODES { Default(); }\nVS\n{\n\tfloat4 g_vViewport < Source( Viewport ); >;\n}\n";
+    let src = "MODES { Default(); }\nVS\n{\n\tfloat4 g_vViewport < Source( Viewport ); >;\n\tfloat4 g_vInvTextureDim < Source( InvTextureDim ); SourceArg( g_tColor ); >;\n}\n";
     let shader = VfxShader::parse(src, std::path::Path::new("source_test.shader"), &shaders::IncludePaths::new(Vec::new())).unwrap();
     let attrs = attributes(&shader);
     let source = attrs["g_vViewport"].source.as_deref().expect("Source( Viewport ) kept");
+    assert_eq!(attrs["g_vInvTextureDim"].source_arg.as_deref(), Some("g_tColor"), "SourceArg kept");
     let view = super::view::View { viewport: [8.0, 4.0, 1024.0, 768.0], target: [1040.0, 780.0], ..Default::default() };
     assert_eq!(view.source(source), Some(Vec4::new(8.0, 4.0, 1024.0, 768.0)));
 }

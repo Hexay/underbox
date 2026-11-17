@@ -16,6 +16,7 @@ pub mod sampler_state;
 mod stages;
 pub mod standin;
 pub mod texel_words;
+mod texture_dim;
 pub mod vertex;
 pub mod view;
 pub mod view_space;

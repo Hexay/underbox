@@ -60,8 +60,7 @@ impl View {
     }
 
     /// A global's `Source( ... )` value. `Viewport` is the raster viewport in pixels, which the UI
-    /// shaders map screen positions through.
-    // TODO: TextureDim / InvTextureDim need the texture the variable is paired with.
+    /// shaders map screen positions through. Texture sizes: shading/texture_dim.rs.
     pub fn source(&self, source: &str) -> Option<Vec4> {
         (source == "Viewport").then(|| Vec4::from_array(self.viewport))
     }

@@ -124,8 +124,7 @@ enum Storage {
     Loaded,
 }
 
-/// The GPU side of a 2D, 2D array or cube texture, when a device exists and the format maps.
-/// TODO: volume textures on the GPU (CPU-only here).
+/// The GPU side of a 2D, 2D array, cube or volume texture, when a device exists and the format maps.
 fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8], storage: Storage) -> Option<render::Texture> {
     let gpu = device::gpu()?;
     let format = formats::to_wgpu(c.m_n_image_format)?;
@@ -134,9 +133,10 @@ fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8], storage: St
     }
     let format = if storage == Storage::Loaded { format.add_srgb_suffix() } else { format };
     let cube = c.m_n_flags & TSPEC_CUBE_TEXTURE != 0;
+    let volume = c.m_n_flags & TSPEC_VOLUME_TEXTURE != 0 && !cube && !format.is_depth_stencil_format();
     let depth = c.m_n_depth.max(1) as u32;
-    let plain = c.m_n_flags & TSPEC_TEXTURE_ARRAY == 0 && !cube;
-    if c.m_n_flags & TSPEC_VOLUME_TEXTURE != 0 || (plain && depth > 1) || c.m_n_width <= 0 || c.m_n_height <= 0 {
+    let plain = c.m_n_flags & TSPEC_TEXTURE_ARRAY == 0 && !cube && !volume;
+    if (plain && depth > 1) || c.m_n_width <= 0 || c.m_n_height <= 0 {
         return None;
     }
     let desc = render::TextureDesc {
@@ -145,9 +145,10 @@ fn gpu_texture(name: &str, c: &TextureCreationConfig_t, data: &[u8], storage: St
         height: c.m_n_height as u32,
         format,
         mips: c.m_n_num_mip_levels.max(1) as u32,
-        render_target: c.m_n_flags & TSPEC_RENDER_TARGET != 0 || format.is_depth_stencil_format(),
+        render_target: !volume && (c.m_n_flags & TSPEC_RENDER_TARGET != 0 || format.is_depth_stencil_format()),
         layers: if cube { depth * 6 } else { depth },
         cube,
+        volume,
     };
     let texture = render::Texture::new(gpu, desc);
     if texture.layer_size().is_some_and(|l| data.len() == l || data.len() == l * texture.desc.layers as usize) {
@@ -186,16 +187,23 @@ fn on<R: Default>(t: Ref, f: impl FnOnce(&Texture) -> R) -> R {
     resolve(t).map(|t| f(&t)).unwrap_or_default()
 }
 
+impl Texture {
+    /// Every texel of the CPU copy set to `texel`, when the copy is whole texels of its size.
+    pub(crate) fn fill_cpu(&self, texel: &[u8]) {
+        let mut d = self.data.lock().unwrap();
+        if !texel.is_empty() && d.len().is_multiple_of(texel.len()) {
+            d.chunks_mut(texel.len()).for_each(|px| px.copy_from_slice(texel));
+        }
+    }
+}
+
 /// Fill the whole texture with one colour: on the GPU when it has a side there, and always in the
 /// CPU copy of 4-byte formats so reads without a device agree.
 pub fn clear(t: Ref, c: Color32) {
     on(t, |t| {
         let rgba8 = t.config.m_n_image_format == 0;
-        let mut d = t.data.lock().unwrap();
-        if rgba8 && d.len() % 4 == 0 {
-            for px in d.chunks_mut(4) {
-                px.copy_from_slice(&[c.r, c.g, c.b, c.a]);
-            }
+        if rgba8 {
+            t.fill_cpu(&[c.r, c.g, c.b, c.a]);
         }
         let (Some(gpu), Some(tex)) = (device::gpu(), &t.gpu) else { return };
         if tex.desc.render_target && !tex.desc.format.is_depth_stencil_format() {
@@ -203,8 +211,7 @@ pub fn clear(t: Ref, c: Color32) {
             tex.clear(gpu, render::wgpu::Color { r: unit(c.r), g: unit(c.g), b: unit(c.b), a: unit(c.a) }, 1.0);
         } else if !tex.desc.render_target && rgba8 {
             // Not renderable (managed's Clear on a plain texture, e.g. Sandbox's physgun graph): upload the fill.
-            let fill: Vec<u8> = (0..tex.layer_size().unwrap_or(0) * tex.desc.layers.max(1) as usize / 4).flat_map(|_| [c.r, c.g, c.b, c.a]).collect();
-            tex.upload(gpu, &fill);
+            tex.fill(gpu, &[c.r, c.g, c.b, c.a]);
         }
     });
 }
