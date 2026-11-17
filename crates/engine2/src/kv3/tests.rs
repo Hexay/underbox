@@ -21,7 +21,11 @@ fn builds_ctrl_block_like_model_save() {
     mesh.find_or_create("mesh_index").set(Data::Int(0));
     ctrl.find_or_create("embedded_physics").find_or_create("phys_data_block").set(Data::Int(2));
 
-    let (_, parsed) = kv::kv3::parse(&save(r)).unwrap();
+    let saved = save(r);
+    assert_eq!(&saved[..4], &0x4B56_3302u32.to_le_bytes(), "binary KV3 v2, as real's compiled blocks");
+    assert_eq!(u32::from_le_bytes(saved[20..24].try_into().unwrap()), 1, "LZ4");
+    let parsed = assets::kv3bin::read(&saved).unwrap();
+    assert_eq!(parsed, to_value(&ctrl));
     let o = parsed.as_object().unwrap();
     let mesh = &o.get("embedded_meshes").unwrap().as_array().unwrap()[0];
     assert_eq!(mesh.as_object().unwrap().str("name"), Some("mesh#0"));
@@ -77,10 +81,25 @@ fn json_round_trip_and_kv1() {
     assert_eq!(json, r#"{"convars":{"sensitivity":"2"}}"#);
 }
 
+/// Every value type survives Save and our binary reader; files save as text.
 #[test]
-fn resource_strings_save_flagged() {
+fn saves_round_trip_through_the_binary_reader() {
     let (n, r) = root();
     n.find_or_create("model").set(Data::String { text: "a.vmdl".into(), resource: true });
-    assert!(save(r).contains("model = resource:\"a.vmdl\""));
+    n.find_or_create("flags").set(Data::Bool(true));
+    n.find_or_create("big").set(Data::UInt(u64::MAX));
+    n.find_or_create("neg").set(Data::Int(-5));
+    n.find_or_create("scale").set(Data::Double(0.25));
+    n.find_or_create("blob").set(Data::Binary(vec![1, 2, 3]));
+    n.find_or_create("nothing").set(Data::Null);
+    let list = n.find_or_create("list");
+    list.set(Data::Array(Vec::new()));
+    list.push().set(Data::Table(Vec::new()));
+    list.push().set(Data::String { text: "s".into(), resource: false });
+    assert_eq!(assets::kv3bin::read(&save(r)).unwrap(), to_value(&n));
+    let path = std::env::temp_dir().join(format!("underbox-kv3-{}.kv3", std::process::id()));
+    assert!(save_to_file(r, path.to_str().unwrap()));
+    assert!(std::fs::read_to_string(&path).unwrap().contains("model = resource:\"a.vmdl\""));
+    let _ = std::fs::remove_file(&path);
     release(&n);
 }
