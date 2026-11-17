@@ -3,12 +3,14 @@
 //! managed sets parameters through. The animation itself is the `anim` crate.
 
 mod bone_slots;
+mod bounds;
 mod builder;
 mod callback;
 mod controller;
 mod controller_debug;
 mod conv;
 pub mod data;
+mod external_slots;
 pub mod flex;
 mod graph;
 mod graph_builder;
@@ -27,6 +29,7 @@ pub fn register(r: &mut abi::Registry) {
     graph_builder::register(r);
     controller::register(r);
     controller_debug::register(r);
+    external_slots::register(r);
     bone_slots::register(r);
     playback_slots::register(r);
     flex::register(r);

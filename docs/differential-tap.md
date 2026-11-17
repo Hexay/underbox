@@ -157,7 +157,7 @@ From the tap and a scene-state dump, checked with `ProbeBounds.cs` (`BOUNDS`, `S
 | `PhysicsShape.Friction` with no collider value | −1 (`PlayerController` resolves it through the trace surface) | the surface's 0.8 | −1 |
 | `Sleeping` on a static body | true from creation, before any step | false | true |
 | `SceneObject.Bounds` of a model object | world space: the model's render bounds moved by the transform (a rotated, scaled box matches to 4 decimals) | model space (`scene/create.rs` stored them once) | world space (`object::State::world_bounds`), unless managed set bounds |
-| `SkinnedModelRenderer.Bounds` (`m_worldBounds`, `m_localBounds`) | the posed bounds | zero (fields never written) | the model's render bounds, moved for world |
+| `SkinnedModelRenderer.Bounds` (`m_worldBounds`, `m_localBounds`) | the posed bounds | zero (fields never written) | the posed bounds (`anim/bounds.rs`) |
 | A sphere's triangulation | 402 vertices, 800 triangles | a 62-vertex UV sphere | an octahedron cut 10 times per edge: 402 and 800 (`triangulate::octasphere`) |
 | Error model inertia | body-axis order | ascending | body-axis order (docs/differential-joints.md, 21) |
 | Which pairs a trigger reports (`ProbeTrigger.cs`, `TRIGGER`: static, keyframed and dynamic triggers over static, keyframed and dynamic boxes) | every pair but static-static, at tick 1. Teleporting a trigger that already overlaps reports nothing new | only pairs with a dynamic body (a522d19: also keyframed-keyframed) | every pair but static-static (`shape::pair_types`) |
@@ -167,12 +167,13 @@ The walker check: `MAP=scenes/scenemap.scene SLOTS='IPhysicsBody_*' TICKS=0-12 t
 bodies ours left alone); after, none. The walker join (`MODE=walker tools/game.sh`) passes with the
 map pinned (docs/walker.md); unpinned it fails on the client, as real's managed code would too.
 
-Left: real's posed bounds aren't the render bounds. The citizen at yaw 45 reads local
-(−7.0, −29.1, −3.75)–(10.0, 29.1, 71.7) against render bounds (−5.2, −25.7, 0)–(8.6, 25.7, 71.7), and
-its world box is tighter than the local box rotated, so real builds it from posed world-space
-geometry. Ours loads the citizen as the error model on the server, so the probe can't compare it
-yet. Real's sphere vertices sit in another orientation (no vertex at the poles), so only the counts
-match.
+Real's posed bounds aren't the render bounds. The citizen at yaw 45 reads local
+(−7.0, −29.1, −3.75)–(10.0, 29.1, 71.7) against render bounds (−5.2, −25.7, 0)–(8.6, 25.7, 71.7):
+every mesh's per-bone box (`m_skeleton.m_bones[].m_bbox`, `m_vecSize` a half extent) carried by its
+bone, boxed in object space for local and in world space for world. With real's citizen and the
+probe's bone transforms that reproduces both boxes to 3 decimals. Ours loads the citizen as the
+error model on the server, so the probe can't compare it end to end yet. Real's sphere vertices sit
+in another orientation (no vertex at the poles), so only the counts match.
 
 Noise that calibration doesn't remove: `ConVar.GetName` during registration pairs convars by
 position, so different registration orders read as `return`. The per-frame `PerformanceTrace` and

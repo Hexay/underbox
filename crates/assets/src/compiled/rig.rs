@@ -89,6 +89,26 @@ pub fn hitbox_sets(mesh: &Object) -> Vec<HitboxSet> {
         .collect()
 }
 
+/// One bone's `m_skeleton.m_bones[].m_bbox`: the bind-pose box of the vertices it skins, in
+/// bone space. `half` is real's `m_vecSize`, a half extent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoneBounds {
+    pub bone: String,
+    pub center: [f32; 3],
+    pub half: [f32; 3],
+}
+
+/// A mesh's per-bone boxes; bones that skin none of its vertices (a zero box) are left out.
+pub fn bone_bounds(mesh: &Object) -> Vec<BoneBounds> {
+    objects(kv::object(mesh, "m_skeleton"), "m_bones")
+        .filter_map(|b| {
+            let bbox = kv::object(b, "m_bbox");
+            let (center, half) = (kv::vec3(bbox, "m_vecCenter"), kv::vec3(bbox, "m_vecSize"));
+            (half != [0.0; 3]).then(|| BoneBounds { bone: string(b, "m_boneName"), center, half })
+        })
+        .collect()
+}
+
 fn entry(name: &str, v: Value) -> Value {
     obj(vec![("key", text(name)), ("value", v)])
 }
