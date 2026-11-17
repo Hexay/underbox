@@ -2,12 +2,13 @@
 //! `SheetSequence_t`/`SheetSequenceFrame_t` objects `Texture.UpdateSheetInfo` reads through
 //! `g_pRenderDevice.GetSequenceCount`/`GetSequence`. A sequence's fields (`m_nId`, `m_bClamp`,
 //! ..., `m_flTotalTime`) live in the generated field store; the objects are made on first ask and
-//! live as long as their texture.
+//! live as long as their texture. Shaders read the sequences from the metadata texture
+//! (sheet_meta.rs), where a sheet takes rows on its first `GetSheetInfo`.
 
 use crate::math::vec4;
 use crate::render::texture;
 use abi::slots::{g_p_render_device as device, sheet_sequence_frame_t as frame, sheet_sequence_t as seq};
-use abi::structs::SheetFrameImage_t;
+use abi::structs::{SheetFrameImage_t, Vector4};
 use abi::{NativeRef, Registry, bind, class};
 use assets::compiled::texture::sheet::Sequence;
 use std::sync::OnceLock;
@@ -17,11 +18,17 @@ use std::sync::OnceLock;
 pub struct Sheet {
     pub sequences: Vec<Sequence>,
     objects: OnceLock<Vec<NativeRef<class::SheetSequence_t>>>,
+    rows: OnceLock<Option<super::sheet_meta::Rows>>,
 }
 
 impl Sheet {
     pub fn new(sequences: Vec<Sequence>) -> Sheet {
-        Sheet { sequences, objects: OnceLock::new() }
+        Sheet { sequences, objects: OnceLock::new(), rows: OnceLock::new() }
+    }
+
+    /// `GetSheetInfo`: zero for a texture without sequences.
+    pub fn info(&self) -> Vector4 {
+        self.rows.get_or_init(|| super::sheet_meta::allocate(&self.sequences)).as_ref().map(super::sheet_meta::Rows::info).unwrap_or_default()
     }
 
     fn objects(&self) -> &[NativeRef<class::SheetSequence_t>] {
@@ -84,6 +91,10 @@ pub fn count(t: texture::Ref) -> i32 {
     texture::resolve(t).map_or(0, |t| t.sheet.sequences.len() as i32)
 }
 
+pub fn info(t: texture::Ref) -> Vector4 {
+    texture::resolve(t).map(|t| t.sheet.info()).unwrap_or_default()
+}
+
 /// Sequence `i` of `t`, or null past the end.
 pub fn get(t: texture::Ref, i: i32) -> NativeRef<class::SheetSequence_t> {
     let t = texture::resolve(t);
@@ -94,6 +105,8 @@ pub fn get(t: texture::Ref, i: i32) -> NativeRef<class::SheetSequence_t> {
 pub fn register(r: &mut Registry) {
     bind!(r, device::GET_SEQUENCE_COUNT, count);
     bind!(r, device::GET_SEQUENCE, get);
+    bind!(r, device::GET_SHEET_INFO, info);
+    bind!(r, device::GET_SHEET_META_DATA_TEXTURE, super::sheet_meta::texture);
     bind!(r, seq::FRAME_COUNT, |s| frames(s).len() as i32);
     bind!(r, frame::IMAGE_COUNT, |f| objects::get::<_, Vec<[f32; 8]>>(f).map_or(0, |v| v.len() as i32));
     bind!(r, frame::GET_IMAGE, image);

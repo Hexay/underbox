@@ -60,6 +60,7 @@ pub fn load(path: &str) -> Option<Loaded> {
         .collect();
     // Features ride along as scalars: draws read F_TRANSLUCENT and friends (Material::blend).
     let features = material.features.iter().map(|(k, v)| (k.clone(), vec4(*v as f32, 0.0, 0.0, 0.0)));
-    let vectors = material.values.iter().map(|(k, [x, y, z, w])| (k.clone(), vec4(*x, *y, *z, *w))).chain(features).collect();
+    let attributes = material.attributes.iter().map(|(k, v)| (k.clone(), vec4(*v, 0.0, 0.0, 0.0)));
+    let vectors = material.values.iter().map(|(k, [x, y, z, w])| (k.clone(), vec4(*x, *y, *z, *w))).chain(features).chain(attributes).collect();
     Some(Loaded { shader: material.shader, vectors, textures })
 }

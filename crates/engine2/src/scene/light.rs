@@ -1,6 +1,7 @@
 //! `CSceneLightObject`: what managed sets on a light and reads back. Server-side it's state only;
 //! the renderer (M2) shades with it.
 
+use super::light_switches::Switches;
 use super::object::{self, State};
 use super::world;
 use crate::handles::Kind;
@@ -46,15 +47,17 @@ pub struct Light {
     pub(crate) linear_attn: f32,
     pub(crate) quadratic_attn: f32,
     pub(crate) fog_strength: f32,
-    fog_mode: i32,
-    flags: u32,
-    shape: i64,
+    pub(crate) fog_mode: i32,
+    /// `LIGHTTYPE_FLAGS` (light_switches.rs).
+    pub(crate) flags: u32,
+    pub(crate) shape: i64,
     /// An owned texture handle (see `cookie` in register).
     cookie: texture::Ref,
+    pub(crate) switches: Switches,
 }
 
 impl Light {
-    fn new(kind: Type) -> Self {
+    pub(crate) fn new(kind: Type) -> Self {
         Self {
             kind,
             direction: crate::math::identity().rotation,
@@ -79,6 +82,7 @@ impl Light {
             flags: 0,
             shape: 0,
             cookie: texture::Ref::NULL,
+            switches: Switches::default(),
         }
     }
 }
@@ -92,6 +96,10 @@ impl Drop for Light {
 fn with<R: Default>(r: Ref, f: impl FnOnce(&mut Light) -> R) -> R {
     let Some(o) = object::get(r.cast()) else { return R::default() };
     o.light.as_ref().map(|l| f(&mut l.lock().unwrap())).unwrap_or_default()
+}
+
+fn switches(r: Ref, f: impl FnOnce(&mut Switches)) {
+    with(r, |x| f(&mut x.switches))
 }
 
 fn create(w: world::Ref, light: Light) -> HandleId<class::CSceneLightObject> {
@@ -166,16 +174,15 @@ pub fn register(r: &mut Registry) {
         let cookie = with(r, |x| Some(x.cookie)).unwrap_or_default();
         resource::handed_out::<_, texture::Texture>(Some(cookie))
     });
-    // TODO: the renderer's per-light switches and baked-lighting indices (M2).
-    bind!(r, l::SET_RENDER_DIFFUSE, |_, _| {});
-    bind!(r, l::SET_RENDER_SPECULAR, |_, _| {});
-    bind!(r, l::SET_RENDER_TRANSMISSIVE, |_, _| {});
-    bind!(r, l::SET_LIGHT_MODULATOR_RANGE, |_, _, _| {});
-    bind!(r, l::SET_BAKE_LIGHT_INDEX, |_, _| {});
-    bind!(r, l::SET_BAKE_LIGHT_INDEX_SCALE, |_, _| {});
-    bind!(r, l::SET_USES_INDEXED_BAKED_LIGHTING, |_, _| {});
-    bind!(r, l::SET_LIGHT_SOURCE_SIZE0, |_, _| {});
-    bind!(r, l::SET_LIGHT_SOURCE_SIZE1, |_, _| {});
-    bind!(r, l::SET_LIGHT_SOURCE_DIM0, |_, _| {});
-    bind!(r, l::SET_LIGHT_SOURCE_DIM1, |_, _| {});
+    bind!(r, l::SET_RENDER_DIFFUSE, |r, v| switches(r, |s| s.diffuse = v));
+    bind!(r, l::SET_RENDER_SPECULAR, |r, v| switches(r, |s| s.specular = v));
+    bind!(r, l::SET_RENDER_TRANSMISSIVE, |r, v| switches(r, |s| s.transmissive = v));
+    bind!(r, l::SET_LIGHT_MODULATOR_RANGE, |r, offset, count| switches(r, |s| s.modulators = [offset, count]));
+    bind!(r, l::SET_BAKE_LIGHT_INDEX, |r, v| switches(r, |s| s.bake_index = v));
+    bind!(r, l::SET_BAKE_LIGHT_INDEX_SCALE, |r, v| switches(r, |s| s.bake_index_scale = v));
+    bind!(r, l::SET_USES_INDEXED_BAKED_LIGHTING, |r, v| switches(r, |s| s.indexed = v));
+    bind!(r, l::SET_LIGHT_SOURCE_SIZE0, |r, v| switches(r, |s| s.source_size[0] = v));
+    bind!(r, l::SET_LIGHT_SOURCE_SIZE1, |r, v| switches(r, |s| s.source_size[1] = v));
+    bind!(r, l::SET_LIGHT_SOURCE_DIM0, |r, v| switches(r, |s| s.source_dim[0] = v));
+    bind!(r, l::SET_LIGHT_SOURCE_DIM1, |r, v| switches(r, |s| s.source_dim[1] = v));
 }

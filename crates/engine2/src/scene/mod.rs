@@ -6,6 +6,8 @@ mod create;
 mod decal;
 pub mod dynamic;
 pub mod light;
+pub mod light_switches;
+pub mod material_overrides;
 pub mod object;
 mod object_slots;
 mod probes;

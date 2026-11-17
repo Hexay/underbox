@@ -104,7 +104,7 @@ pixels). Bound-buffer and `RenderTools.Draw` gizmo lines take the same path, via
 | `g_pSceneUtils` volumetric fog | froxels from `AddVolumetricFogVolume`, sampled through `volumetric_fog.fxc` | `SetParams` is called unguarded, so null isn't an option; see docs/fog.md |
 | `GetBestMultisampleType`, `IsUpscalerSupported`, `SupportsAsyncCompute` | 0 (none), `false`, `false` | single-sample targets, no upscaler, no async queue |
 | Texture web streaming | inactive, no requests, prefetch done | loads stay local |
-| Sprite sheets (`SheetSequence*`) | no frames | static textures |
+| Sprite sheets (`SheetSequence*`) | sequences and frames; `GetSheetInfo` rows in our metadata texture (render/sheet_meta.rs) | `Sheet.hlsl` samples frames over time |
 | `CalculateRadianceSH`, probe constants | no-op | probes stay empty (docs/lighting.md) |
 | 3D skybox, PVS | stored by the world lane; drawn as a child view (render/scene/skybox.rs) and culled per object (render/scene/pvs.rs) | |
 | Mesh traces | the world lane's (`crates/engine2/src/world`) | |

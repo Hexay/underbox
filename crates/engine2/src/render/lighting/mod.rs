@@ -11,9 +11,10 @@
 
 mod blocks;
 pub mod decals;
+pub mod pack;
 pub mod shadow;
 
-pub use blocks::BLOCKS;
+pub use blocks::{BLOCKS, GPU_LIGHT_WORDS};
 
 use crate::scene::light::{self, Type};
 use crate::scene::{object, world};
@@ -43,6 +44,7 @@ pub struct Light {
     pub handle: Option<i32>,
     /// `ShadowMapIndex`: managed's `ProjectedShadows` (spot) or `ProjectedCubeShadows` (point) index.
     pub shadow_index: Option<u32>,
+    pub pack: pack::Pack,
 }
 
 impl Light {
@@ -80,7 +82,7 @@ impl Lighting {
     pub fn fallback() -> Lighting {
         let toward = Vec3::new(0.4, 0.3, 0.85).normalize();
         let rotation = Quat::from_rotation_arc(Vec3::X, -toward);
-        let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None };
+        let sun = Light { kind: kind::DIRECTIONAL, position: Vec3::ZERO, rotation, color: Vec3::splat(0.7), radius: 0.0, quadratic: 0.0, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None, pack: pack::Pack::default() };
         Lighting { ambient: Vec4::new(0.3, 0.3, 0.3, 1.0), sun: Some(sun), ..Default::default() }
     }
 
@@ -114,6 +116,7 @@ impl Lighting {
                 _ => out.lights.push(l),
             }
         }
+        out.order_baked_last();
         if !found.is_empty() {
             out.decals = Some(std::sync::Arc::new(decals::Decals::pack(found)));
         }
@@ -130,12 +133,14 @@ fn from_scene(l: &light::Light, position: Vec3) -> Light {
         Type::Spot | Type::Ortho => kind::SPOT,
         Type::Directional => kind::DIRECTIONAL,
     };
+    let pack = pack::Pack::from_scene(l);
+    let scale = if pack.baked { l.switches.bake_index_scale } else { 1.0 };
     let c = l.color.vec;
     Light {
         kind,
         position,
         rotation,
-        color: Vec3::new(c.x, c.y, c.z),
+        color: Vec3::new(c.x, c.y, c.z) * scale,
         radius: l.radius,
         quadratic: l.quadratic_attn,
         cone: (kind == kind::SPOT).then_some((l.theta, l.phi)),
@@ -143,6 +148,7 @@ fn from_scene(l: &light::Light, position: Vec3) -> Light {
         shadows: l.shadows,
         handle: None,
         shadow_index: None,
+        pack,
     }
 }
 

@@ -1,6 +1,7 @@
 //! Compiled materials (`.vmat_c`) in the shape of `render::material_source::Loaded` (private to
 //! render, hence the twin): the shader, int (except static `F_*` combos), float and vector params
-//! as vectors (scalars in x, as `.vmat` source gives them), and textures made from their `.vtex_c`.
+//! and int and float user attributes as vectors (scalars in x, as `.vmat` source gives them), and
+//! textures made from their `.vtex_c`.
 
 use crate::math::vec4;
 use crate::render::texture::Ref as TextureRef;
@@ -23,8 +24,9 @@ pub fn compiled_path(path: &str) -> String {
 /// Every numeric param as a vector, in the order the file lists them.
 pub fn vectors(m: &Material) -> Vec<(String, [f32; 4])> {
     let ints = m.ints.iter().filter(|(n, _)| !n.starts_with("F_")).map(|(n, v)| (n.clone(), [*v as f32, 0.0, 0.0, 0.0]));
-    let floats = m.floats.iter().map(|(n, v)| (n.clone(), [*v, 0.0, 0.0, 0.0]));
-    ints.chain(floats).chain(m.vectors.iter().cloned()).collect()
+    let floats = m.floats.iter().chain(&m.float_attributes).map(|(n, v)| (n.clone(), [*v, 0.0, 0.0, 0.0]));
+    let attributes = m.int_attributes.iter().map(|(n, v)| (n.clone(), [*v as f32, 0.0, 0.0, 0.0]));
+    ints.chain(floats).chain(m.vectors.iter().cloned()).chain(attributes).collect()
 }
 
 /// A texture handle for a compiled texture path; the error texture when it won't decode.

@@ -15,6 +15,15 @@ fn vmat_splits_shader_features_values_textures() {
     assert_eq!(bind_textures(&m, None), [("g_tSkyTexture".into(), "materials/skybox/day.exr".into())]);
 }
 
+/// citizen_eyes_advanced.vmat's form: an `Attributes` block next to `SystemAttributes`.
+#[test]
+fn vmat_user_attributes() {
+    let src = "Layer0\n{\n\tshader \"shaders/complex.shader\"\n\tAttributes\n\t{\n\t\teyes \"1\"\n\t\tname \"x\"\n\t}\n\tSystemAttributes\n\t{\n\t\tPhysicsSurfaceProperties \"flesh\"\n\t}\n}";
+    let m = from_vmat(src).unwrap();
+    assert_eq!(m.attributes, [("eyes".into(), 1.0)], "numeric ones only");
+    assert!(m.values.is_empty() && m.textures.is_empty());
+}
+
 #[test]
 fn conventions() {
     assert_eq!(conventional_attribute("TextureColor"), "g_tColor");

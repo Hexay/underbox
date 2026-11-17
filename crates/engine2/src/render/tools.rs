@@ -59,10 +59,8 @@ fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: Raw
     const VISIBLE: i32 = 1;
     const ALPHA_BLENDED: i32 = 2;
     let Some(obj) = object::get(o) else { return NativeRef::NULL };
-    let (m, groups, material_override) = {
-        let s = obj.state.lock().unwrap();
-        (s.model, s.mesh_groups, s.material_override.clone())
-    };
+    let s = obj.state.lock().unwrap().clone();
+    let (m, groups) = (s.model, s.mesh_groups);
     let Some(model) = crate::model::get(m) else { return NativeRef::NULL };
     let mut n = 0;
     for (mi, mm) in model.content.meshes.iter().enumerate() {
@@ -71,8 +69,9 @@ fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: Raw
         }
         for (ci, dc) in mm.mesh.draw_calls().iter().enumerate() {
             if n == index {
-                // Native's draw states carry a whole-object override (managed's SceneMirror.ApplyMesh).
-                let material = material_override.as_ref().or(dc.material.as_ref());
+                // Native's draw states carry the object's overrides (managed's SceneMirror.ApplyMesh).
+                let material = s.material_for(&model, dc.material.as_ref());
+                let material = material.as_ref();
                 let blends = material.and_then(|m| m.material()).is_some_and(|m| m.blend().is_some());
                 // SAFETY: managed passes three ints on its stack (RenderContext.ReadSceneObjectDraws).
                 unsafe {
@@ -161,7 +160,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::GET_SCENE_OBJECT_LIGHTMAP_KEY, |_| 0);
     bind!(r, tools::SET_SCENE_OBJECT_LIGHTMAP_ATTRIBUTES, |_, _| false);
     bind!(r, tools::GET_SCENE_WORLD_WIND, |_, s, d| world_wind(s, d));
-    bind!(r, tools::PACK_SCENE_LIGHT, |_, _, _| -1);
     bind!(r, tools::PACK_SCENE_ENV_MAP, |_, _| false);
     bind!(r, tools::GET_LIGHT_PROBE_VOLUME, |_, mins, maxs, priority, _, _| light_probe_volume(mins, maxs, priority));
     bind!(r, tools::SET_LIGHT_PROBE_VOLUME_ATTRIBUTES, |_, _| false);
@@ -193,8 +191,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, |d| PtrHandle::<abi::handle::SamplerStateHandle_t>::new(crate::render::samplers::find_or_create(d)));
     bind!(r, dev::GET_SAMPLER_INDEX, |h| h.value as i32 - 1);
     bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));
-    bind!(r, dev::GET_SHEET_META_DATA_TEXTURE, || NativeRef::NULL);
-    bind!(r, dev::GET_SHEET_INFO, |_| Vector4::default());
     bind!(r, dev::GET_TEXTURE_RESIDENCY_INFO, |_, _, _| {});
     // Native API objects (VkImage, ID3D12Resource) aren't exposed through wgpu.
     bind!(r, dev::GET_DEVICE_SPECIFIC_INFO, |_| RawPtr::NULL);

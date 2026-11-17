@@ -32,6 +32,7 @@ pub mod scene;
 pub(crate) mod scene_utils;
 pub mod shading;
 pub mod sheet;
+pub mod sheet_meta;
 pub mod skin;
 pub mod stats;
 pub(crate) mod submits;
@@ -61,6 +62,7 @@ pub fn register(r: &mut Registry) {
     draw::draw_call::register(r);
     game_window::register(r);
     image::register(r);
+    lighting::pack::register(r);
     material::register(r);
     material_mode::register(r);
     readback::register(r);
