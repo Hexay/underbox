@@ -10,8 +10,8 @@ Size: **S** up to ~50 lines, **M** a few hundred, **L** a new subsystem or depen
 
 | Area | Missing | Where | Real engine2 | Size |
 | --- | --- | --- | --- | --- |
-| Video | Decoding and encoding: a player never loads, a recorder never takes frames | `crates/engine2/src/video.rs:4` | Decodes mp4/webm into a texture | L, in progress |
-| Skinning | Morph and deformation volumes in `DispatchModelMeshSkinning` | `crates/engine2/src/render/skin/dispatch.rs:87` | Applied on the GPU (docs/skinning.md) | M, in progress |
+| Video | HTTP(S) URLs, VP8/VP9/HEVC, Vorbis, 10-bit AV1, audio in recordings (docs/video.md) | `crates/engine2/src/video/recorder.rs:90` | Supported | M each |
+| Skinning | Deformed one-bone models stay rigid; no bounds padding for deformed objects (docs/skinning.md) | `crates/engine2/src/render/skin/dispatch.rs` | Applied | S |
 | VR | `RenderStereo`/`SubmitStereo`/`BlitStereo` are no-ops | `crates/engine2/src/render/scene/camera.rs:258` | OpenXR through openxr_loader | L |
 | HTML surface | Always null | docs/steam.md "HTML surface" | Steam's HTML surface | L |
 | Render | `RenderToCubeTexture` draws nothing | `crates/engine2/src/render/scene/camera.rs:258` | Six views into the cube's faces | M |
