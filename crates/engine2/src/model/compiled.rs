@@ -127,6 +127,7 @@ pub fn content(m: &model::Model) -> Content {
         lod_distances: m.lod_distances.clone(),
         physics,
         game_data: m.key_value_tree().map(|v| crate::kv3::node::from_value(&v)),
+        bone_bounds: m.bone_bounds.clone(),
         ..Content::default()
     }
 }

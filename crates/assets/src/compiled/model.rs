@@ -10,7 +10,7 @@ use super::kv::{self, int, objects, string, strings};
 use super::mesh::{self, Mesh};
 use super::morph::{self, MorphSet, Target};
 use super::physics::{self, Aggregate};
-use super::rig::{self, Attachment, HitboxSet};
+use super::rig::{self, Attachment, BoneBounds, HitboxSet};
 use super::vbib;
 use super::{Error, block_at, format};
 use ::kv::{Object, Value};
@@ -67,6 +67,8 @@ pub struct Model {
     /// From every mesh's data, first of each name kept.
     pub attachments: Vec<Attachment>,
     pub hitbox_sets: Vec<HitboxSet>,
+    /// Every mesh's per-bone boxes, in mesh order.
+    pub bone_bounds: Vec<BoneBounds>,
     /// `.vagrp` resources (`m_refAnimGroups`); their animations are in `animations`.
     pub anim_groups: Vec<String>,
     /// Embedded animations (after their sequences), then each group's.
@@ -257,6 +259,7 @@ fn read_parts(file: &[u8], load: &dyn Fn(&str) -> Option<Vec<u8>>, full: bool) -
                 model.hitbox_sets.push(s);
             }
         }
+        model.bone_bounds.extend(rig::bone_bounds(&data));
         let mask = |m: &[i64]| m.get(i).map_or(u64::MAX, |&v| v as u64);
         model.meshes.push(ModelMesh { name, mesh, group_mask: mask(&groups), lod_mask: mask(&lods), morph, targets });
     }

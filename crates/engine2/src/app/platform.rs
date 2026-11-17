@@ -88,6 +88,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, global::SOURCE_ENGINE_FRAME, |_, _time, _previous| {
         crate::resource_loaded::flush();
         crate::render::game_window::frame();
+        crate::resource::unload_unreferenced();
         !crate::engine_glue::exit_requested()
     });
     bind!(r, global::SOURCE_ENGINE_SHUTDOWN, |_, _| SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::Relaxed));

@@ -25,6 +25,26 @@ fn rigged_model_reads_animations_from_blocks_and_groups() {
     assert_eq!(m.animations[2].frames[2][0].position, [2.0, 0.0, 0.0]);
 }
 
+/// Each bone's box is real's: its weighted vertices in bind bone space, `m_vecSize` a half extent.
+#[test]
+fn rigged_model_round_trips_per_bone_boxes() {
+    let m = rigged();
+    let bones = fixture::rig_bones();
+    let origin = |i: usize| (0..=i).map(|b| bones[b].position[2]).sum::<f32>();
+    assert!(!m.bone_bounds.is_empty());
+    for b in &m.bone_bounds {
+        let i = bones.iter().position(|x| x.name == b.bone).unwrap();
+        let weighted = m.meshes[0].mesh.vertices.iter().filter(|v| v.bones.iter().zip(v.weights).any(|(x, w)| usize::from(*x) == i && w > 0.0));
+        let (lo, hi) = weighted.fold(([f32::MAX; 3], [f32::MIN; 3]), |(l, h), v| {
+            let p = [v.position[0], v.position[1], v.position[2] - origin(i)];
+            (std::array::from_fn(|k| l[k].min(p[k])), std::array::from_fn(|k| h[k].max(p[k])))
+        });
+        for k in 0..3 {
+            assert!((b.center[k] - b.half[k] - lo[k]).abs() < 1e-3 && (b.center[k] + b.half[k] - hi[k]).abs() < 1e-3, "{b:?} vs {lo:?}..{hi:?}");
+        }
+    }
+}
+
 #[test]
 fn ragdoll_joints_round_trip_and_compounds_flatten() {
     assert_eq!(rigged().physics, Some(fixture::ragdoll()));

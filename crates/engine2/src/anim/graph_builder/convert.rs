@@ -46,6 +46,7 @@ pub fn convert(s: &Snapshot) -> Converted {
         unsupported: BTreeSet::new(),
     };
     c.params();
+    c.def.graph_slots = s.meta.graph_slots.iter().map(|g| c.id_name(i64::from(g.0))).collect();
     let root = c.node(s.root).is_some().then(|| c.pose(s.root as i64));
     c.def.root = root;
     Converted { def: c.def, unsupported: c.unsupported.into_iter().collect() }

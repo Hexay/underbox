@@ -192,6 +192,22 @@ fn legacy_graph_tag_spans_follow_sequence_playback() {
     assert_eq!(step(0.2), [tag("hold", End), tag("lift", Start)], "the next lap's 0.2..0.4");
 }
 
+/// Per-bone boxes ride their bones: boxed in object space for local bounds, in world space for world.
+#[test]
+fn posed_bounds_follow_the_bones() {
+    use assets::compiled::rig::BoneBounds;
+    let mut s = AnimState::new(build(c"anim_test_bounds"));
+    let object = Xform::new(Vec3::new(100.0, 0.0, 0.0), Quat::from_rotation_z(FRAC_PI_2));
+    s.calculate_world(&object);
+    let arm = |bone: &str| BoneBounds { bone: bone.into(), center: [1.0, 0.0, 0.0], half: [1.0, 0.5, 0.5] };
+    let boxes = [arm("arm"), arm("missing")];
+    let local = super::bounds::posed(&s, &boxes, |w| object.to_local(w)).unwrap();
+    assert!(v3(local.mins).abs_diff_eq(Vec3::new(5.0, -0.5, 9.5), 1e-4) && v3(local.maxs).abs_diff_eq(Vec3::new(7.0, 0.5, 10.5), 1e-4), "{local:?}");
+    let world = super::bounds::posed(&s, &boxes, |w| *w).unwrap();
+    assert!(v3(world.mins).abs_diff_eq(Vec3::new(99.5, 5.0, 9.5), 1e-4) && v3(world.maxs).abs_diff_eq(Vec3::new(100.5, 7.0, 10.5), 1e-4), "{world:?}");
+    assert!(super::bounds::posed(&s, &boxes[1..], |w| *w).is_none(), "no box on a known bone");
+}
+
 static TAGS: Mutex<Vec<(String, i32)>> = Mutex::new(Vec::new());
 
 extern "C" fn on_tag(name: *const std::ffi::c_char, status: i32) {

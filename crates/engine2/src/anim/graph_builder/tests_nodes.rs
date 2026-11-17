@@ -81,6 +81,34 @@ fn blend2d_id_selector_and_ease_convert() {
     assert!(matches!((&def.poses[run], &def.poses[*fallback]), (PoseNode::Clip { slot: 1, .. }, PoseNode::Clip { slot: 0, .. })));
 }
 
+/// `ExternalGraphSlot("Extra", fallback: clip 0)` (1) and `IsExternalGraphSlotFilled` (2) of it,
+/// picked by a selector (3).
+#[test]
+fn external_graph_slots_convert() {
+    let b = create();
+    clip(b, 0);
+    let slot = add_node::<class::CReferencedGraphNode_Definition>(b);
+    field!(i16, c_referenced_graph_node_definition::GET_M_FALLBACK_NODE_IDX, slot, 0);
+    let id = intern(b, "Extra");
+    with(b, |s| s.meta.graph_slots.push((id, 1)));
+    let filled = add_node::<class::CIsExternalGraphSlotFilledNode_Definition>(b);
+    field!(i16, c_is_external_graph_slot_filled_node_definition::GET_M_EXTERNAL_GRAPH_NODE_IDX, filled, 1);
+    let sel = add_node::<class::CSelectorNode_Definition>(b);
+    push_int(list::<_, class::CUtlVector_int16_>(sel, "OptionNodeIndices"), 1);
+    push_int(list::<_, class::CUtlVector_int16_>(sel, "ConditionNodeIndices"), 2);
+    let snap = capture(b, 3, "", "").unwrap();
+    delete(b);
+    let out = super::convert::convert(&snap);
+    assert!(out.unsupported.is_empty(), "{:?}", out.unsupported);
+    let def = &out.def;
+    assert_eq!(def.graph_slots, ["Extra"]);
+    let Some(PoseNode::Selector { cases, .. }) = def.root.map(|r| &def.poses[r]) else { panic!("{def:?}") };
+    let [(cond, ext)] = cases[..] else { panic!("{cases:?}") };
+    assert_eq!(def.values[cond], ValueNode::ExternalFilled("Extra".into()));
+    let PoseNode::External { ref slot, fallback: Some(f) } = def.poses[ext] else { panic!("{:?}", def.poses[ext]) };
+    assert!(slot == "Extra" && matches!(def.poses[f], PoseNode::Clip { slot: 0, .. }));
+}
+
 /// `RandomFloat(2, 2.5)` (0) seeds an unweighted variation (4) over clips 1..=3.
 #[test]
 fn random_floats_convert_and_seed_variations() {

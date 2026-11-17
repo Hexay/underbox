@@ -1,8 +1,8 @@
-//! `CAnimGraph2Controller`'s recording, external-graph and debugger slots.
+//! `CAnimGraph2Controller`'s recording, float-channel and debugger slots.
 //!
-//! Recording is real (see `anim::graph::recording`). Our compiled graphs carry no float channels,
-//! external graph slots or editor node numbering, so channel reads, external-graph connections and
-//! per-node debug queries answer "no such channel/slot/node" (false, outputs zeroed).
+//! Recording is real (see `anim::graph::recording`). Our compiled graphs carry no float channels
+//! or editor node numbering, so channel reads and per-node debug queries answer "no such
+//! channel/node" (false, outputs zeroed).
 
 use super::controller::Handle;
 use super::conv::to_transform;
@@ -75,15 +75,9 @@ fn recording(r: &mut Registry) {
     });
 }
 
-fn external_and_channels(r: &mut Registry) {
+fn channels(r: &mut Registry) {
     bind!(r, c::GET_FLOAT_CHANNEL_VALUE, |_, _, _, v| {
         *v = 0.0;
-        false
-    });
-    bind!(r, c::CONNECT_EXTERNAL_GRAPH, |_, _, _| false);
-    bind!(r, c::DISCONNECT_EXTERNAL_GRAPH, |_, _| false);
-    bind!(r, c::GET_EXTERNAL_GRAPH_TIMING, |_, _, duration, time, active| {
-        (*duration, *time, *active) = (0.0, 0.0, 0);
         false
     });
 }
@@ -141,6 +135,6 @@ fn debugger(r: &mut Registry) {
 
 pub fn register(r: &mut Registry) {
     recording(r);
-    external_and_channels(r);
+    channels(r);
     debugger(r);
 }

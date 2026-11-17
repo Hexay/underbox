@@ -4,6 +4,7 @@
 
 use super::data::{CapsuleDesc, HullDesc, JointDesc, MeshDesc, Part, PhysicsData, SharedJoint, SphereDesc};
 use super::hull::Hull;
+use super::hull_simplify::{self, Params};
 use abi::slots::{c_phys_body_desc as bd, c_phys_body_desc_array as arr};
 use abi::structs::{Capsule, Sphere, Transform, Vector3};
 use abi::{NativeRef, RawPtr, Registry, bind, class};
@@ -75,8 +76,12 @@ fn points(ptr: RawPtr<c_void>, n: usize) -> Vec<Vec3> {
 }
 
 fn add_hull(b: *mut c_void, pts: RawPtr<c_void>, n: i32, t: Transform) {
+    add_hull_simplified(b, pts, n, t, Params { method: hull_simplify::NONE, ..Params::default() });
+}
+
+fn add_hull_simplified(b: *mut c_void, pts: RawPtr<c_void>, n: i32, t: Transform, params: Params) {
     let Some(hull) = Hull::from_points(&points(pts, n.max(0) as usize)) else { return };
-    let hull = hull.transformed(mapping(t));
+    let hull = hull_simplify::simplify(hull, params).transformed(mapping(t));
     with_body(b, |p| p.shapes.hulls.push(HullDesc { hull, ids: Default::default() }));
 }
 
@@ -121,7 +126,8 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, bd::ADD_BOX, |b: BodyRef, half, t| add_box(b.as_raw(), half, t));
     bind!(r, bd::ADD_HULL, |b: BodyRef, pts, n, t| add_hull(b.as_raw(), pts, n, t));
-    // TODO: hull simplification (precision, face/edge/vertex caps); the exact hull is kept.
-    bind!(r, bd::ADD_HULL_1, |b: BodyRef, pts, n, t, _, _, _, _, _, _| add_hull(b.as_raw(), pts, n, t));
+    bind!(r, bd::ADD_HULL_1, |b: BodyRef, pts, n, t, _degrees, inches, max_faces, max_edges, max_verts, method| {
+        add_hull_simplified(b.as_raw(), pts, n, t, Params { inches, max_faces, max_edges, max_verts, method })
+    });
     bind!(r, bd::ADD_MESH, |b: BodyRef, vs, nv, is, ni, mats| add_mesh(b.as_raw(), vs, nv, is, ni, mats));
 }

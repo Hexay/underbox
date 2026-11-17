@@ -20,6 +20,7 @@ pub mod resource;
 mod resource_guid;
 mod resource_loaded;
 mod compress;
+mod compress_hc;
 mod net;
 mod resource_system;
 mod steam;
