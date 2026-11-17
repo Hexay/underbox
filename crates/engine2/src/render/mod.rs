@@ -38,6 +38,7 @@ pub(crate) mod submits;
 pub mod swap_chain;
 pub mod texture;
 mod texture_generated;
+pub mod texture_ops;
 mod tools;
 pub mod vfx;
 

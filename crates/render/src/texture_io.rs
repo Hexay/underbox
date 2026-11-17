@@ -1,8 +1,15 @@
-//! Moving texels into and between [`Texture`]s: uploads (texel or 4x4 block rows), clears and
-//! copies. Read-back is in readback.rs.
+//! Moving texels into and between [`Texture`]s: uploads (texel or 4x4 block rows), fills, clears
+//! and copies. Read-back is in readback.rs.
 
-use crate::texture::{extent, sample_aspect};
+use crate::texture::sample_aspect;
 use crate::{Gpu, Texture};
+
+/// One mip of one array layer (a cube face, a volume's depth slice).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Subresource {
+    pub mip: u32,
+    pub layer: u32,
+}
 
 impl Texture {
     /// Bytes per texel of mip 0 (a depth-stencil format's depth); `None` for block-compressed
@@ -71,11 +78,11 @@ impl Texture {
     /// Fill mips 1 and up from `chain`: each level's layers tightly packed, level after level. Stops
     /// at the first level `chain` runs short of; returns how many levels it wrote.
     pub fn upload_smaller_mips(&self, gpu: &Gpu, chain: &[u8]) -> u32 {
-        let layers = self.desc.layers.max(1);
         let mut at = 0;
         gpu.flush();
         for mip in 1..self.desc.mips.max(1) {
             let Some((row, rows)) = self.rows(mip) else { return 0 };
+            let layers = self.mip_layers(mip);
             let len = (row * rows * layers) as usize;
             let Some(data) = chain.get(at..at + len) else { return mip - 1 };
             self.write_mip(gpu, mip, layers, data);
@@ -84,14 +91,32 @@ impl Texture {
         self.desc.mips.max(1) - 1
     }
 
+    /// Every texel of every mip and layer set to the bytes of `texel` (`ClearTextureUint`). False
+    /// for depth, block-compressed formats and a texel of the wrong size.
+    pub fn fill(&self, gpu: &Gpu, texel: &[u8]) -> bool {
+        if self.desc.format.is_depth_stencil_format() || self.texel_size() != Some(texel.len() as u32) {
+            return false;
+        }
+        gpu.flush();
+        for mip in 0..self.desc.mips.max(1) {
+            let (w, h) = self.mip_size(mip);
+            let layers = self.mip_layers(mip);
+            self.write_mip(gpu, mip, layers, &texel.repeat((w * h * layers) as usize));
+        }
+        true
+    }
+
     /// Clear mip 0 with an empty render pass: to `color` for a colour format, or to `depth` (and
     /// stencil 0) for a depth format. The value for the other kind is ignored.
     pub fn clear(&self, gpu: &Gpu, color: wgpu::Color, depth: f32) {
         self.clear_layer(gpu, color, depth, 0);
     }
 
-    /// [`Texture::clear`] of one array layer (a cube face).
+    /// [`Texture::clear`] of one array layer (a cube face). Volumes aren't attachments: no-op.
     pub fn clear_layer(&self, gpu: &Gpu, color: wgpu::Color, depth: f32, layer: u32) {
+        if self.desc.volume {
+            return;
+        }
         let view = (layer > 0).then(|| self.layer_target_view(layer));
         let view = view.as_ref().unwrap_or(&self.target_view);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
@@ -119,25 +144,35 @@ impl Texture {
     }
 
     /// Copy `[x, y, w, h]` of mip 0 into `dst` at `(dx, dy)`, in every array layer both have.
-    /// False (nothing copied) when the formats differ (an sRGB twin counts as the same) or the rect
-    /// falls outside either texture.
-    pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
-        let fits = |t: &Texture, x: u32, y: u32| x + w <= t.desc.width && y + h <= t.desc.height;
-        // Depth and stencil copies must cover whole subresources (wgpu validation).
-        let whole = |t: &Texture| [x, y, dx, dy] == [0; 4] && (w, h) == (t.desc.width, t.desc.height);
-        if self.desc.format.has_depth_aspect() && !(whole(self) && whole(dst)) {
-            return false;
-        }
-        let same = self.desc.format.remove_srgb_suffix() == dst.desc.format.remove_srgb_suffix();
-        if !same || w == 0 || h == 0 || !fits(self, x, y) || !fits(dst, dx, dy) {
-            return false;
-        }
-        fn at(texture: &wgpu::Texture, x: u32, y: u32) -> wgpu::TexelCopyTextureInfo<'_> {
-            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All }
-        }
-        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+    pub fn copy_to(&self, gpu: &Gpu, dst: &Texture, rect: [u32; 4], to: (u32, u32)) -> bool {
         let layers = self.desc.layers.max(1).min(dst.desc.layers.max(1));
-        encoder.copy_texture_to_texture(at(&self.texture, x, y), at(&dst.texture, dx, dy), wgpu::Extent3d { depth_or_array_layers: layers, ..extent(w, h) });
+        self.copy_region(gpu, dst, (Subresource::default(), Subresource::default()), layers, rect, to)
+    }
+
+    /// Copy `[x, y, w, h]` of `layers` layers from `src` into `dst` at `(dx, dy)`, between the
+    /// (mip, first layer) pairs of `subs`. False (nothing copied) when the formats differ (an sRGB
+    /// twin counts as the same), a mip or layer is missing, or the rect falls outside either mip.
+    pub fn copy_region(&self, gpu: &Gpu, dst: &Texture, (src, to): (Subresource, Subresource), layers: u32, [x, y, w, h]: [u32; 4], (dx, dy): (u32, u32)) -> bool {
+        let format = self.desc.format;
+        let (bw, bh) = format.block_dimensions();
+        let whole = |t: &Texture, s: Subresource, x: u32, y: u32| [x, y] == [0, 0] && (w, h) == t.mip_size(s.mip);
+        let fits = |t: &Texture, s: Subresource, x: u32, y: u32| {
+            let (mw, mh) = t.mip_size(s.mip);
+            let aligned = whole(t, s, x, y) || (x % bw == 0 && y % bh == 0 && w % bw == 0 && h % bh == 0);
+            s.mip < t.desc.mips.max(1) && s.layer + layers <= t.mip_layers(s.mip) && x + w <= mw && y + h <= mh && aligned
+        };
+        // Depth and stencil copies must cover whole subresources (wgpu validation).
+        if format.has_depth_aspect() && !(whole(self, src, x, y) && whole(dst, to, dx, dy)) {
+            return false;
+        }
+        let same = format.remove_srgb_suffix() == dst.desc.format.remove_srgb_suffix();
+        if !same || w == 0 || h == 0 || layers == 0 || !fits(self, src, x, y) || !fits(dst, to, dx, dy) {
+            return false;
+        }
+        let at = |texture, s: Subresource, x, y| wgpu::TexelCopyTextureInfo { texture, mip_level: s.mip, origin: wgpu::Origin3d { x, y, z: s.layer }, aspect: wgpu::TextureAspect::All };
+        let size = wgpu::Extent3d { width: w.next_multiple_of(bw), height: h.next_multiple_of(bh), depth_or_array_layers: layers };
+        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_texture(at(&self.texture, src, x, y), at(&dst.texture, to, dx, dy), size);
         gpu.submit(encoder.finish());
         true
     }

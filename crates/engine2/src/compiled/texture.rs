@@ -85,7 +85,9 @@ fn config(t: &vtex::Texture, width: usize, height: usize, layers: usize, mips: i
         config.m_n_depth = (layers / 6) as i16;
         config.m_n_flags |= crate::render::texture::TSPEC_CUBE_TEXTURE;
     }
-    if layers > 1 && !t.is_cube() && t.flags & vtex::flags::VOLUME == 0 {
+    if t.flags & vtex::flags::VOLUME != 0 {
+        config.m_n_flags |= crate::render::texture::TSPEC_VOLUME_TEXTURE;
+    } else if layers > 1 && !t.is_cube() {
         config.m_n_flags |= crate::render::texture::TSPEC_TEXTURE_ARRAY;
     }
     if let Some((w, h)) = t.display {
@@ -106,11 +108,12 @@ pub fn decode(t: &vtex::Texture) -> Option<Decoded> {
     let (data, width, height, format) = decode_level(t, 0, layers)?;
     let mut smaller = Vec::new();
     let mut mips = 1;
-    // Volumes shrink in depth per mip, which the stacked-layer layout can't hold.
-    let chain = if image_file || t.flags & vtex::flags::VOLUME != 0 { 1 } else { t.levels.len() };
+    let volume = t.flags & vtex::flags::VOLUME != 0;
+    let chain = if image_file { 1 } else { t.levels.len() };
     for level in 1..chain {
         let expected = ((width >> level).max(1), (height >> level).max(1));
-        match decode_level(t, level, layers) {
+        let level_layers = if volume { (layers >> level).max(1) } else { layers };
+        match decode_level(t, level, level_layers) {
             Some((d, w, h, f)) if (w, h) == expected && f == format => smaller.extend(d),
             _ => break,
         }

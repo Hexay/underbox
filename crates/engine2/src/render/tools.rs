@@ -4,7 +4,7 @@
 //! tracing, lightmaps), which answer "none" so managed skips them. Skinning: render/skin.
 
 use crate::render::draw::{self, immediate, model as model_draw};
-use crate::render::{context, device, texture};
+use crate::render::{context, device, texture, texture_ops};
 use crate::scene::object;
 use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools as tools};
 use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
@@ -24,14 +24,6 @@ fn copy_from_target(c: context::Ref, dst: texture::Ref, rect: Option<[u32; 4]>, 
 fn rect(r: NativeRect) -> Option<[u32; 4]> {
     let c = |v: i32| v.max(0) as u32;
     Some([c(r.x), c(r.y), c(r.w), c(r.h)])
-}
-
-fn copy_texture(src: texture::Ref, dst: texture::Ref, r: NativeRect, dx: i32, dy: i32) {
-    let (Some(gpu), Some(s), Some(d)) = (device::gpu(), texture::resolve(src), texture::resolve(dst)) else { return };
-    let (Some(a), Some(b)) = (s.gpu.as_ref(), d.gpu.as_ref()) else { return };
-    let r = rect(r).filter(|r| r[2] > 0 && r[3] > 0).unwrap_or([0, 0, a.desc.width, a.desc.height]);
-    // TODO: mip and array slices (always 0 here).
-    a.copy_to(gpu, b, r, (dx.max(0) as u32, dy.max(0) as u32));
 }
 
 /// `BlitTexture`: all of `src` into `viewport` of the bound colour target, scaled and converted
@@ -146,9 +138,10 @@ pub fn register(r: &mut Registry) {
         crate::render::submits::log(c, &format!("blit from {}", crate::render::scene::trace::describe(src)));
         blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb)
     });
-    bind!(r, tools::COPY_TEXTURE, |c, src, dst, r, dx, dy, _, _, _, _| {
+    bind!(r, tools::COPY_TEXTURE, |c, src, dst, r, dx, dy, sm, ss, dm, ds| {
         crate::render::submits::log_texture(c, &format!("copy from {}", crate::render::scene::trace::describe(src)), dst);
-        copy_texture(src, dst, r, dx, dy)
+        let r = rect(r).filter(|r| r[2] > 0 && r[3] > 0);
+        texture_ops::copy(src, dst, r, (dx.max(0) as u32, dy.max(0) as u32), [sm, ss, dm, ds]);
     });
     bind!(r, tools::DRAW_SKY_BOX, |c, attrs, mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, attrs, mode, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
@@ -187,9 +180,12 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::SEMAPHORE_WAIT_AT_BEGIN, |_, _| {});
     bind!(r, ctx::TEXTURE_BARRIER_TRANSITION, |_, _, _, _, _, _, _, _| {});
     bind!(r, ctx::BUFFER_BARRIER_TRANSITION, |_, _, _, _, _, _| {});
-    // TODO: mip generation and uint clears need compute or a blit pass.
-    bind!(r, ctx::GENERATE_MIP_MAPS, |_, _| {});
-    bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, _, _| {});
+    bind!(r, ctx::GENERATE_MIP_MAPS, |_, t| {
+        texture_ops::generate_mips(t);
+    });
+    bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, t, v| {
+        texture_ops::clear_uint(t, v);
+    });
     bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, |d| PtrHandle::<abi::handle::SamplerStateHandle_t>::new(crate::render::samplers::find_or_create(d)));
     bind!(r, dev::GET_SAMPLER_INDEX, |h| h.value as i32 - 1);
     bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));

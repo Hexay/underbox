@@ -85,7 +85,7 @@ pub(super) fn uniform_value<P>(s: &Shading<P>, inputs: &Inputs, name: &str) -> O
     let attribute = || from_attributes(s, inputs, name, attributes::token_value);
     let given = || inputs.values.iter().find_map(|m| names(s, name).find_map(|n| m.get(n).copied()));
     let attr = s.attributes.get(name);
-    let source = || attr.and_then(|a| inputs.view.source(a.source.as_deref()?));
+    let source = || attr.and_then(|a| super::texture_dim::value(s, inputs, a).or_else(|| inputs.view.source(a.source.as_deref()?)));
     let matrix = || from_attributes(s, inputs, name, attributes::token_shader_matrix).map(Value::Mat);
     let vector = attribute().or_else(given).or_else(|| shadow_slots::indices(name)).or_else(|| fog::sun_value(inputs.lighting, name)).or_else(source);
     let unset_matrix = attr.is_some_and(|a| a.attribute.is_some() && a.default.is_none()).then_some(Value::Mat(Mat4::IDENTITY)); // real's world text sets no LayerMat
@@ -101,10 +101,22 @@ enum Resource {
     Samplers(Vec<wgpu::Sampler>),
 }
 
-/// The draw's texture for `b`: a render attribute's or the material's by name, managed's sun
-/// cascade or the lighting's (shadow maps), else a `BindTexture` slot at its binding.
 fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu::TextureView> {
     let B::Texture { sample_type, view_dimension, multisampled: false } = b.ty else { return None };
+    let t = bound_texture(s, inputs, b)?;
+    let gpu = t.gpu.as_ref()?;
+    let srgb = s.attributes.get(&b.name).is_some_and(|a| a.srgb);
+    let slice = || from_attributes(s, inputs, &b.name, attributes::token_texture_slice);
+    let view = || match slice().filter(|_| gpu.texture.mip_level_count() > 1) {
+        Some(mip) => gpu.mip_sample_view(srgb, mip),
+        None => gpu.sample_view(srgb).clone(),
+    };
+    (gpu.dimension() == view_dimension && sample_type_fits(gpu.desc.format, sample_type)).then(view)
+}
+
+/// The draw's texture for `b`: a render attribute's or the material's by name, managed's sun
+/// cascade or the lighting's (shadow maps), else a `BindTexture` slot at its binding.
+pub(super) fn bound_texture<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<std::sync::Arc<texture::Texture>> {
     let attribute = || from_attributes(s, inputs, &b.name, attributes::token_texture_ref);
     let from_material = || names(s, &b.name).find_map(|n| inputs.textures.get(n).copied());
     let from_slot = || inputs.slots.iter().find(|(slot, _)| *slot == b.binding).map(|(_, t)| *t);
@@ -114,17 +126,8 @@ fn texture_view<P>(s: &Shading<P>, inputs: &Inputs, b: &Binding) -> Option<wgpu:
     let t = attribute().or_else(from_material).or_else(from_managed).or_else(|| shadow_slots::texture(base)).or_else(|| inputs.lighting.texture(&b.name)).or_else(from_slot)?;
     // An error texture (a missing file) would paint the draw magenta; the default stands in.
     let t = texture::resolve(t).filter(|t| !t.is_error())?;
-    if inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t)) {
-        return None;
-    }
-    let gpu = t.gpu.as_ref()?;
-    let srgb = s.attributes.get(&b.name).is_some_and(|a| a.srgb);
-    let slice = || from_attributes(s, inputs, &b.name, attributes::token_texture_slice);
-    let view = || match slice().filter(|_| gpu.texture.mip_level_count() > 1) {
-        Some(mip) => gpu.mip_sample_view(srgb, mip),
-        None => gpu.sample_view(srgb).clone(),
-    };
-    (gpu.dimension() == view_dimension && sample_type_fits(gpu.desc.format, sample_type)).then(view)
+    let targeted = inputs.targets.iter().filter_map(|r| texture::resolve(*r)).any(|r| std::sync::Arc::ptr_eq(&r, &t));
+    (!targeted).then_some(t)
 }
 
 /// Whether a texture of `format` can bind where a shader declares `want`.

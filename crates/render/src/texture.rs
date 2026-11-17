@@ -17,21 +17,26 @@ pub struct TextureDesc {
     pub format: wgpu::TextureFormat,
     pub mips: u32,
     pub render_target: bool,
-    /// Array layers (six per cube); 1 for a plain 2D texture.
+    /// Array layers (six per cube); 1 for a plain 2D texture; a volume's depth.
     pub layers: u32,
     /// Sampled as a cube (or cube array) rather than a 2D array.
     pub cube: bool,
+    /// A 3D texture: never an attachment, its depth halves per mip.
+    pub volume: bool,
 }
 
 impl TextureDesc {
     /// A sampleable colour render target that can be read back.
     pub fn render_target(label: &str, width: u32, height: u32, format: wgpu::TextureFormat) -> Self {
-        TextureDesc { label: label.into(), width, height, format, mips: 1, render_target: true, layers: 1, cube: false }
+        TextureDesc { label: label.into(), width, height, format, mips: 1, render_target: true, layers: 1, cube: false, volume: false }
     }
 
-    /// How shaders see it: 2D, 2D array, cube or cube array.
+    /// How shaders see it: 2D, 2D array, cube, cube array or 3D.
     pub fn dimension(&self) -> wgpu::TextureViewDimension {
         use wgpu::TextureViewDimension as D;
+        if self.volume {
+            return D::D3;
+        }
         match (self.cube && self.layers.is_multiple_of(6), self.layers) {
             (true, 6) => D::Cube,
             (true, _) => D::CubeArray,
@@ -50,7 +55,9 @@ impl TextureDesc {
         if gpu.format_features(self.format).allowed_usages.contains(wgpu::TextureUsages::STORAGE_BINDING) {
             base |= wgpu::TextureUsages::STORAGE_BINDING;
         }
-        if self.render_target { base | wgpu::TextureUsages::RENDER_ATTACHMENT } else { base }
+        // Mip generation draws each mip from the one above (mips.rs).
+        let mip_target = self.mips > 1 && gpu.format_features(self.format).allowed_usages.contains(wgpu::TextureUsages::RENDER_ATTACHMENT);
+        if (self.render_target || mip_target) && !self.volume { base | wgpu::TextureUsages::RENDER_ATTACHMENT } else { base }
     }
 }
 
@@ -88,7 +95,7 @@ impl Texture {
             size: wgpu::Extent3d { depth_or_array_layers: desc.layers.max(1), ..extent(desc.width, desc.height) },
             mip_level_count: desc.mips.max(1),
             sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
+            dimension: if desc.volume { wgpu::TextureDimension::D3 } else { wgpu::TextureDimension::D2 },
             format: desc.format,
             usage: desc.usage(gpu),
             view_formats: twin.as_slice(),
@@ -99,7 +106,10 @@ impl Texture {
         let format = (!desc.format.is_depth_stencil_format()).then_some(linear);
         let view = texture.create_view(&wgpu::TextureViewDescriptor { format, dimension, aspect: sample_aspect(desc.format), usage: sampled(linear), ..Default::default() });
         let srgb_view = (linear != srgb).then(|| texture.create_view(&wgpu::TextureViewDescriptor { format: Some(srgb), dimension, usage: sampled(srgb), ..Default::default() }));
-        let target_view = layer_view(&texture, 0);
+        let target_view = match desc.volume {
+            true => texture.create_view(&wgpu::TextureViewDescriptor { mip_level_count: Some(1), ..Default::default() }),
+            false => subresource_view(&texture, desc.format, 0, 0),
+        };
         Texture { desc, texture, view, target_view, srgb_view, mip_views: Mutex::default() }
     }
 
@@ -109,7 +119,12 @@ impl Texture {
 
     /// Mip 0 of one array layer (a cube face), as a 2D attachment.
     pub fn layer_target_view(&self, layer: u32) -> wgpu::TextureView {
-        layer_view(&self.texture, layer)
+        subresource_view(&self.texture, self.desc.format, 0, layer)
+    }
+
+    /// One mip of one array layer through `format` (the texture's or its twin), as a 2D attachment.
+    pub fn subresource_target_view(&self, format: wgpu::TextureFormat, mip: u32, layer: u32) -> wgpu::TextureView {
+        subresource_view(&self.texture, format, mip, layer)
     }
 
     /// Mip 0 as an attachment that encodes on write (native's `RENDER_SRGB` output), for render
@@ -162,6 +177,12 @@ impl Texture {
     pub fn mip_size(&self, mip: u32) -> (u32, u32) {
         ((self.desc.width >> mip).max(1), (self.desc.height >> mip).max(1))
     }
+
+    /// Array layers of `mip`: every layer, or a volume's depth at that mip.
+    pub fn mip_layers(&self, mip: u32) -> u32 {
+        let layers = self.desc.layers.max(1);
+        if self.desc.volume { (layers >> mip).max(1) } else { layers }
+    }
 }
 
 /// What shaders sample and read-backs copy: a depth-stencil format's depth alone (a view or copy
@@ -170,9 +191,13 @@ pub fn sample_aspect(format: wgpu::TextureFormat) -> wgpu::TextureAspect {
     if format.has_depth_aspect() && format.has_stencil_aspect() { wgpu::TextureAspect::DepthOnly } else { wgpu::TextureAspect::All }
 }
 
-fn layer_view(texture: &wgpu::Texture, layer: u32) -> wgpu::TextureView {
+fn subresource_view(texture: &wgpu::Texture, format: wgpu::TextureFormat, mip: u32, layer: u32) -> wgpu::TextureView {
+    let usage = (format != texture.format()).then_some(wgpu::TextureUsages::RENDER_ATTACHMENT);
     texture.create_view(&wgpu::TextureViewDescriptor {
+        format: Some(format),
         dimension: Some(wgpu::TextureViewDimension::D2),
+        usage,
+        base_mip_level: mip,
         mip_level_count: Some(1),
         base_array_layer: layer,
         array_layer_count: Some(1),
