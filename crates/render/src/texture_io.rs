@@ -158,7 +158,7 @@ impl Texture {
         let whole = |t: &Texture, s: Subresource, x: u32, y: u32| [x, y] == [0, 0] && (w, h) == t.mip_size(s.mip);
         let fits = |t: &Texture, s: Subresource, x: u32, y: u32| {
             let (mw, mh) = t.mip_size(s.mip);
-            let aligned = whole(t, s, x, y) || (x % bw == 0 && y % bh == 0 && w % bw == 0 && h % bh == 0);
+            let aligned = whole(t, s, x, y) || (x.is_multiple_of(bw) && y.is_multiple_of(bh) && w.is_multiple_of(bw) && h.is_multiple_of(bh));
             s.mip < t.desc.mips.max(1) && s.layer + layers <= t.mip_layers(s.mip) && x + w <= mw && y + h <= mh && aligned
         };
         // Depth and stencil copies must cover whole subresources (wgpu validation).
