@@ -2,6 +2,7 @@
 //! root. Only active nodes advance; entering a state restarts its subtree.
 
 use super::eval_more::Rig;
+use super::external::External;
 use super::random::{self, Draws};
 use super::tags::MachineStep;
 use super::smooth::{self, Smooth};
@@ -66,10 +67,11 @@ pub struct Instance {
     pub(super) nodes: Vec<NodeState>,
     smooth: Vec<Smooth>,
     /// Clip events passed since the last `take_events`.
-    events: Vec<Fired>,
+    pub(super) events: Vec<Fired>,
     pub(super) draws: Draws,
     /// Tags raised by the last update (see `tags`).
     pub(super) tags: Vec<String>,
+    pub(super) externals: Vec<External>,
 }
 
 impl Instance {
@@ -80,7 +82,7 @@ impl Instance {
         let nodes = vec![NodeState::Idle; def.poses.len()];
         let smooth = vec![Smooth::default(); def.values.len()];
         let draws = Draws::new(random::next_seed(), &def.values);
-        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new(), draws, tags: Vec::new() }
+        Self { def, params, rig: None, clips, nodes, smooth, events: Vec::new(), draws, tags: Vec::new(), externals: Vec::new() }
     }
 
     /// The clip events playing clips passed since the last call.
@@ -109,13 +111,18 @@ impl Instance {
 
     /// Advance by `dt` seconds and return the pose. `bind` is the skeleton's bind pose.
     pub fn update(&mut self, dt: f32, bind: &Pose) -> Pose {
+        self.advance(dt, bind).pose
+    }
+
+    pub(super) fn advance(&mut self, dt: f32, bind: &Pose) -> Out {
         self.tags.clear();
+        self.externals.iter_mut().for_each(External::idle);
         let mut states = std::mem::take(&mut self.smooth);
         smooth::advance(&self.values(StateCtx::default()), &mut states, dt);
         self.smooth = states;
         match self.def.root {
-            Some(root) => self.eval(root, dt, bind).pose,
-            None => bind.clone(),
+            Some(root) => self.eval(root, dt, bind),
+            None => Out { pose: bind.clone(), finished: false, remaining: 0.0 },
         }
     }
 
@@ -125,7 +132,7 @@ impl Instance {
     }
 
     pub(super) fn values(&self, ctx: StateCtx) -> Values<'_> {
-        Values { def: &self.def, params: &self.params, ctx, smooth: &self.smooth, random: &self.draws.held }
+        Values { def: &self.def, params: &self.params, ctx, smooth: &self.smooth, random: &self.draws.held, externals: &self.externals }
     }
 
     pub(super) fn eval(&mut self, id: PoseId, dt: f32, bind: &Pose) -> Out {
@@ -159,6 +166,7 @@ impl Instance {
             PoseNode::Variation { .. } => Out::ended(bind.clone()),
             PoseNode::TwoBoneIk(n) => self.two_bone_ik(id, n, dt, bind),
             PoseNode::LookAt(n) => self.look_at(n, dt, bind),
+            PoseNode::External { slot, fallback } => self.external(slot, *fallback, dt, bind),
         }
     }
 

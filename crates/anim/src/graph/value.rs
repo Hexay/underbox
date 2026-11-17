@@ -52,6 +52,8 @@ pub struct Values<'a> {
     pub(super) smooth: &'a [Smooth],
     /// Each random node's held draw (see `random`); empty reads `min`.
     pub(super) random: &'a [f32],
+    /// The connected external graphs.
+    pub(super) externals: &'a [super::external::External],
 }
 
 impl Values<'_> {
@@ -90,6 +92,7 @@ impl Values<'_> {
                 None => Value::Float(self.float(*input)),
             },
             ValueNode::Random { min, .. } => Value::Float(self.random.get(id).copied().unwrap_or(*min)),
+            ValueNode::ExternalFilled(slot) => Value::Bool(self.externals.iter().any(|e| e.slot == *slot)),
         }
     }
 
