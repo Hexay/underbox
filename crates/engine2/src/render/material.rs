@@ -44,6 +44,16 @@ impl Resource for Material {
 }
 
 impl Material {
+    /// Attribute `t`: its render attributes, else a vector param of that name.
+    pub fn attribute(&self, t: abi::StringToken) -> Option<f32> {
+        // Managed's `Material.Flags.IsTranslucent` reads this.
+        if t == abi::StringToken::of("translucent") {
+            return Some(f32::from(u8::from(self.blend().is_some())));
+        }
+        let own = attributes::token_value(self.attributes, t).map(|v| v.x);
+        own.or_else(|| self.params.lock().unwrap().vectors.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, v)| v.vec.x))
+    }
+
     pub fn shader(&self) -> &str {
         &self.shader
     }
@@ -234,12 +244,6 @@ pub(crate) fn first_texture(h: Ref) -> Texture {
 #[path = "material_tests.rs"]
 mod tests;
 
-/// Attribute `t` of a material: its render attributes, else a vector param of that name.
 fn value(h: Ref, t: abi::StringToken) -> Option<f32> {
-    // Managed's `Material.Flags.IsTranslucent` reads this.
-    if t == abi::StringToken::of("translucent") {
-        return Some(on(h, |mat| f32::from(u8::from(mat.blend().is_some()))));
-    }
-    let own = on(h, |mat| attributes::token_value(mat.attributes, t).map(|v| v.x));
-    own.or_else(|| params(h, |p| p.vectors.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, v)| v.vec.x)))
+    on(h, |mat| mat.attribute(t))
 }

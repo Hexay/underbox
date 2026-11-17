@@ -39,6 +39,15 @@ pub(super) fn parts(m: &Model) -> Vec<Part> {
     parts
 }
 
+/// `mask` with body part `part` switched to its `n`th mesh group; `None` when the model has no
+/// such part or choice.
+pub(crate) fn with_body_group(m: &Model, mask: u64, part: StringToken, n: i32) -> Option<u64> {
+    let parts = parts(m);
+    let p = parts.iter().find(|p| StringToken::of(&p.name) == part)?;
+    let all = p.choices.iter().fold(0, |m, c| m | c.1);
+    Some(mask & !all | choice(p, n)?.1)
+}
+
 fn on_part<R: Default>(r: super::Ref, part: i32, f: impl FnOnce(&Model, &Part) -> R) -> R {
     on(r, |m| usize::try_from(part).ok().and_then(|i| parts(m).into_iter().nth(i)).map(|p| f(m, &p)).unwrap_or_default())
 }
@@ -60,8 +69,8 @@ pub(super) fn group_name(m: &Model, i: i32) -> Option<String> {
     usize::try_from(i).ok().and_then(|i| m.content.material_groups.get(i)).map(|g| g.name.clone())
 }
 
-/// Every distinct material, in first-use order: skins first, then draw calls.
-fn materials(m: &Model) -> Vec<std::sync::Arc<material_ref::MaterialRef>> {
+/// Every distinct material, in first-use order: skins first, then draw calls (`Model.Materials`).
+pub(crate) fn materials(m: &Model) -> Vec<std::sync::Arc<material_ref::MaterialRef>> {
     let skins = m.content.material_groups.iter().flat_map(|g| g.materials.iter().cloned());
     let calls = m.content.meshes.iter().flat_map(|x| x.mesh.draw_calls()).filter_map(|d| d.material);
     let mut out: Vec<std::sync::Arc<material_ref::MaterialRef>> = Vec::new();

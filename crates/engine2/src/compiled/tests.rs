@@ -157,3 +157,13 @@ fn compiled_crate_lands_on_compiled_world_physics() {
     aggregate::destroy(crate_);
     aggregate::destroy(ground);
 }
+
+/// Int and float user attributes (`skin 1`) read like params, for `GetIntAttributeOrDefault` and
+/// scene objects' attribute overrides; static combos don't.
+#[test]
+fn compiled_user_attributes_become_material_values() {
+    let m = assets::compiled::material::Material { ints: vec![("F_X".into(), 1)], int_attributes: vec![("skin".into(), 1)], float_attributes: vec![("wet".into(), 0.5)], ..Default::default() };
+    let v = super::material::vectors(&m);
+    assert!(v.contains(&("skin".into(), [1.0, 0.0, 0.0, 0.0])) && v.contains(&("wet".into(), [0.5, 0.0, 0.0, 0.0])), "{v:?}");
+    assert!(!v.iter().any(|(n, _)| n == "F_X"));
+}

@@ -88,8 +88,7 @@ impl Decal {
             coverage_amount: field!(f32, d::GET_M_FL_COVERAGE_AMOUNT, this),
             coverage_range: field!(f32, d::GET_M_FL_COVERAGE_RANGE, this),
             sequence: field!(u32, d::GET_M_N_SEQUENCE_INDEX, this),
-            // TODO: sheeted decal textures (`GetSheetSequenceTextureData` isn't implemented).
-            sheet: Vec4::ZERO,
+            sheet: { let s = crate::render::sheet::info(color).vec; Vec4::new(s.x, s.y, s.z, s.w) },
         }
     }
 

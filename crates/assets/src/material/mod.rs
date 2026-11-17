@@ -15,6 +15,8 @@ pub struct Material {
     pub textures: Vec<(String, String)>,
     /// Numeric parameters (`g_fl*`, `g_v*`, `g_n*`, `g_b*`); scalars fill x only.
     pub values: Vec<(String, [f32; 4])>,
+    /// User attributes (the `Attributes` block: `skin "1"`), which scene objects' overrides match.
+    pub attributes: Vec<(String, f32)>,
 }
 
 pub fn from_vmat(src: &str) -> Result<Material, kv::Error> {
@@ -22,6 +24,12 @@ pub fn from_vmat(src: &str) -> Result<Material, kv::Error> {
     let layer = root.0.iter().find_map(|(_, v)| v.as_object()).cloned().unwrap_or_default();
     let mut material = Material::default();
     for (key, value) in &layer.0 {
+        if key.eq_ignore_ascii_case("Attributes") {
+            let block = value.as_object().map(|o| o.0.as_slice()).unwrap_or_default();
+            let numeric = block.iter().filter_map(|(k, v)| Some((k.clone(), v.as_str()?.trim().parse().ok()?)));
+            material.attributes.extend(numeric);
+            continue;
+        }
         let Some(text) = value.as_str() else { continue };
         if key.eq_ignore_ascii_case("shader") {
             material.shader = text.to_owned();

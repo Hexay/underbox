@@ -269,8 +269,8 @@ See docs/windowing.md.
 
 ## Next
 
-1. Fog's baked indirect and managed cascades past 0 (docs/fog.md); `GetSheetInfo` and the shader sheet path
-   (`sheet_sampling.fxc` is a stub).
+1. Fog's baked indirect and managed cascades past 0 (docs/fog.md). Sprite sheets sample per frame
+   from our metadata texture (render/sheet_meta.rs); real's layout is closed and unchecked.
 2. Material features as static combos (today they only pick the blend), MSAA, cube and stereo
    renders, GPU timestamps, mip generation.
 

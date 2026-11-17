@@ -2,7 +2,8 @@
 
 use super::object::{self, get, with};
 use abi::slots::{c_scene_object as o, g_p_scene_system as system};
-use abi::{HandleId, Registry, bind};
+use crate::mesh::material_ref::MaterialRef;
+use abi::{HandleId, Registry, StringToken, bind};
 
 pub fn register(r: &mut Registry) {
     bind!(r, system::DELETE_SCENE_OBJECT, object::delete);
@@ -94,11 +95,20 @@ pub fn register(r: &mut Registry) {
     bind!(r, o::GET_CURRENT_LOD_GROUP_MASK, |_| 1);
     bind!(r, o::GET_MODEL_HANDLE, |s| with(s, |st| crate::model::copy(st.model)));
     bind!(r, o::GET_INT_VALUE, |_, _, default| default);
-    bind!(r, o::SET_MATERIAL_OVERRIDE_FOR_MESH_INSTANCES, |s, m| with(s, |st| st.material_override = crate::mesh::material_ref::MaterialRef::keep(m)));
-    // TODO: per-attribute and per-index overrides and material groups.
-    bind!(r, o::CLEAR_MATERIAL_OVERRIDE_LIST, |_| {});
-    bind!(r, o::SET_MATERIAL_OVERRIDE, |_, _, _, _| {});
-    bind!(r, o::SET_MATERIAL_OVERRIDE_BY_INDEX, |_, _, _| {});
-    bind!(r, o::SET_MATERIAL_GROUP, |_, _| {});
-    bind!(r, o::SET_BODY_GROUP, |_, _, _| {});
+    bind!(r, o::SET_MATERIAL_OVERRIDE_FOR_MESH_INSTANCES, |s, m| with(s, |st| st.material_override = MaterialRef::keep(m)));
+    bind!(r, o::CLEAR_MATERIAL_OVERRIDE_LIST, |s| with(s, |st| {
+        st.material_override = None;
+        st.materials.clear();
+    }));
+    bind!(r, o::SET_MATERIAL_OVERRIDE, |s, m, attr, value| with(s, |st| st.materials.set_by_attribute(MaterialRef::keep(m), attr, value)));
+    bind!(r, o::SET_MATERIAL_OVERRIDE_BY_INDEX, |s, i, m| with(s, |st| st.materials.set_by_index(i, MaterialRef::keep(m))));
+    bind!(r, o::SET_MATERIAL_GROUP, |s, t| with(s, |st| st.materials.group = (t.0 != 0).then_some(t)));
+    bind!(r, o::SET_BODY_GROUP, set_body_group);
+}
+
+fn set_body_group(s: object::Ref, part: StringToken, choice: i32) {
+    with(s, |st| {
+        let mask = crate::model::get(st.model).and_then(|m| crate::model::parts::with_body_group(&m, st.mesh_groups, part, choice));
+        st.mesh_groups = mask.unwrap_or(st.mesh_groups);
+    });
 }
