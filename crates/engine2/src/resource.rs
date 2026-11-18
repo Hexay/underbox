@@ -50,10 +50,16 @@ pub fn binding_ptr<C, T: Send + Sync + 'static>(handle: NativeRef<C>) -> RawPtr<
 /// Resources by path, so loading one path twice gives one resource (managed caches wrappers by
 /// binding pointer). As real's resource system, a resource nothing references any more (no
 /// strong handle, no engine object holding it) is deleted on the next frame update
-/// ([`unload_unreferenced`]); loading its path again reads it afresh.
+/// ([`unload_unreferenced`]); loading its path again reads it afresh. Entries the engine looks up
+/// by name instead of holding ([`ByName::find_or_insert_resident`]) are never unloaded.
 pub struct ByName<T: Send + Sync + 'static> {
-    map: LazyLock<Mutex<HashMap<String, Arc<T>>>>,
+    map: LazyLock<Mutex<HashMap<String, Entry<T>>>>,
     swept: AtomicBool,
+}
+
+struct Entry<T> {
+    resource: Arc<T>,
+    resident: bool,
 }
 
 trait Sweep: Sync {
@@ -67,20 +73,33 @@ impl<T: Send + Sync + 'static> ByName<T> {
         Self { map: LazyLock::new(Mutex::default), swept: AtomicBool::new(false) }
     }
 
-    fn map(&'static self) -> std::sync::MutexGuard<'static, HashMap<String, Arc<T>>> {
+    fn map(&'static self) -> std::sync::MutexGuard<'static, HashMap<String, Entry<T>>> {
         if !self.swept.swap(true, Ordering::Relaxed) {
             CACHES.lock().unwrap().push(self);
         }
         self.map.lock().unwrap()
     }
 
+    fn entry(&'static self, name: &str, resident: bool, make: impl FnOnce() -> T) -> Arc<T> {
+        let mut map = self.map();
+        let entry = map.entry(name.to_ascii_lowercase()).or_insert_with(|| Entry { resource: Arc::new(make()), resident });
+        entry.resident |= resident;
+        entry.resource.clone()
+    }
+
     pub fn find_or_insert(&'static self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
-        self.map().entry(name.to_ascii_lowercase()).or_insert_with(|| Arc::new(make())).clone()
+        self.entry(name, false, make)
+    }
+
+    /// As [`Self::find_or_insert`], and keeps the resource loaded from now on: for callers that
+    /// look it up by name each time and key their own caches on its identity.
+    pub fn find_or_insert_resident(&'static self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
+        self.entry(name, true, make)
     }
 
     /// Make `resource` the one `name` finds from now on.
     pub fn insert(&'static self, name: &str, resource: Arc<T>) {
-        self.map().insert(name.to_ascii_lowercase(), resource);
+        self.map().insert(name.to_ascii_lowercase(), Entry { resource, resident: false });
     }
 }
 
@@ -93,7 +112,8 @@ impl<T: Send + Sync + 'static> Default for ByName<T> {
 impl<T: Send + Sync + 'static> Sweep for ByName<T> {
     fn sweep(&self) -> usize {
         // Dropped unlocked: a resource's drop may release others of its type.
-        let gone: Vec<Arc<T>> = self.map.lock().unwrap().extract_if(|_, r| Arc::strong_count(r) == 1).map(|(_, r)| r).collect();
+        let unreferenced = |_: &String, e: &mut Entry<T>| !e.resident && Arc::strong_count(&e.resource) == 1;
+        let gone: Vec<Entry<T>> = self.map.lock().unwrap().extract_if(unreferenced).map(|(_, e)| e).collect();
         gone.len()
     }
 }
@@ -160,5 +180,15 @@ mod tests {
         let c = load();
         assert_eq!(LOADS.load(Ordering::Relaxed), 2, "loaded afresh");
         destroy_handle(c);
+    }
+
+    static ENGINE_HELD: ByName<usize> = ByName::new();
+
+    #[test]
+    fn resident_resources_stay_loaded() {
+        let first = ENGINE_HELD.find_or_insert_resident("Res", || 1);
+        drop(first);
+        assert_eq!(ENGINE_HELD.sweep(), 0);
+        assert_eq!(*ENGINE_HELD.find_or_insert("res", || 2), 1, "same resource, not reloaded");
     }
 }
