@@ -27,6 +27,8 @@ gns = { path = "../gns" }
 half = "2"
 kv = { path = "../kv" }
 lz4_flex = "0.14.0"
+# local-dynamic TLS: libengine2 is dlopened, initial-exec TLS may not fit (docs/perf-build.md).
+mimalloc = { version = "0.1.52", default-features = false, features = ["local_dynamic_tls"] }
 objects = { path = "../objects" }
 physics = { path = "../physics" }
 platform = { path = "../platform" }

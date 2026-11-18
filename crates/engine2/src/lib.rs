@@ -1,6 +1,10 @@
 //! `libengine2`: what s&box's managed engine loads in place of Facepunch's closed core.
 //! Managed calls [`igen_engine`] once; every native function it uses after that is a slot.
 
+// Only Rust allocations; nothing crosses the FFI to be freed by the other side (docs/perf-build.md).
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub mod anim;
 pub mod app;
 pub mod audio;
