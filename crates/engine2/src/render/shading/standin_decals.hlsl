@@ -32,9 +32,10 @@
 		// Before the loop: the whole quad must take derivatives.
 		float3 vDx = ddx( vPositionWs ), vDy = ddy( vPositionWs );
 		ClusterRange r = Cluster::Query( ClusterItemType_Decal, nCluster );
-		for ( uint k = 0; k < r.Count; k++ )
+		// Wave-uniform, as Direct's (standin_lighting.hlsl).
+		ClusterForEach( r )
 		{
-			uint b = Cluster::LoadItem( r, k ) * 16u;
+			uint b = r.Item * 16u;
 			float4 q = float4( DecalWord( b, 3 ), DecalWord( b, 4 ), DecalWord( b, 5 ), DecalWord( b, 6 ) );
 			float3 vScale = float3( DecalWord( b, 7 ), DecalWord( b, 8 ), DecalWord( b, 9 ) );
 			float3 p = DecalRotate( vPositionWs + float3( DecalWord( b, 0 ), DecalWord( b, 1 ), DecalWord( b, 2 ) ), q ) * vScale;

@@ -57,9 +57,12 @@
 		float flLevel = sqrt( s.flRoughness );
 		float flAccumulated = 0.0;
 		ClusterRange r = Cluster::Query( ClusterItemType_EnvMap, nCluster );
-		for ( uint k = 0; k < r.Count && flAccumulated < 1.0; k++ )
+		// Wave-uniform, as Direct's (standin_lighting.hlsl); a lane done accumulating skips the rest.
+		ClusterForEach( r )
 		{
-			uint b = Cluster::LoadItem( r, k ) * ENV_MAP_WORDS;
+			if ( flAccumulated >= 1.0 )
+				continue;
+			uint b = r.Item * ENV_MAP_WORDS;
 			float3 vCubePos = EnvToLocal( b, float4( s.vPositionWs, 1.0 ) );
 			float3 vMin = EnvWord4( b, 12 ).xyz, vMax = EnvWord4( b, 16 ).xyz;
 			float4 vColor = EnvWord4( b, 20 );
