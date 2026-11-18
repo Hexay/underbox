@@ -77,3 +77,6 @@ On `dee0cc7`, skinned's main thread costs 230–290 ms/frame (2.4–2.8 G instr)
 new `Arc<VfxShader>` fails `render::shading::Generation`'s `ptr_eq`, so the program is rebuilt.
 A missing shader also re-logs `shaders/complex.shader: not found` (~260 times per run). The
 docs/differential-perf.md sweep predates this commit.
+
+Fixed in `8921040`: `shader::find` loads through `ByName::find_or_insert_resident`, which the
+sweep skips. Skinned main thread 5.36 ms [4.69–6.03] after, 2 runs at load ~28.
