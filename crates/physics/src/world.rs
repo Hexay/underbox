@@ -7,7 +7,8 @@ use rapier3d::math::{Pose, Vector};
 use rapier3d::pipeline::PhysicsWorld;
 use rapier3d::prelude::{ColliderHandle, RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodyType};
 // Fx, not SipHash: these are looked up per body and pair every step (docs/perf-physics.md).
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use crate::dense::Dense;
+use rustc_hash::FxHashMap as HashMap;
 
 /// Rapier's tolerances assume metres; s&box measures in inches.
 pub const INCHES_PER_METRE: f32 = 39.37;
@@ -66,10 +67,13 @@ pub struct World {
     pub(crate) joints: Joints,
     /// Auto-sleeping bodies' thresholds (inches/s); see `sleep.rs`.
     pub(crate) sleep_thresholds: HashMap<RigidBodyHandle, f32>,
-    awake: HashSet<RigidBodyHandle>,
+    awake: Dense<()>,
+    awake_spare: Dense<()>,
     activity: Vec<Activity>,
-    pub(crate) step_start: HashMap<RigidBodyHandle, crate::bounce::Start>,
+    pub(crate) step_start: Dense<crate::bounce::Start>,
     pub(crate) frozen: HashMap<(ColliderHandle, ColliderHandle), crate::persist::Frozen>,
+    pub(crate) frozen_spare: HashMap<(ColliderHandle, ColliderHandle), crate::persist::Frozen>,
+    pub(crate) step_scratch: crate::persist::StepStart,
 }
 
 impl Default for World {
@@ -95,10 +99,13 @@ impl Default for World {
             contacts: Contacts::default(),
             joints: Joints::default(),
             sleep_thresholds: HashMap::default(),
-            awake: HashSet::default(),
+            awake: Dense::default(),
+            awake_spare: Dense::default(),
             activity: Vec::new(),
-            step_start: HashMap::default(),
+            step_start: Dense::default(),
             frozen: HashMap::default(),
+            frozen_spare: HashMap::default(),
+            step_scratch: Default::default(),
         }
     }
 }
@@ -178,17 +185,18 @@ impl World {
     }
 
     fn collect_activity(&mut self) {
-        let mut awake = HashSet::with_capacity_and_hasher(self.awake.len(), Default::default());
+        let mut awake = std::mem::take(&mut self.awake_spare);
+        awake.clear();
         for (h, rb) in self.inner.rigid_bodies().filter(|(_, rb)| rb.is_dynamic() && rb.is_enabled()) {
-            let was = self.awake.contains(&h);
+            let was = self.awake.contains(h.into_raw_parts());
             if !rb.is_sleeping() {
-                awake.insert(h);
+                awake.insert(h.into_raw_parts(), ());
                 self.activity.push(Activity { body: h, user_data: rb.user_data, fell_asleep: false });
             } else if was {
                 self.activity.push(Activity { body: h, user_data: rb.user_data, fell_asleep: true });
             }
         }
-        self.awake = awake;
+        self.awake_spare = std::mem::replace(&mut self.awake, awake);
     }
 
     /// Bodies that moved or fell asleep since the last call.
@@ -229,7 +237,7 @@ impl World {
         }
         self.mass.remove(&id);
         self.sleep_thresholds.remove(&id);
-        self.awake.remove(&id);
+        self.awake.remove(id.into_raw_parts());
         let joints = &self.inner.impulse_joints;
         self.joints.entries.retain(|h, _| joints.contains(*h));
     }

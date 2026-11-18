@@ -5,7 +5,7 @@ use crate::filter::{Contact, Hooks, ShapeMeta, function};
 use rapier3d::math::Vector;
 use rapier3d::pipeline::PhysicsWorld;
 use rapier3d::prelude::{ColliderHandle, ContactPair};
-use rustc_hash::FxHashMap;
+use crate::dense::Dense;
 
 /// managed's `IntersectionEventType_t`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +53,7 @@ pub(crate) struct Contacts {
     /// (orbmatch's tie-break).
     touching: Vec<Touch>,
     spare: Vec<Touch>,
-    created: FxHashMap<ColliderHandle, u64>,
+    created: Dense<u64>,
     next: u64,
     pub events: Vec<ContactEvent>,
     /// Solid pairs that started touching in the last step.
@@ -172,19 +172,19 @@ impl Contacts {
     }
 
     pub fn created(&mut self, shape: ColliderHandle) {
-        self.created.insert(shape, self.next);
+        self.created.insert(shape.into_raw_parts(), self.next);
         self.next += 1;
     }
 
     /// Forget pairs involving a removed shape without reporting them.
     pub fn forget(&mut self, shape: ColliderHandle) {
         self.touching.retain(|t| t.a != shape && t.b != shape);
-        self.created.remove(&shape);
+        self.created.remove(shape.into_raw_parts());
     }
 
     fn rank(&self, c: ColliderHandle) -> Rank {
         let (index, generation) = c.into_raw_parts();
-        (self.created.get(&c).copied().unwrap_or(u64::MAX), index, generation)
+        (self.created.get((index, generation)).unwrap_or(u64::MAX), index, generation)
     }
 
     fn touch(&self, a: ColliderHandle, b: ColliderHandle, kind: Contact) -> Touch {

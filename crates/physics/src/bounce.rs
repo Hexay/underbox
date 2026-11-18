@@ -7,7 +7,7 @@
 
 use crate::world::World;
 use rapier3d::math::Vector;
-use rapier3d::prelude::RigidBody;
+use rapier3d::prelude::{RigidBody, RigidBodyHandle};
 
 /// Approach speed (inches/s) a point must beat to bounce: real bounces 42 but not 40, just above
 /// Box2D's 1 m/s (39.37).
@@ -35,8 +35,9 @@ fn inv_mass_along(rb: &RigidBody, arm: Vector, n: Vector) -> f32 {
 impl World {
     pub(crate) fn record_step_start(&mut self) {
         self.step_start.clear();
-        let awake = self.inner.bodies.iter().filter(|(_, rb)| rb.is_dynamic() && !rb.is_sleeping());
-        self.step_start.extend(awake.map(|(h, rb)| (h, Start { linvel: rb.linvel(), angvel: rb.angvel() })));
+        for (h, rb) in self.inner.bodies.iter().filter(|(_, rb)| rb.is_dynamic() && !rb.is_sleeping()) {
+            self.step_start.insert(h.into_raw_parts(), Start { linvel: rb.linvel(), angvel: rb.angvel() });
+        }
     }
 
     pub(crate) fn bounce_approaching_contacts(&mut self) {
@@ -46,14 +47,14 @@ impl World {
             for m in pair.manifolds() {
                 let (Some(h1), Some(h2)) = (m.data.rigid_body1, m.data.rigid_body2) else { continue };
                 let e = m.data.restitution;
-                if e <= 0.0 || !(starts.contains_key(&h1) || starts.contains_key(&h2)) {
+                if e <= 0.0 || !(starts.contains(h1.into_raw_parts()) || starts.contains(h2.into_raw_parts())) {
                     continue;
                 }
                 let n = m.data.normal;
                 let (Some(rb1), Some(rb2)) = world.bodies.get_pair_mut(h1, h2) else { continue };
                 // The solver's lever arms, frozen at the pair's last full narrow-phase update.
                 for (a1, a2, acc) in m.points.iter().filter(|p| p.data.impulse > 0.0).map(|p| (p.data.solver_dp1, p.data.solver_dp2, p.data.impulse)) {
-                    let start = |h, rb: &RigidBody, arm| starts.get(&h).map_or(at(rb.linvel(), rb.angvel(), arm), |s| at(s.linvel, s.angvel, arm));
+                    let start = |h: RigidBodyHandle, rb: &RigidBody, arm| starts.get(h.into_raw_parts()).map_or(at(rb.linvel(), rb.angvel(), arm), |s| at(s.linvel, s.angvel, arm));
                     let approach = n.dot(start(h2, rb2, a2) - start(h1, rb1, a1));
                     if approach > -THRESHOLD {
                         continue;

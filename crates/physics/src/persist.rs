@@ -6,7 +6,7 @@
 use crate::world::World;
 use rapier3d::math::{Rotation, Vector};
 use rapier3d::prelude::{ActiveHooks, ColliderHandle, ContactPair};
-use rustc_hash::FxHashMap as HashMap;
+use crate::dense::Dense;
 
 /// cos 10°: real refreshes a rolling pair at 10.4° of turn and keeps it at 9.4° (probe `REFRESH
 /// friction`).
@@ -36,13 +36,13 @@ fn turn_cos(a: Rotation, b: Rotation) -> f32 {
 /// and the shapes whose hooks were switched on to force one.
 #[derive(Default)]
 pub(crate) struct StepStart {
-    rotations: HashMap<ColliderHandle, Rotation>,
+    rotations: Dense<Rotation>,
     forced: Vec<ColliderHandle>,
 }
 
 impl StepStart {
     fn rotation(&self, world: &World, id: ColliderHandle) -> Rotation {
-        self.rotations.get(&id).copied().unwrap_or_else(|| world.inner.colliders.get(id).map_or(Rotation::IDENTITY, |c| c.position().rotation))
+        self.rotations.get(id.into_raw_parts()).unwrap_or_else(|| world.inner.colliders.get(id).map_or(Rotation::IDENTITY, |c| c.position().rotation))
     }
 }
 
@@ -53,10 +53,15 @@ impl World {
     }
 
     pub(crate) fn force_turned_contacts(&mut self) -> StepStart {
-        let mut start = StepStart::default();
+        let mut start = std::mem::take(&mut self.step_scratch);
+        start.rotations.clear();
+        start.forced.clear();
         let moving = self.inner.bodies.iter().filter(|(_, rb)| !rb.is_fixed() && !rb.is_sleeping());
-        let shapes = moving.flat_map(|(_, rb)| rb.colliders().iter().copied());
-        start.rotations = shapes.filter_map(|h| Some((h, self.inner.colliders.get(h)?.position().rotation))).collect();
+        for h in moving.flat_map(|(_, rb)| rb.colliders().iter().copied()) {
+            if let Some(c) = self.inner.colliders.get(h) {
+                start.rotations.insert(h.into_raw_parts(), c.position().rotation);
+            }
+        }
         for pair in self.inner.narrow_phase.contact_pairs().filter(|p| p.has_any_active_contact() && self.unhooked(p)) {
             let Some(f) = self.frozen.get(&(pair.collider1, pair.collider2)) else { continue };
             let (r1, r2) = (start.rotation(self, pair.collider1), start.rotation(self, pair.collider2));
@@ -76,7 +81,8 @@ impl World {
         for &id in &start.forced {
             self.refresh_hooks(id);
         }
-        let mut frozen = HashMap::with_capacity_and_hasher(self.frozen.len(), Default::default());
+        let mut frozen = std::mem::take(&mut self.frozen_spare);
+        frozen.clear();
         for pair in self.inner.narrow_phase.contact_pairs().filter(|p| p.has_any_active_contact() && self.unhooked(p)) {
             let key = (pair.collider1, pair.collider2);
             let Some(sig) = signature(pair) else { continue };
@@ -87,6 +93,7 @@ impl World {
             };
             frozen.insert(key, entry);
         }
-        self.frozen = frozen;
+        self.frozen_spare = std::mem::replace(&mut self.frozen, frozen);
+        self.step_scratch = start;
     }
 }
