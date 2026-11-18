@@ -2,7 +2,7 @@
 //! (`OnPhysicsJointBreak`), and touch/trigger events (`IPhysicsWorld.ProcessIntersections`).
 //! Everything is gathered with the world locked and delivered after it's released.
 
-use super::{body, body_cache, joint, shape, world};
+use super::{body, body_cache, body_snapshot, joint, shape, world};
 use crate::math::{from_rot, from_vec, vec3};
 use abi::callbacks::sandbox_physics_physics_engine as engine;
 use abi::rt::delegates::{IntersectionNotification, IntersectionSide, IntersectionSink};
@@ -14,21 +14,7 @@ type Active = (HandleId<class::IPhysicsBody>, Transform, abi::structs::Vector3, 
 
 /// Step the world, then report activity and broken joints.
 pub fn step(r: world::Ref, dt: f32, substeps: u32) {
-    let (active, broken) = world::with_sim(r, |sim| {
-        sim.step(dt, substeps);
-        let active: Vec<Active> = sim
-            .take_activity()
-            .into_iter()
-            .filter_map(|a| {
-                let rb = sim.body(a.body)?;
-                let handle = body_cache::resolve(body::from_user_data(a.user_data), |e| e.body.handle.id())?;
-                let transform = Transform { position: from_vec(rb.translation()), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(*rb.rotation()) };
-                Some((handle, transform, from_vec(rb.linvel()), from_vec(rb.angvel()), a.fell_asleep))
-            })
-            .collect();
-        let broken: Vec<_> = sim.take_broken_joints().into_iter().map(|(_, data)| joint::from_user_data(data)).collect();
-        (active, broken)
-    });
+    let (active, broken) = simulate(r, dt, substeps);
     for (handle, transform, linear, angular, fell_asleep) in active {
         engine::on_active(handle, transform, linear, angular, fell_asleep, false);
     }
@@ -37,6 +23,28 @@ pub fn step(r: world::Ref, dt: f32, substeps: u32) {
             engine::on_physics_joint_break(id);
         }
     }
+}
+
+/// Step the world and publish its active bodies' snapshots; answers what to report.
+pub(super) fn simulate(r: world::Ref, dt: f32, substeps: u32) -> (Vec<Active>, Vec<joint::Ref>) {
+    world::with_sim(r, |sim| {
+        sim.step(dt, substeps);
+        let active: Vec<Active> = sim
+            .take_activity()
+            .into_iter()
+            .filter_map(|a| {
+                let rb = sim.body(a.body)?;
+                let handle = body_cache::resolve(body::from_user_data(a.user_data), |e| {
+                    body_snapshot::publish(&e.world.epoch, &e.body.snapshot, rb);
+                    e.body.handle.id()
+                })?;
+                let transform = Transform { position: from_vec(rb.translation()), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(*rb.rotation()) };
+                Some((handle, transform, from_vec(rb.linvel()), from_vec(rb.angvel()), a.fell_asleep))
+            })
+            .collect();
+        let broken: Vec<_> = sim.take_broken_joints().into_iter().map(|(_, data)| joint::from_user_data(data)).collect();
+        (active, broken)
+    })
 }
 
 fn side(sim: &physics::World, id: ShapeId) -> Option<IntersectionSide> {
@@ -68,7 +76,7 @@ fn notification(sim: &physics::World, e: &ContactEvent) -> Option<IntersectionNo
 
 /// Drain the world's queued touch/trigger events into managed's handler.
 pub fn process_intersections(r: world::Ref, sink: RawPtr<std::ffi::c_void>) {
-    let batch: Vec<_> = world::with_sim(r, |sim| {
+    let batch: Vec<_> = world::with_sim_bodies_unchanged(r, |sim| {
         let events = sim.take_contact_events();
         events.iter().filter_map(|e| notification(sim, e)).collect()
     });

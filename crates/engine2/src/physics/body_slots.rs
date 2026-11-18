@@ -1,7 +1,7 @@
 //! `IPhysicsBody`'s slots: type, pose, velocity, forces, sleep and switches. Mass is in
 //! `body_mass.rs`, shapes in `shape_slots.rs`, queries in `body_query.rs`.
 
-use super::body::{apply_state, get, read_rb, set_motion_locks, with_rb, with_sim, with_state};
+use super::body::{apply_state, get, read_rb, read_state, set_motion_locks, with_rb, with_sim, with_state};
 use super::shape;
 use crate::math::{from_rot, from_vec, to_rot, to_vec, vec3};
 use abi::slots::i_physics_body as b;
@@ -51,17 +51,16 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::GET_ORIENTATION, |r| read_rb(r, |rb| Some(from_rot(*rb.rotation()))).unwrap_or_else(|| crate::math::identity().rotation));
     bind!(r, b::SET_TRANSFORM, |r, p, q| with_rb(r, |rb| rb.set_position(Pose::from_parts(to_vec(p), to_rot(q)), true)));
     bind!(r, b::GET_TRANSFORM, |r| {
-        let pose = read_rb(r, |rb| Some((rb.translation(), *rb.rotation())));
-        pose.map_or_else(crate::math::identity, |(p, q)| Transform { position: from_vec(p), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(q) })
+        read_state(r).map_or_else(crate::math::identity, |s| Transform { position: from_vec(s.translation), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(s.rotation) })
     });
     bind!(r, b::SET_TARGET_TRANSFORM, |r, p, q, _dt| with_rb(r, |rb| rb.set_next_kinematic_position(Pose::from_parts(to_vec(p), to_rot(q)))));
 
     bind!(r, b::SET_LINEAR_VELOCITY, |r, v| with_rb(r, |rb| rb.set_linvel(to_vec(v), true)));
-    bind!(r, b::GET_LINEAR_VELOCITY, |r| read_rb(r, |rb| from_vec(rb.linvel())));
+    bind!(r, b::GET_LINEAR_VELOCITY, |r| read_state(r).map(|s| from_vec(s.linvel)).unwrap_or_default());
     bind!(r, b::ADD_LINEAR_VELOCITY, |r, v| with_rb(r, |rb| rb.set_linvel(rb.linvel() + to_vec(v), true)));
     bind!(r, b::GET_VELOCITY_AT_POINT, |r, p| read_rb(r, |rb| from_vec(rb.velocity_at_point(to_vec(p)))));
     bind!(r, b::SET_ANGULAR_VELOCITY, |r, v| with_rb(r, |rb| rb.set_angvel(to_vec(v), true)));
-    bind!(r, b::GET_ANGULAR_VELOCITY, |r| read_rb(r, |rb| from_vec(rb.angvel())));
+    bind!(r, b::GET_ANGULAR_VELOCITY, |r| read_state(r).map(|s| from_vec(s.angvel)).unwrap_or_default());
     bind!(r, b::SET_LINEAR_DAMPING, |r, v| with_rb(r, |rb| rb.set_linear_damping(v)));
     bind!(r, b::GET_LINEAR_DAMPING, |r| read_rb(r, |rb| rb.linear_damping()));
     bind!(r, b::SET_ANGULAR_DAMPING, |r, v| with_rb(r, |rb| rb.set_angular_damping(v)));
@@ -79,7 +78,7 @@ pub fn register(r: &mut Registry) {
     bind!(r, b::WAKE, |r| with_rb(r, |rb| rb.wake_up(true)));
     bind!(r, b::SLEEP, |r| with_rb(r, |rb| rb.sleep()));
     // Real reports static bodies asleep from creation.
-    bind!(r, b::IS_SLEEPING, |r| read_rb(r, |rb| rb.is_fixed() || rb.is_sleeping()));
+    bind!(r, b::IS_SLEEPING, |r| read_state(r).is_some_and(|s| s.asleep));
     bind!(r, b::ENABLE_AUTO_SLEEPING, |r| {
         with_state(r, |s| s.auto_sleep = true);
         apply_state(r);

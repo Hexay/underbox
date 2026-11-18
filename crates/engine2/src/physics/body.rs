@@ -1,6 +1,6 @@
 //! `IPhysicsBody`: a rigid body in a world's simulation, plus the state native keeps beside it.
 
-use super::{shape, world};
+use super::{body_snapshot, shape, world};
 use crate::handles::{Handle, Kind};
 use crate::math::to_vec;
 use abi::structs::PhysicsBodySettings;
@@ -36,6 +36,7 @@ pub struct Body {
     pub handle: Handle,
     pub shapes: Mutex<Vec<shape::Ref>>,
     pub state: Mutex<State>,
+    pub(super) snapshot: body_snapshot::Snapshot,
 }
 
 pub fn get(r: Ref) -> Option<Arc<Body>> {
@@ -49,7 +50,7 @@ pub fn from_user_data(data: u128) -> Ref {
 
 /// Run `f` on a live body in its simulation (the world locked). Never call managed inside `f`.
 pub fn with_sim<R: Default>(r: Ref, f: impl FnOnce(&mut physics::World, BodyId) -> R) -> R {
-    super::body_cache::resolve(r, |e| f(&mut e.world.sim.lock().unwrap(), e.id)).unwrap_or_default()
+    super::body_cache::resolve(r, |e| f(&mut e.world.sim_mut(), e.id)).unwrap_or_default()
 }
 
 /// As [`with_sim`], for just the Rapier body.
@@ -60,7 +61,12 @@ pub fn with_rb<R: Default>(r: Ref, f: impl FnOnce(&mut RigidBody) -> R) -> R {
 /// As [`with_rb`], read-only. Getters use it: `body_mut` queues the body as user-modified, which
 /// costs Rapier a pass over it and an island re-sync every step (docs/perf-physics.md).
 pub fn read_rb<R: Default>(r: Ref, f: impl FnOnce(&RigidBody) -> R) -> R {
-    super::body_cache::resolve(r, |e| e.world.sim.lock().unwrap().body(e.id).map(f)).flatten().unwrap_or_default()
+    super::body_cache::resolve(r, |e| e.world.sim_read().body(e.id).map(f)).flatten().unwrap_or_default()
+}
+
+/// What the per-tick getters read: the last step's snapshot while it's current, else the body.
+pub fn read_state(r: Ref) -> Option<body_snapshot::State> {
+    super::body_cache::resolve(r, |e| body_snapshot::read(&e.world.epoch, &e.body.snapshot).or_else(|| e.world.sim_read().body(e.id).map(body_snapshot::State::of))).flatten()
 }
 
 pub fn with_state<R: Default>(r: Ref, f: impl FnOnce(&mut State) -> R) -> R {
@@ -99,7 +105,7 @@ pub fn create(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &Phys
 pub fn spawn(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &PhysicsBodySettings) -> Option<Ref> {
     let world = world::get(world_ref)?;
     let id = {
-        let mut sim = world.sim.lock().unwrap();
+        let mut sim = world.sim_mut();
         let id = sim.add_body(kind, pose);
         if let Some(rb) = sim.body_mut(id) {
             rb.set_linvel(to_vec(settings.velocity), false);
@@ -128,7 +134,7 @@ pub fn spawn(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &Physi
         local_mass_center: to_vec(settings.mass_center),
     };
     let sim_world = Arc::downgrade(&world);
-    let body = Arc::new(Body { world: world_ref, sim_world, id, handle: Handle::default(), shapes: Mutex::default(), state: Mutex::new(state) });
+    let body = Arc::new(Body { world: world_ref, sim_world, id, handle: Handle::default(), shapes: Mutex::default(), state: Mutex::new(state), snapshot: Default::default() });
     let r: Ref = objects::create_shared(body.clone());
     world.bodies.lock().unwrap().push(r);
     with_rb(r, |rb| rb.user_data = r.addr() as u128);
@@ -147,7 +153,7 @@ pub fn delete(r: Ref) {
     }
     super::joint::forget_attached(body.world, r);
     if let Some(world) = world::get(body.world) {
-        world.sim.lock().unwrap().remove_body(body.id);
+        world.sim_mut().remove_body(body.id);
         world.bodies.lock().unwrap().retain(|b| *b != r);
     }
     body.handle.free();

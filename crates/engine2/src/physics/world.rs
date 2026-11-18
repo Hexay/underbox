@@ -1,13 +1,13 @@
 //! `IPhysicsWorld`: one per scene, over a [`physics::World`].
 
-use super::{body, events, joint};
+use super::{body, body_snapshot, events, joint};
 use crate::handles::{Handle, Kind};
 use crate::math::{from_vec, to_rot, to_vec};
 use abi::slots::{g_p_physics_system as system, i_physics_world as w};
 use abi::structs::PhysicsBodySettings;
 use abi::{HandleId, NativeRef, Registry, bind, class};
-use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub type Ref = NativeRef<class::IPhysicsWorld>;
 
@@ -16,12 +16,43 @@ static LIVE: AtomicI32 = AtomicI32::new(0);
 #[derive(Default)]
 pub struct PhysicsWorld {
     pub handle: Handle,
-    pub sim: Mutex<physics::World>,
+    sim: Mutex<physics::World>,
+    /// Bumped by every lock that may change a body (body_snapshot.rs).
+    pub(super) epoch: AtomicU64,
     pub bodies: Mutex<Vec<body::Ref>>,
     pub joints: Mutex<Vec<joint::Ref>>,
     reference: Mutex<body::Ref>,
     debug_scene: Mutex<NativeRef<class::ISceneWorld>>,
     simulation: AtomicI64,
+}
+
+/// The simulation locked for reading only.
+pub struct SimRead<'a>(MutexGuard<'a, physics::World>);
+
+impl std::ops::Deref for SimRead<'_> {
+    type Target = physics::World;
+    fn deref(&self) -> &physics::World {
+        &self.0
+    }
+}
+
+impl PhysicsWorld {
+    /// The simulation, locked for any change; makes every body snapshot stale.
+    pub fn sim_mut(&self) -> MutexGuard<'_, physics::World> {
+        let guard = self.sim.lock().unwrap();
+        body_snapshot::invalidate(&self.epoch);
+        guard
+    }
+
+    pub fn sim_read(&self) -> SimRead<'_> {
+        SimRead(self.sim.lock().unwrap())
+    }
+
+    /// Gotcha: only for changes that leave every body's pose, velocities and sleep state alone,
+    /// as body snapshots stay current through them.
+    fn sim_bodies_unchanged(&self) -> MutexGuard<'_, physics::World> {
+        self.sim.lock().unwrap()
+    }
 }
 
 pub fn get(r: Ref) -> Option<Arc<PhysicsWorld>> {
@@ -30,7 +61,12 @@ pub fn get(r: Ref) -> Option<Arc<PhysicsWorld>> {
 
 /// Run `f` on a world's simulation. Never call managed inside `f`: it may re-enter this world.
 pub fn with_sim<R: Default>(r: Ref, f: impl FnOnce(&mut physics::World) -> R) -> R {
-    get(r).map(|w| f(&mut w.sim.lock().unwrap())).unwrap_or_default()
+    get(r).map(|w| f(&mut w.sim_mut())).unwrap_or_default()
+}
+
+/// As [`with_sim`], for draining what a step queued; see `sim_bodies_unchanged`.
+pub fn with_sim_bodies_unchanged<R: Default>(r: Ref, f: impl FnOnce(&mut physics::World) -> R) -> R {
+    get(r).map(|w| f(&mut w.sim_bodies_unchanged())).unwrap_or_default()
 }
 
 fn create() -> HandleId<class::IPhysicsWorld> {
