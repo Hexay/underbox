@@ -64,9 +64,13 @@ pub fn read_rb<R: Default>(r: Ref, f: impl FnOnce(&RigidBody) -> R) -> R {
     super::body_cache::resolve(r, |e| e.world.sim_read().body(e.id).map(f)).flatten().unwrap_or_default()
 }
 
-/// What the per-tick getters read: the last step's snapshot while it's current, else the body.
-pub fn read_state(r: Ref) -> Option<body_snapshot::State> {
-    super::body_cache::resolve(r, |e| body_snapshot::read(&e.world.epoch, &e.body.snapshot).or_else(|| e.world.sim_read().body(e.id).map(body_snapshot::State::of))).flatten()
+/// For the per-tick getters: `f` of the last step's snapshot while it's current, else of the body.
+#[inline]
+pub fn read_hot<R: Default>(r: Ref, f: impl Fn(body_snapshot::BodyRead) -> R) -> R {
+    let read = |e: &super::body_cache::Entry| {
+        body_snapshot::read(&e.world.epoch, &e.body.snapshot, &f).or_else(|| e.world.sim_read().body(e.id).map(|rb| f(body_snapshot::BodyRead::Body(rb))))
+    };
+    super::body_cache::resolve(r, read).flatten().unwrap_or_default()
 }
 
 pub fn with_state<R: Default>(r: Ref, f: impl FnOnce(&mut State) -> R) -> R {
