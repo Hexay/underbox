@@ -46,7 +46,8 @@ type Attrs = crate::render::attributes::Ref;
 /// Programs by path, then by each program's combo ids ([`variants`]), with the [`generation`] of
 /// the source they were built from. Looked up per draw, so a hit allocates no key.
 type Cached = (Generation, Option<Arc<Shading>>);
-static PROGRAMS: LazyLock<Mutex<HashMap<String, HashMap<Vec<(u64, u64)>, Cached>>>> = LazyLock::new(Default::default);
+type ByVariants = HashMap<Vec<(u64, u64)>, Cached>;
+static PROGRAMS: LazyLock<Mutex<HashMap<String, ByVariants>>> = LazyLock::new(Default::default);
 
 /// The loaded source a shader path has: `GetShader` reloading a changed `.shader_c` swaps the
 /// shader's source `Arc`, so a cached program built from another one is stale. Held (not its
