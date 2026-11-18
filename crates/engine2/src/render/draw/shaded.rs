@@ -108,10 +108,11 @@ pub const MAX_VERTEX_INDEX: u32 = 1 << 17;
 
 /// The draw's bind groups, with its pipeline for `key` built: both under one validation scope.
 pub fn bind(gpu: &render::Gpu, d: &Shaded, view: &View, lighting: &Lighting, key: &PipelineKey, targets: &[texture::Ref]) -> Option<Vec<wgpu::BindGroup>> {
-    let (textures, vectors) = d.material.shading_params();
+    let params = d.material.shading_params();
+    let (textures, vectors) = &*params;
     let instances = [d.instance];
     let attributes: Vec<_> = d.context.attributes.iter().copied().chain(lighting.shadow_attributes).collect();
-    let inputs = binding::Inputs { view, lighting, instances: &instances, textures: &textures, values: &[&d.values, &vectors], attributes: &attributes, slots: &d.context.slots, targets };
+    let inputs = binding::Inputs { view, lighting, instances: &instances, textures, values: &[&d.values, vectors], attributes: &attributes, slots: &d.context.slots, targets };
     let built = gpu.checked(|| binding::bind_groups(gpu, &d.shading, &inputs)).and_then(|groups| groups);
     let built = built.and_then(|groups| d.shading.program.try_pipeline(gpu, key).map(|_| groups));
     built.inspect_err(|e| warn_once(&d.shading.label, e)).ok()

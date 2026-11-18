@@ -100,11 +100,12 @@ fn resource_path(path: &str) -> String {
 /// and recompiled its programs (docs/perf-render.md).
 pub fn find(path: &str) -> Option<Arc<VfxShader>> {
     static HELD: LazyLock<Mutex<rustc_hash::FxHashMap<String, Arc<Vfx>>>> = LazyLock::new(Default::default);
-    if let Some(v) = HELD.lock().unwrap().get(path) {
-        return v.shader();
-    }
-    let v = by_path(path);
-    HELD.lock().unwrap().insert(path.to_owned(), v.clone());
+    let held = HELD.lock().unwrap().get(path).cloned();
+    let v = held.unwrap_or_else(|| {
+        let v = by_path(path);
+        HELD.lock().unwrap().insert(path.to_owned(), v.clone());
+        v
+    });
     v.shader()
 }
 
