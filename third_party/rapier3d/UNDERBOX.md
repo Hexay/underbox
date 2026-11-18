@@ -28,6 +28,16 @@ Left as upstream: the overflow grouper (`interaction_groups.rs` `group_manifold_
 coloring (`group_interactions`) still conflict on kinematic sides. They only see extra manifolds
 of one pair and bodies whose 128 colors are used up, or joints to kinematic bodies.
 
+## Patch: one unbiased rhs refresh per substep
+
+`src/dynamics/solver/staged_island_solver/solve.rs` `refresh_rhs`. Upstream recomputes every
+contact chunk's unbiased rhs (`update_rhs_wo_bias`) from the solver poses on every stabilization
+sweep. Poses only move in the integrate stage before the first sweep, and `solve` never writes
+`rhs` or `cfm_factor`, so sweeps 2.. rewrote the same values. Now only the first sweep of a substep
+refreshes, unless the island has soft constraints (their cluster gathers write proxy poses each
+pass). Bit-identical: pile example hashes unchanged; instructions for a 750-step keyframed run
+5.19 → 4.84 G (docs/perf-physics.md, round 5).
+
 ## Updating
 
 Copy the new crate from the cargo registry over this directory, keep `LICENSE` (refetch it if
