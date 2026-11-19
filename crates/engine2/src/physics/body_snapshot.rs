@@ -7,9 +7,14 @@
 //! (`PhysicsWorld::sim_mut`), which makes all snapshots stale at once; readers then take the lock.
 //! It's a seqlock: a reader checks the tags before its loads and the epoch again after them, so a
 //! publish racing it is detected, never half-read.
+//!
+//! Snapshots live in a dense per-world [`Table`] indexed by the body's arena index, one cache line
+//! each, so managed's passes over its bodies (creation order) read consecutive lines
+//! (docs/perf-bandwidth.md, "Pile: physics working set").
 
-use physics::{RigidBody, Rotation, Vector};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering, fence};
+use physics::{BodyId, RigidBody, Rotation, Vector};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicPtr, AtomicU32, AtomicU64, Ordering, fence};
 
 /// What the per-tick getters read, from a snapshot or the locked body alike. An enum, not a trait
 /// object: an out-of-line accessor returned its vector through the stack, and reloading it in
@@ -57,7 +62,7 @@ impl BodyRead<'_> {
     #[inline(always)]
     pub fn asleep(self) -> bool {
         match self {
-            Self::Snapshot(s) => s.bits[ASLEEP].load(Ordering::Relaxed) != 0,
+            Self::Snapshot(s) => s.stamp.load(Ordering::Relaxed) & ASLEEP != 0,
             Self::Body(rb) => rb.is_fixed() || rb.is_sleeping(),
         }
     }
@@ -67,18 +72,23 @@ const TRANSLATION: usize = 0;
 const ROTATION: usize = 3;
 const LINVEL: usize = 7;
 const ANGVEL: usize = 10;
-const ASLEEP: usize = 13;
 
+/// `stamp` is the publishing epoch above this bit.
+const ASLEEP: u64 = 1;
+
+/// One cache line: the publishing epoch with the sleep bit, the state, and the arena
+/// generation of the body that owns the slot.
 #[repr(align(64))]
 pub struct Snapshot {
-    epoch: AtomicU64,
-    bits: [AtomicU32; 14],
+    stamp: AtomicU64,
+    bits: [AtomicU32; 13],
+    generation: AtomicU32,
 }
 
 impl Default for Snapshot {
     fn default() -> Self {
         // Never matches a world epoch until published.
-        Self { epoch: AtomicU64::new(u64::MAX), bits: Default::default() }
+        Self { stamp: AtomicU64::new(u64::MAX), bits: Default::default(), generation: AtomicU32::new(u32::MAX) }
     }
 }
 
@@ -94,28 +104,85 @@ impl Snapshot {
     }
 }
 
+const CHUNK: usize = 64;
+/// Bodies past `CHUNK * CHUNKS` arena slots have no snapshot and read through the lock.
+const CHUNKS: usize = 1024;
+
+/// A world's snapshots by arena index. Chunks are allocated on first publish and never move or
+/// shrink while the world lives, so readers index them without a lock.
+pub struct Table {
+    chunks: Box<[AtomicPtr<[Snapshot; CHUNK]>]>,
+    grow: Mutex<()>,
+}
+
+impl Default for Table {
+    fn default() -> Self {
+        Self { chunks: (0..CHUNKS).map(|_| AtomicPtr::default()).collect(), grow: Mutex::default() }
+    }
+}
+
+impl Drop for Table {
+    fn drop(&mut self) {
+        for c in self.chunks.iter_mut() {
+            let p = *c.get_mut();
+            if !p.is_null() {
+                drop(unsafe { Box::from_raw(p) });
+            }
+        }
+    }
+}
+
+impl Table {
+    #[inline(always)]
+    fn get(&self, index: u32) -> Option<&Snapshot> {
+        let (chunk, slot) = (index as usize / CHUNK, index as usize % CHUNK);
+        let p = self.chunks.get(chunk)?.load(Ordering::Acquire);
+        // SAFETY: a published chunk stays allocated until the table drops.
+        (!p.is_null()).then(|| unsafe { &(*p)[slot] })
+    }
+
+    fn get_or_grow(&self, index: u32) -> Option<&Snapshot> {
+        if let Some(s) = self.get(index) {
+            return Some(s);
+        }
+        let slot = self.chunks.get(index as usize / CHUNK)?;
+        let _grow = self.grow.lock().unwrap();
+        if slot.load(Ordering::Acquire).is_null() {
+            let chunk: Box<[Snapshot; CHUNK]> = Box::new(std::array::from_fn(|_| Snapshot::default()));
+            slot.store(Box::into_raw(chunk), Ordering::Release);
+        }
+        self.get(index)
+    }
+}
+
 /// Make every snapshot of the world stale. Call with the world locked, before changing anything.
 pub fn invalidate(world_epoch: &AtomicU64) {
     world_epoch.fetch_add(1, Ordering::Relaxed);
     fence(Ordering::Release);
 }
 
-/// Record `rb`'s state as current. Call with the world locked, after its last body change.
-pub fn publish(world_epoch: &AtomicU64, snapshot: &Snapshot, rb: &RigidBody) {
+/// Record `rb`'s state as body `id`'s current one. Call with the world locked, after its last body
+/// change.
+pub fn publish(world_epoch: &AtomicU64, table: &Table, id: BodyId, rb: &RigidBody) {
+    let (index, generation) = id.into_raw_parts();
+    let Some(snapshot) = table.get_or_grow(index) else { return };
     let b = BodyRead::Body(rb);
     let (t, q, l, a) = (b.translation(), b.rotation(), b.linvel(), b.angvel());
-    let values = [t.x, t.y, t.z, q.x, q.y, q.z, q.w, l.x, l.y, l.z, a.x, a.y, a.z, f32::from_bits(b.asleep() as u32)];
+    let values = [t.x, t.y, t.z, q.x, q.y, q.z, q.w, l.x, l.y, l.z, a.x, a.y, a.z];
+    snapshot.generation.store(generation, Ordering::Relaxed);
     for (slot, v) in snapshot.bits.iter().zip(values) {
         slot.store(v.to_bits(), Ordering::Relaxed);
     }
-    snapshot.epoch.store(world_epoch.load(Ordering::Relaxed), Ordering::Release);
+    snapshot.stamp.store(world_epoch.load(Ordering::Relaxed) << 1 | b.asleep() as u64, Ordering::Release);
 }
 
-/// `f` of the published state, if nothing that could change a body locked the world since.
+/// `f` of body `id`'s published state, if nothing that could change a body locked the world since.
 #[inline(always)]
-pub fn read<R>(world_epoch: &AtomicU64, snapshot: &Snapshot, f: impl FnOnce(BodyRead) -> R) -> Option<R> {
+pub fn read<R>(world_epoch: &AtomicU64, table: &Table, id: BodyId, f: impl FnOnce(BodyRead) -> R) -> Option<R> {
+    let (index, generation) = id.into_raw_parts();
+    let snapshot = table.get(index)?;
     let epoch = world_epoch.load(Ordering::Acquire);
-    if snapshot.epoch.load(Ordering::Acquire) != epoch {
+    if snapshot.stamp.load(Ordering::Acquire) >> 1 != epoch || snapshot.generation.load(Ordering::Relaxed) != generation {
         return None;
     }
     let value = f(BodyRead::Snapshot(snapshot));
@@ -137,13 +204,27 @@ mod tests {
         let mut world = World::default();
         let id = world.add_body(BodyType::Dynamic, Pose::from_translation(Vector::new(1.0, 2.0, 3.0)));
         world.body_mut(id).unwrap().set_linvel(Vector::new(4.0, 5.0, 6.0), true);
-        let (epoch, snap) = (AtomicU64::new(0), Snapshot::default());
-        assert!(read(&epoch, &snap, all).is_none());
+        let (epoch, table) = (AtomicU64::new(0), Table::default());
+        assert!(read(&epoch, &table, id, all).is_none());
         invalidate(&epoch);
-        publish(&epoch, &snap, world.body(id).unwrap());
-        assert_eq!(read(&epoch, &snap, all), Some(all(BodyRead::Body(world.body(id).unwrap()))));
+        publish(&epoch, &table, id, world.body(id).unwrap());
+        assert_eq!(read(&epoch, &table, id, all), Some(all(BodyRead::Body(world.body(id).unwrap()))));
         invalidate(&epoch);
-        assert!(read(&epoch, &snap, all).is_none());
+        assert!(read(&epoch, &table, id, all).is_none());
+    }
+
+    #[test]
+    fn a_reused_slot_doesnt_answer_for_its_old_body() {
+        let mut world = World::default();
+        let old = world.add_body(BodyType::Dynamic, Pose::IDENTITY);
+        let (epoch, table) = (AtomicU64::new(0), Table::default());
+        publish(&epoch, &table, old, world.body(old).unwrap());
+        world.remove_body(old);
+        let new = world.add_body(BodyType::Dynamic, Pose::from_translation(Vector::X));
+        assert_eq!(new.into_raw_parts().0, old.into_raw_parts().0, "the arena reuses the slot");
+        publish(&epoch, &table, new, world.body(new).unwrap());
+        assert!(read(&epoch, &table, old, all).is_none());
+        assert_eq!(read(&epoch, &table, new, |b| b.translation()), Some(Vector::X));
     }
 
     #[test]
@@ -153,7 +234,7 @@ mod tests {
         let w: world::Ref = objects::create_shared(std::sync::Arc::new(world::PhysicsWorld::default()));
         let settings = abi::structs::PhysicsBodySettings { flags: body::GRAVITY | (1 << 2), ..Default::default() };
         let b = body::spawn(w, BodyType::Dynamic, Pose::IDENTITY, &settings).unwrap();
-        let published = || body_cache::resolve(b, |e| read(&e.world.epoch, &e.body.snapshot, |_| ()).is_some()).unwrap();
+        let published = || body_cache::resolve(b, |e| read(&e.world.epoch, &e.world.snapshots, e.id, |_| ()).is_some()).unwrap();
         let (active, _) = events::simulate(w, 0.02, 1);
         assert_eq!(active.len(), 1);
         assert!(published(), "the step publishes an awake body");

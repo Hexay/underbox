@@ -3,7 +3,8 @@
 //! The floor and walls are keyframed, as the scene's collider-only GameObjects are; `static`
 //! makes them fixed bodies instead (the cheaper setup the first profile used).
 //! usage: cargo run --release -p physics --example pile [ticks=750] [warmup=250] [keyframed|static]
-//! `PILE_TRACE=1` prints each measured step's time and awake body count to stderr.
+//! `PILE_TRACE=1` prints each measured step's time and awake body count to stderr; `PILE_DRAM`, see
+//! [`Dram`].
 
 use physics::{BodyType, Pose, Rotation, Shape, Surface, Vector, World};
 use std::time::Instant;
@@ -78,6 +79,43 @@ fn hash_events(h: &mut u64, world: &mut World) -> usize {
     events.len()
 }
 
+/// `PILE_DRAM=<MiB>`: before each step, read that many MiB to evict the caches (as a server's
+/// managed work and neighbours do between ticks), then count the step's L2 fills from DRAM on this
+/// thread: the bytes a step touches. AMD Zen 5's event, as `tools/diff/perf_events.py`.
+struct Dram {
+    fd: std::fs::File,
+    evict: Vec<u64>,
+}
+
+impl Dram {
+    fn open() -> Option<Self> {
+        use std::os::fd::FromRawFd;
+        unsafe extern "C" {
+            fn syscall(n: i64, ...) -> i64;
+        }
+        let mib: usize = std::env::var("PILE_DRAM").ok()?.parse().ok()?;
+        // perf_event_attr: type 4 (core PMU), size, config; perf_event_open is syscall 298 on x86_64.
+        let mut attr = [0u8; 128];
+        attr[0..4].copy_from_slice(&4u32.to_ne_bytes());
+        attr[4..8].copy_from_slice(&128u32.to_ne_bytes());
+        attr[8..16].copy_from_slice(&0x1_0000_0865u64.to_ne_bytes());
+        let fd = unsafe { syscall(298, attr.as_ptr(), 0i32, -1i32, -1i32, 8u64) };
+        assert!(fd >= 0, "perf_event_open failed: needs perf_event_paranoid <= 1 and a Zen 5 core PMU");
+        Some(Self { fd: unsafe { std::fs::File::from_raw_fd(fd as i32) }, evict: (0..mib << 17).map(|i| i as u64).collect() })
+    }
+
+    fn lines(&mut self) -> u64 {
+        use std::io::Read;
+        let mut b = [0u8; 8];
+        self.fd.read_exact(&mut b).expect("read counter");
+        u64::from_ne_bytes(b)
+    }
+
+    fn evict(&self) {
+        std::hint::black_box(self.evict.iter().step_by(8).fold(0u64, |a, &x| a ^ x));
+    }
+}
+
 /// CPU nanoseconds of every thread in this process.
 fn cpu_ns() -> u64 {
     let tasks = std::fs::read_dir("/proc/self/task").map(|d| d.flatten().collect::<Vec<_>>()).unwrap_or_default();
@@ -92,6 +130,7 @@ fn main() {
     let mut world = World::default();
     let bodies = build(&mut world, walls);
     let mut times = Vec::with_capacity(ticks);
+    let (mut dram, mut dram_lines) = (Dram::open(), Vec::with_capacity(ticks));
     let (mut events, mut event_hash, mut cpu_start) = (0, 0xcbf2_9ce4_8422_2325, 0);
     for tick in 1..=ticks {
         if tick == warmup + 1 {
@@ -104,8 +143,16 @@ fn main() {
                 rb.set_linvel(v, true);
             }
         }
+        if let Some(d) = &dram {
+            d.evict();
+        }
+        let before = dram.as_mut().map_or(0, Dram::lines);
         let t = Instant::now();
         world.step(0.02, 1);
+        let filled = dram.as_mut().map_or(0, Dram::lines) - before;
+        if tick > warmup {
+            dram_lines.push(filled);
+        }
         let awake = world.take_activity().iter().filter(|a| !a.fell_asleep).count();
         events += hash_events(&mut event_hash, &mut world);
         if tick > warmup {
@@ -127,4 +174,9 @@ fn main() {
         pick(0.95),
         hash(&world, &bodies)
     );
+    if dram.is_some() {
+        dram_lines.sort_unstable();
+        let mb = |lines: u64| lines as f64 * 64.0 / 1e6;
+        println!("DRAM read MB/step median={:.3} mean={:.3}", mb(dram_lines[dram_lines.len() / 2]), mb(dram_lines.iter().sum::<u64>()) / dram_lines.len() as f64);
+    }
 }
