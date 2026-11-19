@@ -80,8 +80,8 @@ pub struct MeshDraw<'a> {
     pub uniforms: DrawUniforms,
     pub state: RasterState,
     pub shaded: Option<Shaded<'a>>,
-    /// An indexed draw's arguments (`DrawIndexedIndirectArgs`) at this buffer and byte offset, in
-    /// place of `range`, `base_vertex` and `instances`.
+    /// The draw's arguments at this buffer and byte offset (`DrawIndexedIndirectArgs` when
+    /// indexed, else `DrawIndirectArgs`), in place of `range`, `base_vertex` and `instances`.
     pub indirect: Option<(&'a wgpu::Buffer, u64)>,
 }
 
@@ -171,7 +171,10 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
                         None => pass.draw_indexed(d.range.clone(), d.base_vertex, 0..d.instances),
                     }
                 }
-                None => pass.draw(d.range.clone(), 0..d.instances),
+                None => match d.indirect {
+                    Some((args, offset)) => pass.draw_indirect(args, offset),
+                    None => pass.draw(d.range.clone(), 0..d.instances),
+                },
             }
         }
     }

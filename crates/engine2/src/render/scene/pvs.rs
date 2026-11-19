@@ -23,7 +23,7 @@ pub fn box_visible(eye: Vec3, pvs: usize, (lo, hi): (Vec3, Vec3)) -> bool {
 }
 
 /// A model-less object without bounds is the point at its origin.
-fn world_bounds(s: &object::State) -> (Vec3, Vec3) {
+pub(super) fn world_bounds(s: &object::State) -> (Vec3, Vec3) {
     let b = s.world_bounds();
     let (lo, hi) = (crate::math::v3(b.mins), crate::math::v3(b.maxs));
     if s.model.is_null() && !hi.cmpgt(lo).any() {

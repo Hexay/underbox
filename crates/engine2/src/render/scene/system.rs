@@ -61,9 +61,12 @@ pub fn register(r: &mut Registry) {
     bind!(r, s::GET_WELL_KNOWN_TEXTURE, super::well_known::texture);
     bind!(r, s::GET_WELL_KNOWN_MATERIAL_HANDLE, |_| NativeRef::default());
     bind!(r, s::SETUP_PER_OBJECT_LIGHTING, |_, _, _| {});
-    // TODO: apply culling boxes (SceneCullingBox hides objects inside or outside them).
-    bind!(r, s::ADD_CULLING_BOX, |_, _, _, _, _| next_id());
-    bind!(r, s::REMOVE_CULLING_BOX, |_, _| {});
+    bind!(r, s::ADD_CULLING_BOX, |w, inside, origin, angles, size| {
+        let id = next_id();
+        super::culling_box::add(w.addr(), id, inside, origin, angles, size);
+        id
+    });
+    bind!(r, s::REMOVE_CULLING_BOX, |w, id| super::culling_box::remove(w.addr(), id));
     bind!(r, s::ADD_VOLUMETRIC_FOG_VOLUME, |w, v| {
         let id = next_id();
         crate::render::fog_volume::add(w.addr(), id, v);

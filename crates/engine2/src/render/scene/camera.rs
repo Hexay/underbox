@@ -3,6 +3,7 @@
 //! lets managed's pipeline add layers (`RenderPipeline.AddLayersToView`), runs it, and frees it.
 //! Rendering is eager: the view runs inside the call (see system.rs).
 
+use super::scratch::Scratch;
 use super::{execute, field, setup, view};
 use crate::frustum::camera::Camera;
 use crate::render::{attributes, swap_chain, texture};
@@ -88,6 +89,11 @@ pub(super) fn camera(r: Ref, width: u32, height: u32) -> (Camera, Option<Mat4>, 
 
 /// Render into `color` / `depth` (sized `width × height`), recording what managed reads back.
 pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth: texture::Ref, width: u32, height: u32) -> bool {
+    render_face(r, swap_chain, (color, depth), width, height, None)
+}
+
+/// [`render`], its colour copied into `cube`'s face when given (cube.rs).
+pub(super) fn render_face(r: Ref, swap_chain: swap_chain::Handle, (color, depth): (texture::Ref, texture::Ref), width: u32, height: u32, cube: Option<(texture::Ref, u32)>) -> bool {
     let Some(renderer) = objects::get::<_, Mutex<CameraRenderer>>(r) else { return false };
     let (camera_id, worlds, attrs, render_tags, exclude_tags) = {
         let c = renderer.lock().unwrap();
@@ -116,6 +122,7 @@ pub fn render(r: Ref, swap_chain: swap_chain::Handle, color: texture::Ref, depth
     // The view's attributes see the camera's: the pipeline reads `NeedsDepthNormals` off the view.
     if let Some(view) = view::get(v) {
         attributes::set_parent(view.attributes, attrs);
+        view.state.lock().unwrap().cube = cube;
     }
     // Managed's `BackgroundColor` is gamma space; the view clears its linear target with it.
     let gamma = attributes::vector4(attrs, StringToken::of("clearColor")).map_or(Vec4::new(0.0, 0.0, 0.0, 1.0), |c| Vec4::new(c.vec.x, c.vec.y, c.vec.z, c.vec.w));
@@ -185,43 +192,8 @@ pub(crate) fn render_to_texture(r: Ref, color: texture::Ref, _parent: view::Ref,
     if !depth.is_null() {
         return render(r, swap_chain::Handle::default(), color, depth, w, h);
     }
-    let scratch = ScratchDepth::lease(w, h);
+    let scratch = Scratch::depth(w, h);
     render(r, swap_chain::Handle::default(), color, scratch.0, w, h)
-}
-
-static FREE_DEPTHS: Mutex<Vec<((u32, u32), texture::Ref)>> = Mutex::new(Vec::new());
-
-/// A depth target for a render managed gives none for, pooled by size across frames. Leased, not
-/// shared: concurrent renders of one size would otherwise draw into each other's depth between
-/// a clear and the sky.
-struct ScratchDepth(texture::Ref, (u32, u32));
-
-impl ScratchDepth {
-    fn lease(w: u32, h: u32) -> ScratchDepth {
-        let mut free = FREE_DEPTHS.lock().unwrap();
-        let t = match free.iter().position(|(s, _)| *s == (w, h)) {
-            Some(i) => free.swap_remove(i).1,
-            None => texture::create_target("camera depth", w, h, swap_chain::DEPTH_IMAGE_FORMAT),
-        };
-        ScratchDepth(t, (w, h))
-    }
-}
-
-impl Drop for ScratchDepth {
-    fn drop(&mut self) {
-        FREE_DEPTHS.lock().unwrap().push((self.1, self.0));
-    }
-}
-
-#[cfg(test)]
-#[test]
-fn concurrent_renders_never_share_a_scratch_depth() {
-    // An odd size no other test renders at, so the pool's state is this test's.
-    let (a, b) = (ScratchDepth::lease(37, 23), ScratchDepth::lease(37, 23));
-    assert_ne!(a.0, b.0, "a leased target isn't handed out twice");
-    let first = a.0;
-    drop(a);
-    assert_eq!(ScratchDepth::lease(37, 23).0, first, "a returned target is reused");
 }
 
 /// Render to a scratch RGBA8 target and copy it into managed's `w × h` bitmap.
@@ -230,7 +202,7 @@ pub(crate) fn render_to_bitmap(r: Ref, data: RawPtr<c_void>, w: i32, h: i32, bpp
         return;
     }
     let color = texture::create_target("bitmap", w as u32, h as u32, 0);
-    let depth = ScratchDepth::lease(w as u32, h as u32);
+    let depth = Scratch::depth(w as u32, h as u32);
     if render(r, swap_chain::Handle::default(), color, depth.0, w as u32, h as u32)
         && let Some((frame, _)) = crate::render::readback::read(color, NativeRect::default(), 0)
     {
@@ -255,8 +227,8 @@ pub fn register(r: &mut Registry) {
     bind!(r, c::RENDER, render_to_swap_chain);
     bind!(r, c::RENDER_TO_TEXTURE, render_to_texture);
     bind!(r, c::RENDER_TO_BITMAP, render_to_bitmap);
-    // TODO: cube faces (six views into array slices) and stereo (OpenXR, M3).
-    bind!(r, c::RENDER_TO_CUBE_TEXTURE, |_, _, _| {});
+    bind!(r, c::RENDER_TO_CUBE_TEXTURE, super::cube::render);
+    // TODO: stereo (OpenXR, M3).
     bind!(r, c::RENDER_STEREO, |_, _, _, _, _| {});
     bind!(r, c::SUBMIT_STEREO, |_, _, _| {});
     bind!(r, c::BLIT_STEREO, |_, _, _| {});

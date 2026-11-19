@@ -141,4 +141,20 @@ impl Texture {
         gpu.submit(encoder.finish());
         true
     }
+
+    /// Copy mip 0 into array layer `layer` (a cube face) of `dst`, mip 0. False (nothing copied)
+    /// unless both have the same size and format and `dst` has that layer.
+    pub fn copy_to_layer(&self, gpu: &Gpu, dst: &Texture, layer: u32) -> bool {
+        let (a, b) = (&self.desc, &dst.desc);
+        if a.format.remove_srgb_suffix() != b.format.remove_srgb_suffix() || (a.width, a.height) != (b.width, b.height) || layer >= b.layers.max(1) {
+            return false;
+        }
+        fn at(texture: &wgpu::Texture, z: u32) -> wgpu::TexelCopyTextureInfo<'_> {
+            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x: 0, y: 0, z }, aspect: wgpu::TextureAspect::All }
+        }
+        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_texture(at(&self.texture, 0), at(&dst.texture, layer), extent(a.width, a.height));
+        gpu.submit(encoder.finish());
+        true
+    }
 }

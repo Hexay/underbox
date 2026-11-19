@@ -90,7 +90,7 @@ pub fn collect(view: &SceneView, f: &Filter) -> Collected {
             }
             continue;
         }
-        if !super::pvs::visible(eye, &obj, &s) {
+        if !super::pvs::visible(eye, &obj, &s) || !super::culling_box::visible(obj.world.addr(), super::pvs::world_bounds(&s)) {
             continue;
         }
         let matched = if f.match_id != 0 { s.layer_match == f.match_id } else { s.layer_match == 0 || f.ignore_match };

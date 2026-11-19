@@ -107,7 +107,7 @@ impl Record {
         }
         self.runs.extend([first, first_arg, 1, phase]);
         self.args.extend([d.range.len() as u32, 0, d.range.start, d.base_vertex as u32, 0]);
-        d.cull.indirect = Some(Indirect { args: args.clone(), args_offset: u64::from(first_arg) * 20, ids: ids.clone(), ids_offset: u64::from(first) * 4 });
+        d.cull.indirect = Some(Indirect { args: args.clone(), args_offset: u64::from(first_arg) * 20, ids: Some((ids.clone(), u64::from(first) * 4)) });
     }
 
     /// Writes the cull's inputs, its instance count where `D_GPU_COUNT` reads it, and its dispatch.

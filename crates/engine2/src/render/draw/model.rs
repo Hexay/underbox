@@ -39,7 +39,7 @@ pub fn draw_call(mesh: &RenderMesh, call: &DrawCall, uniforms: DrawUniforms, vie
 
 /// [`draw_call`] from `vertices` in place of the mesh's own vertex buffer when given, its
 /// material resolved and bound with `context`.
-fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &DrawCall, uniforms: DrawUniforms, view_proj: Mat4, state: RasterState, context: ContextBindings) -> Option<Draw> {
+pub(super) fn draw_call_of(mesh: &RenderMesh, vertices: Option<Arc<VertexBuffer>>, call: &DrawCall, uniforms: DrawUniforms, view_proj: Mat4, state: RasterState, context: ContextBindings) -> Option<Draw> {
     let (vb, ib) = {
         let s = mesh.state();
         (vertices.or_else(|| s.vertices.clone())?, s.indices.clone())

@@ -104,6 +104,7 @@ pub fn run(v: view::Ref) {
             super::trace::probe(v.addr(), &layer, &t);
         }
     }
+    super::cube::sync(&view);
     context::release(ctx);
 }
 
@@ -179,6 +180,7 @@ fn run_layer(view: &SceneView, v: view::Ref, ctx: context::Ref, l: layer::Ref, p
             }
         }
         Kind::Procedural(callback) if callback != 0 => {
+            super::cube::sync(view);
             // SAFETY: managed registered a `void(ManagedRenderSetup_t)` function pointer (HookLayers.cs).
             let f: extern "C" fn(ManagedRenderSetup_t) = unsafe { std::mem::transmute::<usize, extern "C" fn(ManagedRenderSetup_t)>(callback) };
             f(setup(ctx, v, l, t.color));
