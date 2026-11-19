@@ -19,9 +19,15 @@ pub struct ObjectMorphs {
     object: Weak<SceneObject>,
     key: usize,
     meshes: Vec<Weights>,
+    /// The flex controller values the weights were made from (with the model, all they depend on).
+    values: Vec<f32>,
 }
 
 impl ObjectMorphs {
+    pub fn values(&self) -> &[f32] {
+        &self.values
+    }
+
     /// The weights of mesh `index` (content order).
     pub fn mesh(&self, index: usize) -> Option<&Weights> {
         self.meshes.get(index)
@@ -67,7 +73,7 @@ pub fn of(r: object::Ref) -> Option<ObjectMorphs> {
     let controllers = &crate::anim::data::of(handle).anim.flex;
     let sets = sets(&model.name);
     let meshes = (0..model.content.meshes.len()).map(|i| weights(sets.get(i).and_then(Option::as_ref), controllers, &values)).collect();
-    Some(ObjectMorphs { object: Arc::downgrade(&scene), key: r.addr(), meshes })
+    Some(ObjectMorphs { object: Arc::downgrade(&scene), key: r.addr(), meshes, values })
 }
 
 /// `vb` with `morphs` added at `weights`; `None` when no target has weight or the layout's

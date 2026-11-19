@@ -49,6 +49,31 @@ world direction is `-forward` (native `GetWorldDirection` points at the light, `
 Both paths shade linear and encode once at output (docs/renderer.md, colour model): the showroom
 floor matches between them to within a unit per channel.
 
+## Shadow-map cache
+
+`scene/shadow_cache.rs`: a shadow view whose key equals the key of the last render into its
+target layer, with the texture's write count (`render::Texture::writes`) unchanged since, draws
+nothing: no clear, no casters, last frame's map stays. Managed still asks for every view; the skip
+is ours alone, and the frame's draw stats count the kept draws as drawn. The key is the inputs
+byte for byte, compared whole (no hash), rebuilt each view into recycled buffers:
+
+- The view: view-projection, viewport (and its depth range), the scissor rect, raster state
+  (bias, compare, cull), target format, and the depth program by identity.
+- Every final draw (after instancing): vertex and index buffers by identity and CPU write count
+  (`render::Buffer::writes`), offsets, range, instance count, uniforms, state, every caster
+  instance's world and tint; for a vertex-cache draw also its program, material, vertex layout,
+  view-projection and texture slots.
+- Every caster object: address, transform, tint, model, mesh groups, LOD, flags, material
+  override; pose bones and deformers, and morph controller values (the vertex cache's positions
+  are a function of these and the model, so its per-frame rewrite and offset don't matter).
+
+The caster set, culling and visibility enter through the draws and objects listed. Never cached:
+draws with GPU-written arguments or managed instance ids. Shader writes to buffers aren't counted,
+so a caster buffer filled by compute would need its own key input. Pointers in a key are pinned by
+`Weak`, so a freed address can't return as another object while the key lives. A render of one
+layer keeps the other layers' entries of the same texture valid when render/dirty_clear.rs's count
+matches. `UNDERBOX_SHADOW_CACHE=0` disables it; `=stats` logs the kept share every 1000 views.
+
 ## Managed shadows
 
 Managed's maps are reverse-Z: they clear to 0 and compare `GREATER_EQUAL`. Under managed's scene

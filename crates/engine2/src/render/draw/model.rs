@@ -91,6 +91,19 @@ impl Deform {
     pub fn rigid(&self) -> bool {
         self.pose.is_none() && self.morphs.is_none() && self.fragments.is_none() && self.dynamic.is_none()
     }
+
+    /// The pose and morph controllers: what a vertex-cache draw's positions come from besides
+    /// the model. Fragments and dynamic vertices reach their draws' own uniforms and buffers.
+    pub fn hash_inputs(&self, h: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+        self.pose.is_some().hash(h);
+        if let Some(p) = &self.pose {
+            p.hash_inputs(h);
+        }
+        let values = self.morphs.as_ref().map_or(&[][..], |m| m.values());
+        values.len().hash(h);
+        values.iter().for_each(|v| v.to_bits().hash(h));
+    }
 }
 
 /// A scene object's draws, seen through `view_proj`, deformed by `deform`; none without a model

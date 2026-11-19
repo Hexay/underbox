@@ -21,6 +21,16 @@ pub struct Pose {
     deformers: Deformers,
 }
 
+impl Pose {
+    /// Everything of the pose the vertex cache's positions depend on (bones and deformers).
+    pub fn hash_inputs(&self, h: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+        self.bones.iter().for_each(|b| b.to_cols_array().map(f32::to_bits).hash(h));
+        self.deformers.volumes.hash(h);
+        self.deformers.anchors.iter().for_each(|a| a.map(f32::to_bits).hash(h));
+    }
+}
+
 pub fn pose(r: object::Ref) -> Option<Pose> {
     let animatable = object::get(r).is_some_and(|o| o.kind == Kind::SceneAnimatableObject);
     if !animatable {

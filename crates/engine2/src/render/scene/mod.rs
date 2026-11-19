@@ -13,6 +13,7 @@ mod occlusion;
 pub(crate) mod pvs;
 mod scratch;
 pub mod setup;
+mod shadow_cache;
 pub mod shadow_view;
 pub mod skybox;
 pub mod system;

@@ -82,6 +82,34 @@ so `run.sh frame` metrics equal docs/differential-render.md's latest column.
   unranked by shader this round. By thread class ours is at or below real's everywhere but the
   queue thread's copies (CMAA2, below).
 
+## Shadow-map cache, 2026-11-19
+
+A shadow view whose inputs and target are unchanged since its last render keeps that map: no
+clear, no caster draws (key and invalidation rules: docs/lighting.md, "Shadow-map cache"). Kept:
+showroom 4990 of 5000 views, skinned 994 of 1000 (`UNDERBOX_SHADOW_CACHE=stats`; the misses are
+the first frames). Skinned's puppets hold their pose, morphs and deformers between frames, so its
+full-layer cascades are kept too; an animating caster misses every frame in the cascades it
+reaches.
+
+One release build, cache off (`UNDERBOX_SHADOW_CACHE=0`) and on alternating run by run, order
+flipped each round, 4 rounds, `REPEATS=1 WARMUP_FRAMES=300 run.sh perf <scene> ours`, R2R managed
+(`r2r-pending.py` listed nothing), load 22–33; medians [min–max]:
+
+| Metric | Showroom off | Showroom on | Skinned off | Skinned on |
+| --- | --- | --- | --- | --- |
+| DRAM read MB/frame | 120 [83–127] | 94 [68–104] | 149 [123–157] | 98 [87–101] |
+| DRAM lavapipe MB/frame | 65.5 [46–69] | 43.9 [30–49] | 93.3 [81–97] | 42.0 [36–44] |
+| DRAM engine MB/frame | 54.6 | 50.5 | 55.5 | 55.7 |
+| Frame engine CPU ms | 58.9 | 53.0 | 58.4 | 58.2 |
+| Frame lavapipe CPU ms | 85.6 | 73.6 | 70.4 | 60.7 |
+
+These totals sit below the dirty-rect table's above (that one was IL managed, at another load);
+compare within a table. Output: `run.sh frame` showroom and skinned images are byte-identical with
+the cache on and off; their metrics against a fresh real frame (0.07 / 0.23 / 0.36, 0.9993 and
+0.05 / 0.18 / 0.35, 0.9997) are below docs/differential-render.md's latest column with the cache
+off as well, so the moved baseline isn't this change. Tests: `tools/test.sh engine2 shadow_cache`
+(a moving caster and light against an uncached map, byte for byte, every frame).
+
 ## Not changed, and why
 
 - **CMAA2 texel words: the one ours-only hot spot.** `shading/texel_words.rs` copies the
