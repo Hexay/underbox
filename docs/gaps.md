@@ -12,14 +12,10 @@ Size: **S** up to ~50 lines, **M** a few hundred, **L** a new subsystem or depen
 | --- | --- | --- | --- | --- |
 | Video | HTTP(S) URLs, VP8/VP9/HEVC, Vorbis, 10-bit AV1, audio in recordings (docs/video.md) | `crates/engine2/src/video/recorder.rs:90` | Supported | M each |
 | Skinning | Deformed one-bone models stay rigid; no bounds padding for deformed objects (docs/skinning.md) | `crates/engine2/src/render/skin/dispatch.rs` | Applied | S |
-| VR | `RenderStereo`/`SubmitStereo`/`BlitStereo` are no-ops | `crates/engine2/src/render/scene/camera.rs:258` | OpenXR through openxr_loader | L |
+| VR | `RenderStereo`/`SubmitStereo`/`BlitStereo` are no-ops | `crates/engine2/src/render/scene/camera.rs:231` | OpenXR through openxr_loader | L |
 | HTML surface | Always null | docs/steam.md "HTML surface" | Steam's HTML surface | L |
-| Render | `RenderToCubeTexture` draws nothing | `crates/engine2/src/render/scene/camera.rs:258` | Six views into the cube's faces | M |
-| Render | `DrawInstancedIndirect`, `DrawIndexedInstancedIndirect` are no-ops | `crates/engine2/src/render/draw/immediate.rs:256` | Args read on the GPU | M |
-| Render | `DrawModel_1/3/4` ignore GPU-buffer transforms and args | `crates/engine2/src/render/draw/immediate.rs:274` | Transforms from the buffer | M |
 | Render | Decal normal maps and parallax | `crates/engine2/src/render/shading/standin_decals.hlsl:4` | Applied | M |
 | Render | Baked light probe volumes and lightmaps | `crates/shaders/hlsl/builtin/light_probe_volume.fxc:3` | Baked indirect light (docs/lighting.md) | L |
-| Render | Culling boxes are ids only | `crates/engine2/src/render/scene/system.rs:64` | `SceneCullingBox` hides objects inside or outside | S |
 | Render | Gizmo free-form (lattice) deformation | `crates/shaders/hlsl/builtin/ffd.fxc:2` | Deforms | M |
 | Render | A double sRGB encode or decode in one blit | `crates/engine2/src/render/draw/mod.rs:131` | Applied (no pipeline asks) | S |
 | Render | Window surfaces without `COPY_DST` | `crates/render/src/surface.rs:65` | Presents | S |
