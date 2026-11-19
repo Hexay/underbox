@@ -4,7 +4,7 @@
 use crate::filter::{Contact, Hooks, ShapeMeta, function};
 use rapier3d::math::Vector;
 use rapier3d::pipeline::PhysicsWorld;
-use rapier3d::prelude::{ColliderHandle, ContactPair};
+use rapier3d::prelude::{ColliderHandle, ColliderSet, ContactPair};
 use crate::dense::Dense;
 
 /// managed's `IntersectionEventType_t`.
@@ -38,13 +38,22 @@ const TOUCH_DISTANCE: f32 = 0.1;
 /// A shape's place in creation order, then its handle for shapes created before tracking.
 type Rank = (u64, u32, u32);
 
-/// A touching pair, `a` created before `b`.
+/// A touching pair, `a` created before `b`. The shapes are read back from the ranks, which keeps
+/// the per-step lists at 40 bytes a pair.
 #[derive(Clone, Copy)]
 struct Touch {
     key: (Rank, Rank),
-    a: ColliderHandle,
-    b: ColliderHandle,
     kind: Contact,
+}
+
+impl Touch {
+    fn a(&self) -> ColliderHandle {
+        ColliderHandle::from_raw_parts(self.key.0.1, self.key.0.2)
+    }
+
+    fn b(&self) -> ColliderHandle {
+        ColliderHandle::from_raw_parts(self.key.1.1, self.key.1.2)
+    }
 }
 
 #[derive(Default)]
@@ -52,6 +61,7 @@ pub(crate) struct Contacts {
     /// Sorted by `key`: shape creation order, which pairs and events follow as native's do
     /// (orbmatch's tie-break).
     touching: Vec<Touch>,
+    /// This step's list while it's built, else last step's buffer kept for its allocation.
     spare: Vec<Touch>,
     created: Dense<u64>,
     next: u64,
@@ -65,11 +75,11 @@ pub(crate) struct Contacts {
 /// Overlapping pairs skip the contact query's EPA. Not `distance` for the rest: for box pairs the
 /// contact query disagrees with GJK's distance both ways near the threshold (0.24 apart reads as
 /// touching; one pair 0.004 apart doesn't).
-fn touches(world: &PhysicsWorld, pair: &ContactPair) -> bool {
+fn touches(colliders: &ColliderSet, pair: &ContactPair) -> bool {
     if !pair.has_any_active_contact() {
         return false;
     }
-    let (Some(a), Some(b)) = (world.colliders.get(pair.collider1), world.colliders.get(pair.collider2)) else { return false };
+    let (Some(a), Some(b)) = (colliders.get(pair.collider1), colliders.get(pair.collider2)) else { return false };
     let (pa, pb) = (a.position(), b.position());
     if rapier3d::parry::query::intersection_test(pa, a.shape(), pb, b.shape()).is_ok_and(|i| i.intersecting) {
         return true;
@@ -116,16 +126,28 @@ fn merged<'a>(from: &'a [Touch], other: &'a [Touch]) -> impl Iterator<Item = (&'
 }
 
 impl Contacts {
-    /// Diff this step's touching pairs against the last step's, queueing events.
-    pub fn update(&mut self, world: &PhysicsWorld, hooks: &Hooks) {
-        let mut now = std::mem::take(&mut self.spare);
-        now.clear();
-        for pair in world.narrow_phase.contact_pairs().filter(|p| touches(world, p)) {
-            let kind = hooks.classify(pair.collider1, pair.collider2, false);
-            if kind != Contact::None {
-                now.push(self.touch(pair.collider1, pair.collider2, kind));
-            }
+    /// Start this step's list of touching pairs; [`Self::observe`] each contact pair, then
+    /// [`Self::finish`].
+    pub(crate) fn begin(&mut self) {
+        self.spare.clear();
+    }
+
+    /// Add `pair` to this step's list if it touches.
+    pub(crate) fn observe(&mut self, colliders: &ColliderSet, pair: &ContactPair, hooks: &Hooks) {
+        if !touches(colliders, pair) {
+            return;
         }
+        let kind = hooks.classify(pair.collider1, pair.collider2, false);
+        if kind != Contact::None {
+            let touch = self.touch(pair.collider1, pair.collider2, kind);
+            self.spare.push(touch);
+        }
+    }
+
+    /// Add the touching triggers, then diff this step's touching pairs against the last step's,
+    /// queueing events.
+    pub(crate) fn finish(&mut self, world: &PhysicsWorld, hooks: &Hooks) {
+        let mut now = std::mem::take(&mut self.spare);
         for (a, b, _) in world.narrow_phase.intersection_pairs().filter(|p| p.2) {
             now.push(self.touch(a, b, Contact::Trigger));
         }
@@ -143,22 +165,22 @@ impl Contacts {
         for (t, was) in merged(&now, &self.touching) {
             let was = was.map(|w| w.kind);
             if t.kind == Contact::Solid && was.is_none() {
-                self.began.push((t.a, t.b));
+                self.began.push((t.a(), t.b()));
             }
             let kind_event = match (t.kind, was) {
                 (Contact::Trigger, None) => Some(EventKind::TriggerBegin),
-                (Contact::Solid, None) if wants(t.a, t.b, function::TOUCH) => Some(EventKind::TouchBegin),
-                (Contact::Solid, Some(_)) if wants(t.a, t.b, function::PERSISTS) => Some(EventKind::TouchPersists),
+                (Contact::Solid, None) if wants(t.a(), t.b(), function::TOUCH) => Some(EventKind::TouchBegin),
+                (Contact::Solid, Some(_)) if wants(t.a(), t.b(), function::PERSISTS) => Some(EventKind::TouchPersists),
                 _ => None,
             };
             if let Some(k) = kind_event {
-                self.events.push(event(world, k, t.a, t.b));
+                self.events.push(event(world, k, t.a(), t.b()));
             }
         }
         for (t, _) in merged(&self.touching, &now).filter(|(_, kept)| kept.is_none()) {
             match t.kind {
-                Contact::Trigger => self.events.push(event(world, EventKind::TriggerEnd, t.a, t.b)),
-                Contact::Solid if wants(t.a, t.b, function::TOUCH) => self.events.push(event(world, EventKind::TouchEnd, t.a, t.b)),
+                Contact::Trigger => self.events.push(event(world, EventKind::TriggerEnd, t.a(), t.b())),
+                Contact::Solid if wants(t.a(), t.b(), function::TOUCH) => self.events.push(event(world, EventKind::TouchEnd, t.a(), t.b())),
                 _ => {}
             }
         }
@@ -178,7 +200,7 @@ impl Contacts {
 
     /// Forget pairs involving a removed shape without reporting them.
     pub fn forget(&mut self, shape: ColliderHandle) {
-        self.touching.retain(|t| t.a != shape && t.b != shape);
+        self.touching.retain(|t| t.a() != shape && t.b() != shape);
         self.created.remove(shape.into_raw_parts());
     }
 
@@ -189,6 +211,6 @@ impl Contacts {
 
     fn touch(&self, a: ColliderHandle, b: ColliderHandle, kind: Contact) -> Touch {
         let (ra, rb) = (self.rank(a), self.rank(b));
-        if ra <= rb { Touch { key: (ra, rb), a, b, kind } } else { Touch { key: (rb, ra), a: b, b: a, kind } }
+        Touch { key: if ra <= rb { (ra, rb) } else { (rb, ra) }, kind }
     }
 }

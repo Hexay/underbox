@@ -12,6 +12,7 @@ mod mass;
 mod persist;
 mod rules;
 mod scrape;
+mod settle;
 mod shape;
 mod sleep;
 mod trace;

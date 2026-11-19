@@ -35,7 +35,7 @@ pub(super) fn simulate(r: world::Ref, dt: f32, substeps: u32) -> (Vec<Active>, V
             .filter_map(|a| {
                 let rb = sim.body(a.body)?;
                 let handle = body_cache::resolve(body::from_user_data(a.user_data), |e| {
-                    body_snapshot::publish(&e.world.epoch, &e.body.snapshot, rb);
+                    body_snapshot::publish(&e.world.epoch, &e.world.snapshots, e.id, rb);
                     e.body.handle.id()
                 })?;
                 let transform = Transform { position: from_vec(rb.translation()), scale: vec3(1.0, 1.0, 1.0), rotation: from_rot(*rb.rotation()) };

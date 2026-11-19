@@ -36,7 +36,6 @@ pub struct Body {
     pub handle: Handle,
     pub shapes: Mutex<Vec<shape::Ref>>,
     pub state: Mutex<State>,
-    pub(super) snapshot: body_snapshot::Snapshot,
 }
 
 pub fn get(r: Ref) -> Option<Arc<Body>> {
@@ -68,7 +67,7 @@ pub fn read_rb<R: Default>(r: Ref, f: impl FnOnce(&RigidBody) -> R) -> R {
 #[inline]
 pub fn read_hot<R: Default>(r: Ref, f: impl Fn(body_snapshot::BodyRead) -> R) -> R {
     let read = |e: &super::body_cache::Entry| {
-        body_snapshot::read(&e.world.epoch, &e.body.snapshot, &f).or_else(|| e.world.sim_read().body(e.id).map(|rb| f(body_snapshot::BodyRead::Body(rb))))
+        body_snapshot::read(&e.world.epoch, &e.world.snapshots, e.id, &f).or_else(|| e.world.sim_read().body(e.id).map(|rb| f(body_snapshot::BodyRead::Body(rb))))
     };
     super::body_cache::resolve(r, read).flatten().unwrap_or_default()
 }
@@ -138,7 +137,7 @@ pub fn spawn(world_ref: world::Ref, kind: BodyType, pose: Pose, settings: &Physi
         local_mass_center: to_vec(settings.mass_center),
     };
     let sim_world = Arc::downgrade(&world);
-    let body = Arc::new(Body { world: world_ref, sim_world, id, handle: Handle::default(), shapes: Mutex::default(), state: Mutex::new(state), snapshot: Default::default() });
+    let body = Arc::new(Body { world: world_ref, sim_world, id, handle: Handle::default(), shapes: Mutex::default(), state: Mutex::new(state) });
     let r: Ref = objects::create_shared(body.clone());
     world.bodies.lock().unwrap().push(r);
     with_rb(r, |rb| rb.user_data = r.addr() as u128);

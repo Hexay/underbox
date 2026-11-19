@@ -7,7 +7,8 @@
 
 use crate::world::World;
 use rapier3d::math::Vector;
-use rapier3d::prelude::{RigidBody, RigidBodyHandle};
+use crate::dense::Dense;
+use rapier3d::prelude::{ContactPair, RigidBody, RigidBodyHandle, RigidBodySet};
 
 /// Approach speed (inches/s) a point must beat to bounce: real bounces 42 but not 40, just above
 /// Box2D's 1 m/s (39.37).
@@ -39,34 +40,32 @@ impl World {
             self.step_start.insert(h.into_raw_parts(), Start { linvel: rb.linvel(), angvel: rb.angvel() });
         }
     }
+}
 
-    pub(crate) fn bounce_approaching_contacts(&mut self) {
-        let world = &mut self.inner;
-        let starts = &self.step_start;
-        for pair in world.narrow_phase.contact_pairs().filter(|p| p.has_any_active_contact()) {
-            for m in pair.manifolds() {
-                let (Some(h1), Some(h2)) = (m.data.rigid_body1, m.data.rigid_body2) else { continue };
-                let e = m.data.restitution;
-                if e <= 0.0 || !(starts.contains(h1.into_raw_parts()) || starts.contains(h2.into_raw_parts())) {
-                    continue;
-                }
-                let n = m.data.normal;
-                let (Some(rb1), Some(rb2)) = world.bodies.get_pair_mut(h1, h2) else { continue };
-                // The solver's lever arms, frozen at the pair's last full narrow-phase update.
-                for (a1, a2, acc) in m.points.iter().filter(|p| p.data.impulse > 0.0).map(|p| (p.data.solver_dp1, p.data.solver_dp2, p.data.impulse)) {
-                    let start = |h: RigidBodyHandle, rb: &RigidBody, arm| starts.get(h.into_raw_parts()).map_or(at(rb.linvel(), rb.angvel(), arm), |s| at(s.linvel, s.angvel, arm));
-                    let approach = n.dot(start(h2, rb2, a2) - start(h1, rb1, a1));
-                    if approach > -THRESHOLD {
-                        continue;
-                    }
-                    let k = inv_mass_along(rb1, a1, n) + inv_mass_along(rb2, a2, n);
-                    let vn = n.dot(at(rb2.linvel(), rb2.angvel(), a2) - at(rb1.linvel(), rb1.angvel(), a1));
-                    // The point's accumulated impulse may shrink to zero, never pull.
-                    let impulse = (-(vn + e * approach) / k).max(-acc);
-                    rb1.apply_impulse_at_point(-n * impulse, rb1.center_of_mass() + a1, true);
-                    rb2.apply_impulse_at_point(n * impulse, rb2.center_of_mass() + a2, true);
-                }
+/// Bounce an active pair's approaching points; see the module doc.
+pub(crate) fn bounce_pair(bodies: &mut RigidBodySet, starts: &Dense<Start>, pair: &ContactPair) {
+    for m in pair.manifolds() {
+        let (Some(h1), Some(h2)) = (m.data.rigid_body1, m.data.rigid_body2) else { continue };
+        let e = m.data.restitution;
+        if e <= 0.0 || !(starts.contains(h1.into_raw_parts()) || starts.contains(h2.into_raw_parts())) {
+            continue;
+        }
+        let n = m.data.normal;
+        let (Some(rb1), Some(rb2)) = bodies.get_pair_mut(h1, h2) else { continue };
+        // The solver's lever arms, frozen at the pair's last full narrow-phase update.
+        for (a1, a2, acc) in m.points.iter().filter(|p| p.data.impulse > 0.0).map(|p| (p.data.solver_dp1, p.data.solver_dp2, p.data.impulse)) {
+            let start = |h: RigidBodyHandle, rb: &RigidBody, arm| starts.get(h.into_raw_parts()).map_or(at(rb.linvel(), rb.angvel(), arm), |s| at(s.linvel, s.angvel, arm));
+            let approach = n.dot(start(h2, rb2, a2) - start(h1, rb1, a1));
+            if approach > -THRESHOLD {
+                continue;
             }
+            let k = inv_mass_along(rb1, a1, n) + inv_mass_along(rb2, a2, n);
+            let vn = n.dot(at(rb2.linvel(), rb2.angvel(), a2) - at(rb1.linvel(), rb1.angvel(), a1));
+            // The point's accumulated impulse may shrink to zero, never pull.
+            let impulse = (-(vn + e * approach) / k).max(-acc);
+            rb1.apply_impulse_at_point(-n * impulse, rb1.center_of_mass() + a1, true);
+            rb2.apply_impulse_at_point(n * impulse, rb2.center_of_mass() + a2, true);
         }
     }
 }
+

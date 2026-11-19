@@ -71,8 +71,7 @@ pub struct World {
     awake_spare: Dense<()>,
     activity: Vec<Activity>,
     pub(crate) step_start: Dense<crate::bounce::Start>,
-    pub(crate) frozen: HashMap<(ColliderHandle, ColliderHandle), crate::persist::Frozen>,
-    pub(crate) frozen_spare: HashMap<(ColliderHandle, ColliderHandle), crate::persist::Frozen>,
+    pub(crate) frozen: crate::persist::FrozenPairs,
     pub(crate) step_scratch: crate::persist::StepStart,
 }
 
@@ -103,8 +102,7 @@ impl Default for World {
             awake_spare: Dense::default(),
             activity: Vec::new(),
             step_start: Dense::default(),
-            frozen: HashMap::default(),
-            frozen_spare: HashMap::default(),
+            frozen: Default::default(),
             step_scratch: Default::default(),
         }
     }
@@ -161,12 +159,11 @@ impl World {
         let start = self.force_turned_contacts();
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
         self.inner.step_with_events(&hooks, &());
-        self.release_forced_contacts(start);
-        self.bounce_approaching_contacts();
+        self.settle_contacts(start);
         self.clamp_speeds();
         self.measure_joints(1);
         let hooks = Hooks { rules: &self.rules, meta: &self.meta };
-        self.contacts.update(&self.inner, &hooks);
+        self.contacts.finish(&self.inner, &hooks);
         self.restart_sleep_on_new_contacts();
         self.collect_activity();
     }
@@ -201,7 +198,9 @@ impl World {
 
     /// Bodies that moved or fell asleep since the last call.
     pub fn take_activity(&mut self) -> Vec<Activity> {
-        std::mem::take(&mut self.activity)
+        // Sized for the next step's list, which grew by doubling from empty every step.
+        let capacity = self.activity.len();
+        std::mem::replace(&mut self.activity, Vec::with_capacity(capacity))
     }
 
     /// Touch and trigger events since the last call.

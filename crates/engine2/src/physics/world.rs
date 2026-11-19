@@ -19,6 +19,7 @@ pub struct PhysicsWorld {
     sim: Mutex<physics::World>,
     /// Bumped by every lock that may change a body (body_snapshot.rs).
     pub(super) epoch: AtomicU64,
+    pub(super) snapshots: body_snapshot::Table,
     pub bodies: Mutex<Vec<body::Ref>>,
     pub joints: Mutex<Vec<joint::Ref>>,
     reference: Mutex<body::Ref>,
