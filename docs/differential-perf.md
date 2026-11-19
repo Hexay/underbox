@@ -48,6 +48,28 @@ logs, `sample.json` and `load.txt`.
   through engine2's null device (`UNDERBOX_AUDIO=null`), real through SDL's `dummy` driver
   (`PERF_SDL_AUDIO`). Under `boot-client.sh`'s ALSA null PCM, real's `SDLAudioP` thread spun
   for a whole core (55 s of CPU in a 200-frame window).
+- **DRAM reads.** `perf_events.py` opens AMD Zen 5 core counters per thread through
+  `perf_event_open` (paranoid 1 is enough; no amd_df/umc PMU is exposed, so no system-wide DRAM
+  count): `l2_fill_rsp_src.dram_io_near` (L2 fills from DRAM, demand plus L2 prefetch, 64 B each:
+  the metric) and `ls_any_fills_from_sys.dram_io_all` (L1D fills from DRAM: misses L2-prefetched
+  lines, a lower bound). Two counts: an inherited counter on every thread alive when the sampler
+  finds the process (so every later thread is counted: the whole process, the reported total) and
+  a plain counter per thread opened when first seen (the engine/lavapipe split and per-thread
+  table). "dram per-thread coverage" is their ratio, 1.00 when nothing escaped. Read every 10
+  samples and interpolated at the markers as CPU is; "boot dram read MB" runs from when the sampler
+  found the process (within ~50 ms of exec). Writes and writebacks are not attributable per process
+  on this PMU and are not reported. Validated on a synthetic stream (4 threads × 256 MiB × 4
+  passes, and 2 × 64 MiB × 10): the inherited count gave 0.999–1.003 of the bytes read; a 16 MiB
+  buffer (inside L3) gave 0.27, so L3 hits aren't counted.
+- **Where DRAM reads come from.** `RECORD='-e l2_fill_rsp_src.dram_io_near -c 20000 -m 16'`
+  attaches `perf record -p` at `PERF:START` (perf names only DSOs mapped when it attaches, so not
+  at boot), enables it at the window's first marker and stops it at the last.
+  `tools/diff/perf_attrib.py <out-dir> [--by dso]` ranks MB per tick/frame by thread class (main,
+  engine, unnamed = lavapipe's compute pool and queue thread, lavapipe), DSO and symbol, medians
+  over runs, ours beside real. Samples skid a few instructions: the function is right, the
+  instruction may not be. Our libengine2 has no frame pointers, so there are no call graphs.
+  `perf mem`/IBS (`ibs_op`) also works per process here, but samples only demand loads (a stream's
+  prefetched lines read as L1/L2 hits), so it was not used for ranking.
 - **Client boot differs in work done:** both start the menu before `+game`, but ours logs
   "Couldn't find scenes/menu-main.scene" and skips it, while real loads and ticks the menu UI
   (its sbox.game calls fail fast through `noweb.sh`). Read client boot numbers with that in mind.
@@ -120,6 +142,25 @@ pile flagged NOISY as the load fell). Medians, ours / real, ratio:
 | Peak RSS MiB | 500 / 545, 0.92 | 541 / 629, 0.86 | 1253 / 3781, 0.33 | 1298 / 3873, 0.34 |
 
 Above real: skinned's main thread (flat profile, docs/perf-render.md) and showroom's within noise.
+
+## Memory bandwidth, 2026-11-19
+
+`sweep`: `run.sh perf <scenario> both`, 5 rounds each, `RECORD` on (servers `-c 2000`, clients
+`-c 20000`), release build of 4bfb0e5. DRAM read fills × 64 B over the window, whole process;
+median [min–max]. GB/s depends on wall time (real's client frames took about 3× ours' wall time in these runs),
+so compare bytes per tick/frame. Load average per scenario: pile 15–27, probe 16–21, showroom
+18 → 47 (NOISY), skinned 47 → 22 (NOISY).
+
+| Scenario | Ours MB/unit | Real MB/unit | Ratio | Ours GB/s | Real GB/s | Boot GB ours / real |
+| --- | --- | --- | --- | --- | --- | --- |
+| pile (tick) | 7.29 [7.19–7.50] | 6.42 [5.79–6.67] | 1.14 | 0.37 | 0.32 | 7.3 / 10.8 |
+| probe (tick) | 2.93 [2.59–3.17] | 3.65 [3.39–3.94] | 0.80 | 0.15 | 0.18 | 10.7 / 13.4 |
+| showroom (frame) | 192 [170–216] | 232 [201–252] | 0.83 | 2.12 | 0.84 | 34 / 87 |
+| skinned (frame) | 197 [189–212] | 229 [207–232] | 0.86 | 2.28 | 0.92 | 39 / 78 |
+
+Client split (thread names, as CPU): showroom engine 73 / 97, lavapipe 119 / 135; skinned engine
+77 / 97, lavapipe 119 / 132 MB/frame. Lavapipe runs in-process, so most of a client's traffic is
+rasterising and compute dispatches. Where it comes from, and what's ours: docs/perf-bandwidth.md.
 
 ## Caveats
 
