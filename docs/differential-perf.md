@@ -72,6 +72,7 @@ showroom` leaves `VK_ICD_FILENAMES` alone, so both engines pick the hardware dri
 Server tick profile on `pile`, what was changed and before/after numbers: docs/perf-physics.md.
 Client frame profile on `showroom` and `skinned`, the same: docs/perf-render.md.
 Allocator and release-profile A/B, and a load-proof instruction-count method: docs/perf-build.md.
+Boot to the first scene frame, client and server, the same: docs/perf-boot.md.
 
 ## Sweep, 2026-11-13
 
