@@ -1,5 +1,8 @@
 # underbox
 
+[![CI](https://github.com/Hexay/underbox/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/underbox/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 underbox is an open-source Rust implementation of `engine2`, the closed native core under s&box.
 Facepunch publishes s&box's C# engine as [sbox-public](https://github.com/Facepunch/sbox-public)
 under MIT, but it only runs on top of their closed binaries. underbox replaces those binaries, so
@@ -41,6 +44,34 @@ What doesn't work yet:
   packages are missing.
 - Deliberately out of scope: ray tracing, MSAA, the Steam HTML surface, the editor and its tools.
   Open renderer work is under "Next" in [renderer.md](docs/renderer.md).
+
+## Performance
+
+`tools/diff/run.sh perf` boots the same managed build and scene on underbox and on Facepunch's
+engine2, five times each, and reports CPU time, boot time and memory per engine
+([differential-perf.md](docs/differential-perf.md)). A client uses about a third of the memory
+real engine2 does.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/peak-memory-dark.svg">
+  <img alt="Peak memory in MiB. pile (server): underbox 500, real 545. probe (server): 541 against 629. showroom (client): 1,253 against 3,781. skinned (client): 1,298 against 3,873." src="docs/img/peak-memory-light.svg" width="720">
+</picture>
+
+Medians from the 2026-11-19 sweep:
+
+| Metric | Scenario | underbox | real engine2 |
+| --- | --- | --- | --- |
+| Peak memory | showroom / skinned (client) | 1,253 / 1,298 MiB | 3,781 / 3,873 MiB |
+| Peak memory | pile / probe (server) | 500 / 541 MiB | 545 / 629 MiB |
+| Server tick CPU | pile, 328 awake bodies | 1.83 ms | 2.04 ms |
+| Engine CPU per frame | showroom / skinned | 80.7 / 80.9 ms | 85.0 / 89.1 ms |
+| Main thread per frame | showroom / skinned | 3.50 / 4.45 ms | 3.36 / 3.88 ms |
+| Boot CPU | showroom / skinned | 45.4 / 46.4 s | 66.5 / 77.6 s |
+
+The test machine has no GPU. Both engines render through lavapipe, Mesa's software Vulkan driver,
+so the client figures measure CPU cost rather than GPU frame time. Real's client also loads the
+main menu before the game and underbox skips it, which flatters underbox's boot numbers. The
+chart is drawn by `tools/readme_charts.py`.
 
 ## Requirements
 

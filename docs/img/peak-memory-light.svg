@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" font-family='system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif' role="img" aria-label="Peak memory in MiB, underbox against real engine2, per scenario">
+<rect width="720" height="420" rx="8" fill="#fcfcfb"/>
+<text x="24.0" y="34" fill="#0b0b0b" font-size="16" font-weight="600" text-anchor="start">Peak memory (MiB)</text>
+<text x="24.0" y="56" fill="#52514e" font-size="13" font-weight="400" text-anchor="start">Lower is better. Median of 5 runs per engine.</text>
+<rect x="24" y="68" width="12" height="12" rx="2" fill="#2a78d6"/>
+<text x="42.0" y="79" fill="#52514e" font-size="13" font-weight="400" text-anchor="start">underbox</text>
+<rect x="144" y="68" width="12" height="12" rx="2" fill="#eb6834"/>
+<text x="162.0" y="79" fill="#52514e" font-size="13" font-weight="400" text-anchor="start">real engine2</text>
+<line x1="150.0" y1="92" x2="150.0" y2="356" stroke="#c3c2b7" stroke-width="1"/>
+<text x="150.0" y="376" fill="#898781" font-size="12" font-weight="400" text-anchor="middle">0</text>
+<line x1="267.5" y1="92" x2="267.5" y2="356" stroke="#e1e0d9" stroke-width="1"/>
+<text x="267.5" y="376" fill="#898781" font-size="12" font-weight="400" text-anchor="middle">1,000</text>
+<line x1="385.0" y1="92" x2="385.0" y2="356" stroke="#e1e0d9" stroke-width="1"/>
+<text x="385.0" y="376" fill="#898781" font-size="12" font-weight="400" text-anchor="middle">2,000</text>
+<line x1="502.5" y1="92" x2="502.5" y2="356" stroke="#e1e0d9" stroke-width="1"/>
+<text x="502.5" y="376" fill="#898781" font-size="12" font-weight="400" text-anchor="middle">3,000</text>
+<line x1="620.0" y1="92" x2="620.0" y2="356" stroke="#e1e0d9" stroke-width="1"/>
+<text x="620.0" y="376" fill="#898781" font-size="12" font-weight="400" text-anchor="middle">4,000</text>
+<text x="136.0" y="120.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="end">pile</text>
+<text x="136.0" y="142.0" fill="#898781" font-size="12" font-weight="400" text-anchor="end">server</text>
+<path d="M150,104.0 H204.8 Q208.8,104.0 208.8,108.0 V120.0 Q208.8,124.0 204.8,124.0 H150 Z" fill="#2a78d6"/>
+<path d="M150,126.0 H210.0 Q214.0,126.0 214.0,130.0 V142.0 Q214.0,146.0 210.0,146.0 H150 Z" fill="#eb6834"/>
+<text x="214.8" y="119.0" fill="#0b0b0b" font-size="12" font-weight="600" text-anchor="start">500</text>
+<text x="220.0" y="141.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start">545</text>
+<text x="136.0" y="186.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="end">probe</text>
+<text x="136.0" y="208.0" fill="#898781" font-size="12" font-weight="400" text-anchor="end">server</text>
+<path d="M150,170.0 H209.6 Q213.6,170.0 213.6,174.0 V186.0 Q213.6,190.0 209.6,190.0 H150 Z" fill="#2a78d6"/>
+<path d="M150,192.0 H219.9 Q223.9,192.0 223.9,196.0 V208.0 Q223.9,212.0 219.9,212.0 H150 Z" fill="#eb6834"/>
+<text x="219.6" y="185.0" fill="#0b0b0b" font-size="12" font-weight="600" text-anchor="start">541</text>
+<text x="229.9" y="207.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start">629</text>
+<text x="136.0" y="252.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="end">showroom</text>
+<text x="136.0" y="274.0" fill="#898781" font-size="12" font-weight="400" text-anchor="end">client</text>
+<path d="M150,236.0 H293.2 Q297.2,236.0 297.2,240.0 V252.0 Q297.2,256.0 293.2,256.0 H150 Z" fill="#2a78d6"/>
+<path d="M150,258.0 H590.3 Q594.3,258.0 594.3,262.0 V274.0 Q594.3,278.0 590.3,278.0 H150 Z" fill="#eb6834"/>
+<text x="303.2" y="251.0" fill="#0b0b0b" font-size="12" font-weight="600" text-anchor="start">1,253</text>
+<text x="600.3" y="273.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start">3,781</text>
+<text x="136.0" y="318.0" fill="#0b0b0b" font-size="14" font-weight="600" text-anchor="end">skinned</text>
+<text x="136.0" y="340.0" fill="#898781" font-size="12" font-weight="400" text-anchor="end">client</text>
+<path d="M150,302.0 H298.5 Q302.5,302.0 302.5,306.0 V318.0 Q302.5,322.0 298.5,322.0 H150 Z" fill="#2a78d6"/>
+<path d="M150,324.0 H601.1 Q605.1,324.0 605.1,328.0 V340.0 Q605.1,344.0 601.1,344.0 H150 Z" fill="#eb6834"/>
+<text x="308.5" y="317.0" fill="#0b0b0b" font-size="12" font-weight="600" text-anchor="start">1,298</text>
+<text x="611.1" y="339.0" fill="#52514e" font-size="12" font-weight="400" text-anchor="start">3,873</text>
+<text x="24.0" y="404" fill="#898781" font-size="11" font-weight="400" text-anchor="start">Sweep of 2026-11-19. Same managed build on both engines; clients at 1024×768 on lavapipe.</text>
+</svg>
