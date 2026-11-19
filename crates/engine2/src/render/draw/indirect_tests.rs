@@ -40,7 +40,10 @@ fn context_draws_take_counts_from_the_args_buffer() {
     let color = texture::create_target("indirect", SIZE, SIZE, 0);
     context::bind_targets(c, color, Default::default());
     let mesh = screen_triangle();
-    let (vb, ib) = (mesh.state().vertices.clone().unwrap(), mesh.state().indices.clone().unwrap());
+    let (vb, ib) = {
+        let state = mesh.state();
+        (state.vertices.clone().unwrap(), state.indices.clone().unwrap())
+    };
     immediate::bind_vertices(c, 0, Some(Vertices::Mesh(vb)), 0);
     let drawn = |args: &[u32], offset, count, stride, indexed| {
         let b = gpu_buffer(&words(args), 4);
@@ -84,11 +87,12 @@ fn draw_model_reads_instances_and_transforms_from_buffers() {
     let mat = material::create_raw(Some(c"materials/test/indirect.vmat"), Some(c"shaders/complex.shader"), true);
     crate::model::get(model).unwrap().content.meshes[0].mesh.state().material = MaterialRef::keep(mat);
 
+    // Two args records, 20 bytes apart; the offset is in bytes (Graphics.DrawModelInstancedIndirect).
     let counts = gpu_buffer(&words(&[0, 0, 0, 0, 0, 0, 1, 0]), 4);
     let empty = middle(c, color, || instanced(c, model, 0, (counts, 0), draw));
     assert_eq!(empty, CLEAR, "no instances, no box");
-    let one = middle(c, color, || instanced(c, model, 0, (counts, 4), draw));
-    assert_ne!(one, CLEAR, "the box from the instance count at byte 4");
+    let one = middle(c, color, || instanced(c, model, 0, (counts, 20), draw));
+    assert_ne!(one, CLEAR, "the box from the second record's instance count, at byte 24");
 
     // Entry 0 far off screen, entry 1 at the origin in red; each args record draws one instance.
     let far = Mat4::from_translation(Vec3::new(0.0, 5000.0, 0.0));

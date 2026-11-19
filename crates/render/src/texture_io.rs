@@ -1,7 +1,7 @@
 //! Moving texels into and between [`Texture`]s: uploads (texel or 4x4 block rows), fills, clears
 //! and copies. Read-back is in readback.rs.
 
-use crate::texture::sample_aspect;
+use crate::texture::{extent, sample_aspect};
 use crate::{Gpu, Texture};
 
 /// One mip of one array layer (a cube face, a volume's depth slice).
