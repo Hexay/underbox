@@ -110,6 +110,60 @@ the cache on and off; their metrics against a fresh real frame (0.07 / 0.23 / 0.
 off as well, so the moved baseline isn't this change. Tests: `tools/test.sh engine2 shadow_cache`
 (a moving caster and light against an uncached map, byte for byte, every frame).
 
+## Per-pass traffic, clients, 2026-11-19
+
+Measured on 5dff43b, before the shadow-map cache above.
+
+`tools/diff/perf-variants.sh <scene> <label>=[VAR=value;...] ...` runs `perf.sh <scene> ours` once
+per variant per round (`ROUNDS`, 3), interleaved, and tabulates medians plus the median *paired*
+change against the first variant's run in the same round, so load drift between rounds cancels.
+Each pass was dropped with `UNDERBOX_SKIP_LAYERS` (a layer name, or a compute shader's stem);
+base build 5dff43b, `WARMUP_FRAMES=300`, R2R managed (`tools/r2r-pending.py` listed nothing).
+Six paired rounds per variant (three for the last four rows): three at load 22–30 (base 95–123
+MB/frame) and three on a quieter box (base 66–70 showroom, 106–110 skinned). Changes under ~5 MB
+are inside the run-to-run spread. Shadow views can't be skipped this way (shadow lane's code).
+
+| Pass (skipped as) | Showroom MB/frame | Skinned MB/frame | Targets, ours vs real (`run.sh gpu`, both scenes) | Notes |
+| --- | --- | --- | --- | --- |
+| CMAA2 whole (`Managed: BeforePostProcessing`) | −18.7 (quiet −15.5) | −10.4 (quiet −15.7) | copy of the `R16G16B16A16Sfloat` 1024×768 colour into `Cmaa2Color`, 5 dispatches, composite into the colour: same on both | engine threads −12.6/−12.9, engine CPU −10.6/−10.2 ms. Ours adds the two 768 KiB texel-word copies (below) |
+| CMAA2 compute (`cmaa2_cs`) | −8.2 | −2.4 (quiet −5.9) | `R32Uint` 512×768 edges, 512×384 heads | the rest of the row above (~7–10) is the colour copy and the composite |
+| Opaque forward (`Dynamic Opaque Forward`) | −7.4 | −4.4 | `R16G16B16A16Sfloat` + `D32SfloatS8Uint` 1024×768, Load/Store on both | lavapipe CPU −57/−41 ms: compute-bound, not DRAM-bound. Ours draws showroom's boxes as 3 indirect draws, real as 1 instanced |
+| SPD (`downsample_spd`, 4 dispatches) | −6.3 | −3.7 | same dispatch grids | |
+| Clear (`Clear Color Depth Stencil`) | −5.7 | −4.7 | colour + depth cleared on both | needed: neither scene's sky draws, the clear colour is the background |
+| Contact shadows (`screen_space_shadows_cs`) | −3.9 | −4.2 | `R8Unorm` 1024×768 mask cleared to 1 on both (ours a render-pass clear, real `vkCmdClearColorImage`) | engine CPU −14.6/−14.8 ms |
+| Light culling (`clustered_light_culling_cs`) | −2.5 | −4.3 | same | |
+| Resolve to SDR (`ResolveHDRToFinalSDR`) | +0.6 | −2.2 | Rgba16F → 8-bit 1024×768; real clears its swap-chain image first, ours loads | noise |
+| Depth resolve (`depthresolve_cs`) | +3.7 | −5.1 | same | noise |
+| Depth prepass (Large, Small, Late) | +1.8 | +0.2 | `D32SfloatS8Uint` Load on both | skipped, the opaque pass writes that depth instead |
+| Occlusion cull (`occlusion_cull_cs`) | −22.9 | −10.0 | same | downstream only: unfilled indirect args make the opaque and late prepass draw nothing |
+| Quarter depth (`Quarter Depth Downsample`) | +2.6 | −8.2 | `A2B10G10R10` + `D32Sfloat` 256×192; real also clears that depth and runs two more 256×192 clear passes | noise |
+
+Pass for pass, formats, sizes and load/store ops are real's: the same targets at the same
+resolutions, no MSAA or resolves on either side, the same one colour copy (CMAA2's input). Where
+the captures differ, ours does less (rect clears of cascades and the morph composite, no clear of
+the final target or of the quarter depth, no 256×192 clear passes), except CMAA2's texel words.
+
+CPU-side traffic, from temporary counters on uploads, writes, copies and full clears (not kept),
+MB/frame showroom / skinned: uploads 0.073 / 0.155, buffer writes 0.002 / 0.004, texture writes 0,
+copies 7.86 / 7.86 (CMAA2's colour copy 6.29, texel words 1.57), full clears 13.4 / 60.6 (skinned's
+three cascades 50.3; partial `RectClearer` clears not counted).
+
+Checked for redundant work, none found that is output-identical by construction:
+
+- **Clears overwritten before a read:** none. The view's colour clear is the background; the
+  contact-shadow mask clear stays where the light-facing dispatches don't reach (their grids
+  don't cover the screen), and real clears it too; the final target isn't cleared on ours.
+- **`StoreOp::Discard` on transient targets:** lavapipe renders straight into image memory and
+  ignores store ops, and wgpu marks a discarded texture uninitialized and zero-fills it before its
+  next load: it would add a clear.
+- **Per-frame uploads of unchanged data:** 0.07–0.16 MB/frame in all; nothing to dirty-track.
+- **Copies whose destination is never read:** none; the colour copy is CMAA2's input.
+- **Double staging in `render/batch.rs`:** at most 0.16 MB/frame passes through it.
+
+Medians of the base build in the quiet rounds, showroom / skinned: DRAM 68.8 / 108 MB/frame, engine
+CPU 42.8 / 43.9 ms, lavapipe CPU 66.6 / 55.6 ms, main thread 2.35 / 3.08 ms. Nothing in the engine
+changed, so frames and `run.sh frame` metrics are unchanged.
+
 ## Not changed, and why
 
 - **CMAA2 texel words: the one ours-only hot spot.** `shading/texel_words.rs` copies the
@@ -119,7 +173,11 @@ off as well, so the moved baseline isn't this change. Tests: `tools/test.sh engi
   16.4 → 14.0, real's 13.6. Removing the copies needs the words to be the texels' only home: every
   module touching the image rewritten to words, and clears, copies and samples of the texture
   synced. That is a SPIR-V pass change (PASSES_VERSION) with golden-frame risk for 1.2% of a
-  frame's traffic. Left open.
+  frame's traffic. Left open. Rechecked 2026-11-19 against managed's `Cmaa2Renderer.cs`: the heads
+  are a pooled temporary that passes 0 (clear), 2 (atomics) and 3 (read) use. Words in every pass
+  with an eager store after each writing pass is still two copies; fewer needs a lazy store before
+  any other reader of the texture, and readers reach it through ~35 `texture::resolve` sites,
+  bindless slots and bind groups the cache reuses without resolving again. Not attempted.
 - **Pile's Rapier working set** (+1.8 MB/tick, 0.09 GB/s): no single owner; shrinking it means
   Rapier's layout or our side tables (`step_start`, `frozen`, `sleep_thresholds`, about 0.1 MB in all),
   under the byte-identical `run.sh state` lock. Not attempted.
