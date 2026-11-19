@@ -142,8 +142,16 @@ pub fn program(gpu: &render::Gpu, shader_path: &str, attrs: &[Attrs]) -> Option<
         })
     })();
     let built = built.inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader_path}: {e}"))).ok().map(Arc::new);
-    PROGRAMS.lock().unwrap().entry(shader_path.to_owned()).or_default().insert(ids, (generation, built.clone()));
-    built
+    let mut programs = PROGRAMS.lock().unwrap();
+    let variants = programs.entry(shader_path.to_owned()).or_default();
+    // Gotcha: threads racing to build one variant must all get the first: identity keys caches (shadow_cache.rs).
+    match variants.get(&ids) {
+        Some((built_from, first)) if *built_from == generation => first.clone(),
+        _ => {
+            variants.insert(ids, (generation, built.clone()));
+            built
+        }
+    }
 }
 
 pub type Compute = Shading<render::ComputeProgram>;

@@ -49,8 +49,7 @@ impl Key {
     /// One draw as the GPU sees it: buffers by identity and CPU write count, ranges, uniforms,
     /// state, caster instances, and a material program by identity (its depth variant reads
     /// only positions: the vertex cache's come from the object's pose, keyed by the caller).
-    pub fn draw(&mut self, d: &Draw) {
-        self.pin(&d.vertices);
+    pub fn draw(&mut self, d: &Draw) {        self.pin(&d.vertices);
         self.write_u64(d.vertices.writes());
         (d.vertex_offset, &d.vertex, d.range.clone(), d.base_vertex, d.instances, d.state).hash(self);
         match &d.indices {
