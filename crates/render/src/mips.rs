@@ -27,6 +27,7 @@ impl MipGenerator {
         }
         let key = PipelineKey { color: Some(format), depth: None, vertex: Vec::new(), state: RasterState { depth_write: false, ..Default::default() } };
         let pipeline = self.program.pipeline_for(gpu, &key);
+        t.wrote();
         let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("mips") });
         for mip in 1..t.desc.mips {
             for layer in 0..t.desc.layers.max(1) {

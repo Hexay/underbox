@@ -46,6 +46,7 @@ impl Texture {
 
     fn write_mip(&self, gpu: &Gpu, mip: u32, layers: u32, data: &[u8]) {
         let Some((row, rows)) = self.rows(mip) else { return };
+        self.wrote();
         gpu.queue.write_texture(
             wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: mip, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
             data,
@@ -67,6 +68,7 @@ impl Texture {
     pub fn upload_region(&self, gpu: &Gpu, [x, y, z]: [u32; 3], [w, h, layers]: [u32; 3], data: &[u8]) {
         let Some(texel) = self.texel_size() else { return };
         gpu.flush();
+        self.wrote();
         gpu.queue.write_texture(
             wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z }, aspect: wgpu::TextureAspect::All },
             data,
@@ -119,6 +121,7 @@ impl Texture {
         }
         let view = (layer > 0).then(|| self.layer_target_view(layer));
         let view = view.as_ref().unwrap_or(&self.target_view);
+        self.wrote();
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let format = self.desc.format;
         let color_attachment = [Some(wgpu::RenderPassColorAttachment {
@@ -171,6 +174,7 @@ impl Texture {
         }
         let at = |texture, s: Subresource, x, y| wgpu::TexelCopyTextureInfo { texture, mip_level: s.mip, origin: wgpu::Origin3d { x, y, z: s.layer }, aspect: wgpu::TextureAspect::All };
         let size = wgpu::Extent3d { width: w.next_multiple_of(bw), height: h.next_multiple_of(bh), depth_or_array_layers: layers };
+        dst.wrote();
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_texture(at(&self.texture, src, x, y), at(&dst.texture, to, dx, dy), size);
         gpu.submit(encoder.finish());
@@ -187,6 +191,7 @@ impl Texture {
         fn at(texture: &wgpu::Texture, z: u32) -> wgpu::TexelCopyTextureInfo<'_> {
             wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x: 0, y: 0, z }, aspect: wgpu::TextureAspect::All }
         }
+        dst.wrote();
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_texture(at(&self.texture, 0), at(&dst.texture, layer), extent(a.width, a.height));
         gpu.submit(encoder.finish());

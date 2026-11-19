@@ -85,6 +85,12 @@ impl Deform {
     pub fn casts_shadow(&self) -> bool {
         self.dynamic.is_none()
     }
+
+    /// Drawn from the model's own vertices under the object's transform: no pose, morphs or
+    /// aggregate fragments, so the model's bounds hold it.
+    pub fn rigid(&self) -> bool {
+        self.pose.is_none() && self.morphs.is_none() && self.fragments.is_none() && self.dynamic.is_none()
+    }
 }
 
 /// A scene object's draws, seen through `view_proj`, deformed by `deform`; none without a model

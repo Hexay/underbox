@@ -64,6 +64,7 @@ impl Blitter {
         let state = RasterState { depth_write: false, ..Default::default() };
         let key = PipelineKey { color: Some(format), depth: None, vertex: Vec::new(), state };
         let pipeline = program.pipeline_for(gpu, &key);
+        dst.wrote();
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

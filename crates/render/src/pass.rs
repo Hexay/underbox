@@ -124,6 +124,7 @@ pub fn execute(gpu: &Gpu, placeholder: &Placeholder, targets: &Targets, load: Lo
         depth_ops: Some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear), store }),
         stencil_ops: t.desc.format.has_stencil_aspect().then_some(wgpu::Operations { load: load.depth.map_or(wgpu::LoadOp::Load, |_| wgpu::LoadOp::Clear(0)), store }),
     });
+    targets.color.iter().chain(&targets.depth).for_each(|t| t.wrote());
     let color_count = usize::from(color.is_some());
     let colors = [color];
     let mut encoder = gpu.device.create_command_encoder(&Default::default());

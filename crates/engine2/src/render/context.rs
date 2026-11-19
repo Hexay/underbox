@@ -129,7 +129,7 @@ fn clear_rect(t: &render::Texture, viewport: &RenderViewport, scissor: Option<Na
     [x0, y0, x1.saturating_sub(x0), y1.saturating_sub(y0)]
 }
 
-fn rect_clearer(gpu: &render::Gpu) -> &'static render::RectClearer {
+pub(crate) fn rect_clearer(gpu: &render::Gpu) -> &'static render::RectClearer {
     static CLEARER: std::sync::OnceLock<render::RectClearer> = std::sync::OnceLock::new();
     CLEARER.get_or_init(|| render::RectClearer::new(gpu))
 }

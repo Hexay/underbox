@@ -77,6 +77,7 @@ impl Morpher {
                 (group, vb, ib, indices.len() as u32)
             })
             .collect();
+        target.wrote();
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         {
             let load = if clear { wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT) } else { wgpu::LoadOp::Load };

@@ -82,6 +82,7 @@ fn copy(gpu: &render::Gpu, pairs: &[(Arc<Texture>, wgpu::Buffer)], into_words: b
         if into_words {
             encoder.copy_texture_to_buffer(texels, buffer, size);
         } else {
+            g.wrote();
             encoder.copy_buffer_to_texture(buffer, texels, size);
         }
     }
