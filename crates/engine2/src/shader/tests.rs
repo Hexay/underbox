@@ -96,13 +96,3 @@ fn combo_objects_name_their_feature() {
     assert_eq!(objects::get::<_, schema::ComboInfo>(r).map(|c| c.labels.len()), Some(2));
     objects::destroy(r);
 }
-
-/// The renderer looks shaders up by path every draw; the frame's unload sweep must not drop them.
-#[test]
-fn found_shaders_survive_the_unload_sweep() {
-    let path = "shaders/underbox_test_held.shader";
-    find(path);
-    let held = Arc::downgrade(&by_path(path));
-    resource::unload_unreferenced();
-    assert!(held.upgrade().is_some());
-}

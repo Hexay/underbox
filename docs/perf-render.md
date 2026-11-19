@@ -160,7 +160,7 @@ sampler (the same cascades and taps on both). Showroom, ms per frame:
 
 | Hot spot | Ours | Real | Fix |
 | --- | --- | --- | --- |
-| Main thread reparsing and recompiling ~10 shaders every frame | 155–348 | 3.8 | the renderer holds the shaders it finds (`shader::find`) |
+| Main thread reparsing and recompiling ~10 shaders every frame | 155–348 | 3.8 | fixed on main (bdfb281's regression); measured here with a local fix |
 | Stand-in fragment shader: 96 `vpgatherdd`, real's 14 | 35.8 | ~30 | lights, env maps, decals walked with `ClusterForEach` |
 | `lp_rast_clear_zstencil` | 9.9 | ~5.7 | open: the captures clear the same targets |
 | Cube shadow compares (`z16 t4`) | 2.2 | ~7 | none: real samples point shadows more (output, not cost) |
@@ -170,7 +170,8 @@ sampler (the same cascades and taps on both). Showroom, ms per frame:
   renderer's `shader::find` held nothing, so its shaders went every frame: the next draw reloaded
   the source, the new `Arc` failed the program caches' generation check, and cmaa2, SPD,
   depth resolve, screen-space shadows, occlusion and light culling recompiled (4717 stages in a
-  262-frame run, found by logging `render::Stage::new`). Test: `found_shaders_survive_the_unload_sweep`.
+  262-frame run, found by logging `render::Stage::new`). Main fixes it; this lane's "+ fix" and
+  "After" builds held the shaders in `shader::find` for measurement only.
 - **Gathers.** Lavapipe loads a storage-buffer word with a gather when its index differs per lane.
   The stand-in walked each pixel's cluster per lane and read every light, env map and decal word
   that way. `ClusterForEach` (`WaveActiveMin`, as `vr_lighting.fxc`) makes the item wave-uniform,
@@ -181,7 +182,8 @@ sampler (the same cascades and taps on both). Showroom, ms per frame:
   program caches look up by `&str` without a per-draw key. No change beyond noise (below).
 
 Interleaved `run.sh perf <scene> ours|real`, one run each per round; medians (showroom: base 1
-run, the rest 5, real 3; skinned 3 each). Base is main before this; "+ fix" holds the shaders only.
+run, the rest 5, real 3; skinned 3 each). Base is main with the regression; "+ fix" holds the
+shaders only, so "+ fix" → "After" is this lane's change.
 Load was 35–170.
 
 | Metric | Base | + fix | After | Real | After / real |

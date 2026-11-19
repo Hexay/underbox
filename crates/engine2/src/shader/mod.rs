@@ -23,7 +23,7 @@ use shaders::{IncludePaths, Stage, VfxShader};
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
 
 pub struct Vfx {
@@ -95,18 +95,9 @@ fn resource_path(path: &str) -> String {
 }
 
 /// The shader at a resource path, loaded once; `None` when neither its source nor a `.shader_c`
-/// we can read is on disk (closed core shaders such as `complex`). The renderer's lookups hold
-/// the shader resident: unheld, the frame's unload sweep dropped it, and every frame reparsed it
-/// and recompiled its programs (docs/perf-render.md).
+/// we can read is on disk (closed core shaders such as `complex`).
 pub fn find(path: &str) -> Option<Arc<VfxShader>> {
-    static HELD: LazyLock<Mutex<rustc_hash::FxHashMap<String, Arc<Vfx>>>> = LazyLock::new(Default::default);
-    let held = HELD.lock().unwrap().get(path).cloned();
-    let v = held.unwrap_or_else(|| {
-        let v = by_path(path);
-        HELD.lock().unwrap().insert(path.to_owned(), v.clone());
-        v
-    });
-    v.shader()
+    by_path(path).shader()
 }
 
 fn by_path(path: &str) -> Arc<Vfx> {
