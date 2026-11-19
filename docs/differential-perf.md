@@ -19,7 +19,7 @@ logs, `sample.json` and `load.txt`.
 - **Markers.** `perf.sh` injects `tools/diff/PerfMark.cs` into a scratch copy of the scene
   (`tools/game/prepare.py`, as `state.sh`). It logs its own wall-clock timestamp at scene start
   (`PERF:START`), at every fixed tick after `WARMUP_TICKS` (server), or at the start and end of
-  `FRAMES` frames after `WARMUP_FRAMES` (client). Both engines run the same marker code.
+  `FRAMES` frames after `WARMUP_FRAMES` (300; client). Both engines run the same marker code.
 - **CPU.** `tools/diff/perf_sample.py` finds the `dotnet` process writing the boot's stdout and
   reads every thread's `/proc/<pid>/task/<tid>/schedstat` (nanoseconds of CPU, not wall time) about
   every 1.5 ms, plus `VmRSS`/`VmHWM` every 20 samples. A thread that exits keeps its last reading.

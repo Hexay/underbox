@@ -3,7 +3,7 @@
 # tick or client frame, boot time and memory (docs/differential-perf.md).
 # usage: tools/diff/perf.sh <pile|probe|corpus|game-checkout> [both|ours|real] [artifact-root]   (or tools/diff/run.sh perf ...)
 # Env: REPEATS=5, SIDE=server|client (default: client for showroom and skinned, else server), CPUS=0-7
-# (taskset), LP_NUM_THREADS=4, WARMUP_TICKS=250 TICKS=500, WARMUP_FRAMES=60 FRAMES=200, SECS=300,
+# (taskset), LP_NUM_THREADS=4, WARMUP_TICKS=250 TICKS=500, WARMUP_FRAMES=300 FRAMES=200, SECS=300,
 # SCENE=scenes/x.scene, CONTENT=source (no real core content seeded into ours), GPU=1 (no lavapipe ICD),
 # UNDERBOX_ENGINE2=<libengine2.so> (else a release build), RECORD='<perf record args>' (each run's
 # window into perf.data; tools/diff/perf_attrib.py ranks it).
@@ -49,9 +49,10 @@ prepare() {
     copy=$UNDERBOX_GAME_COPIES/$NAME-perf-$(printf %s "$ROOT" | cksum | cut -d' ' -f1)
     sh "$ROOT/tools/game/copy.sh" "$SRC" "$copy"
     mode=tick; [ "$SIDE" = server ] || mode=frame
+    # R2R code re-JITs at tier 1 for ~6-8 s after boot; fewer warmup frames measure that (docs/perf-boot.md).
     python3 -I "$ROOT/tools/game/prepare.py" "$copy" "${SCENE:-}" "$ROOT/tools/diff/PerfMark.cs" --prop "Mode=$mode" \
         --prop "WarmupTicks=${WARMUP_TICKS:-250}" --prop "Ticks=${TICKS:-500}" \
-        --prop "WarmupFrames=${WARMUP_FRAMES:-60}" --prop "Frames=${FRAMES:-200}"
+        --prop "WarmupFrames=${WARMUP_FRAMES:-300}" --prop "Frames=${FRAMES:-200}"
 }
 
 # boot <engine> <i>: one sampled run; the sampler stays off the engine's cores where it can.
