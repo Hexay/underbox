@@ -57,17 +57,18 @@ pub fn resume(t: &Arc<Texture>, slice: u32) -> Prepared {
 /// Record that `slice` of `t` holds its clear value outside `dirty`, after the prepared clear and
 /// `passes` more writes of ours. A count that doesn't match means another write landed in
 /// between: the layer is forgotten. Other layers of `t` known before stay known, since these
-/// writes touched only `slice`.
-pub fn finish(t: &Arc<Texture>, slice: u32, p: Prepared, passes: u64, dirty: Option<[u32; 4]>) {
-    let Some(g) = &t.gpu else { return };
+/// writes touched only `slice`. Returns whether the count matched.
+pub fn finish(t: &Arc<Texture>, slice: u32, p: Prepared, passes: u64, dirty: Option<[u32; 4]>) -> bool {
+    let Some(g) = &t.gpu else { return false };
     let now = g.writes();
     let mut known = KNOWN.lock().unwrap();
     known.retain(|k| k.texture.strong_count() > 0 && !(k.slice == slice && same(k, t)));
     if Some(now) != p.writes.checked_add(p.ours + passes) {
-        return;
+        return false;
     }
     for k in known.iter_mut().filter(|k| same(k, t) && k.writes == p.writes) {
         k.writes = now;
     }
     known.push(Known { texture: Arc::downgrade(t), slice, writes: now, dirty });
+    true
 }

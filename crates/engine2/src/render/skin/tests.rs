@@ -9,7 +9,7 @@ use glam::Vec3;
 use std::sync::Once;
 
 /// The fixture's compiled files and sbox-public's core shaders, on the search paths.
-pub(super) fn mount() -> Option<()> {
+pub(crate) fn mount() -> Option<()> {
     static MOUNT: Once = Once::new();
     let core = crate::render::shading::tests::core_dir()?;
     MOUNT.call_once(|| {

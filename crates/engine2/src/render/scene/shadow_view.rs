@@ -5,6 +5,7 @@
 //! managed's rasterizer bias, one instanced draw per mesh, scissored to the casters' bounds so
 //! the next frame clears only that rect (render/dirty_clear.rs).
 
+use super::shadow_cache::{self, Key};
 use super::view;
 use crate::frustum::camera::Camera;
 use crate::render::{depth, dirty_clear};
@@ -17,6 +18,7 @@ use abi::{NativeRef, class};
 use glam::{Mat4, Vec2, Vec3, Vec4Swizzles};
 use render::RasterState;
 use render::pass::Load;
+use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 
 /// What one shadow view draws: `required` and `excluded` are `SceneObjectFlags` masks.
@@ -91,7 +93,8 @@ impl Reach {
 }
 
 /// The parent's shadow casters inside `c`, with the view's flag masks, and where they can land.
-fn casters(v: &ShadowView, c: &Camera, view_proj: Mat4) -> (Vec<draw::Draw>, Reach) {
+/// Each caster's object inputs go into `key`.
+fn casters(v: &ShadowView, c: &Camera, view_proj: Mat4, mut key: Option<&mut Key>) -> (Vec<draw::Draw>, Reach) {
     let worlds = view::with(v.parent, |_, s| s.worlds.clone());
     let mut draws = Vec::new();
     let mut reach = Reach::Nothing;
@@ -120,19 +123,38 @@ fn casters(v: &ShadowView, c: &Camera, view_proj: Mat4) -> (Vec<draw::Draw>, Rea
             }
             false => Reach::Anywhere,
         });
+        if let Some(k) = key.as_deref_mut() {
+            k.write_usize(r.addr());
+            deform.hash_inputs(k);
+            k.mat(&model_draw::matrix(&s.transform));
+            k.floats(&model_draw::tint(s.tint));
+            (s.model.addr(), s.mesh_groups, s.lod, flags).hash(k);
+            s.material_override.is_some().hash(k);
+            if let Some(m) = &s.material_override {
+                k.pin(m);
+            }
+        }
         draws.extend(these);
     }
     (draws, reach)
 }
 
+/// [`draw`] with the cache as `UNDERBOX_SHADOW_CACHE` sets it.
+pub fn render(v: &ShadowView) -> bool {
+    draw(v, shadow_cache::enabled())
+}
+
 /// Draw `v` into its target slice: cleared, then every caster, scissored to where they can land.
-pub fn render(v: &ShadowView) {
-    let Some(c) = camera(v.frustum) else { return };
-    let Some(t) = texture::resolve(v.target) else { return };
-    let Some(g) = &t.gpu else { return };
+/// With `cache`, nothing when the slice still holds that render (shadow_cache.rs). Returns
+/// whether it drew.
+pub fn draw(v: &ShadowView, cache: bool) -> bool {
+    let Some(c) = camera(v.frustum) else { return false };
+    let Some(t) = texture::resolve(v.target) else { return false };
+    let Some(g) = &t.gpu else { return false };
     let view_proj = view_proj(&c);
     let state = RasterState { cull: Some(render::wgpu::Face::Back), depth_compare: depth::SHADOW.compare(), depth_bias: depth::SHADOW.bias(v.bias.0, v.bias.1), ..Default::default() };
-    let (draws, reach) = casters(v, &c, view_proj);
+    let mut key = cache.then(shadow_cache::key);
+    let (draws, reach) = casters(v, &c, view_proj, key.as_mut());
     let [x, y, w, h] = draw::viewport_rect(g, &v.viewport);
     let (w, h) = (w.min(g.desc.width.saturating_sub(x)), h.min(g.desc.height.saturating_sub(y)));
     let scissor = reach.texels([x, y, w, h]);
@@ -140,13 +162,39 @@ pub fn render(v: &ShadowView) {
         Some(_) => draws.into_iter().map(|d| draw::Draw { state: RasterState { topology: d.state.topology, ..state }, ..d }).collect(),
         None => Vec::new(),
     };
+    let draws = caster::instanced(draws, view_proj);
+    if let Some(k) = key.as_mut() {
+        k.mat(&view_proj);
+        let vp = &v.viewport;
+        (vp.m_n_top_left_x, vp.m_n_top_left_y, vp.m_n_width, vp.m_n_height, [x, y, w, h], scissor, state, g.desc.format).hash(k);
+        k.floats(&[vp.min_z, vp.max_z]);
+        caster::program().is_some().hash(k);
+        if let Some(p) = caster::program() {
+            k.pin(&p);
+        }
+        draws.iter().for_each(|d| k.draw(d));
+    }
+    if let Some(k) = key.take() {
+        match shadow_cache::holds(&t, v.slice, k) {
+            Ok(()) => {
+                crate::render::stats::drew(&draws);
+                return false;
+            }
+            Err(k) => key = Some(k),
+        }
+    }
+    let before = g.writes();
     let prepared = dirty_clear::prepare(&t, v.slice, render::wgpu::Color::TRANSPARENT, depth::SHADOW.clear());
     let passes = u64::from(prepared.full || !draws.is_empty());
     let scissor_rect = scissor.map(|[x, y, w, h]| NativeRect { x: x as i32, y: y as i32, w: w as i32, h: h as i32 });
     let target = Target { depth: v.target, depth_slice: v.slice, viewport: v.viewport, scissor: scissor_rect, ..Default::default() };
     let load = Load { color: None, depth: prepared.full.then(|| depth::SHADOW.clear()) };
-    draw::execute(&target, &Lighting::default(), load, &caster::instanced(draws, view_proj));
-    dirty_clear::finish(&t, v.slice, prepared, passes, scissor);
+    draw::execute(&target, &Lighting::default(), load, &draws);
+    let ours = dirty_clear::finish(&t, v.slice, prepared, passes, scissor);
+    if let Some(k) = key {
+        shadow_cache::rendered(&t, v.slice, before, ours, k);
+    }
+    true
 }
 
 #[cfg(test)]

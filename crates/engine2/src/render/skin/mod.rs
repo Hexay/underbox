@@ -25,7 +25,7 @@ pub mod native;
 #[cfg(test)]
 mod deform_tests;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use crate::mesh::buffers::VertexBuffer;
 use crate::mesh::layout::{Layout, format};

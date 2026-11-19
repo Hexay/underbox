@@ -32,7 +32,7 @@ fn a_flex_weight_moves_the_morphed_vertex() {
     let (mesh, set) = fixture();
     let w = weights(Some(&set), &["jaw".into()], &[0.25]);
     assert_eq!(w.get("smile"), Some(&0.5));
-    let morphs = ObjectMorphs { object: Weak::new(), key: 1, meshes: vec![w] };
+    let morphs = ObjectMorphs { object: Weak::new(), key: 1, meshes: vec![w], values: Vec::new() };
     let morphed = vertices(&morphs, 0, &mesh).expect("a weighted target morphs");
     assert_eq!(position(&morphed, 1), [1.0, 0.0, 1.5]);
     assert_eq!(position(&morphed, 0), [0.0; 3], "vertices without deltas stay");
@@ -45,10 +45,10 @@ fn a_flex_weight_moves_the_morphed_vertex() {
 fn zero_weight_and_unnamed_targets_leave_the_mesh() {
     let (mesh, set) = fixture();
     for w in [weights(Some(&set), &["jaw".into()], &[0.0]), weights(None, &["brow".into()], &[1.0])] {
-        let morphs = ObjectMorphs { object: Weak::new(), key: 2, meshes: vec![w] };
+        let morphs = ObjectMorphs { object: Weak::new(), key: 2, meshes: vec![w], values: Vec::new() };
         assert!(vertices(&morphs, 0, &mesh).is_none());
     }
     // Without a set, a controller weighs the target of its own name.
-    let morphs = ObjectMorphs { object: Weak::new(), key: 3, meshes: vec![weights(None, &["smile".into()], &[1.0])] };
+    let morphs = ObjectMorphs { object: Weak::new(), key: 3, meshes: vec![weights(None, &["smile".into()], &[1.0])], values: Vec::new() };
     assert_eq!(position(&vertices(&morphs, 0, &mesh).unwrap(), 1), [1.0, 0.0, 3.0]);
 }
