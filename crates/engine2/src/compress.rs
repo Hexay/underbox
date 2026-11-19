@@ -1,5 +1,5 @@
 //! `LZ4Glue`: standard LZ4 block and frame formats (snapshots go to real clients' decoders).
-//! HC levels compress as regular LZ4: same format, lower ratio. TODO: an HC encoder.
+//! HC levels (blocks above 1, frames from 3, as liblz4) use [`crate::compress_hc`].
 
 use abi::slots::lz4_glue as lz4;
 use abi::{RawPtr, Registry, bind};
@@ -25,11 +25,21 @@ pub fn compress_block(src: &[u8], dst: &mut [u8]) -> Option<usize> {
     lz4_flex::block::compress_into(src, dst).ok()
 }
 
+pub fn compress_block_hc(src: &[u8], dst: &mut [u8], level: i32) -> Option<usize> {
+    let packed = crate::compress_hc::compress(src, level);
+    dst.get_mut(..packed.len())?.copy_from_slice(&packed);
+    Some(packed.len())
+}
+
 pub fn decompress_block(src: &[u8], dst: &mut [u8]) -> Option<usize> {
     lz4_flex::block::decompress_into(src, dst).ok()
 }
 
-pub fn compress_frame(src: &[u8]) -> Option<Vec<u8>> {
+/// liblz4's frame API compresses at HC from level 3 (`LZ4HC_CLEVEL_MIN`).
+pub fn compress_frame(src: &[u8], level: i32) -> Option<Vec<u8>> {
+    if level >= 3 {
+        return Some(crate::compress_hc::compress_frame(src, level));
+    }
     let info = FrameInfo::new().content_size(Some(src.len() as u64));
     let mut enc = FrameEncoder::with_frame_info(info, Vec::with_capacity(frame_bound(src.len())));
     enc.write_all(src).ok()?;
@@ -72,11 +82,11 @@ pub fn register(r: &mut Registry) {
     bind!(r, lz4::COMPRESS_FRAME_BOUND, |n| frame_bound(n.max(0) as usize) as i32);
     // SAFETY (all below): managed pins both spans and passes their lengths.
     bind!(r, lz4::COMPRESS, |src, dst, n, cap| len(unsafe { compress_block(bytes(src, n), bytes(dst, cap)) }).max(0));
-    bind!(r, lz4::COMPRESS_HC, |src, dst, n, cap, _level| len(unsafe { compress_block(bytes(src, n), bytes(dst, cap)) }).max(0));
+    bind!(r, lz4::COMPRESS_HC, |src, dst, n, cap, level| len(unsafe { compress_block_hc(bytes(src, n), bytes(dst, cap), level) }).max(0));
     bind!(r, lz4::DECOMPRESS, |src, dst, n, cap| len(unsafe { decompress_block(bytes(src, n), bytes(dst, cap)) }));
-    bind!(r, lz4::COMPRESS_FRAME, |src, dst, n, cap, _level| {
+    bind!(r, lz4::COMPRESS_FRAME, |src, dst, n, cap, level| {
         let (src, dst) = unsafe { (bytes(src, n), bytes(dst, cap)) };
-        match compress_frame(src) {
+        match compress_frame(src, level) {
             Some(f) if f.len() <= dst.len() => {
                 dst[..f.len()].copy_from_slice(&f);
                 f.len() as i32
@@ -111,7 +121,7 @@ mod tests {
     #[test]
     fn frame_round_trip_with_content_size() {
         let src = sample();
-        let frame = compress_frame(&src).unwrap();
+        let frame = compress_frame(&src, 1).unwrap();
         assert!(frame.len() <= frame_bound(src.len()));
         assert_eq!(frame_content_size(&frame), Some(src.len() as u64));
         let mut out = vec![0; src.len()];
@@ -120,10 +130,57 @@ mod tests {
         assert_eq!(frame_content_size(b"not a frame"), None);
     }
 
+    /// Repetitive text with far, near and overlapping matches.
+    fn text() -> Vec<u8> {
+        let words = ["alpha ", "beta ", "gamma ", "delta ", "epsilon ", "zeta "];
+        (0..30_000u32).flat_map(|i| words[(i.wrapping_mul(2_654_435_761) >> 29) as usize % 6].bytes()).chain([b'x'; 300]).collect()
+    }
+
+    #[test]
+    fn hc_blocks_round_trip_smaller_than_plain() {
+        let src = text();
+        let mut plain = vec![0; block_bound(src.len())];
+        let plain = compress_block(&src, &mut plain).unwrap();
+        let mut last = usize::MAX;
+        for level in [2, 9, 12] {
+            let mut packed = vec![0; block_bound(src.len())];
+            let n = compress_block_hc(&src, &mut packed, level).unwrap();
+            let mut out = vec![0; src.len()];
+            assert_eq!(decompress_block(&packed[..n], &mut out), Some(src.len()), "level {level}");
+            assert_eq!(out, src);
+            assert!(n < plain && n <= last, "level {level}: {n} against plain {plain}, previous level {last}");
+            last = n;
+        }
+        for len in 0..40 {
+            let src = &sample()[..len];
+            let mut packed = vec![0; block_bound(len)];
+            let n = compress_block_hc(src, &mut packed, 12).unwrap();
+            let mut out = vec![0; len];
+            assert_eq!(decompress_block(&packed[..n], &mut out), Some(len));
+            assert_eq!(out, src);
+        }
+        assert_eq!(compress_block_hc(&src, &mut [0; 16], 9), None, "too small a destination fails");
+    }
+
+    #[test]
+    fn hc_frames_round_trip_within_bound() {
+        let mut x = 0x1234_5678u32;
+        let noise: Vec<u8> = (0..70_000).map(|_| { x ^= x << 13; x ^= x >> 17; x ^= x << 5; x as u8 }).collect();
+        for src in [text(), sample(), noise, Vec::new()] {
+            let frame = compress_frame(&src, 12).unwrap();
+            assert!(frame.len() <= frame_bound(src.len()));
+            assert_eq!(frame_content_size(&frame), Some(src.len() as u64));
+            let mut out = vec![0; src.len()];
+            assert_eq!(decompress_frame(&frame, &mut out), Some(src.len()));
+            assert_eq!(out, src);
+        }
+        assert!(compress_frame(&text(), 12).unwrap().len() < compress_frame(&text(), 1).unwrap().len());
+    }
+
     #[test]
     fn incompressible_frame_fits_bound() {
         let mut x = 0x1234_5678u32;
         let noise: Vec<u8> = (0..150_000).map(|_| { x ^= x << 13; x ^= x >> 17; x ^= x << 5; x as u8 }).collect();
-        assert!(compress_frame(&noise).unwrap().len() <= frame_bound(noise.len()));
+        assert!(compress_frame(&noise, 1).unwrap().len() <= frame_bound(noise.len()));
     }
 }

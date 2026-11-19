@@ -104,17 +104,22 @@ pub fn register(r: &mut Registry) {
     bind!(r, kv3::GET_MEMBER, |r, i| handle_opt(nth_member(r, i).map(|(_, n)| n)));
     bind!(r, kv3::GET_MEMBER_NAME, |r, i| StrRet::from(nth_member(r, i).map(|(k, _)| k)));
 
-    bind!(r, kv3::SAVE, |r| crate::utl_buffer::create(save(r).into_bytes()));
+    bind!(r, kv3::SAVE, |r| crate::utl_buffer::create(save(r)));
     bind!(r, kv3::SAVE_TO_FILE, |r, path| save_to_file(r, &text(path)));
     glue::register(r);
 }
 
-/// The tree as KV3 text, valid for any KV3 loader. TODO: native's binary auto-compressed encoding.
-pub fn save(r: Ref) -> String {
-    let value = get(r).map_or(kv::Value::Null, |n| to_value(&n));
-    kv::write::kv3(&value)
+fn value(r: Ref) -> kv::Value {
+    get(r).map_or(kv::Value::Null, |n| to_value(&n))
 }
 
+/// `KV3_ENCODING_BINARY_AUTO_COMPRESSED`: binary KV3 v2, LZ4, as real's compiled blocks are
+/// (Model.Save.cs registers it as the CTRL block).
+pub fn save(r: Ref) -> Vec<u8> {
+    assets::kv3bin::write(&value(r), 2, assets::kv3bin::Compression::Lz4)
+}
+
+/// Text: the tools read these files back through `LoadKeyValues3` (Utility.cs).
 fn save_to_file(r: Ref, path: &str) -> bool {
-    !path.is_empty() && get(r).is_some() && std::fs::write(path, save(r)).is_ok()
+    !path.is_empty() && get(r).is_some() && std::fs::write(path, kv::write::kv3(&value(r))).is_ok()
 }

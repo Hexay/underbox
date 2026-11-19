@@ -130,17 +130,30 @@ fn inverse_binds(m: &Model) -> Vec<[f32; 12]> {
         .collect()
 }
 
+/// Bone `bone`'s box over the vertices it weights, in its bind space: (centre, half extent,
+/// farthest vertex from the bone), all zero if it weights none (as real writes them).
+fn bone_box(mesh: &super::mesh::Mesh, bone: usize, inv: &[f32; 12]) -> ([f32; 3], [f32; 3], f32) {
+    let to_bone = |p: [f32; 3]| -> [f32; 3] { std::array::from_fn(|r| inv[r * 4] * p[0] + inv[r * 4 + 1] * p[1] + inv[r * 4 + 2] * p[2] + inv[r * 4 + 3]) };
+    let weighted = mesh.vertices.iter().filter(|v| v.bones.iter().zip(v.weights).any(|(b, w)| usize::from(*b) == bone && w > 0.0));
+    let (mut lo, mut hi, mut radius) = ([f32::MAX; 3], [f32::MIN; 3], 0.0f32);
+    for q in weighted.map(|v| to_bone(v.position)) {
+        lo = std::array::from_fn(|k| lo[k].min(q[k]));
+        hi = std::array::from_fn(|k| hi[k].max(q[k]));
+        radius = radius.max(q.iter().map(|x| x * x).sum::<f32>().sqrt());
+    }
+    if lo[0] > hi[0] {
+        return ([0.0; 3], [0.0; 3], 0.0);
+    }
+    (std::array::from_fn(|k| (lo[k] + hi[k]) * 0.5), std::array::from_fn(|k| (hi[k] - lo[k]) * 0.5), radius)
+}
+
 /// `CRenderMesh::m_skeleton`: real skins vertex blend index `i` (through `m_remappingTable`)
 /// with mesh bone `i`'s inverse bind pose; with no bones it deforms the mesh arbitrarily.
 fn mesh_skeleton(m: &Model, mesh: &super::mesh::Mesh) -> Value {
-    let (lo, hi) = mesh.bounds.unwrap_or(([0.0; 3], [0.0; 3]));
-    let size: [f32; 3] = std::array::from_fn(|i| hi[i] - lo[i]);
-    let radius = size.iter().map(|s| s * s).sum::<f32>().sqrt() * 0.5;
-    let bones = m.bones.iter().zip(inverse_binds(m)).map(|(b, inv)| {
+    let bones = m.bones.iter().zip(inverse_binds(m)).enumerate().map(|(i, (b, inv))| {
         let parent = b.parent.and_then(|p| m.bones.get(p)).map_or("", |p| p.name.as_str());
-        let center = apply(&[[inv[0], inv[1], inv[2]], [inv[4], inv[5], inv[6]], [inv[8], inv[9], inv[10]]], std::array::from_fn(|i| (lo[i] + hi[i]) * 0.5));
-        let center: [f32; 3] = std::array::from_fn(|i| center[i] + inv[i * 4 + 3]);
-        let bbox = obj(vec![("m_vecCenter", floats(&center)), ("m_vecSize", floats(&size))]);
+        let (center, half, radius) = bone_box(mesh, i, &inv);
+        let bbox = obj(vec![("m_vecCenter", floats(&center)), ("m_vecSize", floats(&half))]);
         obj(vec![("m_boneName", text(&b.name)), ("m_parentName", text(parent)), ("m_invBindPose", floats(&inv)), ("m_bbox", bbox), ("m_flSphereRadius", Value::Double(f64::from(radius)))])
     });
     obj(vec![("m_bones", list(bones)), ("m_boneParents", list([])), ("m_nBoneWeightCount", int_value(4))])

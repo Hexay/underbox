@@ -4,7 +4,7 @@
 //! tracing, lightmaps), which answer "none" so managed skips them. Skinning: render/skin.
 
 use crate::render::draw::{self, immediate, model as model_draw};
-use crate::render::{context, device, texture};
+use crate::render::{context, device, texture, texture_ops};
 use crate::scene::object;
 use abi::slots::{g_p_render_device as dev, i_render_context as ctx, render_tools as tools};
 use abi::structs::{NativeRect, RenderViewport, Vector3, Vector4};
@@ -24,14 +24,6 @@ fn copy_from_target(c: context::Ref, dst: texture::Ref, rect: Option<[u32; 4]>, 
 fn rect(r: NativeRect) -> Option<[u32; 4]> {
     let c = |v: i32| v.max(0) as u32;
     Some([c(r.x), c(r.y), c(r.w), c(r.h)])
-}
-
-fn copy_texture(src: texture::Ref, dst: texture::Ref, r: NativeRect, dx: i32, dy: i32) {
-    let (Some(gpu), Some(s), Some(d)) = (device::gpu(), texture::resolve(src), texture::resolve(dst)) else { return };
-    let (Some(a), Some(b)) = (s.gpu.as_ref(), d.gpu.as_ref()) else { return };
-    let r = rect(r).filter(|r| r[2] > 0 && r[3] > 0).unwrap_or([0, 0, a.desc.width, a.desc.height]);
-    // TODO: mip and array slices (always 0 here).
-    a.copy_to(gpu, b, r, (dx.max(0) as u32, dy.max(0) as u32));
 }
 
 /// `BlitTexture`: all of `src` into `viewport` of the bound colour target, scaled and converted
@@ -59,10 +51,8 @@ fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: Raw
     const VISIBLE: i32 = 1;
     const ALPHA_BLENDED: i32 = 2;
     let Some(obj) = object::get(o) else { return NativeRef::NULL };
-    let (m, groups, material_override) = {
-        let s = obj.state.lock().unwrap();
-        (s.model, s.mesh_groups, s.material_override.clone())
-    };
+    let s = obj.state.lock().unwrap().clone();
+    let (m, groups) = (s.model, s.mesh_groups);
     let Some(model) = crate::model::get(m) else { return NativeRef::NULL };
     let mut n = 0;
     for (mi, mm) in model.content.meshes.iter().enumerate() {
@@ -71,8 +61,9 @@ fn scene_object_draw(o: object::Ref, index: i32, mesh: RawPtr<c_void>, call: Raw
         }
         for (ci, dc) in mm.mesh.draw_calls().iter().enumerate() {
             if n == index {
-                // Native's draw states carry a whole-object override (managed's SceneMirror.ApplyMesh).
-                let material = material_override.as_ref().or(dc.material.as_ref());
+                // Native's draw states carry the object's overrides (managed's SceneMirror.ApplyMesh).
+                let material = s.material_for(&model, dc.material.as_ref());
+                let material = material.as_ref();
                 let blends = material.and_then(|m| m.material()).is_some_and(|m| m.blend().is_some());
                 // SAFETY: managed passes three ints on its stack (RenderContext.ReadSceneObjectDraws).
                 unsafe {
@@ -146,9 +137,10 @@ pub fn register(r: &mut Registry) {
         crate::render::submits::log(c, &format!("blit from {}", crate::render::scene::trace::describe(src)));
         blit_texture(c, src, RenderViewport { m_n_top_left_x: x, m_n_top_left_y: y, m_n_width: w, m_n_height: h, ..Default::default() }, srgb)
     });
-    bind!(r, tools::COPY_TEXTURE, |c, src, dst, r, dx, dy, _, _, _, _| {
+    bind!(r, tools::COPY_TEXTURE, |c, src, dst, r, dx, dy, sm, ss, dm, ds| {
         crate::render::submits::log_texture(c, &format!("copy from {}", crate::render::scene::trace::describe(src)), dst);
-        copy_texture(src, dst, r, dx, dy)
+        let r = rect(r).filter(|r| r[2] > 0 && r[3] > 0);
+        texture_ops::copy(src, dst, r, (dx.max(0) as u32, dy.max(0) as u32), [sm, ss, dm, ds]);
     });
     bind!(r, tools::DRAW_SKY_BOX, |c, attrs, mode, _xf, tint, _fog, _, _, _, _| draw_sky_box(c, attrs, mode, tint));
     bind!(r, tools::DRAW_DYNAMIC_SCENE_OBJECT, |c, o, _mode| {
@@ -161,7 +153,6 @@ pub fn register(r: &mut Registry) {
     bind!(r, tools::GET_SCENE_OBJECT_LIGHTMAP_KEY, |_| 0);
     bind!(r, tools::SET_SCENE_OBJECT_LIGHTMAP_ATTRIBUTES, |_, _| false);
     bind!(r, tools::GET_SCENE_WORLD_WIND, |_, s, d| world_wind(s, d));
-    bind!(r, tools::PACK_SCENE_LIGHT, |_, _, _| -1);
     bind!(r, tools::PACK_SCENE_ENV_MAP, |_, _| false);
     bind!(r, tools::GET_LIGHT_PROBE_VOLUME, |_, mins, maxs, priority, _, _| light_probe_volume(mins, maxs, priority));
     bind!(r, tools::SET_LIGHT_PROBE_VOLUME_ATTRIBUTES, |_, _| false);
@@ -187,14 +178,15 @@ pub fn register(r: &mut Registry) {
     bind!(r, ctx::SEMAPHORE_WAIT_AT_BEGIN, |_, _| {});
     bind!(r, ctx::TEXTURE_BARRIER_TRANSITION, |_, _, _, _, _, _, _, _| {});
     bind!(r, ctx::BUFFER_BARRIER_TRANSITION, |_, _, _, _, _, _| {});
-    // TODO: mip generation and uint clears need compute or a blit pass.
-    bind!(r, ctx::GENERATE_MIP_MAPS, |_, _| {});
-    bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, _, _| {});
+    bind!(r, ctx::GENERATE_MIP_MAPS, |_, t| {
+        texture_ops::generate_mips(t);
+    });
+    bind!(r, ctx::CLEAR_TEXTURE_UINT, |_, t, v| {
+        texture_ops::clear_uint(t, v);
+    });
     bind!(r, dev::FIND_OR_CREATE_SAMPLER_STATE, |d| PtrHandle::<abi::handle::SamplerStateHandle_t>::new(crate::render::samplers::find_or_create(d)));
     bind!(r, dev::GET_SAMPLER_INDEX, |h| h.value as i32 - 1);
     bind!(r, dev::GET_TEXTURE_VIEW_INDEX, |t, color_space, _| crate::render::bindless::index(t, color_space == crate::render::bindless::SRGB));
-    bind!(r, dev::GET_SHEET_META_DATA_TEXTURE, || NativeRef::NULL);
-    bind!(r, dev::GET_SHEET_INFO, |_| Vector4::default());
     bind!(r, dev::GET_TEXTURE_RESIDENCY_INFO, |_, _, _| {});
     // Native API objects (VkImage, ID3D12Resource) aren't exposed through wgpu.
     bind!(r, dev::GET_DEVICE_SPECIFIC_INFO, |_| RawPtr::NULL);

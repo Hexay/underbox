@@ -278,3 +278,72 @@ sweeps (2 PGS, 3 stabilization), fitted to real's landings and resting depths. F
 another solver would change behaviour. Within the wrapper, `touches`' GJK pass (0.06 ms) is the
 largest piece; the narrow-phase manifold can't stand in for it, as its distances are from before
 the solver moved the bodies.
+
+## Round 5: ranking
+
+`perf record -e instructions:u -c 500000` on the server over the 500 measured ticks, 12.8 k
+samples. Managed JIT code has no perf map here, so it lands in the CLR bucket.
+
+| Area | Share | Top symbols |
+| --- | --- | --- |
+| Rapier | 47.8% | contact `solve` 13.1%, constraint builder 9.5% (`update_rhs_wo_bias` 4.6, `update` 2.7, `generate` 2.2), `run_worker` 5.3% |
+| Managed and CLR | 35.6% | same on both engines |
+| Pacer | 6.2% | `SDL_DelayPrecise`, tick clock |
+| Wrapper | 5.3% | `World::step` (inlined passes) 2.9%, hashing in per-step maps |
+| Interop | 2.8% | the four hot getters' `read_rb` 2.2% |
+
+Interop is a quarter of round 2's share. In cycles, the getters still cost about 0.15 ms a tick:
+the mutex's locked instructions stall on managed's pending stores.
+
+## Round 5: changes
+
+- **Rapier: one unbiased rhs refresh per substep** (third_party/rapier3d/UNDERBOX.md). Every
+  stabilization sweep recomputed every chunk's unbiased rhs from poses that only move before the
+  first one; sweeps 2 and 3 wrote the same values.
+- **Wrapper: dense per-step lookups** (`physics/src/dense.rs`). `awake`, the step-start
+  velocities, the step-start rotations and shape creation ranks are keyed by the handle's arena
+  index instead of an Fx map; `frozen` and the scratch maps keep their allocations. None of them
+  is iterated, so order can't change.
+- **Getters read a snapshot** (`engine2/src/physics/body_snapshot.rs`). The step publishes each
+  active body's pose, velocities and sleep state; `IsSleeping`, `GetTransform` and the two velocity
+  getters read it without the world lock while no mutable lock happened since. Every mutable lock
+  goes through `PhysicsWorld::sim_mut`, which bumps the epoch (the `sim` field is private).
+  First version, through a `&dyn` accessor, gained no cycles: the accessor ran out of line and its
+  vector was reloaded from the stack in other widths, a store-forwarding stall that also waits on
+  managed's stores. The `BodyRead` enum inlines.
+
+Headless example, instructions for a 750-step run (`perf stat`):
+
+| Build | Keyframed | Static |
+| --- | --- | --- |
+| Before | 5.19 G | 4.55 G |
+| rhs refresh | 4.84 G | 4.27 G |
+| + dense lookups | 4.71 G | 4.15 G |
+
+Server, 4 interleaved rounds per build, instruction samples during the ticks:
+
+| Area | Before | After |
+| --- | --- | --- |
+| Rapier | 5.98–6.12 k | 5.38–5.57 k |
+| Wrapper | 0.63–0.69 k | 0.58–0.61 k |
+| Other engine2 (interop) | 0.35–0.39 k | 0.23–0.30 k |
+
+Getters in cycles (`cycles:u -c 500000`, 3 rounds): 669–917 samples → 362–483; publishing adds
+about 90 to `OnActive` gathering. Tick CPU median, same 4 rounds at load 35–100: before 3.50–4.06
+ms, after 3.33–3.86 ms. The box was too loaded to resolve the ~6% instruction drop in CPU time;
+re-measure on a quiet box.
+
+Behaviour: example hashes unchanged (keyframed `57a4a5e26da5184e` / `5a3c86598a03dbd0`, static
+`0e777ad5c9426843` / `1aa55350fe0e57e3`); `run.sh state` on the pile (9 dumps to tick 750) is
+byte-identical before and after; `tools/test.sh physics` and `tools/test.sh engine2 physics` pass.
+
+## Round 5: tried, not kept
+
+- **Rapier `simd8`** (8 lanes, without AVX target features): hashes change (it bundles
+  constraints differently) and instructions rise 4.71 → 4.87 G.
+- **Rapier has no `simd-stable` feature** in 0.36; the solver is always 4-lane `wide`.
+- **Pacer.** SDL 3.4's `SDL_DelayPrecise` already spins only the worst overshoot of its own 1 ms
+  sleeps, and real calls the same function (round 2: real's spin matches ours). A shorter spin
+  trades wake-up accuracy for CPU; left alone.
+- **`run_worker`'s rest** is the gyroscopic correction, integration and the CCD velocity
+  (`pose_errors`, `atan2f`, about 2% of the example); all of it feeds the result.

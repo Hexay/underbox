@@ -4,6 +4,7 @@
 use abi::{Guid, NativeClass, NativeRef, RawPtr};
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
 struct Handle<T> {
@@ -47,28 +48,80 @@ pub fn binding_ptr<C, T: Send + Sync + 'static>(handle: NativeRef<C>) -> RawPtr<
 }
 
 /// Resources by path, so loading one path twice gives one resource (managed caches wrappers by
-/// binding pointer). Entries stay resident; TODO: unload unreferenced ones.
-pub struct ByName<T>(LazyLock<Mutex<HashMap<String, Arc<T>>>>);
+/// binding pointer). As real's resource system, a resource nothing references any more (no
+/// strong handle, no engine object holding it) is deleted on the next frame update
+/// ([`unload_unreferenced`]); loading its path again reads it afresh. Entries the engine looks up
+/// by name instead of holding ([`ByName::find_or_insert_resident`]) are never unloaded.
+pub struct ByName<T: Send + Sync + 'static> {
+    map: LazyLock<Mutex<HashMap<String, Entry<T>>>>,
+    swept: AtomicBool,
+}
 
-impl<T> ByName<T> {
+struct Entry<T> {
+    resource: Arc<T>,
+    resident: bool,
+}
+
+trait Sweep: Sync {
+    fn sweep(&self) -> usize;
+}
+
+static CACHES: Mutex<Vec<&'static dyn Sweep>> = Mutex::new(Vec::new());
+
+impl<T: Send + Sync + 'static> ByName<T> {
     pub const fn new() -> Self {
-        Self(LazyLock::new(Mutex::default))
+        Self { map: LazyLock::new(Mutex::default), swept: AtomicBool::new(false) }
     }
 
-    pub fn find_or_insert(&self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
-        self.0.lock().unwrap().entry(name.to_ascii_lowercase()).or_insert_with(|| Arc::new(make())).clone()
+    fn map(&'static self) -> std::sync::MutexGuard<'static, HashMap<String, Entry<T>>> {
+        if !self.swept.swap(true, Ordering::Relaxed) {
+            CACHES.lock().unwrap().push(self);
+        }
+        self.map.lock().unwrap()
+    }
+
+    fn entry(&'static self, name: &str, resident: bool, make: impl FnOnce() -> T) -> Arc<T> {
+        let mut map = self.map();
+        let entry = map.entry(name.to_ascii_lowercase()).or_insert_with(|| Entry { resource: Arc::new(make()), resident });
+        entry.resident |= resident;
+        entry.resource.clone()
+    }
+
+    pub fn find_or_insert(&'static self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
+        self.entry(name, false, make)
+    }
+
+    /// As [`Self::find_or_insert`], and keeps the resource loaded from now on: for callers that
+    /// look it up by name each time and key their own caches on its identity.
+    pub fn find_or_insert_resident(&'static self, name: &str, make: impl FnOnce() -> T) -> Arc<T> {
+        self.entry(name, true, make)
     }
 
     /// Make `resource` the one `name` finds from now on.
-    pub fn insert(&self, name: &str, resource: Arc<T>) {
-        self.0.lock().unwrap().insert(name.to_ascii_lowercase(), resource);
+    pub fn insert(&'static self, name: &str, resource: Arc<T>) {
+        self.map().insert(name.to_ascii_lowercase(), Entry { resource, resident: false });
     }
 }
 
-impl<T> Default for ByName<T> {
+impl<T: Send + Sync + 'static> Default for ByName<T> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+impl<T: Send + Sync + 'static> Sweep for ByName<T> {
+    fn sweep(&self) -> usize {
+        // Dropped unlocked: a resource's drop may release others of its type.
+        let unreferenced = |_: &String, e: &mut Entry<T>| !e.resident && Arc::strong_count(&e.resource) == 1;
+        let gone: Vec<Entry<T>> = self.map.lock().unwrap().extract_if(unreferenced).map(|(_, e)| e).collect();
+        gone.len()
+    }
+}
+
+/// Drop every cached resource only its cache still holds; how many went.
+pub fn unload_unreferenced() -> usize {
+    let caches = CACHES.lock().unwrap().clone();
+    caches.iter().map(|c| c.sweep()).sum()
 }
 
 /// What every resource type answers about itself through its handles.
@@ -100,4 +153,42 @@ macro_rules! bind_resource_handle {
         abi::bind!($r, m::GET_BINDING_PTR, resource::binding_ptr::<_, $ty>);
         abi::bind!($r, m::GET_GUID, |h| resource::resolve::<_, $ty>(h).map(|r| r.guid()).unwrap_or_default());
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    static LOADED: ByName<usize> = ByName::new();
+    static LOADS: AtomicUsize = AtomicUsize::new(0);
+
+    fn load() -> NativeRef<abi::class::CModel> {
+        new_handle(LOADED.find_or_insert("Res", || LOADS.fetch_add(1, Ordering::Relaxed)))
+    }
+
+    /// Resident while any handle holds it; the frame after the last one goes, a load reads it afresh.
+    #[test]
+    fn unreferenced_resources_unload() {
+        let (a, b) = (load(), load());
+        assert_eq!(LOADS.load(Ordering::Relaxed), 1);
+        assert_eq!(binding_ptr::<_, usize>(a).as_ptr(), binding_ptr::<_, usize>(b).as_ptr());
+        destroy_handle(a);
+        assert_eq!(LOADED.sweep(), 0, "b still holds it");
+        destroy_handle(b);
+        assert_eq!(LOADED.sweep(), 1);
+        let c = load();
+        assert_eq!(LOADS.load(Ordering::Relaxed), 2, "loaded afresh");
+        destroy_handle(c);
+    }
+
+    static ENGINE_HELD: ByName<usize> = ByName::new();
+
+    #[test]
+    fn resident_resources_stay_loaded() {
+        let first = ENGINE_HELD.find_or_insert_resident("Res", || 1);
+        drop(first);
+        assert_eq!(ENGINE_HELD.sweep(), 0);
+        assert_eq!(*ENGINE_HELD.find_or_insert("res", || 2), 1, "same resource, not reloaded");
+    }
 }

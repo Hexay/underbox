@@ -90,21 +90,48 @@ pub fn srgb_write(r: Ref) -> bool {
     with(r, |b| b.srgb_write)
 }
 
-/// TODO: clears cover the whole target; a viewport or scissor smaller than it needs a quad draw.
-/// Depth clears to 0, the far plane: every view is reverse-Z, as native's.
+/// Clears the bound targets within the viewport and scissor. Depth clears to 0, the far plane:
+/// every view is reverse-Z, as native's.
 pub(crate) fn clear(r: Ref, color: Vector4, clear_color: bool, clear_depth: bool, _clear_stencil: bool) {
     let Some(gpu) = device::gpu() else { return };
-    let (target, depth, slice) = with(r, |b| (b.color, b.depth, b.depth_slice));
+    let (target, depth, slice, viewport, scissor) = with(r, |b| (b.color, b.depth, b.depth_slice, b.viewport, b.scissor));
     crate::render::submits::log(r, &format!("clear color {clear_color} depth {clear_depth}"));
     let v = color.vec;
     let rgba = render::wgpu::Color { r: v.x.into(), g: v.y.into(), b: v.z.into(), a: v.w.into() };
-    let gpu_of = |t: Option<texture::Ref>| t.and_then(texture::resolve);
-    if clear_color && let Some(t) = gpu_of(target) && let Some(tex) = &t.gpu {
-        tex.clear(gpu, rgba, 1.0);
+    let clear_in = |t: Option<texture::Ref>, depth: f32, layer: u32| {
+        let Some(t) = t.and_then(texture::resolve) else { return };
+        let Some(tex) = &t.gpu else { return };
+        let rect = clear_rect(tex, &viewport, scissor);
+        if rect[2] == 0 || rect[3] == 0 {
+            return;
+        }
+        let partial = rect != [0, 0, tex.desc.width, tex.desc.height] && rect_clearer(gpu).clear(gpu, tex, layer, rect, rgba, depth);
+        if !partial {
+            tex.clear_layer(gpu, rgba, depth, layer);
+        }
+    };
+    if clear_color {
+        clear_in(target, 1.0, 0);
     }
-    if clear_depth && let Some(t) = gpu_of(depth) && let Some(tex) = &t.gpu {
-        tex.clear_layer(gpu, rgba, crate::render::depth::VIEW.clear(), slice);
+    if clear_depth {
+        clear_in(depth, crate::render::depth::VIEW.clear(), slice);
     }
+}
+
+/// The viewport (an empty one is the whole target) within the scissor, clamped to `t`.
+fn clear_rect(t: &render::Texture, viewport: &RenderViewport, scissor: Option<NativeRect>) -> [u32; 4] {
+    let [x, y, w, h] = crate::render::draw::viewport_rect(t, viewport);
+    let (mut x0, mut y0, mut x1, mut y1) = (x, y, (x + w).min(t.desc.width), (y + h).min(t.desc.height));
+    if let Some(s) = scissor.filter(|s| s.w > 0 && s.h > 0) {
+        let (sx, sy) = (s.x.max(0) as u32, s.y.max(0) as u32);
+        (x0, y0, x1, y1) = (x0.max(sx), y0.max(sy), x1.min(sx + s.w as u32), y1.min(sy + s.h as u32));
+    }
+    [x0, y0, x1.saturating_sub(x0), y1.saturating_sub(y0)]
+}
+
+fn rect_clearer(gpu: &render::Gpu) -> &'static render::RectClearer {
+    static CLEARER: std::sync::OnceLock<render::RectClearer> = std::sync::OnceLock::new();
+    CLEARER.get_or_init(|| render::RectClearer::new(gpu))
 }
 
 fn set_viewport(r: Ref, x: i32, y: i32, w: i32, h: i32) {

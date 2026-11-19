@@ -18,7 +18,8 @@ fn model_round_trips_in_every_packing() {
             assert_eq!((&g.mesh.indices, &g.mesh.draws, g.mesh.bounds), (&w.mesh.indices, &w.mesh.draws, w.mesh.bounds), "{packing:?}");
         }
         assert_eq!(got.physics, want.physics);
-        assert_eq!(model::Model { meshes: vec![], physics: None, ..got }, model::Model { meshes: vec![], physics: None, ..want.clone() });
+        // Bone boxes are derived on write (rigged_tests).
+        assert_eq!(model::Model { meshes: vec![], physics: None, bone_bounds: vec![], ..got }, model::Model { meshes: vec![], physics: None, ..want.clone() });
     }
 }
 

@@ -64,9 +64,8 @@ fn register_wheel(r: &mut Registry) {
     // Spin is about frame X; steering is the twist about frame Z.
     bind!(r, j::WHEEL_GET_SPIN_SPEED, |r| with_sim(r, |sim, id| sim.joint_relative_spin(id).x));
     bind!(r, j::WHEEL_GET_STEERING_ANGLE, |r| with_sim(r, |sim, id| sim.joint_angle(id)));
-    // TODO: per-axis motor torques; the joint's total angular impulse stands in for both.
-    bind!(r, j::WHEEL_GET_SPIN_TORQUE, |r| with_sim(r, |sim, id| sim.joint_impulses(id).1));
-    bind!(r, j::WHEEL_GET_STEERING_TORQUE, |r| with_sim(r, |sim, id| sim.joint_impulses(id).1));
+    bind!(r, j::WHEEL_GET_SPIN_TORQUE, |r| with_sim(r, |sim, id| sim.wheel_torques(id).0));
+    bind!(r, j::WHEEL_GET_STEERING_TORQUE, |r| with_sim(r, |sim, id| sim.wheel_torques(id).1));
 }
 
 pub fn register(r: &mut Registry) {

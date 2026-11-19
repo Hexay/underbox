@@ -30,6 +30,25 @@ fn clear_bound_target_reads_back() {
 }
 
 #[test]
+fn clears_keep_to_the_viewport_and_scissor() {
+    gpu();
+    let target = render_target(16);
+    let r = create(0);
+    bind_targets(r, target, NativeRef::default());
+    let rgba = |x, y, z| Vector4 { vec: System_Numerics_Vector4 { x, y, z, w: 1.0 } };
+    clear(r, rgba(0.0, 0.0, 0.0), true, false, false);
+    set_viewport(r, 4, 4, 8, 8);
+    clear(r, rgba(1.0, 0.0, 0.0), true, false, false);
+    with(r, |b| b.scissor = Some(NativeRect { x: 0, y: 0, w: 6, h: 16 }));
+    clear(r, rgba(0.0, 0.0, 1.0), true, false, false);
+    let frame = texture::resolve(target).unwrap().gpu.as_ref().unwrap().read_back(gpu());
+    for (x, y, want) in [(3, 3, [0, 0, 0, 255]), (12, 12, [0, 0, 0, 255]), (11, 11, [255, 0, 0, 255]), (6, 4, [255, 0, 0, 255]), (5, 4, [0, 0, 255, 255]), (5, 3, [0, 0, 0, 255])] {
+        assert_eq!(frame.texel(x, y), want, "({x}, {y})");
+    }
+    release(r);
+}
+
+#[test]
 fn viewport_round_trips() {
     let r = create(0);
     set_viewport(r, 1, 2, 30, 40);

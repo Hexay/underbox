@@ -23,7 +23,12 @@ struct Params {
     vectors: HashMap<String, Vector4>,
     textures: HashMap<String, Texture>,
     edited: bool,
+    /// [`Material::shading_params`], until [`params`] next touches them.
+    shading: Option<Arc<ShadingParams>>,
 }
+
+/// Texture params by attribute (`g_tColor`) and vector params by name.
+pub type ShadingParams = (HashMap<String, texture::Ref>, HashMap<String, glam::Vec4>);
 
 pub struct Material {
     name: String,
@@ -44,15 +49,30 @@ impl Resource for Material {
 }
 
 impl Material {
+    /// Attribute `t`: its render attributes, else a vector param of that name.
+    pub fn attribute(&self, t: abi::StringToken) -> Option<f32> {
+        // Managed's `Material.Flags.IsTranslucent` reads this.
+        if t == abi::StringToken::of("translucent") {
+            return Some(f32::from(u8::from(self.blend().is_some())));
+        }
+        let own = attributes::token_value(self.attributes, t).map(|v| v.x);
+        own.or_else(|| self.params.lock().unwrap().vectors.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, v)| v.vec.x))
+    }
+
     pub fn shader(&self) -> &str {
         &self.shader
     }
 
-    /// Texture params by attribute (`g_tColor`) and vector params by name, for a draw's binding.
-    pub fn shading_params(&self) -> (HashMap<String, texture::Ref>, HashMap<String, glam::Vec4>) {
-        let p = self.params.lock().unwrap();
+    /// The params a draw binds, built once per change rather than per draw.
+    pub fn shading_params(&self) -> Arc<ShadingParams> {
+        let mut p = self.params.lock().unwrap();
+        if let Some(s) = &p.shading {
+            return s.clone();
+        }
         let vectors = p.vectors.iter().map(|(k, v)| (k.clone(), glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, v.vec.w))).collect();
-        (p.textures.clone(), vectors)
+        let s = Arc::new((p.textures.clone(), vectors));
+        p.shading = Some(s.clone());
+        s
     }
 
     /// How a translucent material blends (its `F_TRANSLUCENT` / `F_ADDITIVE_BLEND` feature);
@@ -147,7 +167,11 @@ fn on<R: Default>(h: Ref, f: impl FnOnce(&Material) -> R) -> R {
 }
 
 fn params<R: Default>(h: Ref, f: impl FnOnce(&mut Params) -> R) -> R {
-    on(h, |mat| f(&mut mat.params.lock().unwrap()))
+    on(h, |mat| {
+        let mut p = mat.params.lock().unwrap();
+        p.shading = None;
+        f(&mut p)
+    })
 }
 
 /// `IMaterial2::Set( name, texture )`: the material keeps its own copy of the handle.
@@ -234,12 +258,6 @@ pub(crate) fn first_texture(h: Ref) -> Texture {
 #[path = "material_tests.rs"]
 mod tests;
 
-/// Attribute `t` of a material: its render attributes, else a vector param of that name.
 fn value(h: Ref, t: abi::StringToken) -> Option<f32> {
-    // Managed's `Material.Flags.IsTranslucent` reads this.
-    if t == abi::StringToken::of("translucent") {
-        return Some(on(h, |mat| f32::from(u8::from(mat.blend().is_some()))));
-    }
-    let own = on(h, |mat| attributes::token_value(mat.attributes, t).map(|v| v.x));
-    own.or_else(|| params(h, |p| p.vectors.iter().find(|(k, _)| abi::StringToken::of(k) == t).map(|(_, v)| v.vec.x)))
+    on(h, |mat| mat.attribute(t))
 }

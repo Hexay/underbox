@@ -33,6 +33,7 @@ pub struct State {
     pub model: NativeRef<class::CModel>,
     /// Every mesh draws with this instead of its own material (`SetMaterialOverrideForMeshInstances`).
     pub material_override: Option<Arc<crate::mesh::material_ref::MaterialRef>>,
+    pub materials: super::material_overrides::Overrides,
 }
 
 /// `SceneObjectFlags.IsOpaque`.
@@ -58,7 +59,12 @@ impl State {
         if self.model.is_null() {
             return self.flags;
         }
-        self.flags | crate::render::draw::model::surface_flags(self.model, self.mesh_groups, self.material_override.as_ref())
+        self.flags | crate::render::draw::model::surface_flags(self)
+    }
+
+    /// What a draw call of `model` whose own material is `own` draws with.
+    pub fn material_for(&self, model: &crate::model::Model, own: Option<&Arc<crate::mesh::material_ref::MaterialRef>>) -> Option<Arc<crate::mesh::material_ref::MaterialRef>> {
+        self.material_override.clone().or_else(|| self.materials.resolve(model, own))
     }
 }
 
@@ -84,6 +90,7 @@ impl Default for State {
             layer_match: 0,
             model: NativeRef::NULL,
             material_override: None,
+            materials: Default::default(),
         }
     }
 }

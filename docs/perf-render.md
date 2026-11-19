@@ -150,6 +150,58 @@ frames, against real 0.03 / 0.17 / 0.34, SSIM 0.9998 (skinned) and 0.07 / 0.23 /
 Tried, not kept: an upload-buffer ring (a frame overflowing one 4 MB chunk would get a new
 buffer each frame). No frame overflowed, and the miss count didn't move.
 
+## Shader reloads and wave-uniform cluster walks
+
+Raster per JIT function: `perf record -p <client>` over the PerfMark window on the Mesa `PROFILE`
+build, ms per frame = samples / 499 Hz / frames. The client needs `PERF_BUILDID_DIR` in its
+environment, or lavapipe writes no perf map. Real under that build compiles inside the window and
+never reaches `PERF:END`, so its column is its 15 s share scaled to ours by the shadow-compare
+sampler (the same cascades and taps on both). Showroom, ms per frame:
+
+| Hot spot | Ours | Real | Fix |
+| --- | --- | --- | --- |
+| Main thread reparsing and recompiling ~10 shaders every frame | 155–348 | 3.8 | fixed on main (bdfb281's regression); measured here with a local fix |
+| Stand-in fragment shader: 96 `vpgatherdd`, real's 14 | 35.8 | ~30 | lights, env maps, decals walked with `ClusterForEach` |
+| `lp_rast_clear_zstencil` | 9.9 | ~5.7 | open: the captures clear the same targets |
+| Cube shadow compares (`z16 t4`) | 2.2 | ~7 | none: real samples point shadows more (output, not cost) |
+| Final blit, `r16g16b16a16_float` key 20 | 1.25 | ~0.8 | open |
+
+- **The regression.** The resource-unload merge sweeps every `ByName` cache each frame. The
+  renderer's `shader::find` held nothing, so its shaders went every frame: the next draw reloaded
+  the source, the new `Arc` failed the program caches' generation check, and cmaa2, SPD,
+  depth resolve, screen-space shadows, occlusion and light culling recompiled (4717 stages in a
+  262-frame run, found by logging `render::Stage::new`). Main fixes it; this lane's "+ fix" and
+  "After" builds held the shaders in `shader::find` for measurement only.
+- **Gathers.** Lavapipe loads a storage-buffer word with a gather when its index differs per lane.
+  The stand-in walked each pixel's cluster per lane and read every light, env map and decal word
+  that way. `ClusterForEach` (`WaveActiveMin`, as `vr_lighting.fxc`) makes the item wave-uniform,
+  so its words load once. The binner lists items ascending, so each lane sums in the same order:
+  frames are byte-identical. The fragment shader went from 2.25× to 1.52× the shadow-compare
+  sampler's time (real 1.90).
+- **Main thread.** Material params are built once per change instead of cloned per draw, and the
+  program caches look up by `&str` without a per-draw key. No change beyond noise (below).
+
+Interleaved `run.sh perf <scene> ours|real`, one run each per round; medians (showroom: base 1
+run, the rest 5, real 3; skinned 3 each). Base is main with the regression; "+ fix" holds the
+shaders only, so "+ fix" → "After" is this lane's change.
+Load was 35–170.
+
+| Metric | Base | + fix | After | Real | After / real |
+| --- | --- | --- | --- | --- | --- |
+| showroom lavapipe | 110 | 113 | 104 | 118 | 0.88 |
+| showroom engine | 223 | 73.0 | 79.7 | 83.6 | 0.95 |
+| showroom main thread | 155 | 3.85 | 3.87 | 3.78 | 1.02 |
+| skinned lavapipe | 90.3 | 91.8 | 84.0 | 94.5 | 0.89 |
+| skinned engine | 366 | 78.6 | 74.1 | 95.1 | 0.78 |
+| skinned main thread | 289 | 5.19 | 5.08 | 4.50 | 1.13 |
+
+- Frames are unchanged: every golden frame passes (the base's hashes), so `run.sh frame` metrics
+  equal docs/differential-render.md's latest column.
+- Negative: one `run.sh gpu showroom ours` boot hung after 14 frames on the "+ fix" build; base and
+  the final build captured. Not reproduced.
+- Open: the depth clears cost ours ~1.7× real's for the same passes in the capture; the main
+  thread's remaining 13% on skinned is flat (malloc, `StringToken::of`, attribute walk).
+
 ## Left, and negative results
 
 - **Skinned raster is within noise of real.** About 1 ms is left in the blit's nearest sample

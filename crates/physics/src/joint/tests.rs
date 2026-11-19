@@ -157,6 +157,25 @@ fn spring_settles_near_rest_length_and_filter_disables_contact() {
     assert!(world.body(ball).unwrap().translation().z < -10.0, "filtered pair passes through");
 }
 
+/// Saturated spin and steering motors each report their own max torque.
+#[test]
+fn wheel_reports_spin_and_steering_torques_per_axis() {
+    let mut world = World::default();
+    world.set_gravity(Vector::ZERO);
+    let (a, b) = arm(&mut world);
+    let id = world.add_joint(a, b, Joint::new(JointKind::Wheel, Pose::IDENTITY, Pose::from_translation(Vector::new(-20.0, 0.0, 0.0)))).unwrap();
+    world.update_joint(id, |j| {
+        j.wheel.spin_motor = true;
+        (j.wheel.spin_speed, j.wheel.max_spin_torque) = (50.0, 30.0);
+        j.wheel.steering = true;
+        (j.wheel.steering_hertz, j.wheel.steering_damping, j.wheel.max_steering_torque) = (5.0, 1.0, 10.0);
+        j.wheel.target_steering = 1.0;
+    });
+    run(&mut world, 2);
+    let (spin, steer) = world.wheel_torques(id);
+    assert!((spin - 30.0).abs() < 0.3 && (steer - 10.0).abs() < 0.1, "spin {spin}, steering {steer}");
+}
+
 #[test]
 fn removing_a_body_drops_its_joints() {
     let mut world = World::default();

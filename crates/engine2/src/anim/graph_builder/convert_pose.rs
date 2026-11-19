@@ -22,7 +22,10 @@ impl<'a> Conv<'a> {
         if !self.visiting.insert(i) {
             return self.def.add_pose(PoseNode::Reference);
         }
-        let p = self.pose_node(n);
+        let p = match self.graph_slot(i as i64) {
+            Some(slot) => self.external(slot, n),
+            None => self.pose_node(n),
+        };
         self.visiting.remove(&i);
         self.poses.insert(i, p);
         p

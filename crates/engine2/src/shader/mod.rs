@@ -96,17 +96,21 @@ fn resource_path(path: &str) -> String {
 
 /// The shader at a resource path, loaded once; `None` when neither its source nor a `.shader_c`
 /// we can read is on disk (closed core shaders such as `complex`).
+/// Resident: the renderer looks shaders up by path every draw and keys its programs on identity.
 pub fn find(path: &str) -> Option<Arc<VfxShader>> {
-    by_path(path).shader()
+    let path = resource_path(path);
+    LOADED.find_or_insert_resident(&path, || open(&path)).shader()
 }
 
 fn by_path(path: &str) -> Arc<Vfx> {
     let path = resource_path(path);
-    LOADED.find_or_insert(&path, || {
-        let v = Vfx::new(path.clone(), Some(path.clone()));
-        load(&v, &path);
-        v
-    })
+    LOADED.find_or_insert(&path, || open(&path))
+}
+
+fn open(path: &str) -> Vfx {
+    let v = Vfx::new(path.to_string(), Some(path.to_string()));
+    load(&v, path);
+    v
 }
 
 /// `GetShader`: as [`by_path`], reloading a shader whose `.shader_c` changed since (a recompile

@@ -157,6 +157,8 @@ pub(crate) struct Entry {
     pub joint: Joint,
     pub linear_impulse: f32,
     pub angular_impulse: f32,
+    /// Each Rapier axis's motor torque or force (`JointAxis` order).
+    pub motor: [f32; 6],
 }
 
 #[derive(Default)]
@@ -172,7 +174,7 @@ impl World {
         self.body(b)?;
         let data = build::rapier(&joint, self.bodies_pair(a, b));
         let id = self.raw_mut().insert_impulse_joint(a, b, data);
-        self.joints.entries.insert(id, Entry { joint, linear_impulse: 0.0, angular_impulse: 0.0 });
+        self.joints.entries.insert(id, Entry { joint, linear_impulse: 0.0, angular_impulse: 0.0, motor: [0.0; 6] });
         self.refresh_body_hooks(a);
         self.refresh_body_hooks(b);
         Some(id)
@@ -222,6 +224,12 @@ impl World {
         self.joints.entries.get(&id).map_or((0.0, 0.0), |e| (e.linear_impulse, e.angular_impulse))
     }
 
+    /// The wheel motors' last torques, Box3D's sign: (spin about frame X, steering about frame Z).
+    pub fn wheel_torques(&self, id: JointId) -> (f32, f32) {
+        // Rapier's motor impulse opposes its drive; spin is about −AngZ, steering AngX (build.rs).
+        self.joints.entries.get(&id).map_or((0.0, 0.0), |e| (e.motor[5], -e.motor[3]))
+    }
+
     /// Hinge angle, or twist for other joints: frame2's rotation about frame1's axis.
     pub fn joint_angle(&self, id: JointId) -> f32 {
         let (Some(joint), Some((a, b))) = (self.joint(id), self.joint_bodies(id)) else { return 0.0 };
@@ -266,12 +274,15 @@ impl World {
     /// After a substep of `dt`: record joint impulses and break any over its strength.
     pub(crate) fn measure_joints(&mut self, substeps: u32) {
         let mut broken = Vec::new();
+        let p = &self.inner.integration_parameters;
+        let inv_h = p.num_solver_iterations as f32 / p.dt.max(f32::EPSILON);
         for (h, j) in self.inner.impulse_joints.iter() {
             let Some(entry) = self.joints.entries.get_mut(&h) else { continue };
             let i = j.impulses;
             let linear = Vector::new(i[0], i[1], i[2]).length() * substeps as f32;
             let angular = Vector::new(i[3], i[4], i[5]).length() * substeps as f32;
             (entry.linear_impulse, entry.angular_impulse) = (linear, angular);
+            entry.motor = std::array::from_fn(|k| j.data.motors[k].impulse * inv_h);
             let over = |max: f32, v: f32| max > 0.0 && v > max;
             if over(entry.joint.max_linear_impulse, linear) || over(entry.joint.max_angular_impulse, angular) {
                 broken.push((h, j.data.user_data));

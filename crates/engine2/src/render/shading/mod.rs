@@ -16,6 +16,7 @@ pub mod sampler_state;
 mod stages;
 pub mod standin;
 pub mod texel_words;
+mod texture_dim;
 pub mod vertex;
 pub mod view;
 pub mod view_space;
@@ -34,19 +35,19 @@ pub(crate) mod tests;
 
 pub use program::Shading;
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 static COMPILER: LazyLock<Option<shaders::Compiler>> = LazyLock::new(|| {
     shaders::Compiler::new().inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("shader compiler: {e}"))).ok()
 });
 
-/// The path and each program's combo ids ([`variants`]).
-type Key = (String, Vec<(u64, u64)>);
 type Attrs = crate::render::attributes::Ref;
-/// Programs by key, with the [`generation`] of the source they were built from.
+/// Programs by path, then by each program's combo ids ([`variants`]), with the [`generation`] of
+/// the source they were built from. Looked up per draw, so a hit allocates no key.
 type Cached = (Generation, Option<Arc<Shading>>);
-static PROGRAMS: LazyLock<Mutex<HashMap<Key, Cached>>> = LazyLock::new(Default::default);
+type ByVariants = HashMap<Vec<(u64, u64)>, Cached>;
+static PROGRAMS: LazyLock<Mutex<HashMap<String, ByVariants>>> = LazyLock::new(Default::default);
 
 /// The loaded source a shader path has: `GetShader` reloading a changed `.shader_c` swaps the
 /// shader's source `Arc`, so a cached program built from another one is stale. Held (not its
@@ -124,8 +125,7 @@ fn keyed_source(shader_path: &str, generation: &Generation) -> Option<Arc<shader
 pub fn program(gpu: &render::Gpu, shader_path: &str, attrs: &[Attrs]) -> Option<Arc<Shading>> {
     let generation = generation(shader_path);
     let ids = keyed_source(shader_path, &generation).map(|s| variants(&s, attrs)).unwrap_or_default();
-    let key = (shader_path.to_owned(), ids);
-    if let Some((built_from, cached)) = PROGRAMS.lock().unwrap().get(&key)
+    if let Some((built_from, cached)) = PROGRAMS.lock().unwrap().get(shader_path).and_then(|m| m.get(&ids))
         && *built_from == generation
     {
         return cached.clone();
@@ -142,7 +142,7 @@ pub fn program(gpu: &render::Gpu, shader_path: &str, attrs: &[Attrs]) -> Option<
         })
     })();
     let built = built.inspect_err(|e| abi::rt::log::log(abi::rt::log::Level::Warn, &format!("{shader_path}: {e}"))).ok().map(Arc::new);
-    PROGRAMS.lock().unwrap().insert(key, (generation, built.clone()));
+    PROGRAMS.lock().unwrap().entry(shader_path.to_owned()).or_default().insert(ids, (generation, built.clone()));
     built
 }
 
@@ -159,14 +159,14 @@ pub fn compute(gpu: &render::Gpu, shader_path: &str, attrs: &[crate::render::att
 
 fn compute_for(gpu: &render::Gpu, shader_path: &str, attrs: &[crate::render::attributes::Ref], storage: &[program::StorageFormat]) -> Result<Arc<Compute>, String> {
     type Built = Result<Arc<Compute>, String>;
-    static COMPUTE: LazyLock<Mutex<HashMap<Key, (Generation, Built)>>> = LazyLock::new(Default::default);
+    type Variants = HashMap<(u64, u64, Vec<program::StorageFormat>), (Generation, Built)>;
+    static COMPUTE: LazyLock<Mutex<HashMap<String, Variants>>> = LazyLock::new(Default::default);
     let generation = generation(shader_path);
-    let shader = source(shader_path)?;
+    let shader = keyed_source(shader_path, &generation).ok_or("shader not found")?;
     let cs = shader.programs.iter().find(|p| p.stage == shaders::Stage::Cs).ok_or("no CS program")?;
-    let name = if storage.is_empty() { shader_path.to_owned() } else { format!("{shader_path} {storage:?}") };
     let (statics, dynamics) = combo_ids(cs, attrs);
-    let key = (name, vec![(statics, dynamics)]);
-    if let Some((built_from, cached)) = COMPUTE.lock().unwrap().get(&key)
+    let key = (statics, dynamics, storage.to_vec());
+    if let Some((built_from, cached)) = COMPUTE.lock().unwrap().get(shader_path).and_then(|m| m.get(&key))
         && *built_from == generation
     {
         return cached.clone();
@@ -176,6 +176,6 @@ fn compute_for(gpu: &render::Gpu, shader_path: &str, attrs: &[crate::render::att
         program::build_compute_for(gpu, compiler, &shader, shader_path, &shaders::Variant::new(statics, dynamics), storage)
     })()
     .map(Arc::new);
-    COMPUTE.lock().unwrap().insert(key, (generation, built.clone()));
+    COMPUTE.lock().unwrap().entry(shader_path.to_owned()).or_default().insert(key, (generation, built.clone()));
     built
 }

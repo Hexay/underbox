@@ -5,6 +5,7 @@
 pub mod blend2d;
 mod eval;
 mod eval_more;
+mod external;
 pub mod ik;
 mod ik_node;
 mod random;
@@ -90,6 +91,8 @@ pub enum ValueNode {
     Spring { input: ValueId, hertz: f32, damping: f32, start: Option<f32> },
     /// Uniform in `[min, max]`, drawn when a pose node reading it starts (see `random`).
     Random { min: f32, max: f32 },
+    /// A graph is connected to external graph slot `0` (see `external`).
+    ExternalFilled(String),
 }
 
 /// managed's `GraphBuilder.Easing`, in its order.
@@ -217,6 +220,8 @@ pub enum PoseNode {
     Variation { seed: ValueId, options: Vec<PoseId>, weights: Option<Vec<u32>> },
     TwoBoneIk(Box<TwoBoneIk>),
     LookAt(Box<LookAt>),
+    /// The graph connected to external graph slot `slot`, else `fallback` (else the bind pose).
+    External { slot: String, fallback: Option<PoseId> },
 }
 
 impl PoseNode {
@@ -232,6 +237,7 @@ impl PoseNode {
             PoseNode::Variation { options, .. } => options.clone(),
             PoseNode::TwoBoneIk(ik) => vec![ik.source],
             PoseNode::LookAt(l) => vec![l.source],
+            PoseNode::External { fallback, .. } => fallback.iter().copied().collect(),
         }
     }
 }
@@ -246,6 +252,8 @@ pub struct Definition {
     pub slots: Vec<String>,
     pub model: String,
     pub variation: String,
+    /// External graph slot names, which `PoseNode::External` nodes play.
+    pub graph_slots: Vec<String>,
 }
 
 impl Definition {
@@ -278,6 +286,8 @@ impl Definition {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_external;
 #[cfg(test)]
 mod tests_ik;
 #[cfg(test)]

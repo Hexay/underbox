@@ -39,8 +39,21 @@ impl<'a> Conv<'a> {
                 let xform = anim::Xform::new(pos, quat(&n.components("m_rotation")));
                 ValueNode::Const(Value::Target(Target { set: n.bool("m_isSet"), bone, xform }))
             }
+            "CIsExternalGraphSlotFilledNode" => ValueNode::ExternalFilled(self.graph_slot(n.idx("m_externalGraphNodeIdx"))?),
             _ => return None,
         })
+    }
+
+    /// The external graph slot `AddExternalGraphSlot` put at node `i`, by name.
+    pub(super) fn graph_slot(&self, i: i64) -> Option<String> {
+        self.s.meta.graph_slots.iter().find(|s| i64::from(s.1) == i).map(|s| self.id_name(i64::from(s.0)))
+    }
+
+    /// An external graph slot (a referenced-graph node managed's builder registered as one).
+    pub(super) fn external(&mut self, slot: String, n: &'a Node) -> PoseId {
+        let fallback = n.idx("m_fallbackNodeIdx");
+        let fallback = (fallback >= 0).then(|| self.pose(fallback));
+        self.def.add_pose(PoseNode::External { slot, fallback })
     }
 
     pub(super) fn pose_more(&mut self, class: &str, n: &'a Node) -> Option<PoseId> {

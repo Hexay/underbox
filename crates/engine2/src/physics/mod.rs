@@ -10,6 +10,7 @@ mod body_cache;
 mod body_mass;
 mod body_query;
 mod body_slots;
+mod body_snapshot;
 mod events;
 mod heightfield;
 pub mod joint;

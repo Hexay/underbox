@@ -31,13 +31,24 @@ fn s(x: f32) -> Option<Value> {
 /// managed's `LightBinnerFeature.GpuLight` uploads too. std430 would put `LightToWorld` at 16, not 12.
 pub const GPU_LIGHT_WORDS: usize = 39;
 
+/// How far out a directional light's `GPULight` puts it.
+const SUN_DISTANCE: f32 = 1e8;
+
 impl Light {
     /// `LightToWorld`'s rows in memory: columns forward, left, up, position. Read column-major,
     /// the shader's rows 0 and 3 are forward and position. A point light's axes stay zero, as
     /// native packs it: its cone test then reads `0 - (-1)`, so the cone factor is exactly 1.
+    /// A directional light (a baked sun) points from the receiver toward the source, and sits
+    /// [`SUN_DISTANCE`] that way.
     fn light_to_world_rows(&self) -> [Vec4; 4] {
-        let axes = |v: Vec3| if self.cone.is_some() { self.rotation * v } else { Vec3::ZERO };
-        let (f, l, u, p) = (axes(Vec3::X), axes(Vec3::Y), axes(Vec3::Z), self.position);
+        let sun = self.kind == super::kind::DIRECTIONAL;
+        let axes = |v: Vec3| match () {
+            _ if sun => self.rotation * -v,
+            _ if self.cone.is_some() => self.rotation * v,
+            _ => Vec3::ZERO,
+        };
+        let p = if sun { -self.forward() * SUN_DISTANCE } else { self.position };
+        let (f, l, u) = (axes(Vec3::X), axes(Vec3::Y), axes(Vec3::Z));
         [Vec4::new(f.x, l.x, u.x, p.x), Vec4::new(f.y, l.y, u.y, p.y), Vec4::new(f.z, l.z, u.z, p.z), Vec4::W]
     }
 
@@ -57,20 +68,21 @@ impl Light {
     }
 
     /// The light as one `GPULight`.
-    fn gpu_light(&self) -> [u32; GPU_LIGHT_WORDS] {
+    pub(super) fn gpu_light(&self) -> [u32; GPU_LIGHT_WORDS] {
         let (linear, quadratic, bias) = self.falloff();
         let mut w = [0u32; GPU_LIGHT_WORDS];
-        // Type, shape (sphere), flags (visible, diffuse, specular).
-        w[..3].copy_from_slice(&[self.kind, 0, 0x7]);
+        w[..3].copy_from_slice(&[self.kind, self.pack.shape, self.pack.flags]);
         for (i, row) in self.light_to_world_rows().iter().enumerate() {
             w[3 + i * 4..7 + i * 4].copy_from_slice(&row.to_array().map(f32::to_bits));
         }
-        let floats = [self.color.x, self.color.y, self.color.z, linear, quadratic, bias, self.radius, self.radius * self.radius, 0.0, 0.0];
+        let [sx, sy] = self.pack.shape_size;
+        let floats = [self.color.x, self.color.y, self.color.z, linear, quadratic, bias, self.radius, self.radius * self.radius, sx, sy];
         w[19..29].copy_from_slice(&floats.map(f32::to_bits));
         w[29..33].copy_from_slice(&self.cone_cosines().to_array().map(f32::to_bits));
         w[33] = self.fog.to_bits();
-        // Shadow map, cookie and shadow mask indices; modulator offset and count stay 0.
+        // Shadow map, cookie and shadow mask indices, then the modulator range.
         w[34..37].copy_from_slice(&[self.shadow_index.unwrap_or(u32::MAX), u32::MAX, u32::MAX]);
+        w[37..39].copy_from_slice(&self.pack.modulators);
         w
     }
 }
@@ -80,12 +92,13 @@ impl Lighting {
     /// members. The cluster grid is one cluster deep over the view's depth range; managed's
     /// `ClusteredCullingLayer` binds its own grid on the view's attributes, which wins.
     pub fn constant(&self, block: &str, name: &str, view: &View) -> Option<Value> {
-        let n = self.lights.len() as f32;
+        let n = self.dynamic_count() as f32;
         let decals = self.decal_count() as f32;
         let (near, far) = view.near_far();
         let [_, _, w, h] = view.viewport.map(|x| x.max(1.0));
         match (block, name) {
-            ("ViewLightingConfigV2", "NumLights") => v(n, 0.0, 0.0, decals),
+            ("ViewLightingConfigV2", "NumLights") => v(n, self.baked_count() as f32, 0.0, decals),
+            ("ViewLightingConfigV2", "BakedLightIndexMapping") => Some(Value::Array(self.bake_mapping().iter().map(|&i| Value::Vec(Vec4::new(i as f32, 0.0, 0.0, 0.0))).collect())),
             ("ViewLightingConfigV2", "AmbientLightColor") => Some(Value::Vec(self.ambient)),
             ("DirectionalLightCB", _) => self.sun_constant(name),
             ("ClusteredLightingConstants", "ClusterCounts") => v(1.0, 1.0, 1.0, 1.0),
@@ -115,6 +128,7 @@ impl Lighting {
     pub fn texture(&self, name: &str) -> Option<texture::Ref> {
         match name {
             "g_fogCubemapTexture" => crate::render::fog::cube_texture(self),
+            "g_SheetTexture" => Some(crate::render::sheet_meta::texture()),
             _ => None,
         }
     }
@@ -122,9 +136,9 @@ impl Lighting {
     /// A structured buffer's bytes for elements laid out as `element`; `None` for buffers this
     /// module doesn't own.
     pub fn storage(&self, name: &str, element: &Block) -> Option<Vec<u8>> {
-        let n = self.lights.len();
+        let n = self.dynamic_count();
         Some(match name {
-            "BinnedLightBufferV2" => self.lights.iter().flat_map(Light::gpu_light).flat_map(u32::to_le_bytes).collect(),
+            "BinnedLightBufferV2" => self.binned().into_iter().flatten().flat_map(u32::to_le_bytes).collect(),
             "ClusterLightCounts" => element.fill_elements(1, |_, _| s(n as f32)),
             "ClusterLightIndices" => element.fill_elements(n, |i, _| s(i as f32)),
             "ClusterDecalCounts" => element.fill_elements(1, |_, _| s(self.decal_count() as f32)),
@@ -149,7 +163,7 @@ mod tests {
 
     /// A `PointLight` component's light: `Attenuation` 1 reaches native as 1e-4.
     fn point(radius: f32) -> Light {
-        Light { kind: kind::POINT, position: Vec3::new(1.0, 2.0, 3.0), rotation: Quat::IDENTITY, color: Vec3::ONE, radius, quadratic: 1e-4, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None }
+        Light { kind: kind::POINT, position: Vec3::new(1.0, 2.0, 3.0), rotation: Quat::IDENTITY, color: Vec3::ONE, radius, quadratic: 1e-4, cone: None, fog: 1.0, shadows: false, handle: None, shadow_index: None, pack: Default::default() }
     }
 
     /// The stand-in's `saturate(1 / (l·d + q·d²) - bias)` at distance `d`.

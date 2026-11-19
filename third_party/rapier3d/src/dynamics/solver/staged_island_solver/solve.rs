@@ -98,6 +98,9 @@ pub(super) unsafe fn solve_pass(
     let solve_friction = wo_bias
         || ctx.base_params.friction_in_bias_pass
         || ctx.base_params.num_internal_stabilization_iterations == 0;
+    // underbox patch: only the first unbiased pass of a substep reads the poses; later ones would
+    // write the same rhs (see UNDERBOX.md). Soft clusters re-gather poses each pass, so they keep it.
+    let refresh_rhs = wo_bias && (soft_update || !soft_ref.is_empty());
 
     // Helpers solving one scalar joint (all its rows), one SIMD joint chunk, or
     // one contact chunk.
@@ -140,7 +143,7 @@ pub(super) unsafe fn solve_pass(
         #[cfg(feature = "dim3")]
         if ctx.use_twist {
             let c = unsafe { &mut *ctx.twist_constraints.add(chunk_id) };
-            if wo_bias {
+            if refresh_rhs {
                 // Positions were integrated after the biased pass: update the unbiased rhs
                 // from the current poses (reusing pre-integration separations
                 // destabilizes stack rocking).
@@ -151,7 +154,7 @@ pub(super) unsafe fn solve_pass(
         }
         if !ctx.use_twist {
             let c = unsafe { &mut *ctx.coulomb_constraints.add(chunk_id) };
-            if wo_bias {
+            if refresh_rhs {
                 let builder = unsafe { &*ctx.coulomb_builders.add(chunk_id) };
                 builder.update_rhs_wo_bias(params, solved_dt, solver_bodies, c);
             }

@@ -258,6 +258,6 @@ Running a game checkout instead of a corpus scene, and walker's divergences: doc
   reads the streaming two yet, and managed sampler states don't clamp to `r_max_anisotropy`
   (`render/samplers.rs`), though real clamps them. The froxel grid stays 96×56×64 whatever `volume_fog_*` say.
 - **Managed draw-call tint (15):** real's managed path leaves the puppets' top faces untinted.
-- **Decals (16):** normal and height (parallax) maps, sheeted decal textures
-  (`GetSheetSequenceTextureData`), and the exclusion mask aren't applied; the corpus uses none.
+- **Decals (16):** normal and height (parallax) maps and the exclusion mask aren't applied; the
+  corpus uses none. Sheeted decal textures get `GetSheetInfo` (render/sheet_meta.rs).
   Decal edges (19).

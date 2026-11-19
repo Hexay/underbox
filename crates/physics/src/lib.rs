@@ -4,6 +4,7 @@
 mod body_query;
 mod bounce;
 mod contacts;
+mod dense;
 mod filter;
 mod heightfield;
 mod joint;

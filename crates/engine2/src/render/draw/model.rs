@@ -98,7 +98,7 @@ pub fn object(s: &crate::scene::object::State, deform: &Deform, view_proj: Mat4)
     }
     let Some(model) = crate::model::get(s.model) else { return Vec::new() };
     let mut out = Vec::new();
-    each_call(&model, s.mesh_groups, s.material_override.as_ref(), |i, mesh, call| {
+    each_call(&model, s.mesh_groups, &|own| s.material_for(&model, own), |i, mesh, call| {
         let world = matrix(&s.transform);
         let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint: tint(s.tint) };
         let posed = deform.pose.as_ref().and_then(|p| Some((p, skin::mesh_skin(&model, s.model, i)?)));
@@ -142,18 +142,18 @@ pub fn shadow_draws(s: &crate::scene::object::State, deform: &Deform, view_proj:
 pub fn draws(model: &Model, world: Mat4, view_proj: Mat4, tint: [f32; 4], mesh_groups: u64, material: Option<&Arc<MaterialRef>>) -> Vec<Draw> {
     let uniforms = DrawUniforms { mvp: view_proj * world, model: world, tint };
     let mut out = Vec::new();
-    each_call(model, mesh_groups, material, |_, mesh, call| out.extend(draw_call(mesh, call, uniforms, view_proj, RasterState::default())));
+    each_call(model, mesh_groups, &|own| material.or(own).cloned(), |_, mesh, call| out.extend(draw_call(mesh, call, uniforms, view_proj, RasterState::default())));
     out
 }
 
 /// `IsOpaque` and/or `IsTranslucent` for a model's draw calls, by whether each call's material
 /// blends ([`Material::blend`](crate::render::material::Material::blend)); native's
 /// `UpdateFlagsBasedOnMaterial`. A call without a material is opaque.
-pub fn surface_flags(model: abi::NativeRef<abi::class::CModel>, mesh_groups: u64, material: Option<&Arc<MaterialRef>>) -> i64 {
+pub fn surface_flags(s: &crate::scene::object::State) -> i64 {
     use crate::scene::object::{IS_OPAQUE, IS_TRANSLUCENT};
-    let Some(model) = crate::model::get(model) else { return IS_OPAQUE };
+    let Some(model) = crate::model::get(s.model) else { return IS_OPAQUE };
     let mut flags = 0;
-    each_call(&model, mesh_groups, material, |_, _, call| {
+    each_call(&model, s.mesh_groups, &|own| s.material_for(&model, own), |_, _, call| {
         let blends = call.material.as_ref().and_then(|m| m.material()).is_some_and(|m| m.blend().is_some());
         flags |= if blends { IS_TRANSLUCENT } else { IS_OPAQUE };
     });
@@ -174,17 +174,18 @@ pub fn as_translucent(d: Draw) -> Draw {
     Draw { state: RasterState { blend: blend.or(d.state.blend), depth_write: false, cull, ..d.state }, ..d }
 }
 
-/// `f(mesh index, mesh, call)` for each draw call of the LOD 0 meshes in `mesh_groups`, with
-/// `material` overriding the calls' own.
-fn each_call(model: &Model, mesh_groups: u64, material: Option<&Arc<MaterialRef>>, mut f: impl FnMut(usize, &RenderMesh, &DrawCall)) {
+/// The material a draw call draws with, given its own.
+type Pick<'a> = dyn Fn(Option<&Arc<MaterialRef>>) -> Option<Arc<MaterialRef>> + 'a;
+
+/// `f(mesh index, mesh, call)` for each draw call of the LOD 0 meshes in `mesh_groups`, each with
+/// the material `pick` makes of its own.
+fn each_call(model: &Model, mesh_groups: u64, pick: &Pick, mut f: impl FnMut(usize, &RenderMesh, &DrawCall)) {
     for (i, m) in model.content.meshes.iter().enumerate() {
         if m.lod_mask & 1 == 0 || (m.group_mask != 0 && m.group_mask & mesh_groups == 0) {
             continue;
         }
         for mut call in m.mesh.draw_calls() {
-            if let Some(material) = material {
-                call.material = Some(material.clone());
-            }
+            call.material = pick(call.material.as_ref());
             f(i, &m.mesh, &call);
         }
     }

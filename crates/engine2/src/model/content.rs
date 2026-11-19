@@ -50,6 +50,8 @@ pub struct Content {
     pub view_bounds: Option<BBox>,
     pub eye_position: Vector3,
     pub max_eye_deflection: f32,
+    /// Compiled models' per-bone boxes, for posed bounds (`anim::bounds`).
+    pub bone_bounds: Vec<assets::compiled::rig::BoneBounds>,
 }
 
 impl Default for Content {
@@ -68,6 +70,7 @@ impl Default for Content {
             view_bounds: None,
             eye_position: Vector3::default(),
             max_eye_deflection: 0.0,
+            bone_bounds: Vec::new(),
         }
     }
 }
