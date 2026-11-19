@@ -1,8 +1,8 @@
 //! Per-frame clears limited to what the last frame drew. A pass that confines its writes to a
 //! rect (a scissor, or quads it places itself) leaves its layer at the clear value everywhere
 //! else. While no other write reaches the texture (`render::Texture::writes`), the next frame only
-//! needs that rect cleared, not the layer: lavapipe's full clears of the shadow cascades and the
-//! morph composite cost ~70 MB of DRAM reads a frame (docs/perf-bandwidth.md).
+//! needs that rect cleared, not the layer (shadow cascades, the morph composite; measured in
+//! docs/perf-bandwidth.md).
 
 use crate::render::texture::Texture;
 use std::sync::{Arc, Mutex, Weak};
