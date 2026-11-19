@@ -90,9 +90,29 @@ impl Compiler {
             program.stage.entry().as_bytes(),
             defs.as_bytes(),
             PRELUDE.as_bytes(),
-            program.source.as_bytes(),
+            keyed_source(&program.source).as_bytes(),
         ])
     }
+}
+
+/// `source` with each `#line` marker's path cut to its file name. The expanded text already holds
+/// every include's content; the content root is a per-boot game copy, and keying on it missed the
+/// cache for every program each time a boot got a new copy (docs/perf-boot.md).
+fn keyed_source(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    for line in source.split_inclusive('\n') {
+        match line.strip_prefix("#line ").and_then(|rest| rest.split_once('"')) {
+            Some((number, quoted)) => {
+                let path = quoted.trim_end().trim_end_matches('"');
+                out.push_str("#line ");
+                out.push_str(number);
+                out.push_str(path.rsplit('/').next().unwrap_or(path));
+                out.push('\n');
+            }
+            None => out.push_str(line),
+        }
+    }
+    out
 }
 
 /// `UNDERBOX_DUMP_SPV=<dir>` writes what naga gets (after the passes) as `<shader>.<stage>.spv`;
@@ -124,4 +144,18 @@ pub fn defines(shader: &VfxShader, program: &Program, v: &Variant) -> Vec<(Strin
         out.push((format!("UB_SPEC_{id}"), value));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::keyed_source;
+
+    #[test]
+    fn keyed_source_ignores_the_content_root_only() {
+        let at = |root: &str, body: &str| format!("#line 1 \"{root}/core/shaders/common.fxc\"\n{body}\n#line 7 \"shaders/x.shader\"\nfloat4 y;\n");
+        let a = keyed_source(&at("/games/copy.vA", "float x;"));
+        assert_eq!(a, keyed_source(&at("/games/copy.vB", "float x;")));
+        assert_eq!(a, "#line 1 common.fxc\nfloat x;\n#line 7 x.shader\nfloat4 y;\n");
+        assert_ne!(a, keyed_source(&at("/games/copy.vA", "float z;")));
+    }
 }
