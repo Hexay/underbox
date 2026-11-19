@@ -10,6 +10,7 @@ import statistics
 import sys
 
 NOISY = 0.25
+LINE = 64
 
 
 def pct(values, q):
@@ -19,6 +20,39 @@ def pct(values, q):
 
 def marks(sample, kind):
     return [m for m in sample["marks"] if m["kind"] == kind and "t" in m]
+
+
+def window(sample, t0, t1):
+    """The two marks bounding the measured window."""
+    at = {m["t"]: m for m in sample["marks"] if "t" in m}
+    return at[t0], at[t1]
+
+
+def dram(sample, side, t0, t1):
+    """DRAM read traffic over the window from perf_sample.py's fill counters; empty without them."""
+    a, b = window(sample, t0, t1)
+    if "l2_dram_all" not in a:
+        return {}
+    unit = "tick" if side == "server" else "frame"
+    n = sample_count(a, b, side)
+    mb = lambda k: (b[k] - a[k]) * LINE / 1e6
+    out = {
+        "dram read GB/s": mb("l2_dram_all") / 1e3 / (t1 - t0),
+        f"dram read MB/{unit}": mb("l2_dram_all") / n,
+        f"l1d dram fills MB/{unit}": mb("l1_dram_all") / n,
+        # Per-thread sum over the whole: below 1 means traffic in threads the sampler saw late.
+        "dram per-thread coverage": (mb("l2_dram_eng") + mb("l2_dram_gpu")) / max(mb("l2_dram_all"), 1e-9),
+    }
+    if side != "server":
+        out[f"dram engine MB/{unit}"] = mb("l2_dram_eng") / n
+        out[f"dram lavapipe MB/{unit}"] = mb("l2_dram_gpu") / n
+    if sample.get("counter_min_running", 1) < 0.99:
+        out["counter min running"] = sample["counter_min_running"]
+    return out
+
+
+def sample_count(a, b, side):
+    return int(b["args"][0]) - int(a["args"][0]) if side == "server" else int(b["args"][0].split("=")[1])
 
 
 def steady_rss(sample, t0, t1):
@@ -59,7 +93,10 @@ def metrics(sample, side):
             out["frame wall ms"] = (e["t"] - b["t"]) * 1e3 / n
             out["frames"] = n
             t0, t1 = b["t"], e["t"]
+    if start and "l2_dram_all" in start[0]:
+        out["boot dram read MB"] = start[0]["l2_dram_all"] * LINE / 1e6
     if t0 is not None:
+        out.update(dram(sample, side, t0, t1))
         rss = steady_rss(sample, t0, t1)
         if rss:
             out["steady rss MiB"] = rss / 2**20
@@ -82,13 +119,14 @@ def fmt(v):
 def main():
     out, side = pathlib.Path(sys.argv[1]), sys.argv[2]
     note = sys.argv[3] if len(sys.argv) > 3 else ""
-    runs, threads = {}, {}
+    runs, threads, fills = {}, {}, {}
     for f in sorted(out.glob("*-*/sample.json")):
         eng = f.parent.name.rsplit("-", 1)[0]
         sample = json.loads(f.read_text())
         runs.setdefault(eng, []).append(metrics(sample, side))
-        for name, s in sample.get("threads_window_s", {}).items():
-            threads.setdefault(eng, {}).setdefault(name, []).append(s)
+        for into, key in ((threads, "threads_window_s"), (fills, "threads_window_dram_mb")):
+            for name, s in sample.get(key, {}).items():
+                into.setdefault(eng, {}).setdefault(name, []).append(s)
     (l0, l1) = load_avg(out / "load.txt")
     noisy = abs(l1[0] - l0[0]) > NOISY * max(l0[0], 1)
     print(f"perf {out.name} ({side}); {note}")
@@ -115,9 +153,11 @@ def main():
             row += f"{meds[0] / meds[1]:13.2f}"
         print(row)
     print("\nruns: " + ", ".join(f"{e} {len(runs[e])}" for e in engines))
-    for e in engines:
-        top = sorted(((statistics.median(v), n) for n, v in threads.get(e, {}).items()), reverse=True)[:8]
-        print(f"{e} busiest threads in the window (CPU s, median): " + ", ".join(f"{n} {s:.2f}" for s, n in top))
+    for what, into, f in (("CPU s", threads, "{:.2f}"), ("DRAM read MB", fills, "{:.0f}")):
+        for e in engines:
+            top = sorted(((statistics.median(v), n) for n, v in into.get(e, {}).items()), reverse=True)[:8]
+            if top:
+                print(f"{e} busiest threads in the window ({what}, median): " + ", ".join(f"{n} {f.format(s)}" for s, n in top))
 
 
 if __name__ == "__main__":

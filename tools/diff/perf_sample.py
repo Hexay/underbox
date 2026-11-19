@@ -17,9 +17,15 @@ import re
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_events import EVENTS, Counters, Recorder  # noqa: E402
+
 MARK = re.compile(r"PERF:(START|TICK|BEGIN|END|DONE)\b(.*)")
 # Threads.totals' order; each marker gets its CPU in every series.
 SERIES = ("eng", "gpu", "main", "unnamed")
+# Threads.fills' order: DRAM fill counts (perf_events.EVENTS) per thread class, and the whole process.
+FILLS = tuple(f"{e}_{c}" for e in EVENTS for c in ("eng", "gpu", "all"))
+FILL_EVERY = 10
 
 
 def find_pid(stdout, deadline):
@@ -53,12 +59,15 @@ class Threads:
     def __init__(self, pid, gpu):
         self.pid, self.gpu = pid, gpu
         self.fds, self.cpu, self.name = {}, {}, {}
+        self.counters = Counters()
 
     def sample(self, refresh_names):
         try:
             tids = os.listdir(f"/proc/{self.pid}/task")
         except OSError:
             return False
+        if self.counters.ok:
+            self.counters.add(tids)
         for tid in tids:
             if tid not in self.fds:
                 try:
@@ -96,9 +105,20 @@ class Threads:
             unnamed += ns if kind == "unnamed" else 0
         return eng, gpu, main, unnamed
 
-    def by_name(self):
+    def fills(self):
+        """DRAM fills in FILLS' order: per-thread counts split engine/lavapipe, then the whole process."""
+        out = dict.fromkeys(FILLS, 0)
+        for tid, counts in self.counters.per_thread().items():
+            cls = "gpu" if self.gpu.search(self.name.get(tid, "")) else "eng"
+            for e, v in counts.items():
+                out[f"{e}_{cls}"] += v
+        for e, v in self.counters.whole().items():
+            out[f"{e}_all"] = v
+        return tuple(out[k] for k in FILLS)
+
+    def by_name(self, values=None):
         out = {}
-        for tid, ns in self.cpu.items():
+        for tid, ns in (self.cpu if values is None else values).items():
             kind = self.kind(tid)
             key = f"{self.name.get(tid, '?')} ({kind})" if kind != "named" else re.sub(r"\d+$", "#", self.name.get(tid, "?"))
             out[key] = out.get(key, 0) + ns
@@ -143,20 +163,26 @@ def main():
     ap.add_argument("--period", type=float, default=0.001)
     ap.add_argument("--gpu", default=r"^(llvmpipe|lp:|lvp|gallivm|WSI )|:disk\$")
     ap.add_argument("--wait", type=float, default=600, help="seconds to wait for the process")
+    ap.add_argument("--record", default="", help="perf record args over the window (perf_events.Recorder)")
     a = ap.parse_args()
     pid = find_pid(a.stdout, time.time() + a.wait)
     if pid is None:
         sys.exit(f"perf_sample: no dotnet process writing {a.stdout}")
     threads, log = Threads(pid, re.compile(a.gpu)), Log(a.log)
+    recorder = None
     start = started_at(pid)
-    ts, rss, marks = [], [], []
-    series = {k: [] for k in SERIES}
-    hwm, n, done_at, window_names = 0, 0, None, None
+    ts, rss, marks, fts = [], [], [], []
+    series = {k: [] for k in SERIES + FILLS}
+    hwm, n, done_at, window_names, window_fills = 0, 0, None, None, None
     while threads.sample(n % 200 == 0):
         now = time.time()
         ts.append(now)
         for k, v in zip(SERIES, threads.totals()):
             series[k].append(v)
+        if n % FILL_EVERY == 0 and threads.counters.ok:
+            fts.append(now)
+            for k, v in zip(FILLS, threads.fills()):
+                series[k].append(v)
         if n % 20 == 0:
             try:
                 m = memory(pid)
@@ -168,26 +194,51 @@ def main():
             hit = MARK.search(line)
             if hit:
                 marks.append({"kind": hit[1], "args": hit[2].split(), "seen": now})
+                # Attached at scene start, not at boot: perf only names the DSOs mapped when it attaches.
+                if hit[1] == "START" and a.record:
+                    recorder = Recorder(pid, a.record, os.path.dirname(os.path.abspath(a.out)))
                 if hit[1] == "BEGIN" or (hit[1] == "TICK" and hit[2].split()[0] == "1"):
-                    window_names = threads.by_name()
+                    window_names, window_fills = threads.by_name(), threads.by_name(l2_by_tid(threads))
+                    if recorder:
+                        recorder.enable()
+                if hit[1] in ("DONE", "END") and recorder:
+                    recorder.stop()
+                    recorder = None
                 if hit[1] == "DONE":
                     done_at = now
         if done_at and now - done_at > 0.5:
             break
         n += 1
         time.sleep(a.period)
-    end_names = threads.by_name()
-    names = {k: (v - (window_names or {}).get(k, 0)) / 1e9 for k, v in end_names.items()}
+    if recorder:
+        recorder.stop()
+    names = window_delta(window_names, threads.by_name(), 1e9)
+    fills = window_delta(window_fills, threads.by_name(l2_by_tid(threads)), 1e6 / 64)
     for m in marks:
         if m["args"] and m["args"][-1].isdigit() and ts:
             m["t"] = int(m["args"][-1]) / 1e6
             m.update({k: cpu_at(ts, series[k], m["t"]) for k in SERIES})
-    json.dump({
-        "pid": pid, "started": start, "samples": len(ts),
-        "period": (ts[-1] - ts[0]) / max(1, len(ts) - 1) if ts else 0,
-        "last": [ts[-1], series["eng"][-1], series["gpu"][-1]] if ts else None, "rss": rss, "hwm": hwm, "marks": marks,
-        "threads_window_s": dict(sorted(names.items(), key=lambda kv: -kv[1])[:40]),
-    }, open(a.out, "w"))
+            if fts:
+                m.update({k: cpu_at(fts, series[k], m["t"]) for k in FILLS})
+    with open(a.out + ".tmp", "w") as f:
+        json.dump({
+            "pid": pid, "started": start, "samples": len(ts),
+            "period": (ts[-1] - ts[0]) / max(1, len(ts) - 1) if ts else 0,
+            "last": [ts[-1], series["eng"][-1], series["gpu"][-1]] if ts else None, "rss": rss, "hwm": hwm, "marks": marks,
+            "threads_window_s": names, "threads_window_dram_mb": fills,
+            "counter_min_running": threads.counters.min_running, "thread_names": threads.name,
+        }, f)
+    os.replace(a.out + ".tmp", a.out)
+
+
+def l2_by_tid(threads):
+    return {tid: c.get("l2_dram", 0) for tid, c in threads.counters.last.items()}
+
+
+def window_delta(before, after, unit):
+    """Per-name growth from the window's first marker to the end, top 40, in `unit`s."""
+    d = {k: (v - (before or {}).get(k, 0)) / unit for k, v in after.items()}
+    return dict(sorted(d.items(), key=lambda kv: -kv[1])[:40])
 
 
 def cpu_at(ts, values, t):

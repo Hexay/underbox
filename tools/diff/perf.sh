@@ -5,7 +5,8 @@
 # Env: REPEATS=5, SIDE=server|client (default: client for showroom and skinned, else server), CPUS=0-7
 # (taskset), LP_NUM_THREADS=4, WARMUP_TICKS=250 TICKS=500, WARMUP_FRAMES=60 FRAMES=200, SECS=300,
 # SCENE=scenes/x.scene, CONTENT=source (no real core content seeded into ours), GPU=1 (no lavapipe ICD),
-# UNDERBOX_ENGINE2=<libengine2.so> (else a release build).
+# UNDERBOX_ENGINE2=<libengine2.so> (else a release build), RECORD='<perf record args>' (each run's
+# window into perf.data; tools/diff/perf_attrib.py ranks it).
 # Out: target/diff/perf/<name>/<engine>-<i>/{sample.json,...}, report.txt.
 set -eu
 ROOT=$(cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -65,12 +66,12 @@ boot() {
     cut -d' ' -f1-3 /proc/loadavg > "$dir/load.txt"
     until='PERF:DONE|Error \| .*PerfMark'
     if [ "$SIDE" = server ]; then
-        python3 -I "$ROOT/tools/diff/perf_sample.py" "$dir/server.log" "$dir/server.log" "$dir/sample.json" &
+        python3 -I "$ROOT/tools/diff/perf_sample.py" "$dir/server.log" "$dir/server.log" "$dir/sample.json" --record "${RECORD:-}" &
         SAMPLER=$!
         UNDERBOX_REAL_ENGINE2=$real SEED=$seed OUT=$dir UNTIL="$until" GRACE=1 \
             taskset -c "$CPUS" sh "$ROOT/tools/boot-server.sh" "$SECS" "$SBOX" -- +game "$PROJECT" > "$dir/boot.txt" 2>&1 || true
     else
-        python3 -I "$ROOT/tools/diff/perf_sample.py" "$dir/client.out" "@$dir/client.logpath" "$dir/sample.json" &
+        python3 -I "$ROOT/tools/diff/perf_sample.py" "$dir/client.out" "@$dir/client.logpath" "$dir/sample.json" --record "${RECORD:-}" &
         SAMPLER=$!
         # Real's window is the screen's size with no WM; ours renders 1024x768 offscreen (frame.sh).
         XVFB=
@@ -90,8 +91,11 @@ boot() {
         [ -z "$XVFB" ] || kill "$XVFB" 2>/dev/null || true
         unset DISPLAY SDL_AUDIO_DRIVER
     fi
-    kill "$SAMPLER" 2>/dev/null || true
+    # The sampler exits with the process, after perf record (RECORD) finishes writing; killed only if stuck.
+    ( sleep 60; kill "$SAMPLER" 2>/dev/null ) &
+    WATCHDOG=$!
     wait "$SAMPLER" 2>/dev/null || true
+    kill "$WATCHDOG" 2>/dev/null || true
     cut -d' ' -f1-3 /proc/loadavg >> "$dir/load.txt"
     if grep '^FAIL: the game downloaded' "$dir/boot.txt"; then exit 4; fi
     [ -s "$dir/sample.json" ] || echo "perf: $eng run $2 left no sample (see $dir/boot.txt)"
