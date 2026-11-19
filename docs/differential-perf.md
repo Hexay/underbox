@@ -102,6 +102,25 @@ tick (0.71–0.75).
   at a marker is interpolated at its own timestamp, so lag doesn't move CPU figures. It swings
   0.2–1.8 ms run to run on both engines and its ratio flips between sweeps; it's noise.
 
+## Sweep, 2026-11-19
+
+After the physics round 5 (docs/perf-physics.md), mimalloc (docs/perf-build.md), the stand-in
+cluster walk (docs/perf-render.md) and the resident-shader fix. 5 rounds, quiet box (load 9–18;
+pile flagged NOISY as the load fell). Medians, ours / real, ratio:
+
+| Metric | pile | probe | showroom | skinned |
+| --- | --- | --- | --- | --- |
+| Tick CPU median ms | 1.83 / 2.04, 0.90 | 0.852 / 1.08, 0.79 | | |
+| Tick CPU p95 ms | 4.02 / 5.09, 0.79 | 1.69 / 2.47, 0.69 | | |
+| Frame main thread ms | | | 3.50 / 3.36, 1.04 | 4.45 / 3.88, 1.15 |
+| Frame engine CPU ms | | | 80.7 / 85.0, 0.95 | 80.9 / 89.1, 0.91 |
+| Frame lavapipe CPU ms | | | 102 / 119, 0.86 | 80.6 / 90.2, 0.89 |
+| Boot wall s | 4.34 / 4.40, 0.99 | 4.33 / 4.62, 0.94 | 17.5 / 20.1, 0.87 | 18.9 / 23.0, 0.82 |
+| Boot CPU s | 8.88 / 8.74, 1.02 | 9.83 / 10.1, 0.97 | 45.4 / 66.5, 0.68 | 46.4 / 77.6, 0.60 |
+| Peak RSS MiB | 500 / 545, 0.92 | 541 / 629, 0.86 | 1253 / 3781, 0.33 | 1298 / 3873, 0.34 |
+
+Above real: skinned's main thread (flat profile, docs/perf-render.md) and showroom's within noise.
+
 ## Caveats
 
 - `PERF:TICK` logs a line per tick on both engines; its cost is in both numbers.
