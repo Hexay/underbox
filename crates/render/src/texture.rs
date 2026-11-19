@@ -4,6 +4,7 @@
 use crate::Gpu;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -74,6 +75,9 @@ pub struct Texture {
     /// One-mip views made on request ([`Texture::mip_view`]), kept so bind groups that use them
     /// repeat across frames (bind_cache.rs).
     mip_views: Mutex<HashMap<MipViewKey, wgpu::TextureView>>,
+    /// Bumped by every pass that targets it, every clear and every copy into it, not by
+    /// storage-image writes (depth formats can't be storage images): [`Texture::writes`].
+    writes: AtomicU64,
 }
 
 /// A one-mip view's format, mip and usage.
@@ -110,11 +114,22 @@ impl Texture {
             true => texture.create_view(&wgpu::TextureViewDescriptor { mip_level_count: Some(1), ..Default::default() }),
             false => subresource_view(&texture, desc.format, 0, 0),
         };
-        Texture { desc, texture, view, target_view, srgb_view, mip_views: Mutex::default() }
+        Texture { desc, texture, view, target_view, srgb_view, mip_views: Mutex::default(), writes: AtomicU64::new(0) }
     }
 
     pub fn dimension(&self) -> wgpu::TextureViewDimension {
         self.desc.dimension()
+    }
+
+    /// How many writes have been recorded into the texture: equal readings bracket a span in
+    /// which only storage images could have changed it.
+    pub fn writes(&self) -> u64 {
+        self.writes.load(Ordering::Acquire)
+    }
+
+    /// Record a write: every pass, clear and copy into the texture calls this.
+    pub fn wrote(&self) {
+        self.writes.fetch_add(1, Ordering::AcqRel);
     }
 
     /// Mip 0 of one array layer (a cube face), as a 2D attachment.

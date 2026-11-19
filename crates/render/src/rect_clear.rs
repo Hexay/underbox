@@ -47,6 +47,7 @@ impl RectClearer {
             depth_ops: format.has_depth_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Load, store }),
             stencil_ops: format.has_stencil_aspect().then_some(wgpu::Operations { load: wgpu::LoadOp::Load, store }),
         };
+        t.wrote();
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

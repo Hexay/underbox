@@ -36,6 +36,52 @@ body slots and `body_cache::resolve` ~0.1 each. 328 bodies need ~50k lines per t
 32 MiB L3 the state is evicted between 20 ms ticks and refetched every tick, so the count tracks
 the bytes a step touches, not how many times.
 
+## Clears limited to what the last frame drew, 2026-11-19
+
+`render/dirty_clear.rs`. Two full-target clears every frame wrote data that was already the
+clear value almost everywhere:
+
+- **Shadow cascades.** Showroom's casters cover about 56%, 7% and 0.1% of its three 2048²
+  cascades. Shadow views now scissor their casters to the screen rect of their bounds (a texel
+  wider; any deformed caster, or a box reaching behind a perspective camera, takes the whole
+  viewport), so the layer stays at the clear depth outside that rect. While nothing else writes
+  the texture, the next frame clears only that rect (`RectClearer`), or nothing, or all of it
+  when the rect covers more than 75%.
+- **Morph composite** (2048×1024 `Rgba16Float`, 16 MiB): each frame's regions sit in a few rows
+  from the corner; the next frame clears only their box. This was most of skinned's
+  `util_fill_rect` (21.7 → ~6 MB).
+
+"Nothing else writes" is `render::Texture::writes`: every pass, clear, upload, blit and copy
+into a texture counts, storage-image writes don't (depth formats can't be storage images, and
+the composite isn't one). A record whose count moved is dropped and the layer is cleared in full.
+The bounds are the object's (managed may set them) joined with its model's, moved: a rigid caster
+outside both would be cut at the rect, where it used to be drawn whole.
+
+Interleaved `run.sh perf <scene> ours`, base (a90c0e9) and this change alternating per run,
+`WARMUP_FRAMES=300`, IL managed build; medians [min–max], 4–5 runs each (three runs lost to a
+full disk):
+
+| Metric | Showroom base | Showroom after | Skinned base | Skinned after |
+| --- | --- | --- | --- | --- |
+| DRAM read MB/frame | 180 [168–200] | 143 [119–150] | 185 [176–196] | 158 [154–177] |
+| DRAM lavapipe MB/frame | 115 | 75.4 | 117 | 96.6 |
+| Frame engine CPU ms | 75.2 | 76.8 | 77.3 | 72.9 |
+| Frame lavapipe CPU ms | 115 | 108 | 91.2 | 83.7 |
+
+`perf_attrib.py` after: `lp_rast_clear_zstencil` showroom 54 → 9 MB/frame (the view's depth and
+cascade 0, which is 56% covered: cleared in full). Golden frames are unchanged (byte-identical),
+so `run.sh frame` metrics equal docs/differential-render.md's latest column.
+
+- **Skinned's cascades still clear in full** (`lp_rast_clear_zstencil` 50 MB/frame): its puppets
+  are skinned, one morphed and one deformed, and their vertices can leave any bounds we hold on
+  the CPU. An exact box needs per-bone bind-space bounds plus morph and deformation-volume
+  extents; not attempted.
+- **JIT shader symbols:** the Mesa `PROFILE` build (`mesa-lvp-prof`) with
+  `MESA_SHADER_CACHE_DISABLE=true` and `PERF_BUILDID_DIR` wrote a perf map with only lavapipe's
+  sample/image/fetch functions, no `fs`/`cs` variants, so the ~60 MB of JIT reads stayed
+  unranked by shader this round. By thread class ours is at or below real's everywhere but the
+  queue thread's copies (CMAA2, below).
+
 ## Not changed, and why
 
 - **CMAA2 texel words: the one ours-only hot spot.** `shading/texel_words.rs` copies the
@@ -49,7 +95,6 @@ the bytes a step touches, not how many times.
 - **Pile's Rapier working set** (+1.8 MB/tick, 0.09 GB/s): no single owner; shrinking it means
   Rapier's layout or our side tables (`step_start`, `frozen`, `sleep_thresholds`, about 0.1 MB in all),
   under the byte-identical `run.sh state` lock. Not attempted.
-- **Shadow clears** are the biggest single item, but managed asks for them and real does the same.
 - **Main-thread double copy in `render/batch.rs`** (`staged` Vec, then wgpu's staging buffer):
   0.4–0.7 MB/frame, below the main thread's ±2 MB run-to-run spread, so an A/B can't resolve it.
 - **IBS (`perf mem`)** works per process at paranoid 1 and gives data addresses, but it samples demand

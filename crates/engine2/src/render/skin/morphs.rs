@@ -7,7 +7,7 @@
 
 use crate::mesh::render_mesh::RenderMesh;
 use crate::render::draw::morph::{self, Weights};
-use crate::render::{device, texture};
+use crate::render::{device, dirty_clear, texture};
 use abi::slots::render_tools as tools;
 use abi::structs::Vector4;
 use abi::{Registry, bind};
@@ -62,9 +62,11 @@ struct Frame {
     x: u32,
     y: u32,
     shelf: u32,
+    /// Corners (x0, y0, x1, y1) around every region placed, both halves, a texel wider.
+    dirty: Option<[u32; 4]>,
 }
 
-const START: Frame = Frame { used: false, x: 1, y: 1, shelf: 0 };
+const START: Frame = Frame { used: false, x: 1, y: 1, shelf: 0, dirty: None };
 
 impl Frame {
     fn place(&mut self, w: u32, h: u32) -> Option<[u32; 2]> {
@@ -76,7 +78,13 @@ impl Frame {
         }
         let at = [self.x, self.y];
         (self.x, self.shelf) = (self.x + w + 1, self.shelf.max(h));
+        let [x0, y0, x1, y1] = self.dirty.unwrap_or([u32::MAX, u32::MAX, 0, 0]);
+        self.dirty = Some([x0.min(at[0] - 1), y0.min(at[1] - 1), x1.max((HALF + at[0] + w + 1).min(WIDTH)), y1.max((at[1] + h + 1).min(HEIGHT))]);
         Some(at)
+    }
+
+    fn dirty_rect(&self) -> Option<[u32; 4]> {
+        self.dirty.map(|[x0, y0, x1, y1]| [x0, y0, x1 - x0, y1 - y0])
     }
 }
 
@@ -99,15 +107,18 @@ pub fn active(mesh: &RenderMesh, weights: &Weights) -> bool {
     mesh.state().morphs.iter().any(|m| weights.get(&m.name).is_some_and(|w| *w != 0.0))
 }
 
-/// Composite `items` into this frame's texture in one pass (the frame's first clears it): each
-/// item's subrect, zero when it didn't fit.
+/// Composite `items` into this frame's texture in one pass (the frame's first clears what the
+/// last frame placed, render/dirty_clear.rs): each item's subrect, zero when it didn't fit.
 pub fn compose(items: &[(&Weights, &Arc<RenderMesh>)]) -> Vec<[f32; 4]> {
     let none = || vec![[0.0; 4]; items.len()];
     let Some(gpu) = device::gpu() else { return none() };
-    let Some(target) = texture::resolve(texture()) else { return none() };
-    let Some(target) = target.gpu.as_ref() else { return none() };
+    let Some(texture) = texture::resolve(texture()) else { return none() };
+    let Some(target) = texture.gpu.as_ref() else { return none() };
     let mut frame = FRAME.lock().unwrap();
-    let clear = !frame.used;
+    let prepared = match frame.used {
+        false => dirty_clear::prepare(&texture, 0, render::wgpu::Color::TRANSPARENT, 1.0),
+        true => dirty_clear::resume(&texture, 0),
+    };
     frame.used = true;
     let (mut subrects, mut sources, mut placed) = (Vec::new(), Vec::new(), Vec::new());
     for (weights, mesh) in items {
@@ -129,7 +140,8 @@ pub fn compose(items: &[(&Weights, &Arc<RenderMesh>)]) -> Vec<[f32; 4]> {
     }
     let (positions, normals): (Vec<_>, Vec<_>) = placed.into_iter().unzip();
     let batches: Vec<MorphBatch> = sources.iter().zip(positions).map(|(s, quads)| MorphBatch { source: s, quads }).chain(sources.iter().zip(normals).map(|(s, quads)| MorphBatch { source: s, quads })).collect();
-    morpher(gpu).composite(gpu, target, clear, &batches);
+    morpher(gpu).composite(gpu, target, prepared.full, &batches);
+    dirty_clear::finish(&texture, 0, prepared, 1, frame.dirty_rect());
     subrects
 }
 

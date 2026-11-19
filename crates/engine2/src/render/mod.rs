@@ -11,6 +11,7 @@ pub mod context;
 pub mod convars;
 pub mod depth;
 pub mod device;
+mod dirty_clear;
 pub mod draw;
 pub mod fog;
 pub mod fog_managed;
