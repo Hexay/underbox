@@ -23,7 +23,12 @@ struct Params {
     vectors: HashMap<String, Vector4>,
     textures: HashMap<String, Texture>,
     edited: bool,
+    /// [`Material::shading_params`], until [`params`] next touches them.
+    shading: Option<Arc<ShadingParams>>,
 }
+
+/// Texture params by attribute (`g_tColor`) and vector params by name.
+pub type ShadingParams = (HashMap<String, texture::Ref>, HashMap<String, glam::Vec4>);
 
 pub struct Material {
     name: String,
@@ -58,11 +63,16 @@ impl Material {
         &self.shader
     }
 
-    /// Texture params by attribute (`g_tColor`) and vector params by name, for a draw's binding.
-    pub fn shading_params(&self) -> (HashMap<String, texture::Ref>, HashMap<String, glam::Vec4>) {
-        let p = self.params.lock().unwrap();
+    /// The params a draw binds, built once per change rather than per draw.
+    pub fn shading_params(&self) -> Arc<ShadingParams> {
+        let mut p = self.params.lock().unwrap();
+        if let Some(s) = &p.shading {
+            return s.clone();
+        }
         let vectors = p.vectors.iter().map(|(k, v)| (k.clone(), glam::Vec4::new(v.vec.x, v.vec.y, v.vec.z, v.vec.w))).collect();
-        (p.textures.clone(), vectors)
+        let s = Arc::new((p.textures.clone(), vectors));
+        p.shading = Some(s.clone());
+        s
     }
 
     /// How a translucent material blends (its `F_TRANSLUCENT` / `F_ADDITIVE_BLEND` feature);
@@ -157,7 +167,11 @@ fn on<R: Default>(h: Ref, f: impl FnOnce(&Material) -> R) -> R {
 }
 
 fn params<R: Default>(h: Ref, f: impl FnOnce(&mut Params) -> R) -> R {
-    on(h, |mat| f(&mut mat.params.lock().unwrap()))
+    on(h, |mat| {
+        let mut p = mat.params.lock().unwrap();
+        p.shading = None;
+        f(&mut p)
+    })
 }
 
 /// `IMaterial2::Set( name, texture )`: the material keeps its own copy of the handle.

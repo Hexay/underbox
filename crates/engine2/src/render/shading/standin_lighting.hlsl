@@ -59,7 +59,9 @@
 		return flCone * vCone.z * saturate( 1.0 / flDot - l.FalloffBias );
 	}
 
-	// Local lights are the pixel's cluster's (Cluster::Query); a per-lane walk, since ClusterForEach needs wave ops.
+	// Local lights are the pixel's cluster's (Cluster::Query), walked wave-uniform as vr_lighting.fxc
+	// does: the binner lists them ascending, so each lane sums in the same order as a per-lane walk,
+	// and the light's words load once per wave instead of a gather per word.
 	DirectLight Direct( Surface s, uint nCluster )
 	{
 		DirectLight o;
@@ -72,9 +74,9 @@
 				AddLight( o, s, -g_DirectionalLightDirection.xyz, g_DirectionalLightColor.rgb * flVisibility );
 		}
 		ClusterRange r = Cluster::Query( ClusterItemType_Light, nCluster );
-		for ( uint k = 0; k < r.Count; k++ )
+		ClusterForEach( r )
 		{
-			BinnedLight l = LoadLight( Cluster::LoadItem( r, k ) );
+			BinnedLight l = LoadLight( r.Item );
 			float3 vDir;
 			float flMask = BinnedLightMask( l, s.vPositionWs, vDir );
 			if ( flMask > 0.0 && dot( s.vNormalWs, vDir ) > 0.0 )
