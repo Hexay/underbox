@@ -60,6 +60,7 @@ pub fn register(r: &mut Registry) {
     compute::register(r);
     context::register(r);
     draw::immediate::register(r);
+    draw::indirect::register(r);
     draw::draw_call::register(r);
     game_window::register(r);
     image::register(r);

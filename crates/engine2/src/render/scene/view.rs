@@ -35,6 +35,8 @@ pub struct ViewState {
     pub occlusion: Option<super::occlusion::Buffers>,
     /// Instances the culled layers recorded last run, capacity or not (`GetOcclusionCullRequested`).
     pub occlusion_requested: i32,
+    /// The cube texture and face this view renders (`RenderToCubeTexture`, cube.rs).
+    pub cube: Option<(texture::Ref, u32)>,
 }
 
 pub struct SceneView {
@@ -147,7 +149,7 @@ fn new_layer(r: Ref, name: Option<&std::ffi::CStr>, viewport: RenderViewport, ki
 pub fn register(r: &mut Registry) {
     bind!(r, v::GET_MAIN_VIEWPORT, |r| get(r).map(|v| v.viewport).unwrap_or_default());
     bind!(r, v::GET_SWAP_CHAIN, |r| RawPtr::from_raw(get(r).map_or(0, |v| v.swap_chain.value) as *mut _));
-    bind!(r, v::GET_RENDER_TARGET_ARRAY_INDEX, |_| -1);
+    bind!(r, v::GET_RENDER_TARGET_ARRAY_INDEX, |r| get(r).and_then(|v| v.state.lock().unwrap().cube).map_or(-1, |(_, face)| face as i32));
     bind!(r, v::ADD_DEPENDENT_VIEW, |_, _| {});
     bind!(r, v::GET_RENDER_ATTRIBUTES_PTR, |r| get(r).map(|v| v.attributes).unwrap_or_default());
     bind!(r, v::ADD_RENDER_LAYER, |r, name, vp, mode, before| new_layer(r, name, vp, layer::Kind::Render(mode), before));

@@ -8,6 +8,7 @@ pub mod draw_call;
 pub mod dynamic;
 pub mod gpu_mesh;
 pub mod immediate;
+pub mod indirect;
 pub mod model;
 pub mod gizmo;
 pub mod morph;
@@ -49,16 +50,15 @@ pub struct Draw {
 pub struct Cull {
     /// World bounds (min, max) of each instance; none or a mismatched count never culls.
     pub bounds: Vec<[glam::Vec3; 2]>,
-    /// Drawn indirect: the cull's arguments and the ids that survived it, in place of the
-    /// instance-id stream.
+    /// Drawn indirect: arguments on the GPU (the cull's or managed's) and, from the cull, the ids
+    /// that survived it in place of the instance-id stream.
     pub indirect: Option<Indirect>,
 }
 
 pub struct Indirect {
     pub args: Arc<render::Buffer>,
     pub args_offset: u64,
-    pub ids: Arc<render::Buffer>,
-    pub ids_offset: u64,
+    pub ids: Option<(Arc<render::Buffer>, u64)>,
 }
 
 /// Whether `d` draws from the skinning vertex cache: its program takes the vertex index streams
@@ -191,7 +191,7 @@ pub fn execute(target: &Target, lighting: &Lighting, load: Load, draws: &[Draw])
         .zip(&bound)
         .map(|(d, groups)| {
             let as_caster = depth.as_ref().zip(groups.as_ref()).filter(|_| d.shaded.is_none() && d.caster.is_some());
-            let culled = d.cull.indirect.as_ref().map(|c| (&c.ids.buffer, c.ids_offset));
+            let culled = d.cull.indirect.as_ref().and_then(|c| c.ids.as_ref()).map(|(b, offset)| (&b.buffer, *offset));
             let as_caster = as_caster.map(|(c, g)| Shaded { program: &c.program, bind_groups: g, buffers: streams.bound(&d.vertex, culled.unwrap_or((&streams.ids.buffer, 0))) });
             let material = d.shaded.as_ref().zip(groups.as_ref());
             MeshDraw {

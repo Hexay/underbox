@@ -24,12 +24,12 @@ use render::{BufferKind, RasterState};
 use std::ffi::c_void;
 use std::sync::Arc;
 
-enum Vertices {
+pub(super) enum Vertices {
     Mesh(Arc<VertexBuffer>),
     Gpu(Arc<render::Buffer>),
 }
 
-enum Indices {
+pub(super) enum Indices {
     Mesh(Arc<IndexBuffer>),
     Gpu(Arc<render::Buffer>, IndexFormat),
 }
@@ -108,7 +108,7 @@ pub fn set_object(c: Ctx, world: Mat4) {
 
 /// The `SetRenderState` material's program for a draw of `layout` on `c`, bound with its
 /// attributes, the context's and the `BindTexture` slots; `None` draws the placeholder.
-fn render_state_shading(c: Ctx, layout: &Layout) -> Option<Shaded> {
+pub(super) fn render_state_shading(c: Ctx, layout: &Layout) -> Option<Shaded> {
     let ctx = context::get(c)?;
     let (state, slots, view_proj, world) = {
         let s = ctx.draw.lock().unwrap();
@@ -173,7 +173,7 @@ fn no_vertices() -> Option<(Arc<render::Buffer>, Arc<Layout>)> {
     Some(NONE.get_or_init(|| (buffer(), Arc::new(Layout { name: "no vertices".into(), stride: 4, fields: Vec::new() }))).clone())
 }
 
-fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) -> Option<(Draw, Arc<Layout>)> {
+pub(super) fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: i32, base_vertex: i32, indexed: bool) -> Option<(Draw, Arc<Layout>)> {
     let (vertices, layout, offset) = match &s.vertices {
         Some((Vertices::Mesh(b), offset)) => (gpu_mesh::vertices(b)?, s.layout.clone().unwrap_or_else(|| b.meta.clone()), offset),
         Some((Vertices::Gpu(b), offset)) => (b.clone(), s.layout.clone()?, offset),
@@ -192,7 +192,7 @@ fn bound_draw(s: &DrawState, prim: i64, range: std::ops::Range<i32>, instances: 
     Some((Draw { vertices, vertex_offset: *offset, vertex, indices, range, base_vertex, instances: instances.max(1) as u32, uniforms, state, shaded: None, caster: None, cull: Default::default() }, layout))
 }
 
-fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {
+pub(super) fn bind_vertices(c: Ctx, slot: i32, v: Option<Vertices>, offset: i32) -> bool {
     let ok = v.is_some();
     // Stream 0 is the mesh; stream 1 instance ids only matter to bound model calls ([`bind_gpu_vertices`]).
     if slot == 0 {
@@ -208,7 +208,7 @@ fn bind_gpu_vertices(c: Ctx, slot: i32, h: gpu_buffers::Handle, offset: i32) -> 
     bind_vertices(c, slot, gpu_buffers::get(h).map(Vertices::Gpu), offset)
 }
 
-fn bind_indices(c: Ctx, i: Option<Indices>) -> bool {
+pub(super) fn bind_indices(c: Ctx, i: Option<Indices>) -> bool {
     let ok = i.is_some();
     with(c, |s| s.indices = i);
     ok
@@ -253,9 +253,6 @@ pub fn register(r: &mut Registry) {
             draw_bound(c, prim, first..first + count, n, base, true);
         }
     });
-    // TODO: indirect draws need the args buffer read on the GPU (draw_indirect).
-    bind!(r, ctx::DRAW_INSTANCED_INDIRECT, |_, _, _, _, _, _| {});
-    bind!(r, ctx::DRAW_INDEXED_INSTANCED_INDIRECT, |_, _, _, _, _, _| {});
     bind!(r, ctx::BIND_VERTEX_BUFFER, |c, slot, h, off| bind_vertices(c, slot, buffers::vertex_buffer(h).map(Vertices::Mesh), off));
     bind!(r, ctx::BIND_VERTEX_BUFFER_1, |c, slot, h, off, _stride| bind_vertices(c, slot, buffers::vertex_buffer(h).map(Vertices::Mesh), off));
     bind!(r, ctx::BIND_VERTEX_BUFFER_2, bind_gpu_vertices);
@@ -271,9 +268,5 @@ pub fn register(r: &mut Registry) {
     });
     bind!(r, tools::DRAW_MODEL, |c, _layer, _mode, m, xf, n, _attrs| draw_model(c, m, transforms(xf, n)));
     bind!(r, tools::DRAW_MODEL_2, |c, _layer, _mode, m, xf, n, _attrs, _lod| draw_model(c, m, transforms(xf, n)));
-    // TODO: GPU-buffer transforms / draw args (DrawModel_1/3/4) need reading back or indirect draws.
-    bind!(r, tools::DRAW_MODEL_1, |c, _layer, _mode, m, _buf, n, _attrs| draw_model(c, m, vec![Mat4::IDENTITY; n.clamp(0, 1) as usize]));
-    bind!(r, tools::DRAW_MODEL_3, |c, _layer, _mode, m, _buf, n, _attrs, _lod| draw_model(c, m, vec![Mat4::IDENTITY; n.clamp(0, 1) as usize]));
-    bind!(r, tools::DRAW_MODEL_4, |_, _, _, _, _, _, _, _, _| {});
     bind!(r, tools::DRAW_SCENE_OBJECT, |c, _layer, o, t, color, _mat, _attrs| draw_scene_object(c, o, t, color));
 }

@@ -16,7 +16,7 @@ const CLEAR: [u8; 4] = [0, 0, 255, 255];
 /// `RenderView.Update` + `FillConstants` for a camera at `eye` looking at `target` (horizontal
 /// FOV `fov` degrees): `ViewConstants` bytes. A row-vector matrix's row-major bytes are the
 /// column-vector matrix's columns, so glam's `to_cols_array` writes them.
-fn managed_view_constants(eye: Vec3, target: Vec3, fov: f32, (near, far): (f32, f32)) -> Vec<u8> {
+pub(crate) fn managed_view_constants(eye: Vec3, target: Vec3, fov: f32, (near, far): (f32, f32)) -> Vec<u8> {
     let x_scale = 1.0 / (fov.to_radians() * 0.5).tan();
     let range = far - near;
     let projection = Mat4::from_cols(Vec4::new(x_scale, 0.0, 0.0, 0.0), Vec4::new(0.0, x_scale, 0.0, 0.0), Vec4::new(0.0, 0.0, near / range, -1.0), Vec4::new(0.0, 0.0, far * near / range, 0.0));
@@ -60,7 +60,7 @@ fn transform_entry(tint: u32) -> Vec<u8> {
 }
 
 /// One `TransformBuffer.Entry` for `world`.
-pub(super) fn placed_entry(world: Mat4, tint: u32) -> Vec<u8> {
+pub(crate) fn placed_entry(world: Mat4, tint: u32) -> Vec<u8> {
     let rows = world.transpose().to_cols_array();
     let mut b: Vec<u8> = rows[..12].iter().flat_map(|f| f.to_le_bytes()).collect();
     b.extend(1f32.to_le_bytes());
@@ -69,7 +69,7 @@ pub(super) fn placed_entry(world: Mat4, tint: u32) -> Vec<u8> {
     b
 }
 
-pub(super) fn gpu_buffer(bytes: &[u8], element: i32) -> buffers::Handle {
+pub(crate) fn gpu_buffer(bytes: &[u8], element: i32) -> buffers::Handle {
     let desc = BufferDesc { m_n_element_count: bytes.len() as i32 / element, m_n_element_size_in_bytes: element, ..Default::default() };
     let h = buffers::create(0, desc, 0, None);
     buffers::set_data(context::Ref::NULL, h, abi::RawPtr::from_raw(bytes.as_ptr().cast_mut().cast()), bytes.len() as u32, 0);

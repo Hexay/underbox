@@ -1,7 +1,7 @@
 //! Moving texels into and between [`Texture`]s: uploads (texel or 4x4 block rows), fills, clears
 //! and copies. Read-back is in readback.rs.
 
-use crate::texture::sample_aspect;
+use crate::texture::{extent, sample_aspect};
 use crate::{Gpu, Texture};
 
 /// One mip of one array layer (a cube face, a volume's depth slice).
@@ -173,6 +173,22 @@ impl Texture {
         let size = wgpu::Extent3d { width: w.next_multiple_of(bw), height: h.next_multiple_of(bh), depth_or_array_layers: layers };
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_texture(at(&self.texture, src, x, y), at(&dst.texture, to, dx, dy), size);
+        gpu.submit(encoder.finish());
+        true
+    }
+
+    /// Copy mip 0 into array layer `layer` (a cube face) of `dst`, mip 0. False (nothing copied)
+    /// unless both have the same size and format and `dst` has that layer.
+    pub fn copy_to_layer(&self, gpu: &Gpu, dst: &Texture, layer: u32) -> bool {
+        let (a, b) = (&self.desc, &dst.desc);
+        if a.format.remove_srgb_suffix() != b.format.remove_srgb_suffix() || (a.width, a.height) != (b.width, b.height) || layer >= b.layers.max(1) {
+            return false;
+        }
+        fn at(texture: &wgpu::Texture, z: u32) -> wgpu::TexelCopyTextureInfo<'_> {
+            wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x: 0, y: 0, z }, aspect: wgpu::TextureAspect::All }
+        }
+        let mut encoder = gpu.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_texture(at(&self.texture, 0), at(&dst.texture, layer), extent(a.width, a.height));
         gpu.submit(encoder.finish());
         true
     }

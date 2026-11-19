@@ -175,7 +175,7 @@ pub fn register(r: &mut Registry) {
 
 #[cfg(test)]
 #[path = "draw_call_tests.rs"]
-mod tests;
+pub(super) mod tests;
 #[cfg(test)]
 #[path = "managed_shadow_tests.rs"]
 mod managed_shadow_tests;
